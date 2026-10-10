@@ -8,9 +8,9 @@ We claim nothing without fixture evidence. The primary metric is **"no silent lo
 ## Fixture corpus (`fixtures/`, licence-audited per file)
 | Tier | Source | Purpose |
 |---|---|---|
-| A | User-made in Word/Excel/LibreOffice, one feature per file, with a manifest that names the feature and the expected invariant | Regression and feature coverage |
+| A | User-made in Microsoft Word/Excel, one feature per file, with a manifest that names the feature and the expected invariant | Regression and feature coverage |
 | B | Generated (rust_xlsxwriter, scripted docs), including stress files: 1M rows, 500-page docs, 100k shared strings | Performance and limits |
-| C | Public corpora (Apache POI, LibreOffice test files). **Kept outside the repo** until the licence of each file is audited | Breadth / smoke |
+| C | Public corpora (e.g. Apache POI test files). **Kept outside the repo** until the licence of each file is audited | Breadth / smoke |
 | D | Adversarial: zip bombs, DTD/XXE, deep nesting, malformed rels, fuzz-minimised crashers | Security regression |
 
 Required feature fixtures in the first 20: styles, numbering, tables with merges, images, header/footer, comments, tracked changes, footnotes, fields, unknown customXml (DOCX); multi-sheet, shared formulas, defined names, cross-sheet refs, dates in 1900 and 1904 systems, number formats, merged cells, a chart, a pivot, a VBA project (XLSX).
@@ -21,9 +21,10 @@ Required feature fixtures in the first 20: styles, numbering, tables with merges
 3. **Semantic model diff:** read(write(read(x))) == read(x) (idempotence). Property tests do the same for generated models.
 4. **Relationship integrity:** no dangling rIds. Content types cover all parts.
 5. **Dropped-content log empty** unless the fixture manifest expects an entry.
-6. **External validation:** LibreOffice headless opens and converts the output to PDF. Extracted text equals the original's. Open XML SDK validator (MIT; check the tool's licence) reports no *new* errors.
-7. **Formula correctness:** recomputed values equal the Excel-cached `<v>` values (oracle 1) within 1e-9 relative tolerance or exact for text/bool/error. Disagreements with the LibreOffice recalculation (oracle 2) are triaged, not assumed to be our bug.
-8. **Visual (layout, P1+):** render to PDF, compare against the LibreOffice PDF by line breaks per page (tolerance N lines/page), not pixels.
+6. **Schema validation:** our own validator, built from the ECMA-376 published XSDs, reports no *new* errors in the output compared with the input. No third-party office tools are used (ADR-005).
+7. **Formula correctness:** recomputed values equal the cached `<v>` values that Excel wrote into the fixture, within 1e-9 relative tolerance, or exactly for text/bool/error.
+8. **Visual (layout, P1+):** our renderer's PDF is compared against reviewed golden snapshots by line breaks per page (tolerance N lines/page). Pagination recorded in Word-saved fixtures (`lastRenderedPageBreak`) is a secondary signal.
+9. **Real-target check:** outputs open in Microsoft 365 Word/Excel without a repair prompt (manual at first, then automated on a Windows runner if licensing allows).
 
 ## Silent-corruption detection
 - The dropped-content log is wired into save. CI fails if a fixture's log is non-empty without a manifest entry.

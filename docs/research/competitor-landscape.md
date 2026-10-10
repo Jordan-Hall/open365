@@ -11,7 +11,7 @@ LibreOffice is the fidelity benchmark among open-source suites, and Collabora an
 
 | Project | Licence | Health | Fidelity | Embeddable in a native Rust app? | Relevance to Open365 |
 |---|---|---|---|---|---|
-| LibreOffice core | MPL-2.0 (F, libreoffice.org/about-us/licenses) | Very active (F) | Broadest OSS OOXML (I) | LibreOfficeKit is a C++ in-process API that is heavy and has a large attack surface (I) | **Out-of-process oracle** for tests (convert, render to PDF, recalc). Not a product dependency in MVP. |
+| LibreOffice core | MPL-2.0 (F, libreoffice.org/about-us/licenses) | Very active (F) | Broadest OSS OOXML (I) | LibreOfficeKit is a C++ in-process API that is heavy and has a large attack surface (I) | Competitor only. Not used in product or tests (ADR-005). |
 | Collabora Online | MPL-2.0 (F, COPYING) | Active (F) | LibreOffice engine | Web UI; WOPI-based | Competitor for the self-hosted web case. Its WOPI integration pattern is worth matching. |
 | ONLYOFFICE Docs | AGPL-3.0 + s.7 terms: no logo/trademark rights; modified versions must state "based on ONLYOFFICE" (F) | Active (F) | Strong OOXML-native (I) | Web/JS; AGPL network clause | Competitor. Do not embed, because licence and branding terms conflict with a permissive core. |
 | Calligra, Gnumeric | U | U | Lower (I) | GPL family (U) | Low. Gnumeric's function semantics are a possible reference only (licence permitting). |
@@ -48,13 +48,13 @@ VectorCraft is a clean-room Rust vector editor, not an office suite. It is MIT O
 | Subsystem | Decision (proposed) |
 |---|---|
 | OPC package + DOCX/XLSX model and serialisers | Build (thin, lossless) |
-| Formula engine | Wrap IronCalc behind a trait, contribute upstream, fork only if governance stalls |
+| Formula engine | Build our own (ADR-009) |
 | Text shaping | Reuse (parley/harfrust/skrifa/ICU4X) |
 | Page layout, grid renderer, PDF export | Build |
 | UI shell | Decided by spike (see `../architecture/decision-log.md`, ADR-004) |
-| Conversion and rendering oracle | LibreOffice headless, out of process, test-only |
+| Conversion and rendering oracle | None. Cached values, own schema validator, golden snapshots (ADR-005) |
 | CRDT | Reuse (spike Loro vs Yrs in a later phase) |
-| Chat / meetings | Integrate Matrix (Tuwunel) + LiveKit |
+| Chat / meetings | Build our own (ADR-009) |
 | Storage / identity | Thin own service + OIDC; details in `../architecture/system-context.md` |
 
 ## Open questions

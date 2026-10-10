@@ -5,11 +5,15 @@
 //! back byte-identical (ADR-001). Reading treats input as hostile and enforces
 //! [`Limits`] against zip bombs and path tricks (threat model T1).
 
+mod content_types;
 mod name;
 mod package;
+mod rels;
 
+pub use content_types::{ContentTypes, IntegrityIssue};
 pub use name::PartName;
 pub use package::{Compression, Limits, Package, Part};
+pub use rels::{Relationship, Relationships, TargetMode, rels_part_name, resolve_target};
 
 /// Errors from reading or writing a package.
 #[derive(Debug, thiserror::Error)]
@@ -24,4 +28,12 @@ pub enum OpcError {
     DuplicatePart(String),
     #[error("package exceeds limit: {0}")]
     LimitExceeded(String),
+    #[error("XML error: {0}")]
+    Xml(String),
+    #[error("DOCTYPE/DTD is not allowed in package XML")]
+    DoctypeForbidden,
+    #[error("malformed package part: {0}")]
+    MalformedPart(String),
+    #[error("relationship target {0:?} escapes the package root")]
+    TargetEscapesRoot(String),
 }

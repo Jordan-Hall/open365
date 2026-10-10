@@ -13,7 +13,7 @@ Limit, stated plainly: on a desktop, scopes protect against *prompt-injected or 
                     \                    |               |                 /
                      +------------- Command layer (typed, scoped, audited) -------------+
                                          |                         |
-                       Document models (DOCX-like, workbook)    Calc engine (trait; IronCalc adapter)
+                       Document models (DOCX-like, workbook)    Calc engine (own, behind a trait)
                                          |
             Layout (paged text, grid) -> Render scene (vello) -> screen | PDF/print
                                          |
@@ -29,18 +29,18 @@ Limit, stated plainly: on a desktop, scopes protect against *prompt-injected or 
 | `opc` | Zip/OPC part graph, relationships, content types; resource limits (zip-bomb, entity expansion, part count/size); untouched parts byte-identical on save | **P0** | Build on `zip`/`quick-xml` |
 | `docx` | Typed document model plus an `extras` raw-XML bag per node, reader/writer, dirty-part tracking, dropped-content log that blocks silent save | **P0** | Build |
 | `xlsx` | Sparse workbook model (stable row/col IDs), shared strings, styles/numFmts, preservation of pivots/charts/VBA as opaque parts | **P0** | Build |
-| `calc` | `CalcEngine` trait: dependency graph, incremental recalc, error semantics | **P0** | Wrap IronCalc |
+| `calc` | `CalcEngine` trait: dependency graph, incremental recalc, error semantics | **P0** | Build (ADR-009) |
 | `text` / `layout` | Shaping, line breaking, bidi (parley/harfrust/ICU4X); paged layout; grid viewport virtualisation | **P0 basic → P2 rich** | Reuse shaping, build layout |
 | `render` / `pdf` | Scene → GPU (vello/wgpu) and → PDF; same layout used for both | **P1** | Reuse vello; build PDF path |
 | `commands` | Command schema, validation, undo/redo, permission scopes, audit events | **P0** | Build |
 | `cli` | `open365 docx|xlsx <cmd>`: inspect, roundtrip --check, apply-commands, export-pdf | **P0** | Build |
 | `mcp` | Local stdio/loopback MCP server exposing commands; read/write path fencing (VectorCraft pattern); confirmation for destructive commands | **P1** | Build |
 | Desktop shell | App chrome, canvas host, IME, accessibility, clipboard, printing | **Spike in P0, product in P1** | Qt/cxx-qt vs Rust-native (ADR-004) |
-| `testkit` / `xtask` | Fixture corpus, oracles (LibreOffice headless), invariants, fuzz targets, layering checks | **P0** | Build |
-| Sync/storage | Single-org file sync and sharing; integrate a WOPI/WebDAV host (OpenCloud) before building our own | P1–P2 | Integrate first |
+| `testkit` / `xtask` | Fixture corpus, cached-value oracles, ECMA-376 schema validator, invariants, fuzz targets, layering checks | **P0** | Build |
+| Sync/storage | Single-org file sync and sharing; own sync/storage service | P1–P2 | Build (ADR-009) |
 | Real-time co-edit | CRDT (Loro or Yrs) behind a `DocSync` trait, server as sole peer; OOXML stays import/export only | P2 | Reuse CRDT |
 | Identity / tenancy | OIDC with the customer's IdP; simple ACL; per-tenant Postgres with RLS later; audit log | P1 (single-org) → P3 (multi-tenant) | Integrate IdP |
-| Chat / meetings | Matrix (Tuwunel) + LiveKit integration; documents linked into rooms | P3 | Integrate |
+| Chat / meetings | Own chat and meeting services (WebRTC; Matrix protocol optional for interop) | P3 | Build (ADR-009) |
 | Federation | Share-by-link, then OCM-style document sharing; Matrix federation for chat; allowlist trust | P4 | Integrate/standards |
 | Open CoWorker | Provider trait, BYOK in OS keychain, policy/budget/audit; calls the command layer like any other client | P2–P3 | Build contract; reuse providers |
 

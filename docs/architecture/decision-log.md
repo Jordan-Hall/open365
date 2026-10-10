@@ -16,7 +16,7 @@ Format: context, alternatives, decision, consequences, confidence, and what evid
 - **Consequences:** The command schema is a stable contract and needs versioning. Undo/redo and the CRDT mapping build on it. Scopes contain injected agents, not same-user malware (security review 2026-10-10). Remote CRDT updates must be decoded and authorised server-side, because they otherwise bypass this layer.
 - **Confidence:** High. **Would change if:** command granularity proves too coarse for interactive typing latency. In that case batch at the input layer, but keep the single path.
 
-## ADR-003 Formula engine behind a `CalcEngine` trait, IronCalc first — Proposed
+## ADR-003 Formula engine behind a `CalcEngine` trait — revised by ADR-009: we build our own engine (`open365-calc`); IronCalc is not used
 - **Context:** IronCalc is MIT/Apache-2.0, pre-1.0 (v0.8.3), with XLSX I/O. Its function coverage and recalc design are unverified.
 - **Alternatives:** build our own engine; fork IronCalc; LibreOffice Calc via LOK.
 - **Decision:** Use IronCalc through our trait, contribute upstream, and keep our own workbook model for preservation.
@@ -30,10 +30,21 @@ Format: context, alternatives, decision, consequences, confidence, and what evid
 - **Consequences:** The core must not depend on the UI (enforced by an xtask layering check).
 - **Confidence:** Medium. **Would change if:** Qt LGPL review fails (rules out A), or AccessKit gains text-range/rich-text support (strengthens B).
 
-## ADR-005 LibreOffice is a test oracle, not a product dependency — Proposed
-- **Context:** LibreOffice (MPL-2.0) has the broadest open-source OOXML fidelity, but it is a large C++ attack surface.
-- **Decision:** Run it headless, out of process, in CI only, for conversion/PDF render/recalc comparisons.
-- **Confidence:** High. **Would change if:** users demand legacy formats (.doc/.xls) in the MVP. A sandboxed conversion sidecar would then be considered.
+## ADR-005 No other office suite anywhere, not even as a test oracle — Accepted (owner, 2026-10-10)
+- **Context:** The owner wants a complete suite of our own: "a full 365 not using anything else". The earlier proposal used LibreOffice headless as a test-only oracle.
+- **Decision:** No LibreOffice, Collabora, ONLYOFFICE or similar in the product, the tooling or CI. Fidelity evidence comes from (1) values that Excel/Word already wrote into fixtures (cached `<v>` values, field results), (2) our own ECMA-376 schema validation built from the published XSDs, (3) our own renderer with reviewed golden snapshots, and (4) manual "opens cleanly in Microsoft 365" checks, which are the real interoperability target.
+- **Consequences:** The schema validator becomes an M1 deliverable.
+- **Update (owner, 2026-10-10):** Microsoft 365 (Word/Excel 16.0) is installed locally and scriptable via COM, so it is **the** oracle. `tools/office/` generates fixtures, opens our output (repair prompt = failure), exports reference PDFs, and recalculates for reference values. It is a local developer tool only: Microsoft does not support unattended server-side Office automation, so it does not run in CI. CI uses the stored reference outputs instead.
+
+## Product target: 1:1 parity with Microsoft 365 — Accepted (owner, 2026-10-10)
+- **Goal:** everything a user does in Word and Excel works identically in Open365: same file behaviour, same calculation results, same layout.
+- **How we hold ourselves to it:** parity is measured, never claimed. Each feature is "done" only when its Office-generated fixtures pass every invariant (round trip, recalculation equal to Excel, pagination equal to Word, opens in Office without repair). A parity dashboard is generated from the fixture results, and the corpus only grows.
+- **Honest scale:** Word layout and Excel's full function library are each multi-year efforts for a large team. The order is preserve everything (no loss, day one) → calculate and render identically → edit everything.
+- **Confidence:** High.
+
+## ADR-009 Self-contained suite; libraries and open standards allowed — Accepted (owner, 2026-10-10)
+- **Decision:** Open365 does not depend on other office products or third-party servers: office suites, formula engines, chat/meeting servers or file platforms. Every office capability is ours: calc engine, layout, sync, chat and meetings. Low-level permissive libraries (zip, XML, text shaping, fonts, GPU, crypto, CRDT primitives) and open standards/protocols (OOXML, OIDC, WebRTC, and optionally Matrix/WOPI for interop) are allowed.
+- **Consequences:** This supersedes "wrap IronCalc" in ADR-003, and "integrate Tuwunel/LiveKit/OpenCloud" in ADR-006 and system-context. The scope and timeline grow, mainly from the formula engine and, in later phases, the media server.
 
 ## ADR-006 Server deferred; integrate before build — Proposed
 - **Context:** P0/P1 value is file-local editing. Real-time co-editing needs a demand case.
