@@ -73,3 +73,25 @@ Format: context, alternatives, decision, consequences, confidence, and what evid
 - **Spike (scheduled after M3, before P2):** for each platform, open, edit, save and reopen a tier-A DOCX and XLSX. Pass/fail rows cover IME, the screen reader (VoiceOver, TalkBack, browser plus NVDA), selection and clipboard, scroll p95 on large-sheet, app size and cold start. Pick the per-platform stack with that evidence.
 - **Consequences:** The core must stay free of desktop-only assumptions: no egui types, no threads the browser can't run, and no blocking I/O in the core. File access sits behind a storage trait. CI gains a wasm32 build of the core crates now, so the core stays portable.
 - **Confidence:** High on direction. The stack is open until the spike.
+
+## ADR-011 Every Office locale is supported, not just en-US/en-GB — Accepted (owner, 2026-10-10)
+- **Context:** The owner said "We need to support all settings not just UK and US". Excel and Word change behaviour by locale:
+  - number display: decimal and grouping separators, currency, negative patterns, digit substitution;
+  - built-in date/time formats, plus day, month and era names;
+  - date and number text parsing (`DATEVALUE`, `VALUE`, cell entry);
+  - list and argument separators and localised function names in the formula bar (files always store en-US invariant formulas);
+  - collation for sorting and lookup, `UPPER`/`LOWER` casing, first day of week;
+  - calendars: Gregorian variants, Hijri, Japanese era, Thai Buddhist, Korean;
+  - in Word: hyphenation, line breaking, East Asian and complex-script layout, RTL and proofing language.
+- **Alternatives:** hand-written per-locale tables (they don't scale); copying Windows NLS data (not ours to copy); Unicode CLDR via ICU4X.
+- **Decision:**
+  - Add a new core crate, `open365-locale`. Its data comes from Unicode CLDR through ICU4X (Unicode-3.0 licence, already allowed in deny.toml). The data is baked in at build time, so the crate stays wasm- and mobile-portable.
+  - Where Office deviates from CLDR, a reviewed override table records the difference. Each entry is backed by an oracle measurement.
+  - The engine takes an explicit `Locale` (BCP-47 tag plus Office LCID). There is no global state: the document, the user and the system locale are separate inputs.
+  - Excel's in-format locale tags (`[$-xxxx]`) take precedence, as in Excel.
+- **Evidence and oracle:**
+  - Formatting is tested per locale without touching the machine's settings, using Excel's `[$-LCID]` format prefixes and `TEXT()`.
+  - Behaviour that follows the system locale (parsing, separators, built-in formats) needs the oracle to run under each culture. That runs in a separate Windows user profile or VM per culture, never by changing the owner's own settings.
+  - Target matrix: every locale Office supports. The first ratchet covers the top 40 by user population, then all of them.
+- **Consequences:** calc's numfmt, date-text parsing, collation and the grid/formula bar all take a `Locale`. Layout gains script and language-aware line breaking (ICU4X segmenter) and later complex-script shaping and RTL. The conformance corpus tags each case with its locale.
+- **Confidence:** High. **Would change if:** CLDR and Office disagree so often that the override table grows larger than the CLDR-derived data. Even then, CLDR stays as a fallback.
