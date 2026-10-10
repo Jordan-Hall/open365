@@ -1,0 +1,5 @@
+feature = "number-formats"
+made_with = "Microsoft Excel 20430 (Windows)"
+author = "project member"
+expect_dropped = []
+notes = "currency, percent, custom with colour, date formats"

@@ -1,0 +1,5 @@
+feature = "inline-image"
+made_with = "Microsoft Word 16.0.20430 (Windows)"
+author = "project member"
+expect_dropped = []
+notes = "one 32x32 generated PNG as inline picture"

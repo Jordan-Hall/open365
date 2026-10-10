@@ -1,0 +1,5 @@
+feature = "dates-1904"
+made_with = "Microsoft Excel 20430 (Windows)"
+author = "project member"
+expect_dropped = []
+notes = "workbook with Date1904 = true"

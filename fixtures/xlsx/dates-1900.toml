@@ -1,0 +1,5 @@
+feature = "dates-1900"
+made_with = "Microsoft Excel 20430 (Windows)"
+author = "project member"
+expect_dropped = []
+notes = "serials 59..62 around 1900-03-01 leap-year quirk (60 = fake 1900-02-29)"

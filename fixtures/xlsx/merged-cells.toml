@@ -1,0 +1,5 @@
+feature = "merged-cells"
+made_with = "Microsoft Excel 20430 (Windows)"
+author = "project member"
+expect_dropped = []
+notes = "horizontal A1:C1 and vertical A3:A5 merges"

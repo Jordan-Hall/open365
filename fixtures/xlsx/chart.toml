@@ -1,0 +1,5 @@
+feature = "chart"
+made_with = "Microsoft Excel 20430 (Windows)"
+author = "project member"
+expect_dropped = []
+notes = "clustered column chart from A1:B6"

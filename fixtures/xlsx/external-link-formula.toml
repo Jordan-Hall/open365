@@ -1,0 +1,5 @@
+feature = "external-link-formula"
+made_with = "Microsoft Excel 20430 (Windows)"
+author = "project member"
+expect_dropped = []
+notes = "security: formula references external workbook (egress); source path is a neutral folder on the system drive, deleted after save"

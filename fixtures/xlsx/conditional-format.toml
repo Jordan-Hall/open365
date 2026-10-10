@@ -1,0 +1,5 @@
+feature = "conditional-format"
+made_with = "Microsoft Excel 20430 (Windows)"
+author = "project member"
+expect_dropped = []
+notes = "3-colour scale on A1:A10 and expression rule on B1:B10"

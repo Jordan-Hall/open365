@@ -1,0 +1,5 @@
+feature = "comments-notes"
+made_with = "Microsoft Excel 20430 (Windows)"
+author = "project member"
+expect_dropped = []
+notes = "legacy note on A1 (personal info stripped)"

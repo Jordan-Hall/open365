@@ -1,0 +1,5 @@
+feature = "values-types"
+made_with = "Microsoft Excel 20430 (Windows)"
+author = "project member"
+expect_dropped = []
+notes = "number, string, bool, #N/A error, date"

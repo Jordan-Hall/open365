@@ -1,0 +1,5 @@
+feature = "plain-paragraphs"
+made_with = "Microsoft Word 16.0.20430 (Windows)"
+author = "project member"
+expect_dropped = []
+notes = "three plain paragraphs, default style"

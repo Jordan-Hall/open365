@@ -1,0 +1,5 @@
+feature = "shared-formulas"
+made_with = "Microsoft Excel 20430 (Windows)"
+author = "project member"
+expect_dropped = []
+notes = "formula filled down 100 rows"

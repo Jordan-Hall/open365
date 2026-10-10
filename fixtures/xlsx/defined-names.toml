@@ -1,0 +1,5 @@
+feature = "defined-names"
+made_with = "Microsoft Excel 20430 (Windows)"
+author = "project member"
+expect_dropped = []
+notes = "one workbook-scoped and one sheet-scoped name"

@@ -1,0 +1,5 @@
+feature = "data-validation"
+made_with = "Microsoft Excel 20430 (Windows)"
+author = "project member"
+expect_dropped = []
+notes = "list validation Red,Green,Blue on A1:A5"
