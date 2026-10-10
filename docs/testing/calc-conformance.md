@@ -5,7 +5,7 @@ never needs Excel.
 
 | File | Role |
 |---|---|
-| `fixtures/calc/conformance.json` | The corpus: 10,004 cases. Edited by hand or by script; one case per line. |
+| `fixtures/calc/conformance.json` | The corpus: 18,706 cases. Edited by hand or by script; one case per line. |
 | `tools/office/calc-oracle.ps1` | Local-only tool. Runs every case in Excel over COM and writes the results. |
 | `fixtures/reference/calc/conformance-results.json` | Excel's answers, committed. Includes Excel version, build and decimal separator. |
 | `fixtures/calc/known-differences.toml` | Cases where Open365 intentionally or temporarily differs, each with a reason. |
@@ -66,11 +66,10 @@ forms; the corpus has no case for them.
 
 ## Current state
 
-10,004 cases, 9,949 pass (99.45%), 60 known differences (55 earlier ones plus 5 in the text batch) (14 older ones plus 36 in the new math/statistics groups: large COMBIN, trigonometric last digits after argument reduction, variance accumulation order). Before the fixes driven by this corpus 3,311 of 3,700
-passed (89.49%). The remaining differences are listed with reasons in `known-differences.toml`: the `**`
-parse quirk, XLOOKUP array results (no spill), a few undocumented Excel quirks (`DATE` with huge day numbers,
-CONCAT over the cell limit returning an unnamed error code, a 17-digit literal) and two formulas Excel
-refuses (`IFERROR` as a range operand).
+18,706 cases, 18,646 pass (99.68%), 60 known differences (listed with reasons in `known-differences.toml`: the `**` parse
+quirk, XLOOKUP array results (no spill), a few undocumented Excel quirks, large COMBIN, trigonometric last digits, variance
+accumulation order, accounting fill, array lifting `textsplit.sumv`). The test also fails for a corpus case without an Excel
+result or a stored result without a case.
 
 ## Behaviour measured against Excel
 
@@ -156,5 +155,32 @@ TEXTBEFORE, TEXTAFTER, TEXTSPLIT, VALUETOTEXT, ARRAYTOTEXT, REPLACE and the B va
 * Byte functions (no double-byte language): `LENB`, `MIDB`, `FINDB`, `SEARCHB`, `REPLACEB` count UTF-16 units (`MIDB` can split
   a surrogate pair, shown as U+FFFD); `LEFTB`/`RIGHTB` equal `LEFT`/`RIGHT`.
 
-Not done yet: the date/time batch (TIME, HOUR, MINUTE, SECOND, WEEKDAY, WEEKNUM, ISOWEEKNUM, EDATE, EOMONTH, DATEDIF, DAYS,
-DAYS360, NETWORKDAYS(.INTL), WORKDAY(.INTL), YEARFRAC, DATEVALUE, TIMEVALUE) and the five accounting-fill differences.
+Added with the date and time batch (TIME, HOUR, MINUTE, SECOND, WEEKDAY, WEEKNUM, ISOWEEKNUM, EDATE, EOMONTH, DATEDIF, DAYS,
+DAYS360, NETWORKDAYS(.INTL), WORKDAY(.INTL), YEARFRAC, DATEVALUE, TIMEVALUE; about 8,700 cases):
+
+* Serial 1 of the 1900 system is a Sunday; the weekday is `(serial - 1) mod 7`. The time of day is rounded to the nearest
+  second before the date part is taken (`DAY(44999.999995)` is 15; `YEAR`, `WEEKDAY`, `WEEKNUM`, `ISOWEEKNUM`, `DAYS360`,
+  `YEARFRAC` do it, `EDATE`, `EOMONTH`, `DAYS`, `DATEDIF`, `NETWORKDAYS` floor instead). Negative serials are `#NUM!`.
+* `TIME` truncates each argument (limit 32767), `#NUM!` for a negative total, and wraps at 24 hours. `HOUR`/`MINUTE`/`SECOND` round to the second.
+* Analysis ToolPak style functions (`EDATE`, `EOMONTH`, `WEEKNUM`, `NETWORKDAYS(.INTL)`, `WORKDAY(.INTL)`, `YEARFRAC`): an omitted
+  argument is `#N/A`, a boolean or multi-cell range is `#VALUE!` (no implicit intersection). Holiday cells: blank skipped,
+  boolean `#VALUE!`, negative `#NUM!`. `WORKDAY` rounds the day count down (`-0.9` is one day back).
+* `EDATE`/`EOMONTH` results below 1900-01-01 are `#NUM!`; in the 1904 system serials down to 1900-01-01 (-1461) are valid.
+* `DATEDIF`: `MD` adds the length of the month before the end month when the end day is smaller (negative results happen;
+  February 1900 has 29 days); `YD` is the days from the start through `YM` months counted inside the start's own year, plus `MD`
+  (this reproduces Excel's leap-day oddities, for example 2001-02-28 to 2004-06-15 is 107).
+* `DAYS360` US method: only the start date's end of February becomes day 30 (end of February to the same date is -1);
+  `YEARFRAC` basis 0 follows NASD with the real calendar (1900 is not leap there) and tests day 31 against the original start day.
+* Weekend parameter: a code 1-7 or 11-17, or a 7 character 0/1 string from Monday; other text is `#VALUE!`; `"1111111"` is allowed
+  (`NETWORKDAYS.INTL` gives 0, `WORKDAY.INTL` with 0 days returns the start). An error value there becomes `#VALUE!`
+  (`NETWORKDAYS.INTL`) or `#NUM!` (`WORKDAY.INTL`).
+* Date and time text (`crates/calc/src/datetext.rs`): year-first dates (`2024-03-15`, `2024/3/5`, spaces around separators), day-first
+  with an English month name (`15 Mar 2024`, `15-Mar-24`, two-digit years 0-29 are 20xx), times `h:mm`, `h:mm:ss.fff` (rounded to the
+  millisecond), `mm:ss.f`, `h AM`, `h:mm PM` (also `A`/`P`; a space is required), hours up to 9999 and at most one of
+  hour >= 24, minute >= 60, second >= 60. A date and a time may come in either order. `DATEVALUE`/`TIMEVALUE` reject plain numbers;
+  arithmetic does not accept a date or time with leading spaces, `VALUE` does. Not supported (locale dependent or time dependent):
+  `1/2/2024`, month-first names, dates without a year.
+
+Not done yet: array lifting of scalar functions over computed arrays in plain formulas (known difference `textsplit.sumv`), the
+info/logic/lookup batch (ISEVEN, ISODD, ISLOGICAL, ISNONTEXT, ISERR, ISREF, ISFORMULA, TYPE, ERROR.TYPE, IFS, SWITCH, ROWS, COLUMNS, ROW,
+COLUMN, LOOKUP, ADDRESS, OFFSET, INDIRECT and volatile-dependency tests) and the financial batch (PMT ... SYD), and the five accounting-fill differences.

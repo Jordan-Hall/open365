@@ -4,7 +4,7 @@
 use super::criteria::wildcard_search;
 use super::{Res, arity, bool_arg, int_arg, scalar, text_arg};
 use crate::eval::{Arg, EvalContext};
-use crate::value::{ErrorKind, Value, parse_number_text_in};
+use crate::value::{ErrorKind, Value, parse_value_text_in};
 
 /// Excel's maximum cell text length.
 const MAX_TEXT: usize = 32_767;
@@ -306,7 +306,7 @@ pub(super) fn value(ctx: &EvalContext<'_>, args: &[Arg]) -> Res<Value> {
     match scalar(ctx, &args[0])? {
         Value::Number(n) => Ok(Value::Number(n)),
         Value::Empty => Ok(Value::Number(0.0)),
-        Value::Text(t) => parse_number_text_in(&t, ctx.date1904)
+        Value::Text(t) => parse_value_text_in(&t, ctx.date1904)
             .map(Value::Number)
             .ok_or(ErrorKind::Value),
         _ => Err(ErrorKind::Value),

@@ -246,7 +246,23 @@ pub fn parse_number_text_in(text: &str, date1904: bool) -> Option<f64> {
     if s.is_empty() {
         return None;
     }
-    parse_decimal_text(s).or_else(|| parse_date_time_text(s, date1904))
+    // Arithmetic does not accept a date or time with leading spaces, `VALUE` does.
+    parse_decimal_text(s).or_else(|| {
+        if text.starts_with(' ') {
+            None
+        } else {
+            crate::datetext::parse(s, date1904)
+        }
+    })
+}
+
+/// Like [`parse_number_text_in`] for the `VALUE` function, which also accepts a date or time with leading spaces.
+pub fn parse_value_text_in(text: &str, date1904: bool) -> Option<f64> {
+    let s = text.trim_matches(' ');
+    if s.is_empty() {
+        return None;
+    }
+    parse_decimal_text(s).or_else(|| crate::datetext::parse(s, date1904))
 }
 
 fn parse_decimal_text(s: &str) -> Option<f64> {
@@ -319,67 +335,13 @@ fn parse_signed_text(s: &str, allow_sign: bool) -> Option<f64> {
     Some(if neg { -n } else { n })
 }
 
-/// `hh:mm[:ss[.fff]] [AM|PM]` as a fraction of a day.
-fn parse_time_text(s: &str) -> Option<f64> {
-    let (clock, meridiem) = match s.rsplit_once(' ') {
-        Some((c, m)) if m.eq_ignore_ascii_case("AM") || m.eq_ignore_ascii_case("PM") => {
-            (c.trim_end_matches(' '), Some(m.eq_ignore_ascii_case("PM")))
-        }
-        _ => (s, None),
-    };
-    let mut parts = clock.split(':');
-    let mut hours: f64 = parts.next()?.parse::<u32>().ok()?.into();
-    let minutes: f64 = parts.next()?.parse::<u32>().ok()?.into();
-    let seconds: f64 = match parts.next() {
-        None => 0.0,
-        Some(sec) if !sec.is_empty() && sec.bytes().all(|b| b.is_ascii_digit() || b == b'.') => {
-            sec.parse().ok()?
-        }
-        Some(_) => return None,
-    };
-    if parts.next().is_some() {
+/// Date and/or time text as `DATEVALUE`/`TIMEVALUE` read it, as a serial number.
+pub fn parse_datetime_text(text: &str, date1904: bool) -> Option<f64> {
+    let s = text.trim_matches(' ');
+    if s.is_empty() {
         return None;
     }
-    if let Some(pm) = meridiem {
-        if !(1.0..=12.0).contains(&hours) {
-            return None;
-        }
-        hours = (hours % 12.0) + if pm { 12.0 } else { 0.0 };
-    }
-    Some((hours * 3600.0 + minutes * 60.0 + seconds) / 86_400.0)
-}
-
-fn parse_date_time_text(s: &str, date1904: bool) -> Option<f64> {
-    if s.contains(':') && !s.contains('-') {
-        return parse_time_text(s);
-    }
-    let (date, time) = match s.split_once(' ') {
-        Some((d, t)) => (d, Some(t.trim_start_matches(' '))),
-        None => (s, None),
-    };
-    let mut parts = date.split('-');
-    let (y, m, d) = (parts.next()?, parts.next()?, parts.next()?);
-    if parts.next().is_some()
-        || y.len() != 4
-        || !(1..=2).contains(&m.len())
-        || !(1..=2).contains(&d.len())
-    {
-        return None;
-    }
-    let (y, m, d): (i64, i64, i64) = (y.parse().ok()?, m.parse().ok()?, d.parse().ok()?);
-    if !(1..=12).contains(&m) || d < 1 {
-        return None;
-    }
-    let serial = crate::functions::ymd_to_serial(y, m, d, date1904)?;
-    // ymd_to_serial rolls days over; text dates must be real calendar days.
-    if crate::functions::serial_to_ymd(serial, date1904)? != (y, m, d) {
-        return None;
-    }
-    let fraction = match time {
-        None | Some("") => 0.0,
-        Some(t) => parse_time_text(t)?,
-    };
-    Some(serial + fraction)
+    crate::datetext::parse(s, date1904)
 }
 
 /// Longest positional (non-scientific) rendering, in characters, before General switches to

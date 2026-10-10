@@ -7,6 +7,7 @@
 
 pub mod ast;
 mod collate;
+mod datetext;
 pub mod eval;
 pub mod functions;
 pub mod graph;

@@ -2,6 +2,7 @@
 
 mod arith;
 mod criteria;
+mod datecalc;
 mod datetime;
 mod letters;
 mod logical;
@@ -195,6 +196,25 @@ static TABLE: &[(&str, Func)] = &[
     ("DAY", Func::Res(datetime::day)),
     ("TODAY", Func::Res(datetime::today)),
     ("NOW", Func::Res(datetime::now)),
+    ("TIME", Func::Res(datecalc::time)),
+    ("HOUR", Func::Res(datecalc::hour)),
+    ("MINUTE", Func::Res(datecalc::minute)),
+    ("SECOND", Func::Res(datecalc::second)),
+    ("WEEKDAY", Func::Res(datecalc::weekday)),
+    ("WEEKNUM", Func::Res(datecalc::weeknum)),
+    ("ISOWEEKNUM", Func::Res(datecalc::isoweeknum)),
+    ("EDATE", Func::Res(datecalc::edate)),
+    ("EOMONTH", Func::Res(datecalc::eomonth)),
+    ("DATEDIF", Func::Res(datecalc::datedif)),
+    ("DAYS", Func::Res(datecalc::days)),
+    ("DAYS360", Func::Res(datecalc::days360)),
+    ("NETWORKDAYS", Func::Res(datecalc::networkdays)),
+    ("NETWORKDAYS.INTL", Func::Res(datecalc::networkdays_intl)),
+    ("WORKDAY", Func::Res(datecalc::workday)),
+    ("WORKDAY.INTL", Func::Res(datecalc::workday_intl)),
+    ("YEARFRAC", Func::Res(datecalc::yearfrac)),
+    ("DATEVALUE", Func::Res(datecalc::datevalue)),
+    ("TIMEVALUE", Func::Res(datecalc::timevalue)),
 ];
 
 /// Functions whose result changes without any precedent changing.

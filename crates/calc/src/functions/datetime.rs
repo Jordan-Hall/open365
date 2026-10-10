@@ -9,15 +9,15 @@ use crate::eval::{Arg, EvalContext};
 use crate::value::{ErrorKind, Value};
 
 /// Largest valid serial: 9999-12-31 in the 1900 system.
-const MAX_SERIAL_1900: i64 = 2_958_465;
+pub(super) const MAX_SERIAL_1900: i64 = 2_958_465;
 /// Largest valid serial: 9999-12-31 in the 1904 system.
-const MAX_SERIAL_1904: i64 = 2_957_003;
+pub(super) const MAX_SERIAL_1904: i64 = 2_957_003;
 /// Serial of 1970-01-01 in each system.
 const UNIX_EPOCH_1900: f64 = 25_569.0;
 const UNIX_EPOCH_1904: f64 = 24_107.0;
 
 /// Days since 1970-01-01 of a proleptic Gregorian date (month 1..=12).
-fn days_from_civil(y: i64, m: i64, d: i64) -> i64 {
+pub(super) fn days_from_civil(y: i64, m: i64, d: i64) -> i64 {
     let y = if m <= 2 { y - 1 } else { y };
     let era = y.div_euclid(400);
     let yoe = y - era * 400;
@@ -116,10 +116,12 @@ fn floor_arg(ctx: &EvalContext<'_>, arg: &Arg) -> Res<i64> {
 
 fn part(ctx: &EvalContext<'_>, args: &[Arg], pick: fn((i64, i64, i64)) -> i64) -> Res<Value> {
     arity(args, 1, 1)?;
-    // The serial is taken at 15 significant digits, so 0.99999999999999 is already the next day.
-    // Excel rounds the time of day to the millisecond, so 0.99999999999999 is already the next day.
+    // The time of day is rounded to the nearest second first, so 44999.999995 already is the next day.
     let raw = num_arg(ctx, &args[0])?;
-    let serial = (raw * 86_400_000.0).round() / 86_400_000.0;
+    if raw < 0.0 {
+        return Err(ErrorKind::Num);
+    }
+    let serial = (raw * 86_400.0).round().div_euclid(86_400.0);
     let ymd = serial_to_ymd(serial, ctx.date1904).ok_or(ErrorKind::Num)?;
     Ok(Value::Number(pick(ymd) as f64))
 }

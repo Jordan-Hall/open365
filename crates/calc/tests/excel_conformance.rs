@@ -225,10 +225,47 @@ fn matches_excel() {
     )
     .expect("known-differences.toml");
 
+    // Every corpus case needs an Excel answer (a case without one would pass unchecked), and every stored
+    // answer must belong to a case. Order does not matter.
+    let mut answers: BTreeMap<&str, &Expected> = BTreeMap::new();
+    for expected in &reference.results {
+        assert!(
+            answers.insert(expected.id.as_str(), expected).is_none(),
+            "duplicate Excel result for {}",
+            expected.id
+        );
+    }
+    let corpus_ids: BTreeSet<&str> = corpus.cases.iter().map(|c| c.id.as_str()).collect();
     assert_eq!(
+        corpus_ids.len(),
         corpus.cases.len(),
-        reference.results.len(),
-        "corpus and Excel results differ in length: regenerate with tools/office/calc-oracle.ps1"
+        "duplicate case ids in the corpus"
+    );
+    let missing: Vec<&str> = corpus
+        .cases
+        .iter()
+        .filter(|c| !answers.contains_key(c.id.as_str()))
+        .map(|c| c.id.as_str())
+        .collect();
+    assert!(
+        missing.is_empty(),
+        "{} corpus cases have no Excel result; run tools/office/calc-oracle.ps1 -Update:
+  {}",
+        missing.len(),
+        missing.join(
+            "
+  "
+        )
+    );
+    let orphans: Vec<&str> = answers
+        .keys()
+        .filter(|id| !corpus_ids.contains(*id))
+        .copied()
+        .collect();
+    assert!(
+        orphans.is_empty(),
+        "Excel results without a corpus case: {}",
+        orphans.join(", ")
     );
     let known_ids: BTreeMap<&str, &str> = known
         .difference
@@ -240,7 +277,6 @@ fn matches_excel() {
         known.difference.len(),
         "duplicate ids in known-differences.toml"
     );
-    let corpus_ids: BTreeSet<&str> = corpus.cases.iter().map(|c| c.id.as_str()).collect();
     for id in known_ids.keys() {
         assert!(
             corpus_ids.contains(id),
@@ -253,12 +289,16 @@ fn matches_excel() {
     let mut stale = Vec::new();
     let (mut pass, mut known_diff) = (0u32, 0u32);
 
-    for (case, expected) in corpus.cases.iter().zip(&reference.results) {
-        assert_eq!(case.id, expected.id, "corpus and results are out of order");
-        assert_ne!(
-            expected.kind, "oracle_error",
-            "{}: Excel run failed for this case",
-            case.id
+    for case in &corpus.cases {
+        let expected = answers[case.id.as_str()];
+        assert!(
+            matches!(
+                expected.kind.as_str(),
+                "number" | "text" | "bool" | "error" | "rejected"
+            ),
+            "{}: Excel result kind {:?} is not a usable answer",
+            case.id,
+            expected.kind
         );
         let outcome = catch_unwind(AssertUnwindSafe(|| run_case(case)));
         let mismatch = match &outcome {
