@@ -1,15 +1,14 @@
-//! View model of a DOCX body: one entry per paragraph with text, resolved run formatting and
-//! paragraph formatting, plus page setup.
+//! View model of a DOCX body: one entry per paragraph with text and resolved run and
+//! paragraph formatting.
 //!
 //! Built from the typed model in `open365_docx` (styles resolved by `Styles`) and rebuilt per
 //! paragraph after an edit. Character offsets are Unicode scalar values, the same unit the
-//! commands use.
+//! commands use. Page geometry and line breaks come from `open365-layout`, not from here.
 
 use std::sync::Arc;
 
 use open365_docx::{
-    Alignment, Block, BreakKind, Document, EffectiveParagraph, Inline, Paragraph, RawXml,
-    RunContent, Styles,
+    Alignment, Document, EffectiveParagraph, Inline, Paragraph, RunContent, Styles,
 };
 
 /// Font used when a document has no styles part and the run names no font.
@@ -70,8 +69,6 @@ pub struct ParaModel {
     pub para: EffectiveParagraph,
     /// Formatting an empty paragraph (or a caret at its end) takes.
     pub mark: SpanStyle,
-    /// A page break inside the paragraph: the next paragraph starts a new page.
-    pub page_break: bool,
 }
 
 impl ParaModel {
@@ -179,12 +176,7 @@ fn collect(content: &[Inline], p: &Paragraph, styles: Option<&Styles>, model: &m
                     match item {
                         RunContent::Text { text, .. } => model.text.push_str(text),
                         RunContent::Tab => model.text.push('\u{2003}'),
-                        RunContent::Break(b) => {
-                            model.text.push('\n');
-                            if b.kind() == BreakKind::Page {
-                                model.page_break = true;
-                            }
-                        }
+                        RunContent::Break(_) => model.text.push('\n'),
                         RunContent::Raw(_) => {}
                     }
                 }
@@ -208,73 +200,6 @@ fn parse_color(s: &str) -> Option<[u8; 3]> {
     }
     let v = u32::from_str_radix(s, 16).ok()?;
     Some([(v >> 16) as u8, (v >> 8) as u8, v as u8])
-}
-
-/// Page size and margins in points.
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub struct PageSetup {
-    pub width: f32,
-    pub height: f32,
-    pub margin_top: f32,
-    pub margin_bottom: f32,
-    pub margin_left: f32,
-    pub margin_right: f32,
-}
-
-impl PageSetup {
-    pub const LETTER: Self = Self {
-        width: 612.0,
-        height: 792.0,
-        margin_top: 72.0,
-        margin_bottom: 72.0,
-        margin_left: 72.0,
-        margin_right: 72.0,
-    };
-
-    /// Reads the body-level `w:sectPr` (the last section); Letter with one-inch margins when
-    /// there is none.
-    pub fn from_document(doc: &Document) -> Self {
-        let mut setup = Self::LETTER;
-        let sect = doc.body().blocks.iter().rev().find_map(|b| match b {
-            Block::Raw(RawXml::Element(e)) if e.head.is_w("sectPr") => Some(e),
-            _ => None,
-        });
-        let Some(sect) = sect else { return setup };
-        let twips = |v: Option<&str>| v.and_then(|s| s.parse::<f32>().ok()).map(|t| t / 20.0);
-        for child in &sect.children {
-            let RawXml::Element(e) = child else { continue };
-            if e.head.is_w("pgSz") {
-                if let (Some(w), Some(h)) = (twips(e.head.attr_w("w")), twips(e.head.attr_w("h")))
-                    && w > 0.0
-                    && h > 0.0
-                {
-                    setup.width = w;
-                    setup.height = h;
-                }
-            } else if e.head.is_w("pgMar") {
-                let m = |name: &str, current: f32| twips(e.head.attr_w(name)).unwrap_or(current);
-                setup.margin_top = m("top", setup.margin_top);
-                setup.margin_bottom = m("bottom", setup.margin_bottom);
-                setup.margin_left = m("left", setup.margin_left);
-                setup.margin_right = m("right", setup.margin_right);
-            }
-        }
-        // Keep a usable text area whatever the file says.
-        if setup.width - setup.margin_left - setup.margin_right < 72.0
-            || setup.height - setup.margin_top - setup.margin_bottom < 72.0
-        {
-            return Self::LETTER;
-        }
-        setup
-    }
-
-    pub fn body_width(&self) -> f32 {
-        self.width - self.margin_left - self.margin_right
-    }
-
-    pub fn body_height(&self) -> f32 {
-        self.height - self.margin_top - self.margin_bottom
-    }
 }
 
 /// Builds the model of every paragraph (tables flattened, as the command layer indexes them).
@@ -333,7 +258,12 @@ mod tests {
         let landscape =
             Document::open(&fixture("docx/sections-landscape.docx"), &Limits::default())
                 .expect("open");
-        let setup = PageSetup::from_document(&landscape);
-        assert!(setup.width > setup.height, "landscape: {setup:?}");
+        assert!(
+            landscape
+                .sections()
+                .iter()
+                .any(|s| s.page.width_twips > s.page.height_twips),
+            "a landscape section"
+        );
     }
 }

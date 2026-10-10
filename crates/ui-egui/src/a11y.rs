@@ -5,9 +5,7 @@
 //! `accessibility_parent`, because egui only attaches a node to a parent that was registered
 //! through its widget or `Ui` stack.
 
-use egui::epaint::text::CharIndex;
-use egui::text::CCursor;
-use egui::{Context, Galley, Id, Pos2, Rect, Sense, Ui, UiBuilder, accesskit};
+use egui::{Context, Id, Rect, Sense, Ui, UiBuilder, accesskit};
 
 /// AccessKit stores `word_starts` as `u8`, so one text run holds at most this many characters.
 pub const MAX_CHARS_PER_RUN: usize = 255;
@@ -39,15 +37,26 @@ pub fn is_enabled(ctx: &Context, probe: Id) -> bool {
     ctx.accesskit_node_builder(probe, |_| ()).is_some()
 }
 
-/// Converts a caret offset in a paragraph to a (run node, character index) position.
-pub fn text_position(
-    doc: Id,
-    para: usize,
-    galley: &Galley,
-    offset: usize,
-) -> accesskit::TextPosition {
-    let layout = galley.layout_from_cursor(CCursor::new(CharIndex(offset)));
-    let column = layout.column.0;
+/// One laid-out line of a paragraph as the screen reader sees it. Positions and widths are in
+/// screen points, positions relative to the left edge of `rect`.
+#[derive(Debug, Clone)]
+pub struct LineData {
+    pub rect: Rect,
+    /// Offset of the line's first character within the paragraph.
+    pub start: usize,
+    pub chars: Vec<char>,
+    /// Left edge of every character.
+    pub positions: Vec<f32>,
+    pub widths: Vec<f32>,
+    /// The line is a wrapped continuation (its first word starts at the line start).
+    pub continuation: bool,
+    /// The last line of the paragraph carries the paragraph end as a trailing newline.
+    pub last: bool,
+}
+
+/// Converts a caret offset to a (run node, character index) position. `line` is the index of
+/// the line within the paragraph and `column` the character index within that line.
+pub fn text_position(doc: Id, para: usize, line: usize, column: usize) -> accesskit::TextPosition {
     // A caret exactly on a chunk boundary belongs to the end of the previous chunk.
     let chunk = if column > 0 && column.is_multiple_of(MAX_CHARS_PER_RUN) {
         column / MAX_CHARS_PER_RUN - 1
@@ -55,24 +64,27 @@ pub fn text_position(
         column / MAX_CHARS_PER_RUN
     };
     accesskit::TextPosition {
-        node: run_id(doc, para, layout.row, chunk).accesskit_id(),
+        node: run_id(doc, para, line, chunk).accesskit_id(),
         character_index: column - chunk * MAX_CHARS_PER_RUN,
     }
 }
 
-/// Publishes a paragraph node with one `TextRun` per laid-out row (split into chunks of at most
-/// 255 characters). `origin` is where the galley's (0, 0) sits on screen. The last row carries a
-/// trailing `\n` so assistive technology sees the paragraph end. Returns the published runs.
+/// Publishes a paragraph node with one `TextRun` per laid-out line (split into chunks of at
+/// most 255 characters). The last line carries a trailing newline so assistive technology sees the
+/// paragraph end. Returns the published runs.
 pub fn publish_paragraph(
     parent_ui: &mut Ui,
     doc: Id,
     para: usize,
-    galley: &Galley,
-    origin: Pos2,
+    lines: &[LineData],
     label: Option<&str>,
 ) -> Vec<RunEntry> {
     let para_id = paragraph_id(doc, para);
-    let bounds = galley.rect.translate(origin.to_vec2());
+    let bounds = lines
+        .iter()
+        .map(|l| l.rect)
+        .reduce(|a, b| a.union(b))
+        .unwrap_or(Rect::NOTHING);
     parent_ui.interact(bounds, para_id, Sense::hover());
     parent_ui.ctx().accesskit_node_builder(para_id, |b| {
         b.set_role(accesskit::Role::Paragraph);
@@ -90,52 +102,27 @@ pub fn publish_paragraph(
     );
 
     let mut entries = Vec::new();
-    let row_count = galley.rows.len().max(1);
-    let mut char_start = 0usize;
-    for row_index in 0..row_count {
-        let (glyphs, row_pos, row_rect, ends_with_newline) = match galley.rows.get(row_index) {
-            Some(row) => (
-                row.glyphs.as_slice(),
-                row.pos,
-                row.rect_without_leading_space(),
-                row.ends_with_newline,
-            ),
-            None => (
-                &[][..],
-                Pos2::ZERO,
-                Rect::from_min_size(Pos2::ZERO, egui::vec2(0.0, 16.0)),
-                false,
-            ),
-        };
-        let is_last = row_index + 1 == row_count;
+    for (row_index, line) in lines.iter().enumerate() {
         let mut value = String::new();
         let mut lengths: Vec<u8> = Vec::new();
-        let mut positions: Vec<f32> = Vec::new();
-        let mut widths: Vec<f32> = Vec::new();
+        let mut positions: Vec<f32> = line.positions.clone();
+        let mut widths: Vec<f32> = line.widths.clone();
         let mut word_starts: Vec<usize> = Vec::new();
-        // A wrapped continuation row starts mid-word at the row boundary.
-        let mut was_at_word_end = row_index > 0
-            && galley
-                .rows
-                .get(row_index - 1)
-                .is_some_and(|r| !r.ends_with_newline);
-        for glyph in glyphs {
-            let word = is_word_char(glyph.chr);
+        let mut was_at_word_end = line.continuation;
+        for ch in &line.chars {
+            let word = is_word_char(*ch);
             if word && was_at_word_end {
                 word_starts.push(lengths.len());
             }
             was_at_word_end = !word;
             let before = value.len();
-            value.push(glyph.chr);
+            value.push(*ch);
             lengths.push((value.len() - before) as u8);
-            positions.push(glyph.pos.x - row_pos.x);
-            widths.push(glyph.advance_width);
         }
-        let row_width = row_rect.width();
-        if ends_with_newline || is_last {
+        if line.last {
             value.push('\n');
             lengths.push(1);
-            positions.push(row_width);
+            positions.push(line.rect.width());
             widths.push(0.0);
         }
 
@@ -156,8 +143,8 @@ pub fn publish_paragraph(
                 x0
             };
             let rect = Rect::from_min_max(
-                Pos2::new(origin.x + row_rect.min.x + x0, origin.y + row_rect.min.y),
-                Pos2::new(origin.x + row_rect.min.x + x1, origin.y + row_rect.max.y),
+                egui::pos2(line.rect.min.x + x0, line.rect.min.y),
+                egui::pos2(line.rect.min.x + x1, line.rect.max.y),
             );
             run_ui.interact(rect, id, Sense::hover());
             let starts: Vec<u8> = word_starts
@@ -192,11 +179,9 @@ pub fn publish_paragraph(
             entries.push(RunEntry {
                 node: id.accesskit_id(),
                 para,
-                start: char_start + from,
+                start: line.start + from,
             });
         }
-        // Layout characters only: the paragraph-end newline added above is not part of them.
-        char_start += glyphs.len() + usize::from(ends_with_newline);
     }
     entries
 }

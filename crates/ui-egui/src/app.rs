@@ -64,8 +64,8 @@ impl App {
         let fonts = Rc::new(RefCell::new(FontBook::new()));
         let mut app = Self {
             target: None,
-            doc: DocView::with_fonts(Rc::clone(&fonts)),
-            grid: GridView::new(),
+            doc: DocView::new(),
+            grid: GridView::with_fonts(Rc::clone(&fonts)),
             status: "Open a .docx or .xlsx file (Ctrl+O)".to_owned(),
             title: String::new(),
             fonts,
@@ -90,8 +90,8 @@ impl App {
             Ok(target) => {
                 self.status = format!("Opened {}", path.display());
                 self.target = Some(target);
-                self.doc = DocView::with_fonts(Rc::clone(&self.fonts));
-                self.grid = GridView::new();
+                self.doc = DocView::new();
+                self.grid = GridView::with_fonts(Rc::clone(&self.fonts));
             }
             Err(e) => self.status = format!("Could not open {}: {e}", path.display()),
         }

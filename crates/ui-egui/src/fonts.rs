@@ -104,6 +104,8 @@ pub struct Face {
     /// The face itself is bold / italic; when false, bold is faked by overstrike and italic
     /// by egui's slant.
     pub real_bold: bool,
+    // Unused since the document view draws layout glyphs (glyphs.rs); delete with the grid's last use.
+    #[allow(dead_code)]
     pub real_italic: bool,
 }
 
@@ -174,11 +176,15 @@ impl FontBook {
 
     /// Changes whenever the set of usable families changes; caches keyed on text layout must
     /// be dropped when it does.
+    // Unused since the document view draws layout glyphs (glyphs.rs); delete with the grid's last use.
+    #[allow(dead_code)]
     pub fn generation(&self) -> u64 {
         self.applied_gen
     }
 
     /// Fonts the document asked for that are not installed, with what is drawn instead.
+    // Unused since the document view draws layout glyphs (glyphs.rs); delete with the grid's last use.
+    #[allow(dead_code)]
     pub fn substitutions(&self) -> Vec<(String, String)> {
         self.substituted
             .iter()
