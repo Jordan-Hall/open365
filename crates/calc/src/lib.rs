@@ -1,1 +1,477 @@
 //! Open365 formula engine (ADR-009): Excel-compatible formula parser, evaluator and dependency graph.
+//!
+//! Layers, bottom up: [`value`] (cell values, errors, coercion), [`ast`] and [`parser`]
+//! (A1 formula grammar), [`eval`] (evaluator over a [`CellSource`]), [`functions`] (the worksheet
+//! function registry), [`graph`] (dependency graph with a range index) and [`Engine`], a small
+//! in-memory workbook that ties them together. All coordinates are 1-based.
+
+pub mod ast;
+pub mod eval;
+pub mod functions;
+pub mod graph;
+pub mod parser;
+pub mod value;
+
+use std::collections::{HashMap, HashSet};
+
+pub use ast::{Ast, to_formula_string};
+pub use eval::{CellSource, Clock, EvalContext, FixedClock, SystemClock, evaluate};
+pub use parser::{ParseError, ParseErrorKind, parse_formula};
+pub use value::{ErrorKind, Value};
+
+use graph::{CellId, Dep, Graph, extract_deps};
+
+/// A cell address with its sheet name.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct CellAddr {
+    /// Sheet name.
+    pub sheet: String,
+    /// 1-based row.
+    pub row: u32,
+    /// 1-based column.
+    pub col: u32,
+}
+
+#[derive(Debug)]
+struct Formula {
+    ast: Ast,
+    names: Vec<String>,
+}
+
+#[derive(Debug)]
+struct CellData {
+    value: Value,
+    formula: Option<Formula>,
+}
+
+#[derive(Debug)]
+struct SheetData {
+    name: String,
+    /// False for a placeholder created because a formula mentions an unknown sheet.
+    exists: bool,
+    cells: HashMap<(u32, u32), CellData>,
+    max_row: u32,
+    max_col: u32,
+}
+
+/// An in-memory workbook: constant values and formulas per sheet, a dependency graph and
+/// cached formula results. Formulas are evaluated by [`Engine::recalc_dirty`].
+///
+/// Cells that are part of a reference cycle hold `0` (as Excel does) and are reported by
+/// [`Engine::is_circular`]. Formulas returning arrays do not spill: [`Engine::get`] returns
+/// the top-left element and [`Engine::get_full`] the whole array.
+#[derive(Debug)]
+pub struct Engine {
+    sheets: Vec<SheetData>,
+    graph: Graph,
+    names: HashMap<String, Ast>,
+    name_users: HashMap<String, HashSet<CellId>>,
+    date1904: bool,
+    clock: Box<dyn Clock>,
+    dirty: HashSet<CellId>,
+    circular: HashSet<CellId>,
+    all_dirty: bool,
+}
+
+impl Default for Engine {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl Engine {
+    /// An empty workbook using the system clock and the 1900 date system.
+    pub fn new() -> Self {
+        Self::with_clock(Box::new(SystemClock))
+    }
+
+    /// An empty workbook with an injected clock (for `TODAY`/`NOW`).
+    pub fn with_clock(clock: Box<dyn Clock>) -> Self {
+        Engine {
+            sheets: Vec::new(),
+            graph: Graph::new(),
+            names: HashMap::new(),
+            name_users: HashMap::new(),
+            date1904: false,
+            clock,
+            dirty: HashSet::new(),
+            circular: HashSet::new(),
+            all_dirty: false,
+        }
+    }
+
+    /// Replaces the clock. Volatile formulas pick it up on the next recalculation.
+    pub fn set_clock(&mut self, clock: Box<dyn Clock>) {
+        self.clock = clock;
+    }
+
+    /// Whether the workbook uses the 1904 date system.
+    pub fn date1904(&self) -> bool {
+        self.date1904
+    }
+
+    /// Selects the date system and schedules a full recalculation.
+    pub fn set_date1904(&mut self, date1904: bool) {
+        if self.date1904 != date1904 {
+            self.date1904 = date1904;
+            self.all_dirty = true;
+        }
+    }
+
+    /// Adds an (empty) sheet; existing sheets are left alone.
+    pub fn add_sheet(&mut self, name: &str) {
+        self.ensure_sheet(name);
+    }
+
+    /// Names of all existing sheets in creation order.
+    pub fn sheet_names(&self) -> Vec<&str> {
+        self.sheets
+            .iter()
+            .filter(|s| s.exists)
+            .map(|s| s.name.as_str())
+            .collect()
+    }
+
+    fn find_sheet(&self, name: &str) -> Option<usize> {
+        self.sheets
+            .iter()
+            .position(|s| s.name.eq_ignore_ascii_case(name))
+    }
+
+    fn push_sheet(&mut self, name: &str, exists: bool) -> usize {
+        self.sheets.push(SheetData {
+            name: name.to_owned(),
+            exists,
+            cells: HashMap::new(),
+            max_row: 0,
+            max_col: 0,
+        });
+        self.sheets.len() - 1
+    }
+
+    /// Finds or creates a real sheet.
+    fn ensure_sheet(&mut self, name: &str) -> u32 {
+        let index = match self.find_sheet(name) {
+            Some(i) => {
+                if !self.sheets[i].exists {
+                    self.sheets[i].exists = true;
+                    // Formulas that referred to the missing sheet evaluated to #REF!.
+                    self.all_dirty = true;
+                }
+                i
+            }
+            None => self.push_sheet(name, true),
+        };
+        index as u32
+    }
+
+    /// Finds a sheet or creates a placeholder so dependencies can be recorded against it.
+    fn intern_sheet(&mut self, name: &str) -> u32 {
+        match self.find_sheet(name) {
+            Some(i) => i as u32,
+            None => self.push_sheet(name, false) as u32,
+        }
+    }
+
+    fn id(&mut self, sheet: &str, row: u32, col: u32) -> CellId {
+        CellId {
+            sheet: self.ensure_sheet(sheet),
+            row,
+            col,
+        }
+    }
+
+    fn addr(&self, id: CellId) -> CellAddr {
+        CellAddr {
+            sheet: self.sheets[id.sheet as usize].name.clone(),
+            row: id.row,
+            col: id.col,
+        }
+    }
+
+    fn forget_names(&mut self, id: CellId) {
+        let used = self.sheets[id.sheet as usize]
+            .cells
+            .get_mut(&(id.row, id.col))
+            .and_then(|c| c.formula.take())
+            .map(|f| f.names)
+            .unwrap_or_default();
+        for name in used {
+            if let Some(users) = self.name_users.get_mut(&name.to_ascii_lowercase()) {
+                users.remove(&id);
+            }
+        }
+    }
+
+    fn drop_formula(&mut self, id: CellId) {
+        self.forget_names(id);
+        self.graph.remove(id);
+        self.dirty.remove(&id);
+        self.circular.remove(&id);
+    }
+
+    fn mark_dependents(&mut self, id: CellId) {
+        let dependents = self.graph.dirty_from(&[id]);
+        self.dirty.extend(dependents);
+    }
+
+    fn touch(&mut self, id: CellId) {
+        let sheet = &mut self.sheets[id.sheet as usize];
+        sheet.max_row = sheet.max_row.max(id.row);
+        sheet.max_col = sheet.max_col.max(id.col);
+    }
+
+    /// Stores a constant (an empty value clears the cell) and marks its dependents dirty.
+    pub fn set_value(&mut self, sheet: &str, row: u32, col: u32, value: Value) {
+        let id = self.id(sheet, row, col);
+        self.drop_formula(id);
+        let cells = &mut self.sheets[id.sheet as usize].cells;
+        if value == Value::Empty {
+            cells.remove(&(row, col));
+        } else {
+            cells.insert(
+                (row, col),
+                CellData {
+                    value,
+                    formula: None,
+                },
+            );
+            self.touch(id);
+        }
+        self.mark_dependents(id);
+    }
+
+    /// Clears a cell.
+    pub fn clear(&mut self, sheet: &str, row: u32, col: u32) {
+        self.set_value(sheet, row, col, Value::Empty);
+    }
+
+    /// Parses and stores a formula (a leading `=` is optional). The result is computed by
+    /// the next [`Engine::recalc_dirty`]. On a parse error the cell is left unchanged.
+    pub fn set_formula(
+        &mut self,
+        sheet: &str,
+        row: u32,
+        col: u32,
+        formula: &str,
+    ) -> Result<(), ParseError> {
+        let ast = parse_formula(formula)?;
+        let id = self.id(sheet, row, col);
+        self.install_formula(id, ast);
+        Ok(())
+    }
+
+    fn install_formula(&mut self, id: CellId, ast: Ast) {
+        let previous = self.sheets[id.sheet as usize]
+            .cells
+            .get(&(id.row, id.col))
+            .map(|c| c.value.clone());
+        self.drop_formula(id);
+        let sheet_name = self.sheets[id.sheet as usize].name.clone();
+        let deps = {
+            let names = &self.names;
+            extract_deps(&ast, &sheet_name, &|n| {
+                names.get(&n.to_ascii_lowercase()).cloned()
+            })
+        };
+        let graph_deps: Vec<Dep> = deps
+            .refs
+            .iter()
+            .map(|r| {
+                let sheet = self.intern_sheet(&r.sheet);
+                Dep::from_corners(sheet, r.row1, r.col1, r.row2, r.col2)
+            })
+            .collect();
+        self.graph.set_formula(id, graph_deps, deps.volatile);
+        for name in &deps.names {
+            self.name_users
+                .entry(name.to_ascii_lowercase())
+                .or_default()
+                .insert(id);
+        }
+        self.sheets[id.sheet as usize].cells.insert(
+            (id.row, id.col),
+            CellData {
+                value: previous.unwrap_or(Value::Empty),
+                formula: Some(Formula {
+                    ast,
+                    names: deps.names,
+                }),
+            },
+        );
+        self.touch(id);
+        self.dirty.insert(id);
+        self.mark_dependents(id);
+    }
+
+    /// Defines (or redefines) a workbook-level name as a formula, e.g. `Sheet1!$A$1:$A$10`.
+    pub fn define_name(&mut self, name: &str, formula: &str) -> Result<(), ParseError> {
+        let ast = parse_formula(formula)?;
+        self.names.insert(name.to_ascii_lowercase(), ast);
+        self.refresh_name_users(name);
+        Ok(())
+    }
+
+    /// Removes a defined name; formulas using it evaluate to `#NAME?`.
+    pub fn remove_name(&mut self, name: &str) {
+        self.names.remove(&name.to_ascii_lowercase());
+        self.refresh_name_users(name);
+    }
+
+    fn refresh_name_users(&mut self, name: &str) {
+        let users: Vec<CellId> = self
+            .name_users
+            .get(&name.to_ascii_lowercase())
+            .map(|s| s.iter().copied().collect())
+            .unwrap_or_default();
+        for id in users {
+            let ast = self.sheets[id.sheet as usize]
+                .cells
+                .get(&(id.row, id.col))
+                .and_then(|c| c.formula.as_ref())
+                .map(|f| f.ast.clone());
+            if let Some(ast) = ast {
+                self.install_formula(id, ast);
+            }
+        }
+    }
+
+    fn cell_data(&self, sheet: &str, row: u32, col: u32) -> Option<&CellData> {
+        let index = self.find_sheet(sheet)?;
+        self.sheets[index].cells.get(&(row, col))
+    }
+
+    /// The cell's value; for array results the top-left element.
+    pub fn get(&self, sheet: &str, row: u32, col: u32) -> Value {
+        self.cell_data(sheet, row, col)
+            .map_or(Value::Empty, |c| c.value.top_left())
+    }
+
+    /// The cell's value including whole arrays.
+    pub fn get_full(&self, sheet: &str, row: u32, col: u32) -> Value {
+        self.cell_data(sheet, row, col)
+            .map_or(Value::Empty, |c| c.value.clone())
+    }
+
+    /// The canonical formula text (no leading `=`), if the cell holds a formula.
+    pub fn get_formula(&self, sheet: &str, row: u32, col: u32) -> Option<String> {
+        let formula = self.cell_data(sheet, row, col)?.formula.as_ref()?;
+        Some(to_formula_string(&formula.ast))
+    }
+
+    /// Whether the cell is part of a reference cycle after the last recalculation.
+    pub fn is_circular(&self, sheet: &str, row: u32, col: u32) -> bool {
+        self.find_sheet(sheet).is_some_and(|i| {
+            self.circular.contains(&CellId {
+                sheet: i as u32,
+                row,
+                col,
+            })
+        })
+    }
+
+    /// All cells currently in a reference cycle.
+    pub fn circular_cells(&self) -> Vec<CellAddr> {
+        let mut cells: Vec<CellId> = self.circular.iter().copied().collect();
+        cells.sort_unstable();
+        cells.into_iter().map(|c| self.addr(c)).collect()
+    }
+
+    /// Formula cells waiting for recalculation.
+    pub fn dirty_count(&self) -> usize {
+        self.dirty.len()
+    }
+
+    /// The dependency graph, for inspection.
+    pub fn graph(&self) -> &Graph {
+        &self.graph
+    }
+
+    /// Recalculates every dirty formula (plus volatile ones) in dependency order and returns
+    /// the cells that were recomputed.
+    pub fn recalc_dirty(&mut self) -> Vec<CellAddr> {
+        if self.all_dirty {
+            self.all_dirty = false;
+            self.dirty.extend(self.graph.formula_cells());
+        }
+        let volatile: Vec<CellId> = self.graph.volatile_cells().collect();
+        if !volatile.is_empty() {
+            let downstream = self.graph.dirty_from(&volatile);
+            self.dirty.extend(volatile);
+            self.dirty.extend(downstream);
+        }
+        let dirty = std::mem::take(&mut self.dirty);
+        let plan = self.graph.plan(&dirty);
+        let mut recomputed = Vec::with_capacity(plan.order.len());
+        for id in plan.order {
+            let value = if plan.cyclic.contains(&id) {
+                self.circular.insert(id);
+                Value::Number(0.0)
+            } else {
+                self.circular.remove(&id);
+                self.eval_cell(id)
+            };
+            if let Some(cell) = self.sheets[id.sheet as usize]
+                .cells
+                .get_mut(&(id.row, id.col))
+            {
+                cell.value = value;
+            }
+            recomputed.push(self.addr(id));
+        }
+        recomputed
+    }
+
+    /// Recalculates every formula in the workbook.
+    pub fn recalc_all(&mut self) -> Vec<CellAddr> {
+        self.all_dirty = true;
+        self.recalc_dirty()
+    }
+
+    fn eval_cell(&self, id: CellId) -> Value {
+        let sheet = &self.sheets[id.sheet as usize];
+        let Some(formula) = sheet
+            .cells
+            .get(&(id.row, id.col))
+            .and_then(|c| c.formula.as_ref())
+        else {
+            return Value::Empty;
+        };
+        let ctx = EvalContext {
+            source: self,
+            sheet: &sheet.name,
+            cell: Some((id.row, id.col)),
+            date1904: self.date1904,
+            clock: &*self.clock,
+        };
+        evaluate(&formula.ast, &ctx)
+    }
+}
+
+impl CellSource for Engine {
+    fn cell(&self, sheet: &str, row: u32, col: u32) -> Value {
+        self.cell_data(sheet, row, col)
+            .map_or(Value::Empty, |c| c.value.top_left())
+    }
+
+    fn name(&self, name: &str) -> Option<Ast> {
+        self.names.get(&name.to_ascii_lowercase()).cloned()
+    }
+
+    fn sheet_exists(&self, sheet: &str) -> bool {
+        self.find_sheet(sheet)
+            .is_some_and(|i| self.sheets[i].exists)
+    }
+
+    fn used_bounds(&self, sheet: &str) -> (u32, u32) {
+        self.find_sheet(sheet)
+            .map_or((0, 0), |i| (self.sheets[i].max_row, self.sheets[i].max_col))
+    }
+}
+
+#[cfg(test)]
+mod engine_tests;
+#[cfg(test)]
+mod function_tests;
+#[cfg(test)]
+mod test_support;
