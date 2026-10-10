@@ -124,7 +124,8 @@ fn edit_save_reopen_keeps_everything_else() {
             .iter()
             .filter_map(|a| match a {
                 HygieneAction::RemovedPart { name, .. } => Some(name.clone()),
-                HygieneAction::RemovedRelationship { .. } => None,
+                HygieneAction::RemovedRelationship { .. }
+                | HygieneAction::ChangedContentType { .. } => None,
             })
             .collect();
         let rels_edited = !doc.hygiene_log().is_empty();

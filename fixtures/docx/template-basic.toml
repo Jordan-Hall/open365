@@ -1,0 +1,5 @@
+feature = "template-basic"
+made_with = "Microsoft Word 16.0.20430 (Windows)"
+author = "project member"
+expect_dropped = []
+notes = "Word template (.dotx): heading, body paragraph with keep-with-next and one custom centre tab stop"

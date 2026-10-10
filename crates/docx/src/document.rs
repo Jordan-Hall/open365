@@ -2,7 +2,8 @@ use std::fmt;
 use std::ops::Range;
 
 use open365_opc::{
-    Limits, Package, PartName, Relationships, TargetMode, rels_part_name, resolve_target,
+    ContentTypes, Limits, Package, PartName, Relationships, TargetMode, rels_part_name,
+    resolve_target,
 };
 
 use crate::DocxError;
@@ -10,6 +11,8 @@ use crate::model::{Body, DocumentRoot, Paragraph};
 use crate::ppr::Alignment;
 use crate::props::RunPropsPatch;
 use crate::ranges::{DocPos, EditLogEntry};
+use crate::section::Section;
+use crate::settings::Settings;
 use crate::styles::Styles;
 use crate::xml::{self, RawXml};
 
@@ -17,6 +20,65 @@ const OFFICE_DOCUMENT_TYPES: [&str; 2] = [
     "http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument",
     "http://purl.oclc.org/ooxml/officeDocument/relationships/officeDocument",
 ];
+
+const CT_DOCUMENT: &str =
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml";
+const CT_TEMPLATE: &str =
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.template.main+xml";
+const CT_MACRO_DOCUMENT: &str = "application/vnd.ms-word.document.macroEnabled.main+xml";
+const CT_MACRO_TEMPLATE: &str = "application/vnd.ms-word.template.macroEnabledTemplate.main+xml";
+const CT_VBA_PROJECT: &str = "application/vnd.ms-office.vbaProject";
+const CONTENT_TYPES_PART: &str = "[Content_Types].xml";
+const SETTINGS_TYPES: [&str; 1] =
+    ["http://schemas.openxmlformats.org/officeDocument/2006/relationships/settings"];
+
+/// What the main part's content type says the package is (ECMA-376 Part 2 section 10).
+/// Macros are never executed whatever the kind.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DocumentKind {
+    /// `.docx`
+    Document,
+    /// `.dotx`
+    Template,
+    /// `.docm`
+    MacroEnabledDocument,
+    /// `.dotm`
+    MacroEnabledTemplate,
+}
+
+impl DocumentKind {
+    /// The main-part content type for this kind.
+    pub fn content_type(self) -> &'static str {
+        match self {
+            Self::Document => CT_DOCUMENT,
+            Self::Template => CT_TEMPLATE,
+            Self::MacroEnabledDocument => CT_MACRO_DOCUMENT,
+            Self::MacroEnabledTemplate => CT_MACRO_TEMPLATE,
+        }
+    }
+
+    /// The kind a main-part content type denotes, or `None` for any other type.
+    pub fn from_content_type(content_type: &str) -> Option<Self> {
+        Some(match content_type {
+            CT_DOCUMENT => Self::Document,
+            CT_TEMPLATE => Self::Template,
+            CT_MACRO_DOCUMENT => Self::MacroEnabledDocument,
+            CT_MACRO_TEMPLATE => Self::MacroEnabledTemplate,
+            _ => return None,
+        })
+    }
+
+    pub fn is_template(self) -> bool {
+        matches!(self, Self::Template | Self::MacroEnabledTemplate)
+    }
+
+    pub fn is_macro_enabled(self) -> bool {
+        matches!(
+            self,
+            Self::MacroEnabledDocument | Self::MacroEnabledTemplate
+        )
+    }
+}
 
 /// Content the parser could not represent. A non-empty log blocks [`Document::save`].
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -33,6 +95,12 @@ pub enum HygieneAction {
     RemovedPart { name: String, reason: &'static str },
     /// A package-level relationship was removed.
     RemovedRelationship { id: String, rel_type: String },
+    /// The main part's content type was changed in `[Content_Types].xml`.
+    ChangedContentType {
+        part: String,
+        from: String,
+        to: String,
+    },
 }
 
 impl fmt::Display for HygieneAction {
@@ -41,6 +109,9 @@ impl fmt::Display for HygieneAction {
             Self::RemovedPart { name, reason } => write!(f, "removed part {name}: {reason}"),
             Self::RemovedRelationship { id, rel_type } => {
                 write!(f, "removed relationship {id} ({rel_type})")
+            }
+            Self::ChangedContentType { part, from, to } => {
+                write!(f, "changed content type of {part} from {from} to {to}")
             }
         }
     }
@@ -60,6 +131,8 @@ pub struct Document {
     dropped: Vec<DroppedItem>,
     hygiene: Vec<HygieneAction>,
     styles: Option<Styles>,
+    settings: Settings,
+    kind: DocumentKind,
     pub(crate) edit_log: Vec<EditLogEntry>,
 }
 
@@ -87,6 +160,8 @@ impl Document {
         let parsed = xml::parse(part.data())?;
         let root = DocumentRoot::from_xml(parsed.root).map_err(DocxError::NotWordprocessing)?;
         let styles = load_styles(&package, &main_part);
+        let settings = load_settings(&package, &main_part);
+        let kind = detect_kind(&package, &main_part);
         Ok(Self {
             package,
             main_part,
@@ -98,6 +173,8 @@ impl Document {
             dropped: Vec::new(),
             hygiene: Vec::new(),
             styles,
+            settings,
+            kind,
             edit_log: Vec::new(),
         })
     }
@@ -105,6 +182,110 @@ impl Document {
     /// The document's styles, when it has a (valid) styles part.
     pub fn styles(&self) -> Option<&Styles> {
         self.styles.as_ref()
+    }
+
+    /// Layout-relevant settings from `word/settings.xml` (defaults when there is none).
+    pub fn settings(&self) -> &Settings {
+        &self.settings
+    }
+
+    /// The sections in document order. Each section ends at the paragraph whose `w:pPr`
+    /// carries its `w:sectPr` (see [`Section::end_paragraph`]); the last one is the body's
+    /// final `w:sectPr`. A document with no `w:sectPr` has one section with all defaults.
+    /// Paragraphs inside content controls are not scanned (they are not addressable).
+    pub fn sections(&self) -> Vec<Section> {
+        let mut out = Vec::new();
+        for (i, p) in self.body().paragraphs().into_iter().enumerate() {
+            let sect = p.props.as_ref().and_then(|ppr| {
+                ppr.children
+                    .iter()
+                    .filter_map(RawXml::as_element)
+                    .find(|e| e.head.is_w("sectPr"))
+            });
+            if let Some(sect) = sect {
+                out.push(Section::from_sect_pr(sect, out.len(), Some(i)));
+            }
+        }
+        let last = self.body().blocks.iter().rev().find_map(|b| match b {
+            crate::model::Block::Raw(RawXml::Element(e)) if e.head.is_w("sectPr") => Some(e),
+            _ => None,
+        });
+        match last {
+            Some(sect) => out.push(Section::from_sect_pr(sect, out.len(), None)),
+            None => out.push(Section {
+                index: out.len(),
+                ..Section::default()
+            }),
+        }
+        out
+    }
+
+    /// The kind of package the main part's content type declares.
+    pub fn kind(&self) -> DocumentKind {
+        self.kind
+    }
+
+    /// True when the package carries a VBA project. It is kept byte-identical and never run.
+    pub fn has_vba_project(&self) -> bool {
+        has_vba(&self.package, &self.main_part)
+    }
+
+    /// Turns a template into a document for editing: the main part's content type becomes
+    /// the plain document type, or the macro-enabled document type when a VBA project is
+    /// present. The change is logged in [`Document::hygiene_log`]. Returns `Ok(false)`
+    /// without touching anything when this is not a template.
+    pub fn instantiate_template(&mut self) -> Result<bool, DocxError> {
+        if !self.kind.is_template() {
+            return Ok(false);
+        }
+        let to = if self.has_vba_project() {
+            DocumentKind::MacroEnabledDocument
+        } else {
+            DocumentKind::Document
+        };
+        let from = self.kind.content_type();
+        let part = self
+            .package
+            .part(CONTENT_TYPES_PART)
+            .ok_or_else(|| DocxError::Xml("package has no [Content_Types].xml".to_owned()))?;
+        let mut parsed = xml::parse(part.data())?;
+        let target = format!("/{}", self.main_part.as_str().trim_start_matches('/'));
+        let mut found = false;
+        for child in &mut parsed.root.children {
+            let RawXml::Element(e) = child else { continue };
+            if e.head.local_name() != "Override" {
+                continue;
+            }
+            let is_main = e
+                .head
+                .attrs
+                .iter()
+                .any(|a| a.name == "PartName" && a.value.eq_ignore_ascii_case(&target));
+            if !is_main {
+                continue;
+            }
+            for a in &mut e.head.attrs {
+                if a.name == "ContentType" {
+                    to.content_type().clone_into(&mut a.value);
+                    found = true;
+                }
+            }
+        }
+        if !found {
+            return Err(DocxError::Xml(format!(
+                "no content type override for the main part {target}"
+            )));
+        }
+        let name = PartName::new(CONTENT_TYPES_PART)
+            .map_err(|e| DocxError::Xml(format!("content types part name: {e}")))?;
+        self.package.set_part(name, parsed.to_bytes());
+        self.hygiene.push(HygieneAction::ChangedContentType {
+            part: target,
+            from: from.to_owned(),
+            to: to.content_type().to_owned(),
+        });
+        self.kind = to;
+        Ok(true)
     }
 
     /// Name of the main document part.
@@ -382,6 +563,50 @@ fn invalidate_stale_parts(package: &mut Package, log: &mut Vec<HygieneAction>) {
         _ => true,
     });
     package.set_part(rels_name, parsed.to_bytes());
+}
+
+fn detect_kind(package: &Package, main: &PartName) -> DocumentKind {
+    package
+        .part(CONTENT_TYPES_PART)
+        .and_then(|p| ContentTypes::parse(p.data()).ok())
+        .and_then(|ct| {
+            ct.content_type_of(main)
+                .and_then(DocumentKind::from_content_type)
+        })
+        .unwrap_or(DocumentKind::Document)
+}
+
+fn has_vba(package: &Package, main: &PartName) -> bool {
+    let by_rel = package
+        .part(rels_part_name(Some(main)).as_str())
+        .and_then(|p| Relationships::parse(p.data()).ok())
+        .is_some_and(|rels| {
+            rels.iter()
+                .any(|r| r.rel_type.to_ascii_lowercase().ends_with("/vbaproject"))
+        });
+    by_rel
+        || package
+            .part(CONTENT_TYPES_PART)
+            .and_then(|p| ContentTypes::parse(p.data()).ok())
+            .is_some_and(|ct| {
+                ct.overrides()
+                    .iter()
+                    .any(|(_, content_type)| *content_type == CT_VBA_PROJECT)
+            })
+}
+
+/// Parses the settings part found through the main part's relationships.
+fn load_settings(package: &Package, main: &PartName) -> Settings {
+    let load = || -> Option<Settings> {
+        let rels =
+            Relationships::parse(package.part(rels_part_name(Some(main)).as_str())?.data()).ok()?;
+        let rel = rels.iter().find(|r| {
+            r.target_mode == TargetMode::Internal && SETTINGS_TYPES.contains(&r.rel_type.as_str())
+        })?;
+        let name = resolve_target(Some(main), &rel.target).ok()?;
+        Settings::parse(package.part(name.as_str())?.data()).ok()
+    };
+    load().unwrap_or_default()
 }
 
 const STYLES_TYPES: [&str; 1] =

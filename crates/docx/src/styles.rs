@@ -11,6 +11,9 @@ use std::collections::HashMap;
 use open365_opc::PartName;
 
 use crate::DocxError;
+use crate::layout_props::{
+    LayoutFmt, ParagraphMark, ParagraphProps, RunLayoutProps, TabOp, resolve_tabs, tab_ops,
+};
 use crate::model::{Paragraph, Run};
 use crate::ppr::Alignment;
 use crate::props::RunProps;
@@ -114,6 +117,7 @@ struct RunFmt {
     underline: Option<bool>,
     strike: Option<bool>,
     color: Option<Option<[u8; 3]>>,
+    layout: LayoutFmt,
 }
 
 impl RunFmt {
@@ -137,6 +141,7 @@ impl RunFmt {
             underline: props.underline().map(|u| u != "none"),
             strike: props.strike(),
             color: props.color().map(parse_color),
+            layout: LayoutFmt::from_props(props),
         }
     }
 
@@ -153,6 +158,7 @@ impl RunFmt {
         put(&mut self.underline, &other.underline);
         put(&mut self.strike, &other.strike);
         put(&mut self.color, &other.color);
+        self.layout.overlay(&other.layout);
     }
 }
 
@@ -176,6 +182,11 @@ struct ParaFmt {
     first_line: Option<f32>,
     keep_next: Option<bool>,
     keep_lines: Option<bool>,
+    widow_control: Option<bool>,
+    page_break_before: Option<bool>,
+    contextual_spacing: Option<bool>,
+    suppress_auto_hyphens: Option<bool>,
+    tab_ops: Vec<TabOp>,
 }
 
 fn twips(value: Option<&str>) -> Option<f32> {
@@ -200,6 +211,11 @@ impl ParaFmt {
                 "jc" => fmt.alignment = e.head.attr_w("val").and_then(Alignment::from_val),
                 "keepNext" => fmt.keep_next = Some(on_off(e)),
                 "keepLines" => fmt.keep_lines = Some(on_off(e)),
+                "widowControl" => fmt.widow_control = Some(on_off(e)),
+                "pageBreakBefore" => fmt.page_break_before = Some(on_off(e)),
+                "contextualSpacing" => fmt.contextual_spacing = Some(on_off(e)),
+                "suppressAutoHyphens" => fmt.suppress_auto_hyphens = Some(on_off(e)),
+                "tabs" => fmt.tab_ops.extend(tab_ops(e)),
                 "spacing" => {
                     fmt.before = twips(e.head.attr_w("before")).or(fmt.before);
                     fmt.after = twips(e.head.attr_w("after")).or(fmt.after);
@@ -248,6 +264,11 @@ impl ParaFmt {
         put(&mut self.first_line, other.first_line);
         put(&mut self.keep_next, other.keep_next);
         put(&mut self.keep_lines, other.keep_lines);
+        put(&mut self.widow_control, other.widow_control);
+        put(&mut self.page_break_before, other.page_break_before);
+        put(&mut self.contextual_spacing, other.contextual_spacing);
+        put(&mut self.suppress_auto_hyphens, other.suppress_auto_hyphens);
+        self.tab_ops.extend(other.tab_ops.iter().copied());
     }
 }
 
@@ -479,20 +500,23 @@ impl Styles {
         para.style_id().or(self.default_paragraph.as_deref())
     }
 
-    /// Formatting of `run` inside `para` after defaults, styles and direct formatting.
-    pub fn effective_run_props(&self, para: &Paragraph, run: &Run) -> EffectiveRun {
+    fn resolved_run_fmt(&self, para: &Paragraph, direct: &RunProps) -> RunFmt {
         let mut fmt = self.defaults_run.clone();
         if let Some(id) = self.paragraph_style_id(para) {
             for def in self.chain(id).into_iter().rev() {
                 fmt.overlay(&def.run);
             }
         }
-        if let Some(id) = run.props.style_id() {
+        if let Some(id) = direct.style_id() {
             for def in self.chain(id).into_iter().rev() {
                 fmt.overlay(&def.run);
             }
         }
-        fmt.overlay(&RunFmt::from_props(&run.props));
+        fmt.overlay(&RunFmt::from_props(direct));
+        fmt
+    }
+
+    fn effective_from(&self, fmt: &RunFmt) -> EffectiveRun {
         EffectiveRun {
             font: self.resolve_font(fmt.font.as_ref()),
             size_half_points: fmt.size.unwrap_or(FALLBACK_SIZE_HALF_POINTS),
@@ -504,8 +528,50 @@ impl Styles {
         }
     }
 
-    /// Formatting of the paragraph itself after defaults, style chain and direct formatting.
-    pub fn effective_para_props(&self, para: &Paragraph) -> EffectiveParagraph {
+    /// Formatting of `run` inside `para` after defaults, styles and direct formatting.
+    pub fn effective_run_props(&self, para: &Paragraph, run: &Run) -> EffectiveRun {
+        self.effective_from(&self.resolved_run_fmt(para, &run.props))
+    }
+
+    /// Kerning, ligatures, position, character spacing and scale of `run` inside `para`
+    /// after defaults, styles and direct formatting (ECMA-376 Part 1 §17.3.2).
+    pub fn effective_run_layout(&self, para: &Paragraph, run: &Run) -> RunLayoutProps {
+        self.resolved_run_fmt(para, &run.props).layout.finish()
+    }
+
+    /// Run properties of the paragraph mark (`w:pPr/w:rPr`, §17.3.1.29): defaults, the
+    /// paragraph style's run properties, then the mark's own direct formatting.
+    pub fn paragraph_mark_props(&self, para: &Paragraph) -> ParagraphMark {
+        let direct = para
+            .props
+            .as_ref()
+            .and_then(|p| child_el(p, "rPr"))
+            .map(|r| RunProps::from_element(r.clone()))
+            .unwrap_or_default();
+        let fmt = self.resolved_run_fmt(para, &direct);
+        ParagraphMark {
+            run: self.effective_from(&fmt),
+            layout: fmt.layout.finish(),
+        }
+    }
+
+    /// Widow control, keep-with-next, keep-lines, page-break-before, contextual spacing,
+    /// auto-hyphenation suppression and tab stops of `para` after style resolution
+    /// (ECMA-376 Part 1 §17.3.1).
+    pub fn paragraph_flow_props(&self, para: &Paragraph) -> ParagraphProps {
+        let fmt = self.resolved_para_fmt(para);
+        ParagraphProps {
+            widow_control: fmt.widow_control.unwrap_or(true),
+            keep_next: fmt.keep_next.unwrap_or(false),
+            keep_lines: fmt.keep_lines.unwrap_or(false),
+            page_break_before: fmt.page_break_before.unwrap_or(false),
+            contextual_spacing: fmt.contextual_spacing.unwrap_or(false),
+            suppress_auto_hyphens: fmt.suppress_auto_hyphens.unwrap_or(false),
+            tabs: resolve_tabs(&fmt.tab_ops),
+        }
+    }
+
+    fn resolved_para_fmt(&self, para: &Paragraph) -> ParaFmt {
         let mut fmt = self.defaults_para.clone();
         if let Some(id) = self.paragraph_style_id(para) {
             for def in self.chain(id).into_iter().rev() {
@@ -515,6 +581,12 @@ impl Styles {
         if let Some(direct) = &para.props {
             fmt.overlay(&ParaFmt::from_ppr(direct));
         }
+        fmt
+    }
+
+    /// Formatting of the paragraph itself after defaults, style chain and direct formatting.
+    pub fn effective_para_props(&self, para: &Paragraph) -> EffectiveParagraph {
+        let fmt = self.resolved_para_fmt(para);
         EffectiveParagraph {
             alignment: fmt.alignment.unwrap_or(Alignment::Left),
             space_before_pt: fmt.before.unwrap_or(0.0),

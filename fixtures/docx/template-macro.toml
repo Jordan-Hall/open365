@@ -1,0 +1,5 @@
+feature = "template-macro"
+made_with = "Microsoft Word 16.0.20430 (Windows)"
+author = "project member"
+expect_dropped = []
+notes = "Macro-enabled Word template (.dotm) with a trivial no-op VBA module; macros are never executed"

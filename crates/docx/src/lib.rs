@@ -11,15 +11,21 @@
 mod document;
 mod edit;
 mod error;
+mod layout_props;
 mod model;
 mod ppr;
 mod props;
 mod ranges;
+mod section;
+mod settings;
 mod styles;
 mod xml;
 
-pub use document::{Document, DroppedItem, HygieneAction};
+pub use document::{Document, DocumentKind, DroppedItem, HygieneAction};
 pub use error::DocxError;
+pub use layout_props::{
+    Ligatures, ParagraphMark, ParagraphProps, RunLayoutProps, TabKind, TabLeader, TabStop,
+};
 pub use model::{
     Block, Body, Break, BreakKind, Cell, DocChild, DocumentRoot, Group, Inline, Paragraph, Row,
     RowChild, Run, RunContent, Table, TableChild,
@@ -27,6 +33,10 @@ pub use model::{
 pub use ppr::Alignment;
 pub use props::{RunPropItem, RunPropKind, RunProps, RunPropsPatch};
 pub use ranges::{DocPos, EditLogEntry, Snapshot};
+pub use section::{
+    Column, Columns, DocGrid, DocGridType, Orientation, PageMargins, PageSize, Section, SectionType,
+};
+pub use settings::{DEFAULT_COMPATIBILITY_MODE, Settings};
 pub use styles::{
     EffectiveParagraph, EffectiveRun, LineSpacing, StyleInfo, StyleKind, Styles, ThemeFonts,
 };

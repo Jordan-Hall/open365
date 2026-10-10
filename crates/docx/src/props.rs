@@ -219,6 +219,35 @@ impl RunProps {
         })
     }
 
+    /// First WordprocessingML child `local` of the `w:rPr`, typed or not.
+    pub(crate) fn any_w_element(&self, local: &str) -> Option<&XmlElement> {
+        self.items.iter().find_map(|i| match i {
+            RunPropItem::Known(_, e) | RunPropItem::Raw(RawXml::Element(e))
+                if e.head.is_w(local) =>
+            {
+                Some(e)
+            }
+            _ => None,
+        })
+    }
+
+    /// Value of `w14:ligatures`, whatever prefix the file uses for the w14 namespace.
+    pub(crate) fn ligatures_value(&self) -> Option<&str> {
+        const W14: &str = "http://schemas.microsoft.com/office/word/2010/wordml";
+        self.items.iter().find_map(|i| match i {
+            RunPropItem::Raw(RawXml::Element(e))
+                if e.head.ns.as_deref() == Some(W14) && e.head.local_name() == "ligatures" =>
+            {
+                e.head
+                    .attrs
+                    .iter()
+                    .find(|a| a.ns.as_deref() == Some(W14) && a.local_name() == "val")
+                    .map(|a| a.value.as_str())
+            }
+            _ => None,
+        })
+    }
+
     fn toggle(&self, kind: RunPropKind) -> Option<bool> {
         self.find(kind).map(|e| on_off(e.head.attr_w("val")))
     }
