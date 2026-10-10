@@ -1,0 +1,15 @@
+[package]
+name = "open365-commands"
+description = "Typed, scoped, audited commands: the only mutation path into documents."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+open365-docx.workspace = true
+open365-xlsx.workspace = true
+
+[lints]
+workspace = true

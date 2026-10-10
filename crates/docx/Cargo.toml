@@ -1,0 +1,14 @@
+[package]
+name = "open365-docx"
+description = "DOCX document model, reader and writer on the lossless OPC graph."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+open365-opc.workspace = true
+
+[lints]
+workspace = true

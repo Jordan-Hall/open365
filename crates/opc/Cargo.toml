@@ -1,0 +1,16 @@
+[package]
+name = "open365-opc"
+description = "Lossless OPC package graph: parts, relationships, content types and resource limits."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+quick-xml = "0.42.0"
+thiserror = "2.0.21"
+zip = { version = "9.0.1", default-features = false, features = ["deflate"] }
+
+[lints]
+workspace = true

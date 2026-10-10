@@ -1,0 +1,18 @@
+[package]
+name = "open365-cli"
+description = "open365 command-line interface for inspecting and round-tripping documents."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[[bin]]
+name = "open365"
+path = "src/main.rs"
+
+[dependencies]
+open365-commands.workspace = true
+
+[lints]
+workspace = true

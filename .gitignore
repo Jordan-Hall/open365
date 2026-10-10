@@ -1,0 +1,5 @@
+/target
+**/*.rs.bk
+/fixtures/external/
+/fuzz/artifacts/
+/fuzz/corpus/
