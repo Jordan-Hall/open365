@@ -1,7 +1,8 @@
 use std::sync::Arc;
 
 use open365_opc::{
-    Limits, Package, PartName, Relationships, TargetMode, rels_part_name, resolve_target,
+    ContentTypes, Limits, Package, PartName, Relationships, TargetMode, rels_part_name,
+    resolve_target,
 };
 
 use crate::XlsxError;
@@ -22,6 +23,65 @@ const SST_REL_TYPE_STRICT: &str =
     "http://purl.oclc.org/ooxml/officeDocument/relationships/sharedStrings";
 const SST_CONTENT_TYPE: &str =
     "application/vnd.openxmlformats-officedocument.spreadsheetml.sharedStrings+xml";
+
+const CT_WORKBOOK: &str =
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml";
+const CT_TEMPLATE: &str =
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.template.main+xml";
+const CT_MACRO_WORKBOOK: &str = "application/vnd.ms-excel.sheet.macroEnabled.main+xml";
+const CT_MACRO_TEMPLATE: &str = "application/vnd.ms-excel.template.macroEnabled.main+xml";
+const CT_VBA_PROJECT: &str = "application/vnd.ms-office.vbaProject";
+const CONTENT_TYPES_PART: &str = "[Content_Types].xml";
+
+/// What the workbook part's content type says the package is (ECMA-376 Part 2 section
+/// 10). Macros are never executed whatever the kind.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum WorkbookKind {
+    /// `.xlsx`
+    Workbook,
+    /// `.xltx`
+    Template,
+    /// `.xlsm`
+    MacroEnabledWorkbook,
+    /// `.xltm`
+    MacroEnabledTemplate,
+}
+
+impl WorkbookKind {
+    /// The workbook-part content type for this kind.
+    pub fn content_type(self) -> &'static str {
+        match self {
+            Self::Workbook => CT_WORKBOOK,
+            Self::Template => CT_TEMPLATE,
+            Self::MacroEnabledWorkbook => CT_MACRO_WORKBOOK,
+            Self::MacroEnabledTemplate => CT_MACRO_TEMPLATE,
+        }
+    }
+
+    /// The kind a workbook-part content type denotes, or `None` for any other type.
+    pub fn from_content_type(content_type: &str) -> Option<Self> {
+        Some(match content_type {
+            CT_WORKBOOK => Self::Workbook,
+            CT_TEMPLATE => Self::Template,
+            CT_MACRO_WORKBOOK => Self::MacroEnabledWorkbook,
+            CT_MACRO_TEMPLATE => Self::MacroEnabledTemplate,
+            _ => return None,
+        })
+    }
+
+    /// True for `.xltx` and `.xltm`.
+    pub fn is_template(self) -> bool {
+        matches!(self, Self::Template | Self::MacroEnabledTemplate)
+    }
+
+    /// True for `.xlsm` and `.xltm`.
+    pub fn is_macro_enabled(self) -> bool {
+        matches!(
+            self,
+            Self::MacroEnabledWorkbook | Self::MacroEnabledTemplate
+        )
+    }
+}
 
 /// Content the parser could not represent. A non-empty log blocks [`Workbook::save`].
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -109,6 +169,7 @@ pub struct Workbook {
     hygiene_done: bool,
     dropped: Vec<DroppedItem>,
     hygiene: Vec<HygieneAction>,
+    kind: WorkbookKind,
 }
 
 fn is_true(v: &str) -> bool {
@@ -280,6 +341,7 @@ impl Workbook {
             .and_then(|e| e.head.attr("date1904"))
             .is_some_and(is_true);
         let infos = sheets.iter().map(|s| s.info.clone()).collect();
+        let kind = detect_kind(&package, &workbook_part);
 
         Ok(Self {
             package,
@@ -298,7 +360,46 @@ impl Workbook {
             hygiene_done: false,
             dropped,
             hygiene: Vec::new(),
+            kind,
         })
+    }
+
+    /// The kind of package the workbook part's content type declares.
+    pub fn kind(&self) -> WorkbookKind {
+        self.kind
+    }
+
+    /// True when the package carries a VBA project. It is kept byte-identical and never run.
+    pub fn has_vba_project(&self) -> bool {
+        has_vba(&self.package, &self.workbook_part)
+    }
+
+    /// Turns a template into a workbook for editing: the workbook part's content type
+    /// becomes the plain workbook type, or the macro-enabled workbook type when a VBA
+    /// project is present. The change is logged in [`Workbook::hygiene_log`]. Returns
+    /// `Ok(false)` without touching anything when this is not a template.
+    pub fn instantiate_template(&mut self) -> Result<bool, XlsxError> {
+        if !self.kind.is_template() {
+            return Ok(false);
+        }
+        let to = if self.has_vba_project() {
+            WorkbookKind::MacroEnabledWorkbook
+        } else {
+            WorkbookKind::Workbook
+        };
+        let part = self.workbook_part.as_str().trim_start_matches('/');
+        if !parts::set_override_type(&mut self.package, part, to.content_type())? {
+            return Err(XlsxError::Xml(format!(
+                "no content type override for the workbook part /{part}"
+            )));
+        }
+        self.hygiene.push(HygieneAction::ChangedContentType {
+            part: format!("/{part}"),
+            from: self.kind.content_type().to_owned(),
+            to: to.content_type().to_owned(),
+        });
+        self.kind = to;
+        Ok(true)
     }
 
     pub fn package(&self) -> &Package {
@@ -678,6 +779,36 @@ impl Workbook {
         }
         Ok(self.package.write()?)
     }
+}
+
+fn detect_kind(package: &Package, main: &PartName) -> WorkbookKind {
+    package
+        .part(CONTENT_TYPES_PART)
+        .and_then(|p| ContentTypes::parse(p.data()).ok())
+        .and_then(|ct| {
+            ct.content_type_of(main)
+                .and_then(WorkbookKind::from_content_type)
+        })
+        .unwrap_or(WorkbookKind::Workbook)
+}
+
+fn has_vba(package: &Package, main: &PartName) -> bool {
+    let by_rel = package
+        .part(rels_part_name(Some(main)).as_str())
+        .and_then(|p| Relationships::parse(p.data()).ok())
+        .is_some_and(|rels| {
+            rels.iter()
+                .any(|r| r.rel_type.to_ascii_lowercase().ends_with("/vbaproject"))
+        });
+    by_rel
+        || package
+            .part(CONTENT_TYPES_PART)
+            .and_then(|p| ContentTypes::parse(p.data()).ok())
+            .is_some_and(|ct| {
+                ct.overrides()
+                    .iter()
+                    .any(|(_, content_type)| *content_type == CT_VBA_PROJECT)
+            })
 }
 
 fn malformed(reason: &str) -> XlsxError {

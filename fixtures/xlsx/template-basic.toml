@@ -1,0 +1,5 @@
+feature = "template-basic"
+made_with = "Microsoft Excel 16.0.20430 (Windows)"
+author = "project member"
+expect_dropped = []
+notes = "Excel template (.xltx): heading, header row, one formula; creator and lastModifiedBy blank"

@@ -209,6 +209,12 @@ impl FontBook {
         self.base.clone()
     }
 
+    /// The font file `family` draws its first glyphs from, for measuring with hinting.
+    pub(crate) fn font_data(&self, family: &FontFamily) -> Option<Arc<FontData>> {
+        let name = self.defs.families.get(family)?.first()?;
+        self.defs.font_data.get(name).cloned()
+    }
+
     fn add_bundled(&mut self, family: &str, bold: bool, italic: bool) -> String {
         let name = bundled_data_name(family, bold, italic);
         if !self.defs.font_data.contains_key(&name)

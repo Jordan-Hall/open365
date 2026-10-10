@@ -27,6 +27,12 @@ pub enum HygieneAction {
     AddedPart { name: String, reason: &'static str },
     /// `<calcPr fullCalcOnLoad="1"/>` was set so the application recalculates on load.
     SetFullCalcOnLoad,
+    /// The workbook part's content type was changed in `[Content_Types].xml`.
+    ChangedContentType {
+        part: String,
+        from: String,
+        to: String,
+    },
 }
 
 impl fmt::Display for HygieneAction {
@@ -47,6 +53,9 @@ impl fmt::Display for HygieneAction {
             }
             Self::AddedPart { name, reason } => write!(f, "added part {name}: {reason}"),
             Self::SetFullCalcOnLoad => write!(f, "set calcPr fullCalcOnLoad=\"1\""),
+            Self::ChangedContentType { part, from, to } => {
+                write!(f, "changed content type of {part} from {from} to {to}")
+            }
         }
     }
 }
@@ -137,6 +146,41 @@ pub(crate) fn remove_override(package: &mut Package, part: &str) -> Result<bool,
     let name = PartName::new(CONTENT_TYPES)?;
     package.set_part(name, tree.to_bytes());
     Ok(true)
+}
+
+/// Sets the `ContentType` of the `Override` for `part` (name without the leading `/`).
+/// True when an override was found.
+pub(crate) fn set_override_type(
+    package: &mut Package,
+    part: &str,
+    content_type: &str,
+) -> Result<bool, XlsxError> {
+    let Some(mut tree) = load_tree(package, CONTENT_TYPES)? else {
+        return Err(XlsxError::MissingPart(CONTENT_TYPES.to_owned()));
+    };
+    let want = format!("/{part}").to_ascii_lowercase();
+    let mut found = false;
+    for child in &mut tree.root.children {
+        let RawXml::Element(e) = child else { continue };
+        let is_target = e.head.local_name() == "Override"
+            && e.head
+                .attr("PartName")
+                .is_some_and(|n| n.to_ascii_lowercase() == want);
+        if !is_target {
+            continue;
+        }
+        for a in &mut e.head.attrs {
+            if a.name == "ContentType" {
+                content_type.clone_into(&mut a.value);
+                found = true;
+            }
+        }
+    }
+    if found {
+        let name = PartName::new(CONTENT_TYPES)?;
+        package.set_part(name, tree.to_bytes());
+    }
+    Ok(found)
 }
 
 /// Adds an `Override` for `part` (name without the leading `/`).

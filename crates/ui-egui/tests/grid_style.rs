@@ -109,9 +109,9 @@ fn displayed_text_equals_excel_range_text() {
     }
     eprintln!("text parity: {ok}/{total}");
     // Known, explained differences: E27 is stacked text (the grid joins one character per
-    // line, Range.Text is the plain string); E40 "-0.5" fits our unhinted glyph widths by under
-    // a pixel but not Excel's hinted ones; F50 is the en-US short date against the en-GB oracle.
-    bad.retain(|b| !["E27:", "E40:", "F50:"].iter().any(|k| b.starts_with(k)));
+    // line, Range.Text is the plain string); F50 is the en-US short date against the en-GB
+    // oracle.
+    bad.retain(|b| !["E27:", "F50:"].iter().any(|k| b.starts_with(k)));
     assert!(
         bad.is_empty(),
         "text parity {ok}/{total}:\n{}",

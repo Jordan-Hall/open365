@@ -6,13 +6,123 @@
 //! caller supplies a `measure` function that returns the width of a string in pixels with the
 //! cell's font.
 
-use egui::Color32;
+use std::cell::RefCell;
+use std::collections::HashMap;
+use std::rc::Rc;
+use std::sync::Arc;
+
+use egui::{Color32, FontData};
 use open365_xlsx::{CellValue, HorizontalAlignment, Rgb};
 
-/// Pixels between a cell's edges and its text: 2 px each side plus the 1 px grid line, so a
-/// column of `n` pixels holds text up to `n - 5` pixels wide (checked against Excel's `####`
-/// decisions in `tests/grid_style.rs`).
+/// Pixels between a cell's edges and its text: 2 px each side plus the 1 px grid line. Number
+/// text needs more room than this; see `number_inset_px` in the grid view.
 pub(crate) const TEXT_INSET_PX: f32 = 5.0;
+
+/// A font at one pixel size whose glyph advances come from the TrueType hinting program, as
+/// GDI measures text at screen sizes (Excel decides `####`, General-number shrinking and
+/// overflow with these widths). Advances are whole pixels; there is no kerning.
+pub(crate) struct HintedFace {
+    data: Arc<FontData>,
+    hinter: skrifa::outline::HintingInstance,
+    ppem: f32,
+    advances: RefCell<HashMap<char, Option<f32>>>,
+}
+
+struct NullPen;
+
+impl skrifa::outline::OutlinePen for NullPen {
+    fn move_to(&mut self, _: f32, _: f32) {}
+    fn line_to(&mut self, _: f32, _: f32) {}
+    fn quad_to(&mut self, _: f32, _: f32, _: f32, _: f32) {}
+    fn curve_to(&mut self, _: f32, _: f32, _: f32, _: f32, _: f32, _: f32) {}
+    fn close(&mut self) {}
+}
+
+impl HintedFace {
+    /// `ppem` is the font height in whole pixels (GDI rounds `size * dpi / 72`).
+    pub(crate) fn new(data: Arc<FontData>, ppem: u32) -> Option<Self> {
+        use skrifa::MetadataProvider as _;
+        use skrifa::instance::{LocationRef, Size};
+        use skrifa::outline::{Engine, HintingInstance, HintingOptions, Target};
+        let ppem = ppem.max(1) as f32;
+        let font = skrifa::FontRef::from_index(&data.font, data.index).ok()?;
+        let hinter = HintingInstance::new(
+            &font.outline_glyphs(),
+            Size::new(ppem),
+            LocationRef::default(),
+            HintingOptions {
+                engine: Engine::Interpreter,
+                target: Target::Mono,
+            },
+        )
+        .ok()?;
+        Some(Self {
+            data,
+            hinter,
+            ppem,
+            advances: RefCell::new(HashMap::new()),
+        })
+    }
+
+    /// Hinted advance of `c` in pixels, or `None` when the font has no glyph for it.
+    fn advance(&self, c: char) -> Option<f32> {
+        if let Some(a) = self.advances.borrow().get(&c) {
+            return *a;
+        }
+        let a = self.compute(c);
+        self.advances.borrow_mut().insert(c, a);
+        a
+    }
+
+    fn compute(&self, c: char) -> Option<f32> {
+        use skrifa::MetadataProvider as _;
+        use skrifa::instance::{LocationRef, Size};
+        use skrifa::outline::DrawSettings;
+        let font = skrifa::FontRef::from_index(&self.data.font, self.data.index).ok()?;
+        let gid = font.charmap().map(c)?;
+        let outlines = font.outline_glyphs();
+        let hinted = outlines
+            .get(gid)
+            .and_then(|g| {
+                g.draw(DrawSettings::hinted(&self.hinter, false), &mut NullPen)
+                    .ok()
+            })
+            .and_then(|m| m.advance_width);
+        hinted.or_else(|| {
+            font.glyph_metrics(Size::new(self.ppem), LocationRef::default())
+                .advance_width(gid)
+                .map(f32::round)
+        })
+    }
+
+    /// Width of `text` in pixels, or `None` when a character has no glyph in this font.
+    pub(crate) fn width(&self, text: &str) -> Option<f32> {
+        text.chars()
+            .try_fold(0.0, |w, c| Some(w + self.advance(c)?))
+    }
+}
+
+/// Hinted faces by font data and pixel size.
+#[derive(Default)]
+pub(crate) struct HintCache {
+    faces: HashMap<(usize, u32), Option<Rc<HintedFace>>>,
+}
+
+impl std::fmt::Debug for HintCache {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("HintCache")
+            .field("faces", &self.faces.len())
+            .finish()
+    }
+}
+impl HintCache {
+    pub(crate) fn face(&mut self, data: &Arc<FontData>, ppem: u32) -> Option<Rc<HintedFace>> {
+        self.faces
+            .entry((Arc::as_ptr(data) as usize, ppem))
+            .or_insert_with(|| HintedFace::new(Arc::clone(data), ppem).map(Rc::new))
+            .clone()
+    }
+}
 
 pub(crate) fn color32(c: Rgb) -> Color32 {
     Color32::from_rgb(c.r, c.g, c.b)
@@ -40,7 +150,7 @@ pub(crate) fn effective_horizontal(
 }
 
 /// Rounds half away from zero to `decimals` places, as Excel does, and prints without
-/// trailing zeros. `-0` prints as `0`.
+/// trailing zeros. A negative number that rounds to zero prints as `-0`, as Excel shows it.
 fn fixed(n: f64, decimals: usize) -> String {
     let scale = 10f64.powi(decimals as i32);
     let r = (n.abs() * scale + 0.5).floor() / scale;
@@ -53,7 +163,7 @@ fn fixed(n: f64, decimals: usize) -> String {
             s.pop();
         }
     }
-    if n < 0.0 && s != "0" {
+    if n < 0.0 {
         s.insert(0, '-');
     }
     s
@@ -193,6 +303,30 @@ mod tests {
         assert_eq!(fit(1234567.0, "1234567", 54.0, &mut m), "1E+06");
         assert_eq!(fit(1234567.0, "1234567", 36.0, &mut m), "####");
         assert_eq!(fit(0.000123, "0.000123", 27.0, &mut m), "0");
+    }
+
+    #[test]
+    fn negative_numbers_that_round_to_zero_keep_the_sign() {
+        let mut m = measure;
+        let t = fit_number(-0.25, "-0.25".to_owned(), true, 24.0, &mut m);
+        assert_eq!(t.into_string(), "-0");
+    }
+
+    #[test]
+    fn hinted_advances_are_whole_pixels_from_the_font_program() {
+        // Carlito is metric-compatible with Calibri; at 18 px GDI measures '-' 6, digits 9, '.' 5.
+        let data = Arc::new(FontData::from_static(include_bytes!(
+            "../../../assets/fonts/Carlito-Regular.ttf"
+        )));
+        let face = HintedFace::new(Arc::clone(&data), 18).expect("hinting instance");
+        assert_eq!(face.width("-0.5"), Some(29.0));
+        assert_eq!(face.width("-1"), Some(15.0));
+        assert_eq!(face.width("\u{4e2d}"), None, "no glyph: caller falls back");
+        let mut cache = HintCache::default();
+        assert!(Rc::ptr_eq(
+            &cache.face(&data, 18).unwrap(),
+            &cache.face(&data, 18).unwrap()
+        ));
     }
 
     #[test]

@@ -1,0 +1,5 @@
+feature = "template-macro"
+made_with = "Microsoft Excel 16.0.20430 (Windows)"
+author = "project member"
+expect_dropped = []
+notes = "Macro-enabled Excel template (.xltm) saved by Excel, then the no-op vbaProject.bin from fixtures/docx/template-macro.dotm added (AccessVBOM left untouched); Excel opens it with HasVBProject true and no repair; macros are never executed"

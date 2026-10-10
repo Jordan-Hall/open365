@@ -47,7 +47,7 @@ pub use sheet::{
 pub use sst::{SharedStrings, decode_xstring, encode_xstring};
 pub use styles::{Styles, builtin_number_format};
 pub use workbook::{
-    CellInput, DefinedName, DroppedItem, SheetInfo, SheetKind, SheetState, Workbook,
+    CellInput, DefinedName, DroppedItem, SheetInfo, SheetKind, SheetState, Workbook, WorkbookKind,
 };
 pub use xml::{
     Attr, ElementHead, MAIN_NS, MAIN_NS_STRICT, MAX_XML_DEPTH, ParsedXml, RawXml, XmlElement,

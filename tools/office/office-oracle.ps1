@@ -27,6 +27,7 @@ $failed = 0
 
 function Get-Pids($proc) { @(Get-Process -Name $proc -ErrorAction SilentlyContinue | ForEach-Object Id) }
 function Release($o) { if ($o) { try { [void][Runtime.InteropServices.Marshal]::ReleaseComObject($o) } catch {} } }
+function Is-Word($f) { $f -match '\.(docx|dotx|dotm|docm)$' }
 function Rel($p) { ([IO.Path]::GetRelativePath($root, $p)) -replace '\\', '/' }
 function Col-Letter([int]$n) { $s = ''; while ($n -gt 0) { $m = ($n - 1) % 26; $s = [string][char](65 + $m) + $s; $n = [int][math]::Floor(($n - 1) / 26) }; $s }
 function Write-Json($obj, $file) {
@@ -41,12 +42,12 @@ if ($OutDir) { $OutDir = [IO.Path]::GetFullPath($OutDir) }
 foreach ($p in @($Path)) {
   $rp = (Resolve-Path -LiteralPath $p).Path
   if (Test-Path -LiteralPath $rp -PathType Container) {
-    Get-ChildItem -LiteralPath $rp -Recurse -File -Include *.docx, *.xlsx |
+    Get-ChildItem -LiteralPath $rp -Recurse -File -Include *.docx, *.dotx, *.dotm, *.docm, *.xlsx, *.xltx, *.xltm, *.xlsm |
       Where-Object { $_.Name -notlike '~$*' -and $_.FullName -notlike "$refRoot*" } |
       Sort-Object FullName | ForEach-Object { $files.Add($_.FullName) }
   } else { $files.Add($rp) }
 }
-if ($files.Count -eq 0) { Write-Output 'no .docx/.xlsx files found'; exit 1 }
+if ($files.Count -eq 0) { Write-Output 'no Word/Excel files found'; exit 1 }
 
 $wordBefore = Get-Pids 'WINWORD'; $excelBefore = Get-Pids 'EXCEL'
 $word = $null; $excel = $null; $wordPids = @(); $excelPids = @()
@@ -81,7 +82,7 @@ function Open-Book($path) {
 
 function Reset-App($f) {
   # Office died (RPC error): drop it, kill only our own pids, start a fresh instance on next use.
-  if ($f -like '*.docx') { foreach ($id in $script:wordPids) { Stop-Process -Id $id -Force -ErrorAction SilentlyContinue }; $script:word = $null; $script:wordBefore = Get-Pids 'WINWORD' }
+  if (Is-Word $f) { foreach ($id in $script:wordPids) { Stop-Process -Id $id -Force -ErrorAction SilentlyContinue }; $script:word = $null; $script:wordBefore = Get-Pids 'WINWORD' }
   else { foreach ($id in $script:excelPids) { Stop-Process -Id $id -Force -ErrorAction SilentlyContinue }; $script:excel = $null; $script:excelBefore = Get-Pids 'EXCEL' }
   Start-Sleep -Seconds 1
 }
@@ -89,7 +90,7 @@ function Reset-App($f) {
 function Test-File($f) {
   $doc = $null; $wb = $null
   try {
-    if ($f -like '*.docx') {
+    if (Is-Word $f) {
       $doc = Open-Doc $f
       if ($doc.FullName -ne $f) { return "opened document is not the original file ($($doc.FullName))" }
       if (-not $doc.ReadOnly) { return 'document did not open read-only' }
@@ -184,14 +185,14 @@ function Ref-Xlsx($f) {
 try {
   foreach ($f in $files) {
     $rel = Rel $f
-    if ($f -notmatch '\.(docx|xlsx)$') { $skipped.Add("$rel : unsupported extension"); continue }
+    if ($f -notmatch '\.(docx|dotx|dotm|docm|xlsx|xltx|xltm|xlsm)$') { $skipped.Add("$rel : unsupported extension"); continue }
     if ($Mode -eq 'verify') {
       $reason = Test-File $f
       if ($reason) { Write-Output "FAIL ${rel}: $reason"; $failed++ } else { Write-Output "PASS $rel" }
     } else {
       $done = $false
       for ($attempt = 1; $attempt -le 2 -and -not $done; $attempt++) {
-        try { if ($f -like '*.docx') { Ref-Docx $f } else { Ref-Xlsx $f }; $done = $true }
+        try { if (Is-Word $f) { Ref-Docx $f } else { Ref-Xlsx $f }; $done = $true }
         catch {
           $msg = $_.Exception.Message.Trim()
           if ($attempt -eq 1 -and $msg -match '0x800706|0x80010108|RPC') { Reset-App $f }

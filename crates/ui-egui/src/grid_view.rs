@@ -40,8 +40,8 @@ use open365_xlsx::{
 use crate::a11y;
 use crate::fonts::FontBook;
 use crate::grid_text::{
-    NumberText, TEXT_INSET_PX, color32, effective_horizontal, fill_text, fit_number, is_numeric,
-    overflow_room,
+    HintCache, HintedFace, NumberText, TEXT_INSET_PX, color32, effective_horizontal, fill_text,
+    fit_number, is_numeric, overflow_room,
 };
 
 const ROW_HEADER_W: f32 = 54.0;
@@ -361,6 +361,8 @@ pub struct GridView {
     /// The application syncs a shared font book; a grid with its own syncs it itself.
     owns_fonts: bool,
     painted: RefCell<Vec<PaintedCell>>,
+    /// Hinted glyph advances for the cell text decisions.
+    hints: RefCell<HintCache>,
     /// Message for the status bar, taken by the application each frame.
     pub status: Option<String>,
     /// Milliseconds spent drawing the grid in the last frame.
@@ -436,6 +438,7 @@ impl GridView {
             fonts: Rc::new(RefCell::new(FontBook::new())),
             owns_fonts: true,
             painted: RefCell::new(Vec::new()),
+            hints: RefCell::new(HintCache::default()),
             status: None,
             last_frame_ms: 0.0,
         }
@@ -978,6 +981,7 @@ impl GridView {
                     pal: &pal,
                     fonts: &self.fonts,
                     log: &self.painted,
+                    hints: &self.hints,
                     ppp: ctx.pixels_per_point(),
                 };
                 for region in &regions {
@@ -1349,6 +1353,7 @@ struct Paint<'a> {
     pal: &'a Palette,
     fonts: &'a RefCell<FontBook>,
     log: &'a RefCell<Vec<PaintedCell>>,
+    hints: &'a RefCell<HintCache>,
     ppp: f32,
 }
 
@@ -1560,9 +1565,26 @@ fn paint_region(
     }
 }
 
-/// Width of `text` in device pixels with `font`: the sum of the glyph advances, each rounded to
-/// whole pixels as GDI text does at screen sizes.
-fn text_px(painter: &Painter, text: &str, font: &FontId, ppp: f32) -> f32 {
+/// Pixels of a column that never hold number text: Excel's cell padding, 5 px at 96 dpi
+/// growing with the display dpi (7 px at 120 dpi, probed with `Range.Text` over column
+/// widths), so a column of `n` pixels fits a number up to `n - 7` pixels wide there.
+fn number_inset_px(ppp: f32) -> f32 {
+    (5.0 * ppp - 0.001).ceil()
+}
+
+/// Width of `text` in device pixels with `font`. Excel measures with GDI's hinted advances at
+/// the display dpi, so `hinted` (the font's TrueType hinting at the pixel size) decides when it
+/// has every glyph; otherwise the sum of egui's glyph advances, each rounded to whole pixels.
+fn text_px(
+    painter: &Painter,
+    hinted: Option<&HintedFace>,
+    text: &str,
+    font: &FontId,
+    ppp: f32,
+) -> f32 {
+    if let Some(w) = hinted.and_then(|h| h.width(text)) {
+        return w;
+    }
     let galley = painter.layout_no_wrap(text.to_owned(), font.clone(), Color32::WHITE);
     galley.rows.first().map_or(0.0, |row| {
         row.glyphs
@@ -1578,6 +1600,7 @@ fn shown_text(
     paint: &Paint<'_>,
     item: &Item<'_>,
     font: &FontId,
+    hinted: Option<&HintedFace>,
     avail_px: f32,
 ) -> (String, bool) {
     let wb = paint.wb;
@@ -1586,17 +1609,24 @@ fn shown_text(
         CellValue::Number(n) => {
             let code = format_code(wb, item.cell.style.unwrap_or(0));
             let general = code == "General" || code.is_empty();
-            let mut measure = |s: &str| text_px(painter, s, font, paint.ppp);
+            // General counts the decimal point as wide as a digit when it decides what fits.
+            let mut measure = |s: &str| {
+                if general && s.contains('.') {
+                    text_px(painter, hinted, &s.replace('.', "0"), font, paint.ppp)
+                } else {
+                    text_px(painter, hinted, s, font, paint.ppp)
+                }
+            };
             match fit_number(*n, full, general, avail_px, &mut measure) {
                 NumberText::Text(t) => (t, false),
                 NumberText::Hashes(t) => (t, true),
             }
         }
         CellValue::Error(_) => {
-            if text_px(painter, &full, font, paint.ppp) <= avail_px {
+            if text_px(painter, hinted, &full, font, paint.ppp) <= avail_px {
                 (full, false)
             } else {
-                let one = text_px(painter, "#", font, paint.ppp).max(1.0);
+                let one = text_px(painter, hinted, "#", font, paint.ppp).max(1.0);
                 ("#".repeat(((avail_px / one).floor() as usize).max(1)), true)
             }
         }
@@ -1624,8 +1654,17 @@ fn paint_cell_text(painter: &Painter, paint: &Paint<'_>, item: &Item<'_>, region
     let color = text_color(styles, &font.color, pal);
     let px = |v: f32| v / ppp;
 
-    let avail_px = (r.width() * ppp).round() - TEXT_INSET_PX;
-    let (text, hashes) = shown_text(painter, paint, item, &font_id, avail_px);
+    // GDI font height: whole pixels at the display dpi.
+    let ppem = (font.size * f64::from(BASE_DPI * ppp) / 72.0)
+        .round()
+        .max(1.0) as u32;
+    let hinted = {
+        let data = paint.fonts.borrow().font_data(&face.family);
+        data.and_then(|d| paint.hints.borrow_mut().face(&d, ppem))
+    };
+    let hinted = hinted.as_deref();
+    let avail_px = (r.width() * ppp).round() - number_inset_px(ppp);
+    let (text, hashes) = shown_text(painter, paint, item, &font_id, hinted, avail_px);
     if text.is_empty() {
         return;
     }
@@ -1640,7 +1679,7 @@ fn paint_cell_text(painter: &Painter, paint: &Paint<'_>, item: &Item<'_>, region
     };
 
     // Indent: three space widths per step, on the aligned side.
-    let space = text_px(painter, " ", &font_id, ppp) / ppp;
+    let space = text_px(painter, hinted, " ", &font_id, ppp) / ppp;
     let indent = align.indent as f32 * 3.0 * space;
     let mut inner = Rect::from_min_max(
         Pos2::new(r.left() + px(2.0), r.top()),
@@ -1653,7 +1692,7 @@ fn paint_cell_text(painter: &Painter, paint: &Paint<'_>, item: &Item<'_>, region
     }
     let mut text = text;
     if h == HorizontalAlignment::Fill && is_text {
-        let mut measure = |s: &str| text_px(painter, s, &font_id, ppp);
+        let mut measure = |s: &str| text_px(painter, hinted, s, &font_id, ppp);
         text = fill_text(&text, inner.width() * ppp, &mut measure);
     }
 
@@ -1720,7 +1759,12 @@ fn paint_cell_text(painter: &Painter, paint: &Paint<'_>, item: &Item<'_>, region
     // Where the text may spread: over empty neighbours when it overflows its cell.
     let mut clip = cell_rect;
     let mut area = inner;
-    let overflows = size.x > inner.width() + 0.01;
+    // Overflow is decided with GDI's hinted width of a single line, as Excel does.
+    let text_w = match (hinted, rotation, galley.rows.len()) {
+        (Some(h), Some(0), 1) => h.width(galley.text()).map_or(size.x, |w| w / ppp),
+        _ => size.x,
+    };
+    let overflows = text_w > inner.width() + 0.01;
     let can_overflow =
         is_text && !wrap && !align.shrink_to_fit && !item.merged && rotation == Some(0);
     if h == HorizontalAlignment::CenterContinuous {
@@ -1758,7 +1802,7 @@ fn paint_cell_text(painter: &Painter, paint: &Paint<'_>, item: &Item<'_>, region
                 && layout.merge_at(item.row, c).is_none()
         };
         let width = |c: u32| layout.w(c);
-        let need = size.x - inner.width() + px(TEXT_INSET_PX);
+        let need = text_w - inner.width() + px(TEXT_INSET_PX);
         match h {
             HorizontalAlignment::Right => {
                 let room = overflow_room(item.col, -1, MAX_COL, need, &is_empty, &width);
