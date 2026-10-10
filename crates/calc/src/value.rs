@@ -24,10 +24,26 @@ pub enum ErrorKind {
     Num,
     /// `#N/A`
     NA,
+    /// `#GETTING_DATA`: a value still being fetched. A formula may contain this literal.
+    GettingData,
+    /// `#SPILL!`
+    Spill,
+    /// `#CONNECT!`
+    Connect,
+    /// `#BLOCKED!`
+    Blocked,
+    /// `#UNKNOWN!`
+    Unknown,
+    /// `#FIELD!`
+    Field,
+    /// `#CALC!`
+    Calc,
 }
 
 impl ErrorKind {
-    /// Every error kind, in Excel's error-number order.
+    /// The seven classic error values, in Excel's error-number order. Only these and
+    /// [`ErrorKind::GettingData`] can be typed as literals in a formula (Excel refuses `#SPILL!` and the
+    /// other newer ones).
     pub const ALL: [ErrorKind; 7] = [
         ErrorKind::Null,
         ErrorKind::DivZero,
@@ -37,6 +53,37 @@ impl ErrorKind {
         ErrorKind::Num,
         ErrorKind::NA,
     ];
+
+    /// Every error value Excel has, in `ERROR.TYPE` order (the code is the position plus one).
+    pub const EVERY: [ErrorKind; 14] = [
+        ErrorKind::Null,
+        ErrorKind::DivZero,
+        ErrorKind::Value,
+        ErrorKind::Ref,
+        ErrorKind::Name,
+        ErrorKind::Num,
+        ErrorKind::NA,
+        ErrorKind::GettingData,
+        ErrorKind::Spill,
+        ErrorKind::Connect,
+        ErrorKind::Blocked,
+        ErrorKind::Unknown,
+        ErrorKind::Field,
+        ErrorKind::Calc,
+    ];
+
+    /// What `ERROR.TYPE` returns for this error (1 for `#NULL!` to 14 for `#CALC!`).
+    pub fn type_code(self) -> u8 {
+        ErrorKind::EVERY
+            .iter()
+            .position(|k| *k == self)
+            .map_or(7, |i| i as u8 + 1)
+    }
+
+    /// True for the errors a formula can contain as a literal.
+    pub fn is_formula_literal(self) -> bool {
+        matches!(self, ErrorKind::GettingData) || ErrorKind::ALL.contains(&self)
+    }
 
     /// The text Excel displays for this error.
     pub fn as_str(self) -> &'static str {
@@ -48,12 +95,19 @@ impl ErrorKind {
             ErrorKind::Name => "#NAME?",
             ErrorKind::Num => "#NUM!",
             ErrorKind::NA => "#N/A",
+            ErrorKind::GettingData => "#GETTING_DATA",
+            ErrorKind::Spill => "#SPILL!",
+            ErrorKind::Connect => "#CONNECT!",
+            ErrorKind::Blocked => "#BLOCKED!",
+            ErrorKind::Unknown => "#UNKNOWN!",
+            ErrorKind::Field => "#FIELD!",
+            ErrorKind::Calc => "#CALC!",
         }
     }
 
     /// Parses an error literal such as `#N/A` (case-insensitive).
     pub fn parse(text: &str) -> Option<ErrorKind> {
-        ErrorKind::ALL
+        ErrorKind::EVERY
             .iter()
             .copied()
             .find(|k| k.as_str().eq_ignore_ascii_case(text))

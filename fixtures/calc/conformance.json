@@ -20498,6 +20498,11 @@
     {"id": "lift.t457", "formula": "=ROWS(IF({TRUE,FALSE},1,2))", "cells": {"A1": 1, "A2": -2, "A3": 3, "A4": "x", "B1": 10, "B2": 20, "B3": 30, "C1": 1, "D1": 2, "E1": 3, "F1": "a", "G1": "b", "H1": "c", "J1": 5, "J2": 6, "J3": 7, "M1": "1", "M2": "2", "M3": "x", "N1": "ab", "N2": "cde", "N3": ""}},
     {"id": "lift.t458", "formula": "=COLUMNS(IF({TRUE,FALSE},1,2))", "cells": {"A1": 1, "A2": -2, "A3": 3, "A4": "x", "B1": 10, "B2": 20, "B3": 30, "C1": 1, "D1": 2, "E1": 3, "F1": "a", "G1": "b", "H1": "c", "J1": 5, "J2": 6, "J3": 7, "M1": "1", "M2": "2", "M3": "x", "N1": "ab", "N2": "cde", "N3": ""}},
     {"id": "lift.t459", "formula": "=COLUMNS(IF({TRUE;FALSE},{1,2,3},0))", "cells": {"A1": 1, "A2": -2, "A3": 3, "A4": "x", "B1": 10, "B2": 20, "B3": 30, "C1": 1, "D1": 2, "E1": 3, "F1": "a", "G1": "b", "H1": "c", "J1": 5, "J2": 6, "J3": 7, "M1": "1", "M2": "2", "M3": "x", "N1": "ab", "N2": "cde", "N3": ""}},
-    {"id": "lift.t460", "formula": "=ROWS(IF({TRUE;FALSE},{1,2,3},0))", "cells": {"A1": 1, "A2": -2, "A3": 3, "A4": "x", "B1": 10, "B2": 20, "B3": 30, "C1": 1, "D1": 2, "E1": 3, "F1": "a", "G1": "b", "H1": "c", "J1": 5, "J2": 6, "J3": 7, "M1": "1", "M2": "2", "M3": "x", "N1": "ab", "N2": "cde", "N3": ""}}
+    {"id": "lift.t460", "formula": "=ROWS(IF({TRUE;FALSE},{1,2,3},0))", "cells": {"A1": 1, "A2": -2, "A3": 3, "A4": "x", "B1": 10, "B2": 20, "B3": 30, "C1": 1, "D1": 2, "E1": 3, "F1": "a", "G1": "b", "H1": "c", "J1": 5, "J2": 6, "J3": 7, "M1": "1", "M2": "2", "M3": "x", "N1": "ab", "N2": "cde", "N3": ""}},
+    {"id": "errortype.gd", "formula": "=ERROR.TYPE(#GETTING_DATA)"},
+    {"id": "errortype.gd_plus", "formula": "=ERROR.TYPE(#GETTING_DATA)+0"},
+    {"id": "errortype.gd_iserror", "formula": "=ISERROR(#GETTING_DATA)"},
+    {"id": "errortype.gd_typ", "formula": "=TYPE(#GETTING_DATA)"},
+    {"id": "errortype.gd_str", "formula": "=#GETTING_DATA&\"\""}
   ]
 }

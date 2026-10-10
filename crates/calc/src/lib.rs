@@ -105,6 +105,9 @@ pub struct Engine {
     circular: HashSet<CellId>,
     /// Formulas that call `OFFSET` or `INDIRECT`.
     dynamic: HashSet<CellId>,
+    /// `ISFORMULA` watchers: `(formula cell, sheet, row1, col1, row2, col2)` of the cell it asks about. They are
+    /// recalculated when that cell gains or loses a formula but are not graph dependencies.
+    watchers: Vec<(CellId, u32, u32, u32, u32, u32)>,
     all_dirty: bool,
 }
 
@@ -132,6 +135,7 @@ impl Engine {
             dirty: HashSet::new(),
             circular: HashSet::new(),
             dynamic: HashSet::new(),
+            watchers: Vec::new(),
             all_dirty: false,
         }
     }
@@ -245,10 +249,24 @@ impl Engine {
         self.dirty.remove(&id);
         self.circular.remove(&id);
         self.dynamic.remove(&id);
+        self.watchers.retain(|w| w.0 != id);
     }
 
     fn mark_dependents(&mut self, id: CellId) {
-        let dependents = self.graph.dirty_from(&[id]);
+        let mut roots = vec![id];
+        roots.extend(
+            self.watchers
+                .iter()
+                .filter(|&&(watcher, sheet, r1, c1, r2, c2)| {
+                    watcher != id
+                        && sheet == id.sheet
+                        && (r1..=r2).contains(&id.row)
+                        && (c1..=c2).contains(&id.col)
+                })
+                .map(|w| w.0),
+        );
+        let mut dependents = self.graph.dirty_from(&roots);
+        dependents.extend(roots.into_iter().skip(1));
         self.dirty.extend(dependents);
     }
 
@@ -322,6 +340,11 @@ impl Engine {
         self.graph.set_formula(id, graph_deps, deps.volatile);
         if deps.dynamic {
             self.dynamic.insert(id);
+        }
+        for w in &deps.watched {
+            let sheet = self.intern_sheet(&w.sheet);
+            self.watchers
+                .push((id, sheet, w.row1, w.col1, w.row2, w.col2));
         }
         for name in &deps.names {
             self.name_users

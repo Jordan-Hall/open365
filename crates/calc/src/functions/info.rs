@@ -79,13 +79,7 @@ pub(super) fn type_(ctx: &EvalContext<'_>, args: &[Arg]) -> Res<Value> {
 pub(super) fn error_type(ctx: &EvalContext<'_>, args: &[Arg]) -> Res<Value> {
     arity(args, 1, 1)?;
     match ctx.scalar(&args[0]) {
-        Value::Error(e) => {
-            let code = ErrorKind::ALL
-                .iter()
-                .position(|k| *k == e)
-                .map_or(7, |i| i + 1);
-            Ok(Value::Number(code as f64))
-        }
+        Value::Error(e) => Ok(Value::Number(f64::from(e.type_code()))),
         _ => Err(ErrorKind::NA),
     }
 }

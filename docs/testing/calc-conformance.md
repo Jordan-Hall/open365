@@ -5,7 +5,7 @@ never needs Excel.
 
 | File | Role |
 |---|---|
-| `fixtures/calc/conformance.json` | The corpus: 20,496 cases. Edited by hand or by script; one case per line. |
+| `fixtures/calc/conformance.json` | The corpus: 20,501 cases. Edited by hand or by script; one case per line. |
 | `tools/office/calc-oracle.ps1` | Local-only tool. Runs every case in Excel over COM and writes the results. |
 | `fixtures/reference/calc/conformance-results.json` | Excel's answers, committed. Includes Excel version, build and decimal separator. |
 | `fixtures/calc/known-differences.toml` | Cases where Open365 intentionally or temporarily differs, each with a reason. |
@@ -66,9 +66,9 @@ forms; the corpus has no case for them.
 
 ## Current state
 
-20,496 cases, 20,425 pass (99.65%), 71 known differences (listed with reasons in `known-differences.toml`: the `**` parse
+20,501 cases, 20,433 pass (99.67%), 68 known differences (listed with reasons in `known-differences.toml`: the `**` parse
 quirk, XLOOKUP array results (no spill), a few undocumented Excel quirks, large COMBIN, trigonometric last digits, variance
-accumulation order, accounting fill, `ISFORMULA` of its own cell, and arrays of references returned by `OFFSET`/`INDIRECT`
+accumulation order, accounting fill, and arrays of references returned by `OFFSET`/`INDIRECT`
 for array arguments, which Open365 does not model). The test also fails for a corpus case without an Excel
 result or a stored result without a case.
 
@@ -206,3 +206,13 @@ Added with array lifting and the info/logic/reference batch (groups `lift`, `ise
   cannot be 16384 columns. `INDIRECT` rejects leading spaces, operators and several `!`; relative R1C1 wraps at the sheet edge.
 * `OFFSET`/`INDIRECT` are re-evaluated (with everything downstream) until values stop changing, so chains settle
   after `set_value` + `recalc_dirty`. `OFFSET`'s base reference is not a dependency.
+
+Added with the error-literal batch: `ErrorKind` now has all 14 `ERROR.TYPE` kinds (`#GETTING_DATA` 8, `#SPILL!` 9, `#CONNECT!` 10,
+`#BLOCKED!` 11, `#UNKNOWN!` 12, `#FIELD!` 13, `#CALC!` 14). Only the seven classic errors and `#GETTING_DATA` parse as formula
+literals; Excel refuses the others (`ErrorKind::is_formula_literal`). The oracle names unknown error codes `#UNKNOWN(code)`; the test
+reads the name from `Range.Text`. `ISFORMULA(A1)` watches A1 without depending on its value, so `ISFORMULA` of its own cell is TRUE.
+
+Measured, not implemented yet (financial batch): Excel computes `(1+r)^n` for integer `n` by right-to-left binary exponentiation
+(120 of 120 probes bit-exact; fractional `n` is `exp(n*ln x)`), and `PV` is `-(fv + pmt*((q-1)/r*(1+r))) / q` (type 1 multiplies the
+annuity factor), `FV` likewise. `PMT` does not follow the closed form `-(fv+pv*q)*r/((q-1)*k)`; its last digits differ (for example
+`PMT(0.05,1,-1,0)` is 1.0499999999999998). Numeric literals are cut to 15 digits, so test with the cut value.

@@ -199,10 +199,13 @@ fn tokenize(src: &str, base: usize) -> Result<Vec<Token>, ParseError> {
             }
             '#' => {
                 let rest = &src[chars[i].0..];
-                let found = ErrorKind::ALL.iter().find(|k| {
-                    rest.get(..k.as_str().len())
-                        .is_some_and(|p| p.eq_ignore_ascii_case(k.as_str()))
-                });
+                let found = ErrorKind::EVERY
+                    .iter()
+                    .filter(|k| k.is_formula_literal())
+                    .find(|k| {
+                        rest.get(..k.as_str().len())
+                            .is_some_and(|p| p.eq_ignore_ascii_case(k.as_str()))
+                    });
                 let Some(kind) = found else {
                     return err(ParseErrorKind::UnexpectedChar('#'), pos);
                 };

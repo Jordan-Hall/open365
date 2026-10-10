@@ -173,7 +173,14 @@ fn compare(expected: &Expected, outcome: &Outcome) -> Option<String> {
                 }
                 ("text", Value::Text(a), Some(serde_json::Value::String(e))) => a == e,
                 ("bool", Value::Bool(a), Some(serde_json::Value::Bool(e))) => a == e,
-                ("error", Value::Error(a), Some(serde_json::Value::String(e))) => a.as_str() == e,
+                ("error", Value::Error(a), Some(serde_json::Value::String(e))) => {
+                    // The oracle names only the classic errors; others are `#UNKNOWN(code)` with the name in `Range.Text`.
+                    let name = match (e.starts_with("#UNKNOWN("), expected.text.as_deref()) {
+                        (true, Some(t)) => t,
+                        _ => e.as_str(),
+                    };
+                    a.as_str() == name
+                }
                 _ => false,
             };
             if ok {

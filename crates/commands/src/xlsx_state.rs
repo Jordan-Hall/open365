@@ -242,7 +242,9 @@ fn to_calc_value(v: &CellValue) -> Value {
             CellError::Ref => ErrorKind::Ref,
             CellError::Name => ErrorKind::Name,
             CellError::Num => ErrorKind::Num,
-            CellError::NA | CellError::GettingData | CellError::Other(_) => ErrorKind::NA,
+            CellError::NA => ErrorKind::NA,
+            CellError::GettingData => ErrorKind::GettingData,
+            CellError::Other(code) => ErrorKind::parse(code).unwrap_or(ErrorKind::NA),
         }),
         other => Value::Text(other.as_text().unwrap_or_default().to_owned()),
     }
@@ -264,6 +266,8 @@ fn to_cell_value(v: &Value) -> CellValue {
             ErrorKind::Name => CellError::Name,
             ErrorKind::Num => CellError::Num,
             ErrorKind::NA => CellError::NA,
+            ErrorKind::GettingData => CellError::GettingData,
+            other => CellError::Other(other.as_str().into()),
         }),
         Value::Array(_) => CellValue::Error(CellError::Value),
     }

@@ -20498,6 +20498,11 @@
     {"id": "lift.t457", "kind": "number", "value": 1, "text": "1"},
     {"id": "lift.t458", "kind": "number", "value": 2, "text": "2"},
     {"id": "lift.t459", "kind": "number", "value": 3, "text": "3"},
-    {"id": "lift.t460", "kind": "number", "value": 2, "text": "2"}
+    {"id": "lift.t460", "kind": "number", "value": 2, "text": "2"},
+    {"id": "errortype.gd", "kind": "number", "value": 8, "text": "8"},
+    {"id": "errortype.gd_plus", "kind": "number", "value": 8, "text": "8"},
+    {"id": "errortype.gd_iserror", "kind": "bool", "value": true, "text": "TRUE"},
+    {"id": "errortype.gd_typ", "kind": "number", "value": 16, "text": "16"},
+    {"id": "errortype.gd_str", "kind": "error", "value": "#UNKNOWN(-2146826245)", "text": "#GETTING_DATA"}
   ]
 }

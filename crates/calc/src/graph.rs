@@ -393,6 +393,9 @@ pub struct Deps {
     pub dynamic: bool,
     /// The formula calls `SUBTOTAL` or `AGGREGATE`, so other subtotals skip its cell.
     pub subtotal: bool,
+    /// Cells the formula only asks about (`ISFORMULA(A1)`): the answer changes when the cell gains or loses a
+    /// formula, but never depends on its value, so these are not dependencies (`=ISFORMULA(A1)` in A1 is no cycle).
+    pub watched: Vec<SheetRect>,
 }
 
 /// Collects the references, defined names and volatility of a formula. `resolve` expands
@@ -452,8 +455,15 @@ fn walk(ast: &Ast, sheet: &str, resolve: &dyn Fn(&str) -> Option<Ast>, out: &mut
                 .iter()
                 .any(|n| n.eq_ignore_ascii_case(name));
             let offset = name.eq_ignore_ascii_case("OFFSET");
+            let is_formula = name.eq_ignore_ascii_case("ISFORMULA");
             for (i, a) in args.iter().enumerate() {
                 let literal = matches!(a, Ast::Ref(_) | Ast::Area(_));
+                if literal && is_formula {
+                    let mut seen = Deps::default();
+                    walk(a, sheet, resolve, &mut seen, depth);
+                    out.watched.extend(seen.refs);
+                    continue;
+                }
                 if literal && (position_only || offset && i == 0) {
                     continue;
                 }
