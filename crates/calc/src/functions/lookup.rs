@@ -1,15 +1,17 @@
 //! Lookup and reference functions: `VLOOKUP`, `HLOOKUP`, `INDEX`, `MATCH`, `XLOOKUP`, `CHOOSE`.
 //!
-//! Approximate matches scan forward and stop at the first element larger than the lookup
-//! value, which gives Excel's answer on sorted data. Only elements of the same type as the
-//! lookup value are considered (numbers never match text).
+//! Exact matches compare numbers bit for bit (unlike `=`, which equates values equal to 15 digits).
+//! An ascending approximate match (`MATCH` type 1, `VLOOKUP` without FALSE) is the binary search Excel
+//! runs, so unsorted data gives Excel's answer, not the "right" one. `MATCH` type -1 scans forward: it
+//! returns an exact hit at once, otherwise the last element before the first smaller one. Only elements of
+//! the same type as the lookup value are considered (numbers never match text).
 
 use std::cmp::Ordering;
 
 use super::criteria::{has_wildcards, wildcard_match};
 use super::{Res, arity, bool_arg, int_arg, num_arg, optional, scalar};
-use crate::eval::{Arg, EvalContext, Grid};
-use crate::value::{ErrorKind, Value, compare_numbers, compare_text, compare_values};
+use crate::eval::{Arg, EvalContext, Grid, RangeRef};
+use crate::value::{ErrorKind, Value, compare_text, compare_values};
 
 fn class(v: &Value) -> u8 {
     match v {
@@ -21,16 +23,18 @@ fn class(v: &Value) -> u8 {
     }
 }
 
+/// The value to look for; `MATCH` and `VLOOKUP` refuse text longer than 255 characters.
 fn lookup_value(ctx: &EvalContext<'_>, arg: &Arg) -> Res<Value> {
     Ok(match scalar(ctx, arg)? {
         Value::Empty => Value::Number(0.0),
+        Value::Text(t) if t.chars().count() > 255 => return Err(ErrorKind::Value),
         v => v,
     })
 }
 
 fn exact_eq(lookup: &Value, cell: &Value, wildcards: bool) -> bool {
     match (lookup, cell) {
-        (Value::Number(a), Value::Number(b)) => compare_numbers(*a, *b) == Ordering::Equal,
+        (Value::Number(a), Value::Number(b)) => a == b,
         (Value::Text(a), Value::Text(b)) => {
             if wildcards && has_wildcards(a) {
                 wildcard_match(a, b)
@@ -39,6 +43,7 @@ fn exact_eq(lookup: &Value, cell: &Value, wildcards: bool) -> bool {
             }
         }
         (Value::Bool(a), Value::Bool(b)) => a == b,
+        (Value::Empty, Value::Empty) => true,
         (Value::Error(a), Value::Error(b)) => a == b,
         _ => false,
     }
@@ -59,23 +64,47 @@ fn find_exact(
     order.find(|&i| exact_eq(lookup, &get(i), wildcards))
 }
 
-/// Last element not greater than `lookup` in an ascending sequence.
+/// Excel's ascending approximate search: a binary search that keeps going right on equality, so duplicates
+/// give the last one. Elements of another type than the lookup value are skipped.
 fn find_last_le(lookup: &Value, n: usize, get: &dyn Fn(usize) -> Value) -> Option<usize> {
-    let mut best = None;
-    for i in 0..n {
-        let v = get(i);
-        if class(&v) != class(lookup) {
+    let (mut lo, mut hi) = (0isize, n as isize - 1); // inclusive bounds
+    let (mut equal, mut below) = (None, None);
+    while lo <= hi {
+        let probe = (lo + hi) / 2;
+        // Step left past elements of another type.
+        let mut mid = probe;
+        while mid >= lo && class(&get(mid as usize)) != class(lookup) {
+            mid -= 1;
+        }
+        if mid < lo {
+            lo = probe + 1;
             continue;
         }
-        if compare_values(&v, lookup) == Ordering::Greater {
-            break;
+        match compare_exact(&get(mid as usize), lookup) {
+            Ordering::Greater => hi = mid - 1,
+            Ordering::Equal => {
+                equal = Some(mid as usize);
+                lo = mid + 1;
+            }
+            Ordering::Less => {
+                below = Some(mid as usize);
+                lo = mid + 1;
+            }
         }
-        best = Some(i);
     }
-    best
+    equal.or(below)
 }
 
-/// Last element not less than `lookup` in a descending sequence.
+/// Ordering for lookups: numbers exactly, everything else as the comparison operators do.
+fn compare_exact(a: &Value, b: &Value) -> Ordering {
+    match (a, b) {
+        (Value::Number(x), Value::Number(y)) => x.partial_cmp(y).unwrap_or(Ordering::Equal),
+        _ => compare_values(a, b),
+    }
+}
+
+/// `MATCH` type -1: an exact hit wins; otherwise the last element not smaller than `lookup`, scanning
+/// forward until the first smaller one.
 fn find_last_ge(lookup: &Value, n: usize, get: &dyn Fn(usize) -> Value) -> Option<usize> {
     let mut best = None;
     for i in 0..n {
@@ -83,10 +112,11 @@ fn find_last_ge(lookup: &Value, n: usize, get: &dyn Fn(usize) -> Value) -> Optio
         if class(&v) != class(lookup) {
             continue;
         }
-        if compare_values(&v, lookup) == Ordering::Less {
-            break;
+        match compare_exact(&v, lookup) {
+            Ordering::Equal => return Some(i),
+            Ordering::Less => break,
+            Ordering::Greater => best = Some(i),
         }
-        best = Some(i);
     }
     best
 }
@@ -98,17 +128,12 @@ fn table_grid<'a>(ctx: &'a EvalContext<'a>, arg: &'a Arg) -> Res<Grid<'a>> {
     }
 }
 
-fn blank_to_zero(v: Value) -> Value {
-    if v == Value::Empty {
-        Value::Number(0.0)
-    } else {
-        v
-    }
-}
-
 fn table_lookup(ctx: &EvalContext<'_>, args: &[Arg], vertical: bool) -> Res<Value> {
     arity(args, 3, 4)?;
     let lookup = lookup_value(ctx, &args[0])?;
+    if matches!(args[1], Arg::Value(_)) {
+        return Err(ErrorKind::NA);
+    }
     let grid = table_grid(ctx, &args[1])?;
     let index = int_arg(ctx, &args[2])?;
     let approximate = match args.get(3) {
@@ -145,7 +170,7 @@ fn table_lookup(ctx: &EvalContext<'_>, args: &[Arg], vertical: bool) -> Res<Valu
     } else {
         grid.get(index as usize - 1, pos)
     };
-    Ok(blank_to_zero(cell))
+    Ok(cell)
 }
 
 pub(super) fn vlookup(ctx: &EvalContext<'_>, args: &[Arg]) -> Res<Value> {
@@ -170,6 +195,9 @@ fn vector_shape(grid: &Grid<'_>) -> Res<(bool, usize)> {
 pub(super) fn match_(ctx: &EvalContext<'_>, args: &[Arg]) -> Res<Value> {
     arity(args, 2, 3)?;
     let lookup = lookup_value(ctx, &args[0])?;
+    if matches!(args[1], Arg::Value(_)) {
+        return Err(ErrorKind::NA);
+    }
     let grid = table_grid(ctx, &args[1])?;
     let match_type = match optional(args, 2) {
         None => 1.0,
@@ -195,17 +223,28 @@ pub(super) fn match_(ctx: &EvalContext<'_>, args: &[Arg]) -> Res<Value> {
         .ok_or(ErrorKind::NA)
 }
 
-pub(super) fn index(ctx: &EvalContext<'_>, args: &[Arg]) -> Res<Value> {
-    arity(args, 2, 3)?;
+pub(super) fn index(ctx: &EvalContext<'_>, args: &[Arg]) -> Arg {
+    match index_inner(ctx, args) {
+        Ok(arg) => arg,
+        Err(e) => Arg::error(e),
+    }
+}
+
+fn index_inner(ctx: &EvalContext<'_>, args: &[Arg]) -> Res<Arg> {
+    arity(args, 2, 4)?;
+    if args.len() == 4 && int_arg(ctx, &args[3])? != 1 {
+        return Err(ErrorKind::Ref);
+    }
     let grid = table_grid(ctx, &args[0])?;
     let (rows, cols) = (grid.rows(), grid.cols());
     let first = int_arg(ctx, &args[1])?;
-    let second = optional(args, 2).map(|a| int_arg(ctx, a)).transpose()?;
+    // An empty second index counts as 0 (the whole row).
+    let second = args.get(2).map(|a| int_arg(ctx, a)).transpose()?;
     let (r, c) = match second {
         Some(c) => (first, c),
         None if rows == 1 => (1, first),
         None if cols == 1 => (first, 1),
-        None => (first, 0),
+        None => return Err(ErrorKind::Ref),
     };
     if r < 0 || c < 0 {
         return Err(ErrorKind::Value);
@@ -214,26 +253,44 @@ pub(super) fn index(ctx: &EvalContext<'_>, args: &[Arg]) -> Res<Value> {
     if r > rows || c > cols {
         return Err(ErrorKind::Ref);
     }
-    let row_span = if matches!(args[0], Arg::Range(_)) {
-        grid.scan_rows()
-    } else {
-        rows
-    };
-    Ok(match (r, c) {
+    if let Arg::Range(range) = &args[0] {
+        // A reference in, a reference out: blank cells stay blank and `A1:INDEX(...)` works.
+        let (row1, row2) = if r == 0 {
+            (range.row1, range.row2)
+        } else {
+            let row = range.row1 + r as u32 - 1;
+            (row, row)
+        };
+        let (col1, col2) = if c == 0 {
+            (range.col1, range.col2)
+        } else {
+            let col = range.col1 + c as u32 - 1;
+            (col, col)
+        };
+        return Ok(Arg::Range(RangeRef::new(
+            &range.sheet,
+            row1,
+            col1,
+            row2,
+            col2,
+        )));
+    }
+    Ok(Arg::from_value(match (r, c) {
         (r, c) if r > 0 && c > 0 => grid.get(r - 1, c - 1),
-        (0, c) if c > 0 => Value::Array((0..row_span).map(|i| vec![grid.get(i, c - 1)]).collect()),
+        (0, c) if c > 0 => Value::Array((0..rows).map(|i| vec![grid.get(i, c - 1)]).collect()),
         (r, 0) if r > 0 => Value::Array(vec![(0..cols).map(|j| grid.get(r - 1, j)).collect()]),
         _ => Value::Array(
-            (0..row_span)
+            (0..rows)
                 .map(|i| (0..cols).map(|j| grid.get(i, j)).collect())
                 .collect(),
         ),
-    })
+    }))
 }
 
 pub(super) fn xlookup(ctx: &EvalContext<'_>, args: &[Arg]) -> Res<Value> {
     arity(args, 3, 6)?;
-    let lookup = lookup_value(ctx, &args[0])?;
+    // A blank lookup value matches blank cells (not zero).
+    let lookup = scalar(ctx, &args[0])?;
     let keys = table_grid(ctx, &args[1])?;
     let results = table_grid(ctx, &args[2])?;
     let match_mode = match optional(args, 4) {
@@ -245,6 +302,10 @@ pub(super) fn xlookup(ctx: &EvalContext<'_>, args: &[Arg]) -> Res<Value> {
         Some(a) => int_arg(ctx, a)?,
     };
     if !(-1..=2).contains(&match_mode) || !matches!(search_mode, -2 | -1 | 1 | 2) {
+        return Err(ErrorKind::Value);
+    }
+    // Wildcard matching cannot be combined with a binary search.
+    if match_mode == 2 && search_mode.abs() == 2 {
         return Err(ErrorKind::Value);
     }
     let (vertical, n) = vector_shape(&keys).map_err(|_| ErrorKind::Value)?;
@@ -265,9 +326,19 @@ pub(super) fn xlookup(ctx: &EvalContext<'_>, args: &[Arg]) -> Res<Value> {
         }
     };
     let reverse = search_mode < 0;
-    let mut found = find_exact(&lookup, n, &get, reverse, match_mode == 2);
-    if found.is_none() && (match_mode == 1 || match_mode == -1) {
-        found = nearest(&lookup, n, &get, reverse, match_mode == 1);
+    let mut found = if search_mode.abs() == 2 {
+        binary_search(&lookup, n, &get, reverse, match_mode)
+    } else {
+        let mut f = find_exact(&lookup, n, &get, reverse, match_mode == 2);
+        if f.is_none() && (match_mode == 1 || match_mode == -1) {
+            f = nearest(&lookup, n, &get, reverse, match_mode == 1);
+        }
+        f
+    };
+    let full_len = if vertical { keys.rows() } else { keys.cols() };
+    if found.is_none() && lookup == Value::Empty && n < full_len {
+        // The blank cells past the used area of a whole-column reference.
+        found = Some(n);
     }
     let Some(i) = found else {
         return match optional(args, 3) {
@@ -294,6 +365,55 @@ pub(super) fn xlookup(ctx: &EvalContext<'_>, args: &[Arg]) -> Res<Value> {
     })
 }
 
+/// `XLOOKUP` with `search_mode` 2 (ascending data) or -2 (descending data): a plain binary search that
+/// trusts the order, so unsorted data gives Excel's answer. The nearest-match candidate is the last probe on
+/// the smaller (`match_mode` -1) or larger (1) side.
+fn binary_search(
+    lookup: &Value,
+    n: usize,
+    get: &dyn Fn(usize) -> Value,
+    descending: bool,
+    match_mode: i64,
+) -> Option<usize> {
+    let (mut lo, mut hi) = (0isize, n as isize - 1);
+    let mut candidate = None;
+    let mut equal = None;
+    while lo <= hi {
+        let mid = (lo + hi) / 2;
+        let v = get(mid as usize);
+        let ord = if class(&v) == class(lookup) {
+            compare_exact(&v, lookup)
+        } else {
+            Ordering::Less
+        };
+        let ord = if descending { ord.reverse() } else { ord };
+        match ord {
+            // Among equal keys the search keeps going to the first one (ascending) or last one (descending).
+            Ordering::Equal => {
+                equal = Some(mid as usize);
+                if descending {
+                    lo = mid + 1;
+                } else {
+                    hi = mid - 1;
+                }
+            }
+            Ordering::Less => {
+                if match_mode == -1 && !descending || match_mode == 1 && descending {
+                    candidate = Some(mid as usize);
+                }
+                lo = mid + 1;
+            }
+            Ordering::Greater => {
+                if match_mode == 1 && !descending || match_mode == -1 && descending {
+                    candidate = Some(mid as usize);
+                }
+                hi = mid - 1;
+            }
+        }
+    }
+    equal.or(if match_mode == 0 { None } else { candidate })
+}
+
 /// Closest smaller (or larger) element of the same type, first in search order on ties.
 fn nearest(
     lookup: &Value,
@@ -315,12 +435,12 @@ fn nearest(
     };
     for i in order {
         let v = get(i);
-        if class(&v) != class(lookup) || compare_values(&v, lookup) != wanted {
+        if class(&v) != class(lookup) || compare_exact(&v, lookup) != wanted {
             continue;
         }
         let better = match &best {
             None => true,
-            Some((_, b)) => compare_values(&v, b) == wanted.reverse(),
+            Some((_, b)) => compare_exact(&v, b) == wanted.reverse(),
         };
         if better {
             best = Some((i, v));
@@ -332,6 +452,17 @@ fn nearest(
 pub(super) fn choose(ctx: &EvalContext<'_>, args: &[Arg]) -> Arg {
     if args.len() < 2 {
         return Arg::error(ErrorKind::Value);
+    }
+    // An array of indexes picks one value per element.
+    if let Arg::Array(rows) = &args[0] {
+        let pick = |v: &Value| -> Value {
+            match v.to_number_in(ctx.date1904).map(f64::trunc) {
+                Ok(n) if n >= 1.0 && n < args.len() as f64 => ctx.scalar(&args[n as usize]),
+                Ok(_) => Value::Error(ErrorKind::Value),
+                Err(e) => Value::Error(e),
+            }
+        };
+        return Arg::Array(rows.iter().map(|r| r.iter().map(pick).collect()).collect());
     }
     let index = match num_arg(ctx, &args[0]) {
         Ok(n) => n.trunc(),

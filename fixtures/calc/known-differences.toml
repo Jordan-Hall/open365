@@ -1,0 +1,58 @@
+# Cases where Open365 differs from Excel (see docs/testing/calc-conformance.md). Every entry needs a concrete
+# reason; an entry whose case starts to pass makes the conformance test fail, so this list can only shrink.
+
+[[difference]]
+id = "parse.double_mul"
+reason = "Excel parses `a**b` as a*10^b (`1**2` is 100, `2**3` is 2000), an undocumented quirk; Open365 rejects `**`."
+
+[[difference]]
+id = "countif.t71"
+reason = "COUNTIF criterion `*~` (trailing tilde) matches every non-blank cell in Excel; the rule behind it is unknown."
+
+[[difference]]
+id = "iferror.to_ref"
+reason = "Excel refuses IFERROR as the operand of `:` (formula rejected); Open365 accepts it and evaluates the range."
+
+[[difference]]
+id = "ifna.to_ref"
+reason = "Excel refuses IFNA as the operand of `:` (formula rejected); Open365 accepts it and evaluates the range."
+
+[[difference]]
+id = "xlookup.misc_multi_col_result"
+reason = "A multi-column XLOOKUP result is an array; Excel (non-array Range.Formula) shows #VALUE!, Open365 shows the first element. Spill is not implemented."
+
+[[difference]]
+id = "xlookup.isect_result"
+reason = "Same as xlookup.misc_multi_col_result, with the formula cell beside the result rows."
+
+[[difference]]
+id = "xlookup.misc_mm_bad"
+reason = "Excel accepts match_mode 3 for XLOOKUP (undocumented) and behaves like an exact match; Open365 returns #VALUE!."
+
+[[difference]]
+id = "left.float_exact"
+reason = "Excel reads the literal 2.9999999999999999 as 3 here although it cuts other literals of 16+ digits to 15 digits; unexplained."
+
+[[difference]]
+id = "right.float_exact"
+reason = "Same as left.float_exact."
+
+[[difference]]
+id = "concat.long"
+reason = "Excel returns an error with code -2146826238 (not one of the seven classic errors) when CONCAT exceeds 32,767 characters; Open365 returns #VALUE!."
+
+[[difference]]
+id = "concat.one_over"
+reason = "Same as concat.long."
+
+[[difference]]
+id = "textjoin.long"
+reason = "Same as concat.long, for TEXTJOIN."
+
+[[difference]]
+id = "date.big_day"
+reason = "DATE(2024,1,1000000) is 78058 in Excel (the day number wraps in a way that is not understood); Open365 computes the calendar date."
+
+[[difference]]
+id = "date.huge_day"
+reason = "DATE(2024,1,1E10) is 78058 in Excel (same wrap as date.big_day); Open365 returns #NUM!."

@@ -6,6 +6,7 @@
 //! in-memory workbook that ties them together. All coordinates are 1-based.
 
 pub mod ast;
+mod collate;
 pub mod eval;
 pub mod functions;
 pub mod graph;
@@ -15,7 +16,7 @@ pub mod value;
 use std::collections::{HashMap, HashSet};
 
 pub use ast::{Ast, to_formula_string};
-pub use eval::{CellSource, Clock, EvalContext, FixedClock, SystemClock, evaluate};
+pub use eval::{CellSource, Clock, EvalContext, FixedClock, SystemClock, evaluate, evaluate_root};
 pub use parser::{ParseError, ParseErrorKind, parse_formula};
 pub use value::{ErrorKind, Value};
 
@@ -36,6 +37,31 @@ pub struct CellAddr {
 struct Formula {
     ast: Ast,
     names: Vec<String>,
+    /// The outermost add/subtract may snap a near-zero result to zero (false for `=(A1-B1)`).
+    snap_root: bool,
+}
+
+/// True when the whole formula text sits inside one pair of parentheses, as in `=(A1-B1)`.
+fn fully_parenthesized(formula: &str) -> bool {
+    let text = formula.trim().trim_start_matches('=').trim();
+    if !text.starts_with('(') {
+        return false;
+    }
+    let (mut depth, mut in_string) = (0usize, false);
+    for (i, c) in text.char_indices() {
+        match c {
+            '"' => in_string = !in_string,
+            '(' if !in_string => depth += 1,
+            ')' if !in_string => {
+                depth -= 1;
+                if depth == 0 {
+                    return i + 1 == text.len();
+                }
+            }
+            _ => {}
+        }
+    }
+    false
 }
 
 #[derive(Debug)]
@@ -257,11 +283,11 @@ impl Engine {
     ) -> Result<(), ParseError> {
         let ast = parse_formula(formula)?;
         let id = self.id(sheet, row, col);
-        self.install_formula(id, ast);
+        self.install_formula(id, ast, !fully_parenthesized(formula));
         Ok(())
     }
 
-    fn install_formula(&mut self, id: CellId, ast: Ast) {
+    fn install_formula(&mut self, id: CellId, ast: Ast, snap_root: bool) {
         let previous = self.sheets[id.sheet as usize]
             .cells
             .get(&(id.row, id.col))
@@ -296,6 +322,7 @@ impl Engine {
                 formula: Some(Formula {
                     ast,
                     names: deps.names,
+                    snap_root,
                 }),
             },
         );
@@ -325,13 +352,13 @@ impl Engine {
             .map(|s| s.iter().copied().collect())
             .unwrap_or_default();
         for id in users {
-            let ast = self.sheets[id.sheet as usize]
+            let formula = self.sheets[id.sheet as usize]
                 .cells
                 .get(&(id.row, id.col))
                 .and_then(|c| c.formula.as_ref())
-                .map(|f| f.ast.clone());
-            if let Some(ast) = ast {
-                self.install_formula(id, ast);
+                .map(|f| (f.ast.clone(), f.snap_root));
+            if let Some((ast, snap_root)) = formula {
+                self.install_formula(id, ast, snap_root);
             }
         }
     }
@@ -400,6 +427,8 @@ impl Engine {
             self.dirty.extend(volatile);
             self.dirty.extend(downstream);
         }
+        // One reading of the clock per pass, so `NOW()-NOW()` is 0 as in Excel.
+        let now = FixedClock(self.clock.now_unix_seconds());
         let dirty = std::mem::take(&mut self.dirty);
         let plan = self.graph.plan(&dirty);
         let mut recomputed = Vec::with_capacity(plan.order.len());
@@ -409,7 +438,7 @@ impl Engine {
                 Value::Number(0.0)
             } else {
                 self.circular.remove(&id);
-                self.eval_cell(id)
+                self.eval_cell(id, &now)
             };
             if let Some(cell) = self.sheets[id.sheet as usize]
                 .cells
@@ -428,7 +457,7 @@ impl Engine {
         self.recalc_dirty()
     }
 
-    fn eval_cell(&self, id: CellId) -> Value {
+    fn eval_cell(&self, id: CellId, clock: &dyn Clock) -> Value {
         let sheet = &self.sheets[id.sheet as usize];
         let Some(formula) = sheet
             .cells
@@ -442,9 +471,9 @@ impl Engine {
             sheet: &sheet.name,
             cell: Some((id.row, id.col)),
             date1904: self.date1904,
-            clock: &*self.clock,
+            clock,
         };
-        evaluate(&formula.ast, &ctx)
+        evaluate_root(&formula.ast, &ctx, formula.snap_root)
     }
 }
 

@@ -10,37 +10,61 @@ use super::{Res, arity, number};
 use crate::eval::{Arg, EvalContext, Grid};
 use crate::value::{ErrorKind, Value, compare_numbers, compare_text, parse_number_text};
 
+/// Wildcard patterns work on UTF-16 code units, like Excel: `?` matches one unit, so an emoji needs `??`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Pat {
-    Lit(char),
+    Lit(u16),
     Any,
     Star,
 }
 
-fn fold(c: char) -> char {
-    c.to_lowercase().next().unwrap_or(c)
+fn fold(u: u16) -> u16 {
+    match char::from_u32(u32::from(u)) {
+        Some(c) => {
+            let mut lower = c.to_lowercase();
+            match (lower.next(), lower.next()) {
+                (Some(l), None) if (l as u32) <= 0xFFFF => l as u32 as u16,
+                _ => u,
+            }
+        }
+        None => u,
+    }
 }
 
-fn compile(pattern: &str) -> Vec<Pat> {
-    let chars: Vec<char> = pattern.chars().collect();
-    let mut out = Vec::with_capacity(chars.len());
+/// `~` makes the next character literal; a trailing `~` is dropped.
+///
+/// With `strict` (criteria of `COUNTIF` and friends) `~` only escapes `*` and `?`; anywhere else it is an
+/// ordinary character.
+fn compile(pattern: &str, strict: bool) -> Vec<Pat> {
+    let units: Vec<u16> = pattern.encode_utf16().collect();
+    let mut out = Vec::with_capacity(units.len());
     let mut i = 0;
-    while i < chars.len() {
-        match chars[i] {
-            '~' if matches!(chars.get(i + 1), Some('?' | '*' | '~')) => {
-                out.push(Pat::Lit(fold(chars[i + 1])));
+    while i < units.len() {
+        match units[i] {
+            0x7e if strict => {
+                if matches!(units.get(i + 1), Some(0x2a | 0x3f)) {
+                    out.push(Pat::Lit(units[i + 1]));
+                    i += 1;
+                } else {
+                    out.push(Pat::Lit(0x7e));
+                }
+            }
+            0x7e => {
+                if let Some(&next) = units.get(i + 1) {
+                    out.push(Pat::Lit(fold(next)));
+                }
                 i += 1;
             }
-            '?' => out.push(Pat::Any),
-            '*' => out.push(Pat::Star),
-            c => out.push(Pat::Lit(fold(c))),
+            0x3f => out.push(Pat::Any),
+            0x2a => out.push(Pat::Star),
+            u => out.push(Pat::Lit(fold(u))),
         }
         i += 1;
     }
     out
 }
 
-fn match_full(pat: &[Pat], text: &[char]) -> bool {
+fn match_full(pat: &[Pat], text: &[u16]) -> bool {
     let (mut p, mut t) = (0, 0);
     let mut star: Option<(usize, usize)> = None;
     while t < text.len() {
@@ -78,8 +102,14 @@ fn match_full(pat: &[Pat], text: &[char]) -> bool {
 
 /// Case-insensitive match of the whole text against a wildcard pattern.
 pub fn wildcard_match(pattern: &str, text: &str) -> bool {
-    let text: Vec<char> = text.chars().collect();
-    match_full(&compile(pattern), &text)
+    let text: Vec<u16> = text.encode_utf16().collect();
+    match_full(&compile(pattern, false), &text)
+}
+
+/// Like [`wildcard_match`] with the stricter `~` rules of `*IF` criteria.
+fn criteria_match(pattern: &str, text: &str) -> bool {
+    let text: Vec<u16> = text.encode_utf16().collect();
+    match_full(&compile(pattern, true), &text)
 }
 
 /// Whether the text contains wildcard syntax.
@@ -87,11 +117,11 @@ pub(crate) fn has_wildcards(text: &str) -> bool {
     text.contains(['?', '*', '~'])
 }
 
-/// Character index of the first substring (at or after `start`) matching the pattern.
+/// UTF-16 index of the first substring (at or after `start`) matching the pattern.
 pub(crate) fn wildcard_search(pattern: &str, text: &str, start: usize) -> Option<usize> {
-    let mut pat = compile(pattern);
+    let mut pat = compile(pattern, false);
     pat.push(Pat::Star);
-    let text: Vec<char> = text.chars().collect();
+    let text: Vec<u16> = text.encode_utf16().collect();
     (start..=text.len()).find(|&i| match_full(&pat, &text[i..]))
 }
 
@@ -192,12 +222,10 @@ impl Criteria {
         match &self.operand {
             Operand::Number(n) => match cell {
                 Value::Number(c) => self.op.test(compare_numbers(*c, *n)),
-                Value::Text(t) if matches!(self.op, CmpOp::Eq | CmpOp::Ne) => {
-                    match parse_number_text(t) {
-                        Some(c) => self.op.test(compare_numbers(c, *n)),
-                        None => negated,
-                    }
-                }
+                Value::Text(t) if self.op == CmpOp::Eq => match parse_number_text(t) {
+                    Some(c) => compare_numbers(c, *n) == Ordering::Equal,
+                    None => false,
+                },
                 _ => negated,
             },
             Operand::Bool(b) => match cell {
@@ -221,9 +249,9 @@ impl Criteria {
                 _ => false,
             },
             Operand::Text(pattern) => match (self.op, cell) {
-                (CmpOp::Eq, Value::Text(t)) => wildcard_match(pattern, t),
+                (CmpOp::Eq, Value::Text(t)) => criteria_match(pattern, t),
                 (CmpOp::Eq, _) => false,
-                (CmpOp::Ne, Value::Text(t)) => !wildcard_match(pattern, t),
+                (CmpOp::Ne, Value::Text(t)) => !criteria_match(pattern, t),
                 (CmpOp::Ne, _) => true,
                 (op, Value::Text(t)) => op.test(compare_text(t, pattern)),
                 _ => false,
@@ -234,13 +262,18 @@ impl Criteria {
 
 fn range_grid<'a>(ctx: &'a EvalContext<'a>, arg: &'a Arg) -> Res<Grid<'a>> {
     match arg {
-        Arg::Range(_) | Arg::Array(_) => ctx.grid(arg).ok_or(ErrorKind::Value),
+        Arg::Range(_) => ctx.grid(arg).ok_or(ErrorKind::Value),
         _ => Err(ErrorKind::Value),
     }
 }
 
-fn criterion(ctx: &EvalContext<'_>, arg: &Arg) -> Criteria {
-    Criteria::from_value(&ctx.scalar(arg))
+/// Criteria text longer than 255 characters is rejected with `#VALUE!`.
+fn criterion(ctx: &EvalContext<'_>, arg: &Arg) -> Res<Criteria> {
+    let v = ctx.scalar(arg);
+    if matches!(&v, Value::Text(t) if t.encode_utf16().count() > 255) {
+        return Err(ErrorKind::Value);
+    }
+    Ok(Criteria::from_value(&v))
 }
 
 pub(super) fn countif(ctx: &EvalContext<'_>, args: &[Arg]) -> Res<Value> {
@@ -255,6 +288,16 @@ pub(super) fn countifs(ctx: &EvalContext<'_>, args: &[Arg]) -> Res<Value> {
     let pairs = criteria_pairs(ctx, args)?;
     let mut count = 0u64;
     for_each_match(&pairs, |_, _| count += 1);
+    // Cells past the used area (the rest of a whole-column reference) are blank: count them when every
+    // criterion accepts a blank.
+    if let Some((first, _)) = pairs.first() {
+        let total = first.rows() as u64 * first.cols() as u64;
+        let scanned = pairs.iter().map(|(g, _)| g.scan_rows()).max().unwrap_or(0) as u64
+            * pairs.iter().map(|(g, _)| g.scan_cols()).max().unwrap_or(0) as u64;
+        if total > scanned && pairs.iter().all(|(_, crit)| crit.matches(&Value::Empty)) {
+            count += total - scanned;
+        }
+    }
     Ok(Value::Number(count as f64))
 }
 
@@ -268,7 +311,7 @@ fn criteria_pairs<'a>(ctx: &'a EvalContext<'a>, args: &'a [Arg]) -> Res<Vec<(Gri
         {
             return Err(ErrorKind::Value);
         }
-        out.push((grid, criterion(ctx, &pair[1])));
+        out.push((grid, criterion(ctx, &pair[1])?));
     }
     Ok(out)
 }
@@ -293,6 +336,21 @@ fn conditional_total(
     criteria_args: &[Arg],
 ) -> Res<(f64, u64)> {
     let pairs = criteria_pairs(ctx, criteria_args)?;
+    // The value range is resized to the criteria range's shape, keeping its top-left cell.
+    let resized;
+    let values = match (values, pairs.first()) {
+        (Arg::Range(r), Some((first, _))) => {
+            resized = Arg::Range(crate::eval::RangeRef::new(
+                &r.sheet,
+                r.row1,
+                r.col1,
+                r.row1.saturating_add(first.rows() as u32 - 1),
+                r.col1.saturating_add(first.cols() as u32 - 1),
+            ));
+            &resized
+        }
+        _ => values,
+    };
     let value_grid = range_grid(ctx, values)?;
     if let Some((first, _)) = pairs.first()
         && (first.rows() != value_grid.rows() || first.cols() != value_grid.cols())
@@ -318,20 +376,21 @@ fn conditional_total(
 
 pub(super) fn sumif(ctx: &EvalContext<'_>, args: &[Arg]) -> Res<Value> {
     arity(args, 2, 3)?;
-    let sum_range = args
-        .get(2)
-        .filter(|a| !matches!(a, Arg::Missing))
-        .unwrap_or(&args[0]);
+    // An omitted third argument (`SUMIF(r,c,)`) is refused by Excel.
+    if matches!(args.get(2), Some(Arg::Missing)) {
+        return Err(ErrorKind::Value);
+    }
+    let sum_range = args.get(2).unwrap_or(&args[0]);
     let (total, _) = conditional_total(ctx, sum_range, &args[..2])?;
     number(total)
 }
 
 pub(super) fn averageif(ctx: &EvalContext<'_>, args: &[Arg]) -> Res<Value> {
     arity(args, 2, 3)?;
-    let avg_range = args
-        .get(2)
-        .filter(|a| !matches!(a, Arg::Missing))
-        .unwrap_or(&args[0]);
+    if matches!(args.get(2), Some(Arg::Missing)) {
+        return Err(ErrorKind::Value);
+    }
+    let avg_range = args.get(2).unwrap_or(&args[0]);
     let (total, n) = conditional_total(ctx, avg_range, &args[..2])?;
     if n == 0 {
         return Err(ErrorKind::DivZero);
@@ -374,7 +433,9 @@ mod tests {
         assert!(wildcard_match("a~?b", "a?b"));
         assert!(!wildcard_match("a~?b", "axb"));
         assert!(wildcard_match("a~~b", "a~b"));
-        assert!(wildcard_match("~x", "~x"));
+        assert!(wildcard_match("~x", "x"), "a tilde escapes any character");
+        assert!(!wildcard_match("~x", "~x"));
+        assert!(wildcard_match("a~", "a"), "a trailing tilde is dropped");
         assert!(wildcard_match("", ""));
         assert!(!wildcard_match("", "a"));
     }

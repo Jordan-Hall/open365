@@ -131,13 +131,12 @@ impl<'a> EvalContext<'a> {
         match arg {
             Arg::Missing => Value::Empty,
             Arg::Value(v) => v.clone(),
-            Arg::Array(rows) => {
-                if rows.len() == 1 && rows[0].len() == 1 {
-                    rows[0][0].clone()
-                } else {
-                    Value::Error(ErrorKind::Value)
-                }
-            }
+            // A scalar parameter given an array takes its first element.
+            Arg::Array(rows) => rows
+                .first()
+                .and_then(|r| r.first())
+                .cloned()
+                .unwrap_or(Value::Error(ErrorKind::Value)),
             Arg::Range(r) => self.implicit_intersection(r),
             Arg::Union(_) => Value::Error(ErrorKind::Value),
         }
@@ -386,11 +385,26 @@ impl Grid<'_> {
 /// Evaluates a formula to a final cell value. A blank result becomes `0`; a multi-cell
 /// reference result takes the implicit intersection; an array result is returned whole.
 pub fn evaluate(ast: &Ast, ctx: &EvalContext<'_>) -> Value {
+    evaluate_root(ast, ctx, true)
+}
+
+/// Like [`evaluate`]. When `snap_root` is true and the formula's outermost operation is `+` or `-`, a result
+/// within binary noise of zero collapses to exactly zero, which is what Excel does for `=0.1+0.2-0.3` (but
+/// not for `=(0.1+0.2-0.3)`, nor for the same expression inside a function argument). Pass false for a formula
+/// written entirely inside parentheses.
+pub fn evaluate_root(ast: &Ast, ctx: &EvalContext<'_>, snap_root: bool) -> Value {
     let ev = Evaluator {
         ctx,
         name_depth: Cell::new(0),
     };
-    let arg = ev.eval(ast);
+    let arg = match ast {
+        Ast::Binary {
+            op: op @ (BinOp::Add | BinOp::Sub),
+            lhs,
+            rhs,
+        } if snap_root => ev.eval_binary(*op, lhs, rhs, false, true),
+        _ => ev.eval(ast),
+    };
     match arg {
         Arg::Missing => Value::Number(0.0),
         Arg::Value(Value::Empty) => Value::Number(0.0),
@@ -417,6 +431,13 @@ enum Operand {
 
 impl Evaluator<'_, '_> {
     fn eval(&self, ast: &Ast) -> Arg {
+        self.eval_in(ast, false)
+    }
+
+    /// Evaluates `ast`. `array` is true where Excel evaluates operators over whole ranges (the array
+    /// parameters of `INDEX` and `XLOOKUP`); elsewhere an operator applied to a multi-cell range uses the
+    /// implicit intersection of the range with the formula's cell, as in a non-array formula.
+    fn eval_in(&self, ast: &Ast, array: bool) -> Arg {
         match ast {
             Ast::Number(n) => Arg::Value(Value::Number(*n)),
             Ast::Text(t) => Arg::Value(Value::Text(t.clone())),
@@ -428,17 +449,18 @@ impl Evaluator<'_, '_> {
             Ast::Name(n) => self.eval_name(n),
             Ast::Func { name, args, .. } => self.eval_call(name, args),
             Ast::Unary { op, operand } => {
-                let v = self.eval(operand);
-                self.unary(*op, v)
+                let v = self.eval_in(operand, array);
+                self.unary(*op, v, array)
             }
             Ast::Percent(inner) => {
-                let v = self.eval(inner);
-                lift_unary(self.operand(v), |x| match x.to_number() {
+                let v = self.eval_in(inner, array);
+                let d = self.ctx.date1904;
+                lift_unary(self.operand(v, array), |x| match x.to_number_in(d) {
                     Ok(n) => Value::Number(n / 100.0),
                     Err(e) => Value::Error(e),
                 })
             }
-            Ast::Binary { op, lhs, rhs } => self.eval_binary(*op, lhs, rhs),
+            Ast::Binary { op, lhs, rhs } => self.eval_binary(*op, lhs, rhs, array, false),
             Ast::Array(rows) => self.eval_array(rows),
         }
     }
@@ -498,7 +520,12 @@ impl Evaluator<'_, '_> {
         let Some(func) = functions::lookup(name) else {
             return Arg::error(ErrorKind::Name);
         };
-        let evaluated: Vec<Arg> = args.iter().map(|a| self.eval(a)).collect();
+        let array_params = functions::array_params(name);
+        let evaluated: Vec<Arg> = args
+            .iter()
+            .enumerate()
+            .map(|(i, a)| self.eval_in(a, array_params.contains(&i)))
+            .collect();
         match func {
             Func::Val(f) => Arg::from_value(f(self.ctx, &evaluated)),
             Func::Res(f) => match f(self.ctx, &evaluated) {
@@ -509,7 +536,7 @@ impl Evaluator<'_, '_> {
         }
     }
 
-    fn operand(&self, arg: Arg) -> Operand {
+    fn operand(&self, arg: Arg, array: bool) -> Operand {
         match arg {
             Arg::Missing => Operand::Scalar(Value::Empty),
             Arg::Value(v) => Operand::Scalar(v),
@@ -523,6 +550,9 @@ impl Evaluator<'_, '_> {
             Arg::Range(r) => {
                 if r.is_single_cell() {
                     return Operand::Scalar(self.ctx.source.cell(&r.sheet, r.row1, r.col1));
+                }
+                if !array {
+                    return Operand::Scalar(self.ctx.scalar(&Arg::Range(r)));
                 }
                 let cells = u64::from(r.rows()) * u64::from(r.cols());
                 if cells > MAX_ARRAY_CELLS {
@@ -541,27 +571,43 @@ impl Evaluator<'_, '_> {
         }
     }
 
-    fn unary(&self, op: UnaryOp, arg: Arg) -> Arg {
+    fn unary(&self, op: UnaryOp, arg: Arg, array: bool) -> Arg {
         match op {
             UnaryOp::Plus => match arg {
-                Arg::Range(r) => Arg::from_value(self.ctx.scalar(&Arg::Range(r))),
+                Arg::Range(r) if !array => Arg::from_value(self.ctx.scalar(&Arg::Range(r))),
                 other => other,
             },
-            UnaryOp::Neg => lift_unary(self.operand(arg), |x| match x.to_number() {
-                Ok(n) => Value::Number(0.0 - n),
-                Err(e) => Value::Error(e),
-            }),
+            UnaryOp::Neg => {
+                let d = self.ctx.date1904;
+                lift_unary(self.operand(arg, array), |x| match x.to_number_in(d) {
+                    Ok(n) => Value::Number(0.0 - n),
+                    Err(e) => Value::Error(e),
+                })
+            }
         }
     }
 
-    fn eval_binary(&self, op: BinOp, lhs: &Ast, rhs: &Ast) -> Arg {
-        let left = self.eval(lhs);
-        let right = self.eval(rhs);
+    fn eval_binary(&self, op: BinOp, lhs: &Ast, rhs: &Ast, array: bool, snap: bool) -> Arg {
+        // The operands of `:`, space and `,` are references, never evaluated element-wise.
+        let operand_array = array && !matches!(op, BinOp::Range | BinOp::Intersect | BinOp::Union);
+        let left = self.eval_in(lhs, operand_array);
+        let right = self.eval_in(rhs, operand_array);
         match op {
             BinOp::Range => range_operator(left, right),
             BinOp::Intersect => intersect_operator(left, right),
             BinOp::Union => union_operator(left, right),
-            _ => lift_binary(self.operand(left), self.operand(right), op),
+            _ => {
+                let nc = NumCtx {
+                    date1904: self.ctx.date1904,
+                    snap,
+                };
+                lift_binary(
+                    self.operand(left, array),
+                    self.operand(right, array),
+                    op,
+                    nc,
+                )
+            }
         }
     }
 }
@@ -622,7 +668,17 @@ fn lift_unary(operand: Operand, f: impl Fn(&Value) -> Value) -> Arg {
     }
 }
 
-fn lift_binary(left: Operand, right: Operand, op: BinOp) -> Arg {
+/// How numbers are coerced and combined.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct NumCtx {
+    /// Convert date text in the 1904 date system.
+    pub date1904: bool,
+    /// Collapse an add/subtract result that is within binary noise of zero to exactly zero.
+    pub snap: bool,
+}
+
+fn lift_binary(left: Operand, right: Operand, op: BinOp, nc: NumCtx) -> Arg {
+    let binary_scalar = |op: BinOp, a: &Value, b: &Value| binary_scalar_with(op, a, b, nc);
     match (left, right) {
         (Operand::Scalar(a), Operand::Scalar(b)) => Arg::from_value(binary_scalar(op, &a, &b)),
         (Operand::Scalar(a), Operand::Grid(g)) => Arg::Array(
@@ -670,14 +726,25 @@ fn broadcast_len(a: usize, b: usize) -> usize {
     }
 }
 
-/// Applies an arithmetic, concatenation or comparison operator to two scalars. The leftmost
-/// error wins.
+/// Applies an arithmetic, concatenation or comparison operator to two scalars (1900 date system, no
+/// zero snapping). The leftmost error wins.
 pub fn binary_scalar(op: BinOp, a: &Value, b: &Value) -> Value {
-    if let Value::Error(e) = a {
-        return Value::Error(*e);
-    }
-    if let Value::Error(e) = b {
-        return Value::Error(*e);
+    binary_scalar_with(op, a, b, NumCtx::default())
+}
+
+/// Like [`binary_scalar`] with explicit coercion settings.
+pub fn binary_scalar_with(op: BinOp, a: &Value, b: &Value, nc: NumCtx) -> Value {
+    let arithmetic_op = matches!(
+        op,
+        BinOp::Add | BinOp::Sub | BinOp::Mul | BinOp::Div | BinOp::Pow
+    );
+    if !arithmetic_op {
+        if let Value::Error(e) = a {
+            return Value::Error(*e);
+        }
+        if let Value::Error(e) = b {
+            return Value::Error(*e);
+        }
     }
     match op {
         BinOp::Concat => match (a.to_text(), b.to_text()) {
@@ -697,19 +764,24 @@ pub fn binary_scalar(op: BinOp, a: &Value, b: &Value) -> Value {
             Value::Bool(result)
         }
         BinOp::Add | BinOp::Sub | BinOp::Mul | BinOp::Div | BinOp::Pow => {
-            let (x, y) = match (a.to_number(), b.to_number()) {
-                (Ok(x), Ok(y)) => (x, y),
-                (Err(e), _) | (_, Err(e)) => return Value::Error(e),
+            // Excel coerces the left operand (or fails on it) before it looks at the right one.
+            let x = match a.to_number_in(nc.date1904) {
+                Ok(x) => x,
+                Err(e) => return Value::Error(e),
             };
-            arithmetic(op, x, y)
+            let y = match b.to_number_in(nc.date1904) {
+                Ok(y) => y,
+                Err(e) => return Value::Error(e),
+            };
+            arithmetic(op, x, y, nc.snap)
         }
         BinOp::Range | BinOp::Intersect | BinOp::Union => Value::Error(ErrorKind::Value),
     }
 }
 
 /// Add/subtract results that are within binary noise of zero collapse to exactly zero, as in
-/// Excel (`0.1+0.2-0.3` shows `0`).
-fn snap_to_zero(result: f64, x: f64, y: f64) -> f64 {
+/// Excel (`=0.1+0.2-0.3` gives `0`). Excel does this only for the last operation of a formula and in `SUM`.
+pub(crate) fn snap_to_zero(result: f64, x: f64, y: f64) -> f64 {
     if result != 0.0 && result.abs() < x.abs().max(y.abs()) * 4.0 * f64::EPSILON {
         0.0
     } else {
@@ -717,10 +789,17 @@ fn snap_to_zero(result: f64, x: f64, y: f64) -> f64 {
     }
 }
 
-fn arithmetic(op: BinOp, x: f64, y: f64) -> Value {
+fn arithmetic(op: BinOp, x: f64, y: f64, snap: bool) -> Value {
+    let zero = |result: f64| {
+        if snap {
+            snap_to_zero(result, x, y)
+        } else {
+            result
+        }
+    };
     let result = match op {
-        BinOp::Add => snap_to_zero(x + y, x, y),
-        BinOp::Sub => snap_to_zero(x - y, x, y),
+        BinOp::Add => zero(x + y),
+        BinOp::Sub => zero(x - y),
         BinOp::Mul => x * y,
         BinOp::Div => {
             if y == 0.0 {
@@ -749,10 +828,33 @@ pub fn power(x: f64, y: f64) -> Result<f64, ErrorKind> {
     if x == 0.0 && y < 0.0 {
         return Err(ErrorKind::DivZero);
     }
-    let r = x.powf(y);
-    if r.is_finite() {
-        Ok(r)
+    let r = if y == y.trunc() {
+        x.powf(y)
+    } else if x < 0.0 {
+        // A negative base only has a real root when the exponent is 1/odd.
+        let inverse = 1.0 / y;
+        if (inverse - inverse.round()).abs() < 1e-9 && inverse.round() % 2.0 != 0.0 {
+            -fractional_power(-x, y)
+        } else {
+            return Err(ErrorKind::Num);
+        }
     } else {
-        Err(ErrorKind::Num)
+        fractional_power(x, y)
+    };
+    if !r.is_finite() || (x < 0.0 && y.abs() > 2_147_483_648.0) {
+        return Err(ErrorKind::Num);
+    }
+    // Results below the smallest normal number are flushed to zero.
+    Ok(if r.abs() < f64::MIN_POSITIVE { 0.0 } else { r })
+}
+
+/// `x^y` for positive `x` and a fractional `y`. Excel evaluates this as `exp(y * ln x)` (square roots
+/// aside), which differs from a correctly rounded power in the last digit: `27^(1/3)` is
+/// 2.9999999999999996.
+fn fractional_power(x: f64, y: f64) -> f64 {
+    if y == 0.5 {
+        x.sqrt()
+    } else {
+        (y * x.ln()).exp()
     }
 }

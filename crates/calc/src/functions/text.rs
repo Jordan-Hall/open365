@@ -1,10 +1,10 @@
-//! Text functions. Positions and lengths count Unicode scalar values (Excel counts UTF-16
-//! code units, which differs only for characters outside the Basic Multilingual Plane).
+//! Text functions. Positions and lengths count Unicode scalar values: Excel 365 gives `LEN("😀")` = 1 (measured).
+//! Only the wildcard characters of `SEARCH`/`COUNTIF` see UTF-16 units: `"?"` does not match an emoji.
 
 use super::criteria::wildcard_search;
-use super::{Res, arity, bool_arg, int_arg, optional, scalar, text_arg};
+use super::{Res, arity, bool_arg, int_arg, scalar, text_arg};
 use crate::eval::{Arg, EvalContext};
-use crate::value::{ErrorKind, Value, parse_number_text};
+use crate::value::{ErrorKind, Value, parse_number_text_in};
 
 /// Excel's maximum cell text length.
 const MAX_TEXT: usize = 32_767;
@@ -21,14 +21,22 @@ fn count(n: usize) -> Res<Value> {
     Ok(Value::Number(n as f64))
 }
 
+fn units(s: &str) -> Vec<char> {
+    s.chars().collect()
+}
+
+fn from_units(u: &[char]) -> String {
+    u.iter().collect()
+}
+
 pub(super) fn len(ctx: &EvalContext<'_>, args: &[Arg]) -> Res<Value> {
     arity(args, 1, 1)?;
     count(text_arg(ctx, &args[0])?.chars().count())
 }
 
-/// Optional non-negative character count, defaulting to `default`.
+/// A non-negative count argument. An omitted argument counts as 0, an absent one as `default`.
 fn count_arg(ctx: &EvalContext<'_>, args: &[Arg], index: usize, default: usize) -> Res<usize> {
-    match optional(args, index) {
+    match args.get(index) {
         None => Ok(default),
         Some(a) => {
             let n = int_arg(ctx, a)?;
@@ -37,44 +45,94 @@ fn count_arg(ctx: &EvalContext<'_>, args: &[Arg], index: usize, default: usize) 
     }
 }
 
+/// Excel rejects counts beyond the 32,767-character limit.
+fn limit(n: usize) -> Res<usize> {
+    if n > 1 << 30 {
+        Err(ErrorKind::Value)
+    } else {
+        Ok(n)
+    }
+}
+
 pub(super) fn left(ctx: &EvalContext<'_>, args: &[Arg]) -> Res<Value> {
     arity(args, 1, 2)?;
-    let s = text_arg(ctx, &args[0])?;
-    let n = count_arg(ctx, args, 1, 1)?;
-    Ok(Value::Text(s.chars().take(n).collect()))
+    let u = units(&text_arg(ctx, &args[0])?);
+    let n = count_arg(ctx, args, 1, 1)?.min(u.len());
+    Ok(Value::Text(from_units(&u[..n])))
 }
 
 pub(super) fn right(ctx: &EvalContext<'_>, args: &[Arg]) -> Res<Value> {
     arity(args, 1, 2)?;
-    let s = text_arg(ctx, &args[0])?;
-    let n = count_arg(ctx, args, 1, 1)?;
-    let total = s.chars().count();
-    Ok(Value::Text(
-        s.chars().skip(total.saturating_sub(n)).collect(),
-    ))
+    let u = units(&text_arg(ctx, &args[0])?);
+    let n = count_arg(ctx, args, 1, 1)?.min(u.len());
+    Ok(Value::Text(from_units(&u[u.len() - n..])))
 }
 
 pub(super) fn mid(ctx: &EvalContext<'_>, args: &[Arg]) -> Res<Value> {
     arity(args, 3, 3)?;
-    let s = text_arg(ctx, &args[0])?;
+    let u = units(&text_arg(ctx, &args[0])?);
     let start = int_arg(ctx, &args[1])?;
-    let n = count_arg(ctx, args, 2, 0)?;
-    if start < 1 {
+    let n = limit(count_arg(ctx, args, 2, 0)?)?;
+    if !(1..=1 << 30).contains(&start) {
         return Err(ErrorKind::Value);
     }
-    Ok(Value::Text(
-        s.chars().skip(start as usize - 1).take(n).collect(),
-    ))
+    let from = (start as usize - 1).min(u.len());
+    let to = from.saturating_add(n).min(u.len());
+    Ok(Value::Text(from_units(&u[from..to])))
+}
+
+/// Excel maps characters one to one and only inside the Basic Multilingual Plane; a few characters whose
+/// simple case mapping crosses scripts (`µ`, `ſ`, `ẞ`) keep their form.
+fn map_case(s: &str, upper: bool) -> String {
+    let chars: Vec<char> = s.chars().collect();
+    chars
+        .iter()
+        .enumerate()
+        .map(|(i, &c)| {
+            // Greek capital sigma at the end of a word becomes the final form.
+            if !upper
+                && c == 'Σ'
+                && i > 0
+                && chars[i - 1].is_alphabetic()
+                && !chars.get(i + 1).is_some_and(|n| n.is_alphabetic())
+            {
+                return 'ς';
+            }
+            if c.is_ascii() {
+                return if upper {
+                    c.to_ascii_uppercase()
+                } else {
+                    c.to_ascii_lowercase()
+                };
+            }
+            if c as u32 > 0xFFFF || matches!(c, 'µ' | 'ſ' | 'ẞ' | 'ß') {
+                return c;
+            }
+            if !upper && c == 'İ' {
+                return 'i';
+            }
+            let mut mapped = if upper {
+                c.to_uppercase().collect::<Vec<_>>()
+            } else {
+                c.to_lowercase().collect::<Vec<_>>()
+            };
+            if mapped.len() == 1 {
+                mapped.remove(0)
+            } else {
+                c
+            }
+        })
+        .collect()
 }
 
 pub(super) fn upper(ctx: &EvalContext<'_>, args: &[Arg]) -> Res<Value> {
     arity(args, 1, 1)?;
-    Ok(Value::Text(text_arg(ctx, &args[0])?.to_uppercase()))
+    Ok(Value::Text(map_case(&text_arg(ctx, &args[0])?, true)))
 }
 
 pub(super) fn lower(ctx: &EvalContext<'_>, args: &[Arg]) -> Res<Value> {
     arity(args, 1, 1)?;
-    Ok(Value::Text(text_arg(ctx, &args[0])?.to_lowercase()))
+    Ok(Value::Text(map_case(&text_arg(ctx, &args[0])?, false)))
 }
 
 /// Removes leading and trailing spaces and collapses inner runs of spaces to one.
@@ -97,7 +155,11 @@ pub(super) fn concatenate(ctx: &EvalContext<'_>, args: &[Arg]) -> Res<Value> {
     for a in args {
         out.push_str(&text_arg(ctx, a)?);
     }
-    text(out)
+    // Excel cuts the result of CONCATENATE at the cell limit instead of failing.
+    if out.chars().count() > MAX_TEXT {
+        out = out.chars().take(MAX_TEXT).collect();
+    }
+    Ok(Value::Text(out))
 }
 
 pub(super) fn concat(ctx: &EvalContext<'_>, args: &[Arg]) -> Res<Value> {
@@ -118,7 +180,11 @@ pub(super) fn textjoin(ctx: &EvalContext<'_>, args: &[Arg]) -> Res<Value> {
         return Err(ErrorKind::Value);
     }
     let delimiter = text_arg(ctx, &args[0])?;
-    let ignore_empty = bool_arg(ctx, &args[1])?;
+    // An omitted ignore_empty behaves like TRUE.
+    let ignore_empty = match &args[1] {
+        Arg::Missing => true,
+        a => bool_arg(ctx, a)?,
+    };
     let mut parts = Vec::new();
     for a in &args[2..] {
         for v in ctx.cells(a) {
@@ -131,13 +197,13 @@ pub(super) fn textjoin(ctx: &EvalContext<'_>, args: &[Arg]) -> Res<Value> {
     text(parts.join(&delimiter))
 }
 
-/// Shared start-position handling for `FIND` and `SEARCH`.
-fn start_index(ctx: &EvalContext<'_>, args: &[Arg], haystack_len: usize) -> Res<usize> {
-    let start = match optional(args, 2) {
+/// Shared start-position handling for `FIND` and `SEARCH`; `max` is the largest valid 1-based start.
+fn start_index(ctx: &EvalContext<'_>, args: &[Arg], max: usize) -> Res<usize> {
+    let start = match args.get(2) {
         None => 1,
         Some(a) => int_arg(ctx, a)?,
     };
-    if start < 1 || start as usize > haystack_len.max(1) {
+    if start < 1 || start as usize > max {
         return Err(ErrorKind::Value);
     }
     Ok(start as usize - 1)
@@ -145,9 +211,9 @@ fn start_index(ctx: &EvalContext<'_>, args: &[Arg], haystack_len: usize) -> Res<
 
 pub(super) fn find(ctx: &EvalContext<'_>, args: &[Arg]) -> Res<Value> {
     arity(args, 2, 3)?;
-    let needle: Vec<char> = text_arg(ctx, &args[0])?.chars().collect();
-    let hay: Vec<char> = text_arg(ctx, &args[1])?.chars().collect();
-    let start = start_index(ctx, args, hay.len())?;
+    let needle = units(&text_arg(ctx, &args[0])?);
+    let hay = units(&text_arg(ctx, &args[1])?);
+    let start = start_index(ctx, args, hay.len() + 1)?;
     if needle.is_empty() {
         return count(start + 1);
     }
@@ -164,7 +230,17 @@ pub(super) fn search(ctx: &EvalContext<'_>, args: &[Arg]) -> Res<Value> {
     let pattern = text_arg(ctx, &args[0])?;
     let hay = text_arg(ctx, &args[1])?;
     let start = start_index(ctx, args, hay.chars().count())?;
-    wildcard_search(&pattern, &hay, start).map_or(Err(ErrorKind::Value), |i| count(i + 1))
+    // Wildcards work on UTF-16 units; positions are reported in characters.
+    let start16: usize = hay.chars().take(start).map(char::len_utf16).sum();
+    let found16 = wildcard_search(&pattern, &hay, start16).ok_or(ErrorKind::Value)?;
+    let mut offset = 0;
+    for (i, c) in hay.chars().enumerate() {
+        if offset >= found16 {
+            return count(i + 1);
+        }
+        offset += c.len_utf16();
+    }
+    count(hay.chars().count() + 1)
 }
 
 pub(super) fn substitute(ctx: &EvalContext<'_>, args: &[Arg]) -> Res<Value> {
@@ -172,7 +248,7 @@ pub(super) fn substitute(ctx: &EvalContext<'_>, args: &[Arg]) -> Res<Value> {
     let s = text_arg(ctx, &args[0])?;
     let old = text_arg(ctx, &args[1])?;
     let new = text_arg(ctx, &args[2])?;
-    let instance = match optional(args, 3) {
+    let instance = match args.get(3) {
         None => None,
         Some(a) => {
             let n = int_arg(ctx, a)?;
@@ -185,21 +261,22 @@ pub(super) fn substitute(ctx: &EvalContext<'_>, args: &[Arg]) -> Res<Value> {
     if old.is_empty() {
         return Ok(Value::Text(s));
     }
-    let mut out = String::new();
-    let mut rest = s.as_str();
-    let mut seen = 0usize;
-    while let Some(pos) = rest.find(&old) {
+    let Some(n) = instance else {
+        return text(s.replace(&old, &new));
+    };
+    // Occurrences are counted with overlap: the 2nd "aa" in "aaaa" starts at the 2nd character.
+    let first_len = old.chars().next().map_or(1, char::len_utf8);
+    let mut from = 0;
+    let mut seen = 0;
+    while let Some(pos) = s[from..].find(&old) {
         seen += 1;
-        out.push_str(&rest[..pos]);
-        if instance.is_none_or(|n| n == seen) {
-            out.push_str(&new);
-        } else {
-            out.push_str(&old);
+        let at = from + pos;
+        if seen == n {
+            return text(format!("{}{}{}", &s[..at], new, &s[at + old.len()..]));
         }
-        rest = &rest[pos + old.len()..];
+        from = at + first_len;
     }
-    out.push_str(rest);
-    text(out)
+    Ok(Value::Text(s))
 }
 
 pub(super) fn rept(ctx: &EvalContext<'_>, args: &[Arg]) -> Res<Value> {
@@ -220,7 +297,7 @@ pub(super) fn value(ctx: &EvalContext<'_>, args: &[Arg]) -> Res<Value> {
     match scalar(ctx, &args[0])? {
         Value::Number(n) => Ok(Value::Number(n)),
         Value::Empty => Ok(Value::Number(0.0)),
-        Value::Text(t) => parse_number_text(&t)
+        Value::Text(t) => parse_number_text_in(&t, ctx.date1904)
             .map(Value::Number)
             .ok_or(ErrorKind::Value),
         _ => Err(ErrorKind::Value),

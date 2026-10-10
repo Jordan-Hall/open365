@@ -13,7 +13,7 @@ use crate::ast::{
     AreaKind, AreaRef, Ast, BinOp, CellRef, MAX_COL, MAX_ROW, UnaryOp, letters_to_col,
     parse_cell_word, parse_row_digits,
 };
-use crate::value::ErrorKind;
+use crate::value::{ErrorKind, excel_literal};
 
 /// Excel's formula length limit, in characters.
 pub const MAX_FORMULA_CHARS: usize = 8192;
@@ -468,9 +468,9 @@ impl Parser {
                 {
                     return Ok(area);
                 }
-                match raw.parse::<f64>() {
-                    Ok(n) if n.is_finite() => Ok(Ast::Number(n)),
-                    _ => err(ParseErrorKind::InvalidNumber, t.pos),
+                match excel_literal(&raw) {
+                    Some(n) => Ok(Ast::Number(n)),
+                    None => err(ParseErrorKind::InvalidNumber, t.pos),
                 }
             }
             Tok::Str(s) => Ok(Ast::Text(s)),
@@ -568,9 +568,9 @@ impl Parser {
             _ => (None, t),
         };
         match t.tok.clone() {
-            Tok::Number(raw) => match raw.parse::<f64>() {
-                Ok(n) if n.is_finite() => Ok(Ast::Number(if sign == Some(true) { -n } else { n })),
-                _ => err(ParseErrorKind::InvalidNumber, t.pos),
+            Tok::Number(raw) => match excel_literal(&raw) {
+                Some(n) => Ok(Ast::Number(if sign == Some(true) { -n } else { n })),
+                None => err(ParseErrorKind::InvalidNumber, t.pos),
             },
             _ if sign.is_some() => self.unexpected(&t),
             Tok::Str(s) => Ok(Ast::Text(s)),

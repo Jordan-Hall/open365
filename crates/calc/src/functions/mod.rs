@@ -58,6 +58,8 @@ static TABLE: &[(&str, Func)] = &[
     ("AND", Func::Res(logical::and)),
     ("OR", Func::Res(logical::or)),
     ("NOT", Func::Res(logical::not)),
+    ("TRUE", Func::Res(logical::true_fn)),
+    ("FALSE", Func::Res(logical::false_fn)),
     ("XOR", Func::Res(logical::xor)),
     ("ISBLANK", Func::Res(logical::isblank)),
     ("ISNUMBER", Func::Res(logical::isnumber)),
@@ -83,7 +85,7 @@ static TABLE: &[(&str, Func)] = &[
     // lookup and reference
     ("VLOOKUP", Func::Res(lookup::vlookup)),
     ("HLOOKUP", Func::Res(lookup::hlookup)),
-    ("INDEX", Func::Res(lookup::index)),
+    ("INDEX", Func::Arg(lookup::index)),
     ("MATCH", Func::Res(lookup::match_)),
     ("XLOOKUP", Func::Res(lookup::xlookup)),
     ("CHOOSE", Func::Arg(lookup::choose)),
@@ -109,6 +111,18 @@ pub fn lookup(name: &str) -> Option<&'static Func> {
     let map = table();
     map.get(name)
         .or_else(|| map.get(name.to_ascii_uppercase().as_str()))
+}
+
+/// Parameters whose argument expressions Excel evaluates over whole ranges instead of taking the
+/// implicit intersection (the array parameters of `INDEX` and `XLOOKUP`).
+pub(crate) fn array_params(name: &str) -> &'static [usize] {
+    if name.eq_ignore_ascii_case("INDEX") {
+        &[0]
+    } else if name.eq_ignore_ascii_case("XLOOKUP") {
+        &[1, 2]
+    } else {
+        &[]
+    }
 }
 
 /// All implemented function names, sorted.
@@ -145,7 +159,7 @@ pub(crate) fn scalar(ctx: &EvalContext<'_>, arg: &Arg) -> Res<Value> {
 }
 
 pub(crate) fn num_arg(ctx: &EvalContext<'_>, arg: &Arg) -> Res<f64> {
-    scalar(ctx, arg)?.to_number()
+    scalar(ctx, arg)?.to_number_in(ctx.date1904)
 }
 
 pub(crate) fn text_arg(ctx: &EvalContext<'_>, arg: &Arg) -> Res<String> {

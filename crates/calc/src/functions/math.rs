@@ -5,20 +5,31 @@
 //! reference or array are ignored. Errors always propagate.
 
 use super::{Res, arity, int_arg, num_arg, number};
-use crate::eval::{Arg, EvalContext, power as eval_power};
-use crate::value::{ErrorKind, Value, parse_number_text};
+use crate::eval::{Arg, EvalContext, power as eval_power, snap_to_zero};
+use crate::value::{ErrorKind, Value, parse_number_text_in};
 
 /// Collects the numbers an aggregate function sees.
 fn collect(ctx: &EvalContext<'_>, args: &[Arg]) -> Res<Vec<f64>> {
+    collect_with(ctx, args, true)
+}
+
+/// `missing_is_zero` is false for `PRODUCT`, which skips omitted arguments.
+fn collect_with(ctx: &EvalContext<'_>, args: &[Arg], missing_is_zero: bool) -> Res<Vec<f64>> {
+    // Excel refuses a call without arguments, such as `=SUM()`.
+    arity(args, 1, usize::MAX)?;
     let mut out = Vec::new();
     for arg in args {
         match arg {
-            Arg::Missing => out.push(0.0),
+            Arg::Missing => {
+                if missing_is_zero {
+                    out.push(0.0);
+                }
+            }
             Arg::Value(v) => out.push(match v {
                 Value::Number(n) => *n,
                 Value::Bool(b) => f64::from(u8::from(*b)),
                 Value::Empty => 0.0,
-                Value::Text(t) => parse_number_text(t).ok_or(ErrorKind::Value)?,
+                Value::Text(t) => parse_number_text_in(t, ctx.date1904).ok_or(ErrorKind::Value)?,
                 Value::Error(e) => return Err(*e),
                 Value::Array(_) => return Err(ErrorKind::Value),
             }),
@@ -36,9 +47,20 @@ fn collect(ctx: &EvalContext<'_>, args: &[Arg]) -> Res<Vec<f64>> {
     Ok(out)
 }
 
+/// Adds left to right. Like Excel, the last addition collapses a result within binary noise of zero to
+/// exactly zero (`SUM(0.1,0.2,-0.3)` is 0).
+fn total(nums: &[f64]) -> f64 {
+    match nums.split_last() {
+        None => 0.0,
+        Some((last, head)) => {
+            let before: f64 = head.iter().fold(0.0, |acc, x| acc + x);
+            snap_to_zero(before + last, before, *last)
+        }
+    }
+}
+
 pub(super) fn sum(ctx: &EvalContext<'_>, args: &[Arg]) -> Res<Value> {
-    let total: f64 = collect(ctx, args)?.iter().sum();
-    number(total)
+    number(total(&collect(ctx, args)?))
 }
 
 pub(super) fn average(ctx: &EvalContext<'_>, args: &[Arg]) -> Res<Value> {
@@ -46,7 +68,7 @@ pub(super) fn average(ctx: &EvalContext<'_>, args: &[Arg]) -> Res<Value> {
     if nums.is_empty() {
         return Err(ErrorKind::DivZero);
     }
-    number(nums.iter().sum::<f64>() / nums.len() as f64)
+    number(total(&nums) / nums.len() as f64)
 }
 
 pub(super) fn min(ctx: &EvalContext<'_>, args: &[Arg]) -> Res<Value> {
@@ -64,7 +86,7 @@ pub(super) fn max(ctx: &EvalContext<'_>, args: &[Arg]) -> Res<Value> {
 }
 
 pub(super) fn product(ctx: &EvalContext<'_>, args: &[Arg]) -> Res<Value> {
-    let nums = collect(ctx, args)?;
+    let nums = collect_with(ctx, args, false)?;
     if nums.is_empty() {
         return Ok(Value::Number(0.0));
     }
@@ -72,6 +94,9 @@ pub(super) fn product(ctx: &EvalContext<'_>, args: &[Arg]) -> Res<Value> {
 }
 
 pub(super) fn count(ctx: &EvalContext<'_>, args: &[Arg]) -> Value {
+    if args.is_empty() {
+        return Value::Error(ErrorKind::Value);
+    }
     let mut n = 0u32;
     for arg in args {
         match arg {
@@ -79,7 +104,7 @@ pub(super) fn count(ctx: &EvalContext<'_>, args: &[Arg]) -> Value {
             Arg::Value(v) => {
                 let counted = match v {
                     Value::Number(_) | Value::Bool(_) => true,
-                    Value::Text(t) => parse_number_text(t).is_some(),
+                    Value::Text(t) => parse_number_text_in(t, ctx.date1904).is_some(),
                     _ => false,
                 };
                 n += u32::from(counted);
@@ -96,6 +121,9 @@ pub(super) fn count(ctx: &EvalContext<'_>, args: &[Arg]) -> Value {
 }
 
 pub(super) fn counta(ctx: &EvalContext<'_>, args: &[Arg]) -> Value {
+    if args.is_empty() {
+        return Value::Error(ErrorKind::Value);
+    }
     let mut n = 0u32;
     for arg in args {
         match arg {
@@ -125,10 +153,6 @@ pub(super) fn countblank(ctx: &EvalContext<'_>, args: &[Arg]) -> Res<Value> {
             }
             total - non_empty + empty_text
         }
-        Arg::Array(_) | Arg::Union(_) => ctx
-            .cells(&args[0])
-            .filter(|v| matches!(v, Value::Empty) || matches!(v, Value::Text(t) if t.is_empty()))
-            .count() as u64,
         _ => return Err(ErrorKind::Value),
     };
     Ok(Value::Number(blank as f64))
@@ -153,27 +177,35 @@ pub(crate) fn round_decimal(x: f64, places: i64, mode: RoundMode) -> f64 {
     if places < -300 {
         return 0.0;
     }
-    let sci = format!("{:.14e}", x.abs());
+    // ROUND works on the shortest digits that identify the double, cut (not rounded) to 15 significant
+    // digits (so ROUND(0.49999999999999994,0) is 0); ROUNDUP/ROUNDDOWN on the number rounded to 15 digits
+    // (so ROUNDDOWN(0.7+0.1,1) is 0.8).
+    let sci = if matches!(mode, RoundMode::Nearest) {
+        format!("{:e}", x.abs())
+    } else {
+        format!("{:.14e}", x.abs())
+    };
     let Some((mantissa, exp)) = sci.split_once('e') else {
         return x;
     };
     let exp10: i64 = exp.parse().unwrap_or(0);
-    let digits: Vec<u8> = mantissa
+    let mut digits: Vec<u8> = mantissa
         .bytes()
         .filter(u8::is_ascii_digit)
         .map(|b| b - b'0')
         .collect();
+    digits.truncate(15);
     let keep = exp10 + 1 + places;
-    if keep >= digits.len() as i64 {
-        return x;
-    }
-    let (kept, first_discarded, any_discarded) = if keep >= 0 {
+    let (kept, first_discarded, any_discarded) = if keep >= digits.len() as i64 {
+        (&digits[..], 0, false)
+    } else if keep >= 0 {
         let k = keep as usize;
         (&digits[..k], digits[k], digits[k..].iter().any(|&d| d != 0))
     } else {
         (&digits[..0], 0, true)
     };
     let mut kept_int = kept.iter().fold(0u64, |acc, &d| acc * 10 + u64::from(d));
+    // Digits dropped by the 15-digit cut sit below the kept position when `keep >= 15`; nothing to add then.
     let increment = match mode {
         RoundMode::Nearest => first_discarded >= 5,
         RoundMode::Up => any_discarded,
@@ -182,12 +214,15 @@ pub(crate) fn round_decimal(x: f64, places: i64, mode: RoundMode) -> f64 {
     if increment {
         kept_int += 1;
     }
-    let scale = 10f64.powi(places.unsigned_abs().min(300) as i32);
-    let magnitude = if places >= 0 {
-        kept_int as f64 / scale
+    // value = kept_int x 10^(exp10 + 1 - kept.len()) when nothing was dropped, else x 10^(-places).
+    let scale_exp = if keep >= digits.len() as i64 {
+        exp10 + 1 - kept.len() as i64
     } else {
-        kept_int as f64 * scale
+        -places
     };
+    let magnitude = format!("{kept_int}e{scale_exp}")
+        .parse::<f64>()
+        .unwrap_or(x.abs());
     if magnitude == 0.0 {
         0.0
     } else if x < 0.0 {
@@ -201,6 +236,9 @@ fn rounding(ctx: &EvalContext<'_>, args: &[Arg], mode: RoundMode) -> Res<Value> 
     arity(args, 2, 2)?;
     let x = num_arg(ctx, &args[0])?;
     let places = int_arg(ctx, &args[1])?;
+    if matches!(mode, RoundMode::Up) && places < -308 {
+        return Err(ErrorKind::Num);
+    }
     number(round_decimal(x, places, mode))
 }
 
@@ -218,8 +256,18 @@ pub(super) fn rounddown(ctx: &EvalContext<'_>, args: &[Arg]) -> Res<Value> {
 
 pub(super) fn int(ctx: &EvalContext<'_>, args: &[Arg]) -> Res<Value> {
     arity(args, 1, 1)?;
-    number(num_arg(ctx, &args[0])?.floor())
+    let x = num_arg(ctx, &args[0])?;
+    // Excel works on the 15-digit value: INT(0.57*100) is 57, not 56. Beyond 1E15 there is nothing to snap.
+    let snapped = if x.abs() < 1e15 {
+        format!("{x:.14e}").parse::<f64>().unwrap_or(x)
+    } else {
+        x
+    };
+    number(snapped.floor())
 }
+
+/// Quotients at or above this make `MOD` return `#NUM!`.
+const MOD_QUOTIENT_LIMIT: f64 = 1e12;
 
 pub(super) fn modulo(ctx: &EvalContext<'_>, args: &[Arg]) -> Res<Value> {
     arity(args, 2, 2)?;
@@ -227,6 +275,10 @@ pub(super) fn modulo(ctx: &EvalContext<'_>, args: &[Arg]) -> Res<Value> {
     let d = num_arg(ctx, &args[1])?;
     if d == 0.0 {
         return Err(ErrorKind::DivZero);
+    }
+    // Excel gives #NUM! when the quotient is too large for the remainder to be meaningful.
+    if (n / d).abs() >= MOD_QUOTIENT_LIMIT {
+        return Err(ErrorKind::Num);
     }
     let mut r = n % d;
     if r != 0.0 && (r < 0.0) != (d < 0.0) {

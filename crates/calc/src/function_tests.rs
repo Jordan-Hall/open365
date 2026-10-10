@@ -172,7 +172,12 @@ fn arithmetic_errors() {
     assert_eq!(eval("0/0"), err(DivZero));
     assert_eq!(eval("0^0"), err(Num));
     assert_eq!(eval("0^-1"), err(DivZero));
-    assert_eq!(eval("(-8)^(1/3)"), err(Num));
+    assert_eq!(
+        eval("(-8)^(1/3)"),
+        n(-1.999_999_999_999_999_8),
+        "odd root, as Excel"
+    );
+    assert_eq!(eval("(-8)^0.5"), err(Num));
     assert_eq!(eval("10^308*10"), err(Num));
     assert_eq!(eval("\"abc\"+1"), err(ValueErr));
     assert_eq!(eval("-\"abc\""), err(ValueErr));
@@ -208,7 +213,9 @@ fn concatenation_uses_general_number_format() {
     assert_eq!(eval("1&2"), t("12"));
     assert_eq!(eval("TRUE&\"x\""), t("TRUEx"));
     assert_eq!(eval("A1&\"x\""), t("x"));
-    assert_eq!(eval("1000000000000000&\"\""), t("1E+15"));
+    assert_eq!(eval("1000000000000000&\"\""), t("1000000000000000"));
+    assert_eq!(eval("1E20&\"\""), t("1E+20"));
+    assert_eq!(eval("1E-10&\"\""), t("0.0000000001"));
     assert_eq!(eval("123456789012345&\"\""), t("123456789012345"));
     assert_eq!(eval("-2.5&\"\""), t("-2.5"));
 }
@@ -259,9 +266,11 @@ fn array_constants_and_lifting() {
         Value::Array(vec![vec![n(1.0), n(2.0)], vec![n(3.0), n(4.0)]])
     );
     let data = [("A1", n(1.0)), ("A2", n(2.0)), ("A3", n(3.0))];
-    assert_eq!(eval_with(&data, "SUM(A1:A3*2)"), n(12.0));
-    assert_eq!(eval_with(&data, "SUM(IF(A1:A3>1,A1:A3,0))"), n(5.0));
-    assert_eq!(eval_with(&data, "SUM((A1:A3>1)*1)"), n(2.0));
+    // A non-array formula intersects ranges inside operators; only INDEX/XLOOKUP array parameters see whole ranges.
+    assert_eq!(eval_with(&data, "SUM(A1:A3*2)"), err(ValueErr));
+    assert_eq!(eval_with(&data, "SUM(INDEX(A1:A3*2,0))"), n(12.0));
+    assert_eq!(eval_with(&data, "SUM(INDEX((A1:A3>1)*1,0))"), n(2.0));
+    assert_eq!(eval_with(&data, "SUM(IF(A1:A3>1,A1:A3,0))"), err(ValueErr));
 }
 
 #[test]
@@ -464,7 +473,8 @@ fn iferror_and_ifna() {
     assert_eq!(eval("IFNA(1/0,\"x\")"), err(DivZero));
     assert_eq!(eval("IFNA(3,\"x\")"), n(3.0));
     let d = [("A1", n(1.0)), ("A2", err(DivZero)), ("A3", n(3.0))];
-    assert_eq!(eval_with(&d, "SUM(IFERROR(A1:A3,0))"), n(4.0));
+    // The first argument is a scalar parameter: with no intersection it is #VALUE!, which IFERROR catches.
+    assert_eq!(eval_with(&d, "SUM(IFERROR(A1:A3,0))"), n(0.0));
     assert_eq!(eval_with(&d, "IFERROR(A2,\"bad\")"), t("bad"));
 }
 

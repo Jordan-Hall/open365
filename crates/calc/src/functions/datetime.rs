@@ -4,7 +4,7 @@
 //! treats 1900 as a leap year: serial 60 is the non-existent 1900-02-29, and serials from 61
 //! on match the real calendar. The 1904 system counts days from 1904-01-01 (serial 0).
 
-use super::{Res, arity, int_arg, num_arg, number};
+use super::{Res, arity, num_arg, number};
 use crate::eval::{Arg, EvalContext};
 use crate::value::{ErrorKind, Value};
 
@@ -91,10 +91,11 @@ pub fn serial_to_ymd(serial: f64, date1904: bool) -> Option<(i64, i64, i64)> {
 
 pub(super) fn date(ctx: &EvalContext<'_>, args: &[Arg]) -> Res<Value> {
     arity(args, 3, 3)?;
-    let mut year = int_arg(ctx, &args[0])?;
-    let month = int_arg(ctx, &args[1])?;
-    let day = int_arg(ctx, &args[2])?;
-    if !(0..10_000).contains(&year) {
+    // DATE rounds its arguments down (toward minus infinity).
+    let mut year = floor_arg(ctx, &args[0])?;
+    let month = floor_arg(ctx, &args[1])?;
+    let day = floor_arg(ctx, &args[2])?;
+    if !(0..=10_000).contains(&year) {
         return Err(ErrorKind::Num);
     }
     if year < 1900 {
@@ -105,9 +106,20 @@ pub(super) fn date(ctx: &EvalContext<'_>, args: &[Arg]) -> Res<Value> {
         .ok_or(ErrorKind::Num)
 }
 
+fn floor_arg(ctx: &EvalContext<'_>, arg: &Arg) -> Res<i64> {
+    let n = num_arg(ctx, arg)?.floor();
+    if n.abs() > 9.0e15 {
+        return Err(ErrorKind::Num);
+    }
+    Ok(n as i64)
+}
+
 fn part(ctx: &EvalContext<'_>, args: &[Arg], pick: fn((i64, i64, i64)) -> i64) -> Res<Value> {
     arity(args, 1, 1)?;
-    let serial = num_arg(ctx, &args[0])?;
+    // The serial is taken at 15 significant digits, so 0.99999999999999 is already the next day.
+    // Excel rounds the time of day to the millisecond, so 0.99999999999999 is already the next day.
+    let raw = num_arg(ctx, &args[0])?;
+    let serial = (raw * 86_400_000.0).round() / 86_400_000.0;
     let ymd = serial_to_ymd(serial, ctx.date1904).ok_or(ErrorKind::Num)?;
     Ok(Value::Number(pick(ymd) as f64))
 }
