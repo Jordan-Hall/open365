@@ -486,6 +486,185 @@ try {
     }
   }
 
+  # ---- tables ------------------------------------------------------------------------------------------
+  # Cell text is built from unique tokens ("R2C3w1 R2C3w2 ...") so the oracle can tell from the PDF which
+  # paragraph and line each drawn row belongs to.
+  function Toks($tag, $n) { (1..$n | ForEach-Object { "${tag}w$_" }) -join ' ' }
+  # Appends a table after the last paragraph; the document keeps an empty paragraph after it.
+  function T-Add($rows, $cols, [scriptblock]$cfg = $null) {
+    $d = $script:doc
+    $rng = $d.Paragraphs.Item($d.Paragraphs.Count).Range
+    $t = $d.Tables.Add($rng, $rows, $cols)
+    if ($cfg) { & $cfg $t }
+    return $t
+  }
+  # Fills every cell: $words is a scriptblock (r, c) -> number of tokens (0 leaves "RrCc").
+  function T-Fill($t, [scriptblock]$words = $null) {
+    foreach ($c in $t.Range.Cells) {
+      $r = [int]$c.RowIndex; $k = [int]$c.ColumnIndex
+      $n = if ($words) { [int](& $words $r $k) } else { 0 }
+      $c.Range.Text = if ($n -gt 0) { Toks "R${r}C${k}" $n } else { "R${r}C${k}" }
+    }
+  }
+  function T-Widths($t, $widths) {
+    $t.AllowAutoFit = $false
+    for ($i = 1; $i -le $widths.Count; $i++) { $t.Columns.Item($i).Width = [single]$widths[$i - 1] }
+  }
+  $LB = { param($f) $f.Bold = 1 }
+
+  L-Fixture 'layout-table-basic' 'layout-table-basic' 'fixed-layout tables: equal and uneven columns, wrapping cell text, cell padding, table indent, centred and right aligned tables, borderless and thick-bordered tables; 6pt space after in Normal' {
+    Init-Doc 6
+    L-Para 'Equal columns' $null $LB
+    $t = T-Add 3 3; T-Fill $t
+    L-Para 'After the first table.'
+    L-Para 'Uneven columns with wrapping text' $null $LB
+    $t = T-Add 3 3; T-Widths $t @(60, 200, 208); T-Fill $t { param($r, $c) if ($c -eq 2) { 14 } elseif ($c -eq 1) { 3 } else { 6 } }
+    L-Para 'After the second table.'
+    L-Para 'Cell padding 14.4 left and right, 3 top and bottom' $null $LB
+    $t = T-Add 2 2; $t.LeftPadding = 14.4; $t.RightPadding = 14.4; $t.TopPadding = 3; $t.BottomPadding = 3
+    T-Fill $t { param($r, $c) 8 }
+    L-Para 'Table indent 36pt, 3 columns of 100pt'
+    $t = T-Add 2 3; T-Widths $t @(100, 100, 100); $t.Rows.LeftIndent = 36; T-Fill $t
+    L-Para 'Centred table of 3 columns of 100pt'
+    $t = T-Add 2 3; T-Widths $t @(100, 100, 100); $t.Rows.Alignment = 1; T-Fill $t
+    L-Para 'Right aligned table of 3 columns of 100pt'
+    $t = T-Add 2 3; T-Widths $t @(100, 100, 100); $t.Rows.Alignment = 2; T-Fill $t
+    L-Para 'No borders'
+    $t = T-Add 2 3; T-Widths $t @(120, 120, 120); $t.Borders.Enable = $false; T-Fill $t
+    L-Para 'Thick outside border (3pt) and 1.5pt inside'
+    $t = T-Add 2 3; T-Widths $t @(120, 120, 120); $t.Borders.OutsideLineStyle = 1; $t.Borders.OutsideLineWidth = 24
+    $t.Borders.InsideLineStyle = 1; $t.Borders.InsideLineWidth = 12; T-Fill $t
+    L-Para 'Closing paragraph.'
+  }
+
+  L-Fixture 'layout-table-width' 'layout-table-width' 'table widths: preferred percent and point widths, autofit to contents, autofit to window, cell preferred widths with autofit, tables wider than the text area' {
+    Init-Doc 6
+    L-Para 'Percent width 60 percent' $null $LB
+    $t = T-Add 2 3; $t.PreferredWidthType = 2; $t.PreferredWidth = 60; T-Fill $t { param($r, $c) 2 }
+    L-Para 'Autofit to contents, short and long cells' $null $LB
+    $t = T-Add 3 3; T-Fill $t { param($r, $c) if ($r -eq 2) { $c * 3 } else { 1 } }; $t.AutoFitBehavior(1)
+    L-Para 'Autofit to window' $null $LB
+    $t = T-Add 2 3; T-Fill $t { param($r, $c) $c * 4 }; $t.AutoFitBehavior(1); $t.AutoFitBehavior(2)
+    L-Para 'Autofit allowed, preferred column widths 80 100 150 points' $null $LB
+    $t = T-Add 3 3; $t.AllowAutoFit = $true; T-Fill $t { param($r, $c) 10 }
+    $w = 80, 100, 150
+    for ($i = 1; $i -le 3; $i++) { $t.Columns.Item($i).PreferredWidthType = 3; $t.Columns.Item($i).PreferredWidth = [single]$w[$i - 1] }
+    L-Para 'Autofit allowed, one long unbreakable word' $null $LB
+    $t = T-Add 2 3; $t.AllowAutoFit = $true; T-Fill $t
+    $t.Cell(2, 2).Range.Text = 'Supercalifragilisticexpialidocious Pneumonoultramicroscopic'
+    L-Para 'Fixed, columns wider than the text area (3 x 200)' $null $LB
+    $t = T-Add 2 3; T-Widths $t @(200, 200, 200); T-Fill $t
+    L-Para 'Fixed, narrow columns (25pt) with long words' $null $LB
+    $t = T-Add 2 4; T-Widths $t @(25, 25, 25, 25); T-Fill $t { param($r, $c) 2 }
+    L-Para 'Closing paragraph.'
+  }
+
+  L-Fixture 'layout-table-rows' 'layout-table-rows' 'row heights (auto, at least, exact), vertical alignment, paragraph spacing and multiple paragraphs in cells, horizontal and vertical merges' {
+    Init-Doc 6
+    L-Para 'Row heights: auto, at least 40, at least 10, exactly 40, exactly 10' $null $LB
+    $t = T-Add 5 2; T-Widths $t @(200, 200); T-Fill $t { param($r, $c) if ($c -eq 2) { 20 } else { 1 } }
+    $t.Rows.Item(2).HeightRule = 1; $t.Rows.Item(2).Height = 40
+    $t.Rows.Item(3).HeightRule = 1; $t.Rows.Item(3).Height = 10
+    $t.Rows.Item(4).HeightRule = 2; $t.Rows.Item(4).Height = 40
+    $t.Rows.Item(5).HeightRule = 2; $t.Rows.Item(5).Height = 10
+    L-Para 'Vertical alignment: top, centre, bottom' $null $LB
+    $t = T-Add 1 3; T-Widths $t @(130, 130, 130); T-Fill $t { param($r, $c) 1 }
+    $t.Rows.Item(1).HeightRule = 1; $t.Rows.Item(1).Height = 60
+    $t.Cell(1, 1).VerticalAlignment = 0; $t.Cell(1, 2).VerticalAlignment = 1; $t.Cell(1, 3).VerticalAlignment = 3
+    L-Para 'Vertical alignment with a taller neighbour'
+    $t = T-Add 1 3; T-Widths $t @(130, 130, 130); T-Fill $t { param($r, $c) if ($c -eq 3) { 25 } else { 1 } }
+    $t.Cell(1, 1).VerticalAlignment = 0; $t.Cell(1, 2).VerticalAlignment = 1; $t.Cell(1, 3).VerticalAlignment = 0
+    L-Para 'Space before and after, several paragraphs in a cell' $null $LB
+    $t = T-Add 2 2; T-Widths $t @(200, 200)
+    $t.Cell(1, 1).Range.Text = "R1C1p1`rR1C1p2`rR1C1p3"
+    $t.Cell(1, 2).Range.Text = 'R1C2p1'
+    $t.Cell(2, 1).Range.Text = 'R2C1p1'; $t.Cell(2, 2).Range.Text = 'R2C2p1'
+    $t.Cell(1, 1).Range.Paragraphs.Item(1).Format.SpaceBefore = 10; $t.Cell(1, 1).Range.Paragraphs.Item(1).Format.SpaceAfter = 3
+    $t.Cell(1, 1).Range.Paragraphs.Item(2).Format.SpaceBefore = 12; $t.Cell(1, 1).Range.Paragraphs.Item(2).Format.SpaceAfter = 12
+    $t.Cell(1, 1).Range.Paragraphs.Item(3).Format.SpaceAfter = 0
+    $t.Cell(2, 2).Range.Paragraphs.Item(1).Format.SpaceBefore = 20
+    L-Para 'Horizontal merges'
+    $t = T-Add 3 4; T-Widths $t @(100, 100, 100, 100); T-Fill $t
+    $t.Cell(1, 1).Merge($t.Cell(1, 2)); $t.Cell(2, 2).Merge($t.Cell(2, 4)); $t.Cell(3, 1).Merge($t.Cell(3, 4))
+    $t.Cell(1, 1).Range.Text = 'M1 wide cell with several tokens M1w1 M1w2 M1w3 M1w4 M1w5 M1w6 M1w7 M1w8 M1w9 M1w10'
+    L-Para 'Vertical merges, tall merged text'
+    $t = T-Add 4 3; T-Widths $t @(130, 130, 130); T-Fill $t
+    $t.Cell(1, 1).Merge($t.Cell(3, 1)); $t.Cell(2, 3).Merge($t.Cell(4, 3))
+    $t.Cell(1, 1).Range.Text = (Toks 'V1' 40)
+    $t.Cell(2, 3).Range.Text = 'V2 short'
+    L-Para 'Block merge'
+    $t = T-Add 3 3; T-Widths $t @(130, 130, 130); T-Fill $t
+    $t.Cell(1, 1).Merge($t.Cell(2, 2))
+    $t.Cell(1, 1).Range.Text = (Toks 'B1' 30)
+    L-Para 'Closing paragraph.'
+  }
+
+  L-Fixture 'layout-table-pages' 'layout-table-pages' 'tables across pages: a long table, rows that split, rows that cannot split, repeated header rows, vertical merges over a page break' {
+    Init-Doc 0
+    function Fill($n) { foreach ($i in 1..$n) { L-Para "Filler line $i." } }
+    function PageBrk() { $s = $script:word.Selection; [void]$s.EndKey(6); $s.InsertBreak(7) }
+    L-Para 'Long table' $null $LB
+    $t = T-Add 60 2; T-Widths $t @(200, 200); T-Fill $t { param($r, $c) 1 }
+    L-Para 'After the long table.'
+    PageBrk
+    Fill 40
+    L-Para 'Splitting rows (tall rows may break across pages)' $null $LB
+    $t = T-Add 6 2; T-Widths $t @(200, 200); T-Fill $t { param($r, $c) if ($c -eq 1) { 80 } else { 8 } }
+    PageBrk
+    Fill 40
+    L-Para 'Rows that cannot split' $null $LB
+    $t = T-Add 6 2; T-Widths $t @(200, 200); T-Fill $t { param($r, $c) if ($c -eq 1) { 80 } else { 8 } }
+    foreach ($r in 1..6) { $t.Rows.Item($r).AllowBreakAcrossPages = 0 }
+    PageBrk
+    Fill 20
+    L-Para 'Repeated header row' $null $LB
+    $t = T-Add 50 2; T-Widths $t @(200, 200); T-Fill $t { param($r, $c) if ($r -eq 1) { 1 } else { 1 } }
+    $t.Rows.Item(1).HeadingFormat = -1
+    $t.Rows.Item(1).Range.Font.Bold = 1
+    PageBrk
+    Fill 30
+    L-Para 'Two header rows, tall body rows' $null $LB
+    $t = T-Add 16 2; T-Widths $t @(200, 200); T-Fill $t { param($r, $c) if ($r -le 2) { 1 } else { 12 } }
+    $t.Rows.Item(1).HeadingFormat = -1; $t.Rows.Item(2).HeadingFormat = -1
+    PageBrk
+    Fill 36
+    L-Para 'Vertical merge over a page break' $null $LB
+    $t = T-Add 5 2; T-Widths $t @(200, 200); T-Fill $t { param($r, $c) 6 }
+    $t.Cell(1, 1).Merge($t.Cell(5, 1)); $t.Cell(1, 1).Range.Text = (Toks 'VM' 100)
+    PageBrk
+    Fill 44
+    L-Para 'Header row with a row that cannot split' $null $LB
+    $t = T-Add 6 2; T-Widths $t @(200, 200); T-Fill $t { param($r, $c) if ($r -eq 1) { 1 } else { 18 } }
+    $t.Rows.Item(1).HeadingFormat = -1
+    foreach ($r in 2..6) { $t.Rows.Item($r).AllowBreakAcrossPages = 0 }
+  }
+
+  L-Fixture 'layout-table-flow' 'layout-table-flow' 'space before and after around tables, adjacent tables, nested tables, table styles with header row, banding and bold first column' {
+    Init-Doc 6
+    L-Para 'Paragraph with 20pt space after, then a table' { param($f) $f.SpaceAfter = 20 }
+    $t = T-Add 2 2; T-Widths $t @(150, 150); T-Fill $t
+    L-Para 'Paragraph with 20pt space before after the table' { param($f) $f.SpaceBefore = 20 }
+    L-Para 'Paragraph with 30pt space before, then a table' { param($f) $f.SpaceBefore = 30 }
+    $t = T-Add 2 2; T-Widths $t @(150, 150); T-Fill $t
+    L-Para ''
+    $t = T-Add 2 2; T-Widths $t @(150, 150); T-Fill $t
+    L-Para 'Paragraph after two tables'
+    L-Para 'Nested table' $null $LB
+    $t = T-Add 2 2; T-Widths $t @(200, 200); T-Fill $t { param($r, $c) 3 }
+    $t.Cell(1, 2).Range.Text = 'Outer cell'
+    $inner = $doc.Tables.Add($t.Cell(1, 2).Range.Paragraphs.Item(1).Range, 2, 2)
+    $inner.Cell(1, 1).Range.Text = 'I11'; $inner.Cell(1, 2).Range.Text = 'I12'; $inner.Cell(2, 1).Range.Text = 'I21'; $inner.Cell(2, 2).Range.Text = 'I22'
+    L-Para 'Table style Grid Table 4 - Accent 1' $null $LB
+    $t = T-Add 4 3; T-Fill $t { param($r, $c) 2 }; $t.Style = 'Grid Table 4 - Accent 1'
+    L-Para 'Table style List Table 3 - Accent 2' $null $LB
+    $t = T-Add 4 3; T-Fill $t { param($r, $c) 2 }; $t.Style = 'List Table 3 - Accent 2'
+    L-Para 'Table Grid style with explicit 0 spacing' $null $LB
+    $t = T-Add 3 3; T-Fill $t { param($r, $c) 2 }; $t.Style = 'Table Grid'
+    L-Para 'Plain table style (Table Normal) with banding look off'
+    $t = T-Add 3 3; T-Fill $t { param($r, $c) 2 }; $t.Style = 'Table Normal'
+    L-Para 'Closing paragraph.'
+  }
+
 } finally {
   if ($word) {
     try { $word.UserName = $oldUser; $word.UserInitials = $oldInit; $word.Options.UseLocalUserInfo = $oldLocal } catch {}

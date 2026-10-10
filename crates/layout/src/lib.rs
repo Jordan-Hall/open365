@@ -10,15 +10,17 @@
 //! downwards. Character offsets are UTF-16 code units of the main story, counting a paragraph
 //! mark, a tab and a break as one each, which is how Word's `Range.Start` counts.
 //!
-//! Not supported yet (reported in [`Layout::notes`]): tables are laid out as sequential
-//! paragraphs, and images, fields, footnotes, headers, footers, columns,
-//! right-to-left text and bidi are ignored.
+//! Tables are laid out with Word's column, row and page-splitting rules (`table.rs`,
+//! `flow.rs`). Not supported yet (reported in [`Layout::notes`]): images, fields,
+//! footnotes, headers, footers, columns, right-to-left text and bidi are ignored.
 
+mod build;
 mod flow;
 mod metrics;
 mod numbering;
 mod para;
 mod props;
+mod table;
 
 use open365_docx::{Block, Document, Paragraph, Styles};
 use open365_text::{FaceId, FontLibrary, FontMatch};
@@ -26,8 +28,10 @@ use open365_text::{FaceId, FontLibrary, FontMatch};
 pub use metrics::LineMetricModel;
 pub use props::{SectionProps, TabKind, TabLeader, TabStop};
 
-use numbering::{Numbering, NumberingState};
-use para::{Context, ParaLayout, layout_paragraph};
+use build::Builder;
+use flow::FlowItem;
+use numbering::{Labeler, NumberingState};
+use para::Context;
 
 /// Knobs for layout. The defaults are the measured Word behaviour.
 #[derive(Debug, Clone, Copy)]
@@ -96,6 +100,16 @@ impl Line {
     }
 }
 
+/// The rectangle of a table cell (or a cell fragment, when its row continues on another
+/// page) in page coordinates.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct CellBox {
+    pub x: f64,
+    pub y: f64,
+    pub width: f64,
+    pub height: f64,
+}
+
 /// One page of the main story.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Page {
@@ -103,6 +117,8 @@ pub struct Page {
     pub number: usize,
     pub section: SectionProps,
     pub lines: Vec<Line>,
+    /// Table cell rectangles on this page, in drawing order.
+    pub cells: Vec<CellBox>,
 }
 
 /// A font family the document asked for and how the library satisfied it.
@@ -138,7 +154,7 @@ struct Item<'a> {
 }
 
 /// Paragraphs in document order, the order `Document::sections` indexes them in.
-fn collect_items<'a>(blocks: &'a [Block], items: &mut Vec<Item<'a>>, notes: &mut Vec<String>) {
+fn collect_items<'a>(blocks: &'a [Block], items: &mut Vec<Item<'a>>) {
     for block in blocks {
         match block {
             Block::Paragraph(p) => items.push(Item {
@@ -146,12 +162,9 @@ fn collect_items<'a>(blocks: &'a [Block], items: &mut Vec<Item<'a>>, notes: &mut
                 extra_chars: 0,
             }),
             Block::Table(t) => {
-                if !notes.iter().any(|n| n.starts_with("tables")) {
-                    notes.push("tables are laid out as sequential paragraphs".to_owned());
-                }
                 for row in t.rows() {
                     for cell in row.cells() {
-                        collect_items(&cell.blocks, items, notes);
+                        collect_items(&cell.blocks, items);
                     }
                     if let Some(last) = items.last_mut() {
                         last.extra_chars += 1;
@@ -168,8 +181,8 @@ fn collect_items<'a>(blocks: &'a [Block], items: &mut Vec<Item<'a>>, notes: &mut
 /// numbering definition (often a private-use code point of the Symbol font).
 pub fn list_labels(doc: &Document) -> Vec<Option<String>> {
     let mut items: Vec<Item<'_>> = Vec::new();
-    collect_items(&doc.body().blocks, &mut items, &mut Vec::new());
-    let numbering = Numbering::new(doc);
+    collect_items(&doc.body().blocks, &mut items);
+    let numbering = Labeler::new(doc);
     let mut state = NumberingState::default();
     items
         .iter()
@@ -195,12 +208,11 @@ pub fn layout_document(doc: &Document, fonts: &FontLibrary, options: LayoutOptio
     let ctx = Context {
         fonts,
         styles,
+        table: None,
         default_tab: f64::from(doc.settings().default_tab_stop_twips) / 20.0,
         model: options.metric_model,
     };
 
-    let mut items: Vec<Item<'_>> = Vec::new();
-    collect_items(&doc.body().blocks, &mut items, &mut layout.notes);
     let doc_sections = doc.sections();
     let sections: Vec<SectionProps> = doc_sections.iter().map(SectionProps::from).collect();
     for (i, s) in doc_sections.iter().enumerate() {
@@ -211,28 +223,36 @@ pub fn layout_document(doc: &Document, fonts: &FontLibrary, options: LayoutOptio
         }
     }
 
-    let mut laid: Vec<(ParaLayout, usize)> = Vec::with_capacity(items.len());
-    let mut story = 0usize;
+    let mut builder = Builder::new(doc, ctx);
+    let mut flow: Vec<FlowItem> = Vec::new();
     let mut section = 0usize;
-    let numbering = Numbering::new(doc);
-    let mut numbers = NumberingState::default();
-    for (index, item) in items.iter().enumerate() {
-        let width = sections[section].text_width();
-        let label = numbering
-            .as_ref()
-            .and_then(|n| n.label(&mut numbers, item.para));
-        let pl = layout_paragraph(&ctx, item.para, index, story, width, label.as_ref());
-        story = pl.story_end + item.extra_chars;
-        laid.push((pl, section));
-        // The paragraph that carries a `w:sectPr` is the last of its section.
-        if doc_sections[section].end_paragraph == Some(index) {
-            section += 1;
+    for block in &doc.body().blocks {
+        match block {
+            Block::Paragraph(p) => {
+                let width = sections[section].text_width();
+                let index = builder.paragraph(p, width, None);
+                flow.push(FlowItem::Para {
+                    arena: index,
+                    section,
+                });
+                // The paragraph that carries a `w:sectPr` is the last of its section.
+                if doc_sections[section].end_paragraph == Some(index) {
+                    section += 1;
+                }
+            }
+            Block::Table(t) => {
+                let width = sections[section].text_width();
+                let table = table::layout_table(&mut builder, t, width);
+                flow.push(FlowItem::Table { table, section });
+            }
+            Block::Raw(_) => {}
         }
     }
+    let arena = std::mem::take(&mut builder.arena);
 
-    let mut requested: Vec<&str> = laid
+    let mut requested: Vec<&str> = arena
         .iter()
-        .flat_map(|(pl, _)| pl.styles.iter().map(|s| s.requested.as_str()))
+        .flat_map(|pl| pl.styles.iter().map(|s| s.requested.as_str()))
         .collect();
     requested.sort_unstable();
     requested.dedup();
@@ -244,6 +264,6 @@ pub fn layout_document(doc: &Document, fonts: &FontLibrary, options: LayoutOptio
         })
         .collect();
 
-    layout.pages = flow::paginate(&ctx, &laid, &sections);
+    layout.pages = flow::paginate(&ctx, &arena, &flow, &sections);
     layout
 }

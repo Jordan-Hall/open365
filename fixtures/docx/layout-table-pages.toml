@@ -1,0 +1,5 @@
+feature = "layout-table-pages"
+made_with = "Microsoft Word 16.0.20430 (Windows)"
+author = "project member"
+expect_dropped = []
+notes = "tables across pages: a long table, rows that split, rows that cannot split, repeated header rows, vertical merges over a page break"

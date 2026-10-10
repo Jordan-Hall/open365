@@ -1,17 +1,41 @@
-//! Page flow: places laid-out paragraphs onto pages with Word's rules for spacing, widow and
-//! orphan control, keep-with-next, keep-lines, page breaks and sections.
+//! Page flow: places laid-out paragraphs and tables onto pages with Word's rules for spacing,
+//! widow and orphan control, keep-with-next, keep-lines, page breaks, sections, table row
+//! splitting and repeated header rows.
 
 use crate::para::{AtomClass, Context, LineBox, ParaLayout};
 use crate::props::SectionProps;
-use crate::{GlyphRun, Line, Page, PlacedGlyph};
+use crate::table::{CellLayout, FlowLine, RowLayout, TableLayout};
+use crate::{CellBox, GlyphRun, Line, Page, PlacedGlyph};
 
 const EPS: f64 = 1e-6;
+
+/// A block of the main story in layout order.
+pub(crate) enum FlowItem {
+    /// A body paragraph: index into the paragraph arena.
+    Para {
+        arena: usize,
+        section: usize,
+    },
+    Table {
+        table: TableLayout,
+        section: usize,
+    },
+}
+
+impl FlowItem {
+    fn section(&self) -> usize {
+        match self {
+            Self::Para { section, .. } | Self::Table { section, .. } => *section,
+        }
+    }
+}
 
 struct PageBuild {
     number: usize,
     section: SectionProps,
     section_index: usize,
     lines: Vec<Line>,
+    cells: Vec<CellBox>,
     /// Cursor: top of the next line.
     y: f64,
     /// Space after the previous paragraph on this page, not yet applied.
@@ -30,6 +54,7 @@ impl PageBuild {
             section,
             section_index,
             lines: Vec::new(),
+            cells: Vec::new(),
             y: section.margin_top,
             pending_after: 0.0,
             prev_style: None,
@@ -43,7 +68,12 @@ impl PageBuild {
     }
 
     fn has_content(&self) -> bool {
-        !self.lines.is_empty()
+        !self.lines.is_empty() || !self.cells.is_empty()
+    }
+
+    /// Left edge of the text area.
+    fn origin_x(&self) -> f64 {
+        self.section.margin_left + self.section.gutter
     }
 
     fn finish(self) -> Page {
@@ -51,6 +81,7 @@ impl PageBuild {
             number: self.number,
             section: self.section,
             lines: self.lines,
+            cells: self.cells,
         }
     }
 }
@@ -105,22 +136,36 @@ fn decide(para: &ParaLayout, from: usize, y0: f64, bottom: f64, at_top: bool) ->
     Placement { take: k }
 }
 
-/// Whether paragraph `p` (and, when it is kept with the next, its followers) can start on a
-/// page whose cursor is at `y`.
+/// Whether item `p` (and, when it is kept with the next, its followers) can start on a page
+/// whose cursor is at `y`.
 fn can_start(
-    paras: &[(ParaLayout, usize)],
+    arena: &[ParaLayout],
+    items: &[FlowItem],
     p: usize,
     y: f64,
     prev_after: f64,
     bottom: f64,
     depth: usize,
 ) -> bool {
-    let (para, section) = &paras[p];
+    let (para, section) = match &items[p] {
+        FlowItem::Para { arena: a, section } => (&arena[*a], *section),
+        FlowItem::Table { table, .. } => {
+            // A table starts with its first row's first line.
+            let first = table.rows.first().map_or(0.0, |r| {
+                r.cells
+                    .iter()
+                    .filter_map(|c| c.lines.first())
+                    .map(|l| l.dy + l.height)
+                    .fold(0.0, f64::max)
+            });
+            return y + prev_after + first <= bottom + EPS;
+        }
+    };
     // A follower that starts its own page (page-break-before, a new section) is not kept with.
     if para.flow.page_break_before
         || p.checked_sub(1)
-            .and_then(|q| paras.get(q))
-            .is_some_and(|(_, s)| s != section)
+            .and_then(|q| items.get(q))
+            .is_some_and(|i| i.section() != section)
     {
         return true;
     }
@@ -130,13 +175,14 @@ fn can_start(
     if place.take == 0 {
         return false;
     }
-    if para.flow.keep_next && place.take == para.lines.len() && p + 1 < paras.len() && depth < 8 {
+    if para.flow.keep_next && place.take == para.lines.len() && p + 1 < items.len() && depth < 8 {
         let used: f64 = para.lines.iter().map(|l| l.height).sum();
         return can_start(
-            paras,
+            arena,
+            items,
             p + 1,
             y0 + used,
-            para.props.space_after_pt as f64,
+            f64::from(para.props.space_after_pt),
             bottom,
             depth + 1,
         );
@@ -153,14 +199,9 @@ fn snap_baseline(y: f64) -> f64 {
     ((y - 1e-6) / BASELINE_GRID).ceil() * BASELINE_GRID
 }
 
-fn build_line(
-    ctx: &Context<'_>,
-    para: &ParaLayout,
-    lb: &LineBox,
-    section: &SectionProps,
-    top: f64,
-) -> Line {
-    let left_origin = section.margin_left + section.gutter;
+/// Builds the placed line `lb` of `para`, its text area starting at `origin_x` on the page.
+fn build_line(para: &ParaLayout, lb: &LineBox, origin_x: f64, top: f64) -> Line {
+    let left_origin = origin_x;
     let mut runs: Vec<GlyphRun> = Vec::new();
     let mut cur_style: Option<usize> = None;
     if lb.atoms.start == 0
@@ -225,7 +266,6 @@ fn build_line(
             }
         }
     }
-    let _ = ctx;
     Line {
         paragraph: para.index,
         start: lb.start,
@@ -239,44 +279,365 @@ fn build_line(
     }
 }
 
+/// A cell that spans several rows and is still being drawn.
+struct ActiveSpan {
+    start_row: usize,
+    cell: usize,
+    end_row: usize,
+    /// Index into `PageBuild::cells` of the box on the current page, `None` on a new page
+    /// until the next row creates it.
+    box_idx: Option<usize>,
+}
+
+struct Paginator<'a> {
+    arena: &'a [ParaLayout],
+    sections: &'a [SectionProps],
+    done: Vec<Page>,
+    page: PageBuild,
+}
+
+impl Paginator<'_> {
+    fn new_page(&mut self, hard: bool, section: usize) {
+        let number = self.page.number + 1;
+        let next = PageBuild::new(
+            number,
+            section,
+            self.sections.get(section).copied().unwrap_or_default(),
+            hard,
+        );
+        self.done
+            .push(std::mem::replace(&mut self.page, next).finish());
+    }
+
+    /// Emits the lines of `cell` that start within `[row.top, row.top + row.height)` of the
+    /// table, with the row drawn at page offset `y`.
+    fn emit_cell_lines(&mut self, table: &TableLayout, cell: &CellLayout, row: &RowLayout, y: f64) {
+        let origin = self.page.origin_x() + table.x + cell.x + cell.pad.left;
+        let (lo, hi) = (row.top - EPS, row.top + row.height - EPS);
+        for ln in &cell.lines {
+            let abs = cell.content_top + ln.dy;
+            if abs < lo || abs >= hi {
+                continue;
+            }
+            self.push_line(ln, origin, y + (abs - row.top));
+        }
+        for bx in &cell.boxes {
+            let abs = cell.content_top + bx.dy;
+            if abs < lo || abs >= hi {
+                continue;
+            }
+            self.page.cells.push(CellBox {
+                x: origin + bx.dx,
+                y: y + (abs - row.top),
+                width: bx.w,
+                height: bx.h,
+            });
+        }
+    }
+
+    fn push_line(&mut self, ln: &FlowLine, origin: f64, top: f64) {
+        let para = &self.arena[ln.para];
+        let line = build_line(para, &para.lines[ln.line], origin + ln.dx, top);
+        self.page.lines.push(line);
+    }
+
+    /// Draws row `r` whole at `y`. `active` holds the vertically merged cells that cover it.
+    fn emit_row(
+        &mut self,
+        table: &TableLayout,
+        r: usize,
+        y: f64,
+        active: &mut Vec<ActiveSpan>,
+        repeated: bool,
+    ) {
+        let row = &table.rows[r];
+        let origin = self.page.origin_x() + table.x;
+        // Merged cells from above continue (new box when the page changed).
+        for s in active.iter_mut() {
+            if s.start_row < r && r <= s.end_row {
+                let cell = &table.rows[s.start_row].cells[s.cell];
+                match s.box_idx {
+                    Some(i) => {
+                        let b = &mut self.page.cells[i];
+                        b.height = y + row.height - b.y;
+                    }
+                    None => {
+                        self.page.cells.push(CellBox {
+                            x: origin + cell.x,
+                            y,
+                            width: cell.w,
+                            height: row.height,
+                        });
+                        s.box_idx = Some(self.page.cells.len() - 1);
+                    }
+                }
+            }
+        }
+        for (ci, cell) in row.cells.iter().enumerate() {
+            if cell.row_span == 0 {
+                continue;
+            }
+            self.page.cells.push(CellBox {
+                x: origin + cell.x,
+                y,
+                width: cell.w,
+                height: row.height,
+            });
+            if cell.row_span > 1 && !repeated {
+                active.push(ActiveSpan {
+                    start_row: r,
+                    cell: ci,
+                    end_row: (r + cell.row_span - 1).min(table.rows.len() - 1),
+                    box_idx: Some(self.page.cells.len() - 1),
+                });
+            }
+            self.emit_cell_lines(table, cell, row, y);
+        }
+        let spans: Vec<(usize, usize)> = active
+            .iter()
+            .filter(|s| s.start_row < r && r <= s.end_row)
+            .map(|s| (s.start_row, s.cell))
+            .collect();
+        for (sr, ci) in spans {
+            self.emit_cell_lines(table, &table.rows[sr].cells[ci], row, y);
+        }
+        active.retain(|s| s.end_row > r);
+    }
+
+    /// Whether row `r` may be split across pages: free of merges, not exact, not `cantSplit`.
+    fn splittable(table: &TableLayout, r: usize, active: &[ActiveSpan]) -> bool {
+        let row = &table.rows[r];
+        !row.cant_split
+            && !row.exact
+            && row.cells.iter().all(|c| c.row_span == 1)
+            && !active.iter().any(|s| s.start_row < r && r <= s.end_row)
+    }
+
+    /// Takes as many lines of every cell of row `r` as fit in `avail`, starting at `resume`.
+    /// Returns the new cursors, the fragment height and whether the row is finished.
+    fn split_fragment(
+        table: &TableLayout,
+        r: usize,
+        resume: &[usize],
+        avail: f64,
+    ) -> (Vec<usize>, f64, bool) {
+        let row = &table.rows[r];
+        let mut next = resume.to_vec();
+        let mut height = 0.0f64;
+        let mut finished = true;
+        for (ci, cell) in row.cells.iter().enumerate() {
+            let start = resume[ci];
+            if start >= cell.lines.len() {
+                continue;
+            }
+            let base = if start == 0 {
+                0.0
+            } else {
+                cell.lines[start].dy
+            };
+            let mut k = start;
+            let mut used = 0.0;
+            while k < cell.lines.len() {
+                let ln = &cell.lines[k];
+                let bottom = ln.dy + ln.height - base;
+                if cell.pad.top + bottom + cell.pad.bottom > avail + EPS {
+                    break;
+                }
+                used = bottom;
+                k += 1;
+            }
+            if k == cell.lines.len() {
+                used = used.max(cell.content_h - base);
+                if cell.pad.top + used + cell.pad.bottom > avail + EPS {
+                    // The trailing space does not fit: leave the last line for the next page.
+                    k = cell.lines.len().saturating_sub(1).max(start);
+                    used = cell.lines[k.saturating_sub(1).max(start)].dy - base;
+                }
+            }
+            if k < cell.lines.len() {
+                finished = false;
+            }
+            next[ci] = k;
+            if k > start {
+                height = height.max(cell.pad.top + used + cell.pad.bottom);
+            }
+        }
+        (next, height, finished)
+    }
+
+    fn emit_fragment(
+        &mut self,
+        table: &TableLayout,
+        r: usize,
+        y: f64,
+        from: &[usize],
+        to: &[usize],
+        height: f64,
+    ) {
+        let row = &table.rows[r];
+        let origin = self.page.origin_x() + table.x;
+        for (ci, cell) in row.cells.iter().enumerate() {
+            self.page.cells.push(CellBox {
+                x: origin + cell.x,
+                y,
+                width: cell.w,
+                height,
+            });
+            let base = if from[ci] == 0 {
+                0.0
+            } else {
+                cell.lines.get(from[ci]).map_or(0.0, |l| l.dy)
+            };
+            for ln in &cell.lines[from[ci].min(cell.lines.len())..to[ci].min(cell.lines.len())] {
+                let top = y + cell.pad.top + (ln.dy - base);
+                self.push_line(ln, origin + cell.pad.left + cell.x, top);
+            }
+        }
+    }
+
+    /// Places `table` starting where the page cursor is (`gap` below it).
+    fn place_table(&mut self, table: &TableLayout, gap: f64) {
+        let mut y = self.page.y + gap;
+        let mut active: Vec<ActiveSpan> = Vec::new();
+        let mut r = 0usize;
+        let mut resume: Option<Vec<usize>> = None;
+        while r < table.rows.len() {
+            let row = &table.rows[r];
+            let avail = self.page.bottom() - y;
+            let at_top = !self.page.has_content();
+            if let Some(cursors) = resume.clone() {
+                let (to, h, finished) = Self::split_fragment(table, r, &cursors, avail);
+                if h > 0.0 || finished {
+                    self.emit_fragment(table, r, y, &cursors, &to, h);
+                    y += h;
+                    if finished {
+                        resume = None;
+                        r += 1;
+                        continue;
+                    }
+                    resume = Some(to);
+                }
+                self.page.y = y;
+                self.break_in_table(table, r, &mut y, &mut active);
+                continue;
+            }
+            if row.height <= avail + EPS || (at_top && !Self::splittable(table, r, &active)) {
+                self.emit_row(table, r, y, &mut active, false);
+                y += row.height;
+                r += 1;
+                continue;
+            }
+            if Self::splittable(table, r, &active) {
+                let zero = vec![0usize; row.cells.len()];
+                let (to, h, finished) = Self::split_fragment(table, r, &zero, avail);
+                if h > 0.0 || (at_top && finished) {
+                    self.emit_fragment(table, r, y, &zero, &to, h);
+                    y += h;
+                    if finished {
+                        r += 1;
+                        continue;
+                    }
+                    resume = Some(to);
+                    self.page.y = y;
+                    self.break_in_table(table, r, &mut y, &mut active);
+                    continue;
+                }
+                if at_top {
+                    // Not even one line fits on an empty page: take one anyway.
+                    let to: Vec<usize> = row
+                        .cells
+                        .iter()
+                        .map(|c| usize::from(!c.lines.is_empty()))
+                        .collect();
+                    let h = row.height.min(avail.max(1.0));
+                    self.emit_fragment(table, r, y, &zero, &to, h);
+                    y += h;
+                    resume = Some(to);
+                    self.page.y = y;
+                    self.break_in_table(table, r, &mut y, &mut active);
+                    continue;
+                }
+            }
+            // Move the whole row to the next page.
+            self.page.y = y;
+            self.break_in_table(table, r, &mut y, &mut active);
+        }
+        self.page.y = y;
+    }
+
+    /// Starts a new page inside a table, repeating the header rows when row `r` is a body row.
+    fn break_in_table(
+        &mut self,
+        table: &TableLayout,
+        r: usize,
+        y: &mut f64,
+        active: &mut [ActiveSpan],
+    ) {
+        let section = self.page.section_index;
+        self.new_page(false, section);
+        for s in active.iter_mut() {
+            s.box_idx = None;
+        }
+        *y = self.page.y;
+        if table.header_rows > 0 && r >= table.header_rows {
+            let mut none: Vec<ActiveSpan> = Vec::new();
+            for h in 0..table.header_rows {
+                self.emit_row(table, h, *y, &mut none, true);
+                *y += table.rows[h].height;
+            }
+        }
+    }
+}
+
 pub(crate) fn paginate(
-    ctx: &Context<'_>,
-    paras: &[(ParaLayout, usize)],
+    _ctx: &Context<'_>,
+    arena: &[ParaLayout],
+    items: &[FlowItem],
     sections: &[SectionProps],
 ) -> Vec<Page> {
-    let mut done: Vec<Page> = Vec::new();
-    let first_section = paras.first().map_or(0, |p| p.1);
-    let mut page = PageBuild::new(
+    let first_section = items.first().map_or(0, FlowItem::section);
+    let page = PageBuild::new(
         1,
         first_section,
         sections.get(first_section).copied().unwrap_or_default(),
         true,
     );
-
-    macro_rules! new_page {
-        ($hard:expr, $section:expr) => {{
-            let number = page.number + 1;
-            let sec = $section;
-            let next = PageBuild::new(
-                number,
-                sec,
-                sections.get(sec).copied().unwrap_or_default(),
-                $hard,
-            );
-            done.push(std::mem::replace(&mut page, next).finish());
-        }};
-    }
+    let mut pg = Paginator {
+        arena,
+        sections,
+        done: Vec::new(),
+        page,
+    };
 
     let mut force_break = false;
-    for (p, (para, section)) in paras.iter().enumerate() {
-        let wants_break = force_break || para.flow.page_break_before;
-        if *section != page.section_index || (wants_break && page.has_content()) {
+    for (p, item) in items.iter().enumerate() {
+        let section = item.section();
+        let (para, table) = match item {
+            FlowItem::Para { arena: a, .. } => (Some(&arena[*a]), None),
+            FlowItem::Table { table, .. } => (None, Some(table)),
+        };
+        let wants_break = force_break || para.is_some_and(|p| p.flow.page_break_before);
+        if section != pg.page.section_index || (wants_break && pg.page.has_content()) {
             // Space before is dropped at the top of every page after the first, whether the page
             // began naturally, after a break character or at `pageBreakBefore`; a new section
             // keeps it (layout-pagination).
-            new_page!(*section != page.section_index, *section);
+            pg.new_page(section != pg.page.section_index, section);
         }
         force_break = false;
+
+        if let Some(table) = table {
+            let gap = if pg.page.has_content() {
+                pg.page.pending_after
+            } else {
+                0.0
+            };
+            pg.place_table(table, gap);
+            pg.page.pending_after = 0.0;
+            pg.page.prev_style = None;
+            pg.page.prev_contextual = false;
+            continue;
+        }
+        let Some(para) = para else { continue };
 
         let contextual_same =
             |pg: &PageBuild| pg.prev_style.as_ref().is_some_and(|s| *s == para.style_id);
@@ -308,22 +669,23 @@ pub(crate) fn paginate(
                 // Word does not add space after and space before; the larger one separates.
                 after.max(before)
             };
-            let y0 = page.y + gap(&page);
-            let at_top = !page.has_content();
-            let mut place = decide(para, from, y0, page.bottom(), at_top);
+            let y0 = pg.page.y + gap(&pg.page);
+            let at_top = !pg.page.has_content();
+            let mut place = decide(para, from, y0, pg.page.bottom(), at_top);
             if first_segment
                 && place.take == para.lines.len()
                 && para.flow.keep_next
                 && !at_top
-                && p + 1 < paras.len()
+                && p + 1 < items.len()
             {
                 let used: f64 = para.lines.iter().map(|l| l.height).sum();
                 let ok = can_start(
-                    paras,
+                    arena,
+                    items,
                     p + 1,
                     y0 + used,
                     f64::from(para.props.space_after_pt),
-                    page.bottom(),
+                    pg.page.bottom(),
                     0,
                 );
                 if !ok {
@@ -346,34 +708,35 @@ pub(crate) fn paginate(
             }
             if place.take == 0 {
                 // Nothing of this paragraph goes here: move to a fresh page and retry.
-                new_page!(false, *section);
+                pg.new_page(false, section);
                 continue;
             }
             let mut y = y0;
             let mut placed = 0usize;
             let mut broke = false;
+            let origin = pg.page.origin_x();
             for lb in &para.lines[from..from + place.take] {
-                let line = build_line(ctx, para, lb, &page.section, y);
+                let line = build_line(para, lb, origin, y);
                 y += lb.height;
-                page.lines.push(line);
+                pg.page.lines.push(line);
                 placed += 1;
                 if lb.page_break_after {
                     broke = true;
                     break;
                 }
             }
-            page.y = y;
+            pg.page.y = y;
             from += placed;
             if from < n {
-                new_page!(broke, *section);
+                pg.new_page(broke, section);
             } else if broke {
                 force_break = true;
             }
         }
-        page.pending_after = f64::from(para.props.space_after_pt);
-        page.prev_style = Some(para.style_id.clone());
-        page.prev_contextual = para.flow.contextual_spacing;
+        pg.page.pending_after = f64::from(para.props.space_after_pt);
+        pg.page.prev_style = Some(para.style_id.clone());
+        pg.page.prev_contextual = para.flow.contextual_spacing;
     }
-    done.push(page.finish());
-    done
+    pg.done.push(pg.page.finish());
+    pg.done
 }

@@ -76,6 +76,26 @@ total = 383
 matched = 160
 total = 221
 
+[fixtures.layout-table-basic]
+matched = 114
+total = 138
+
+[fixtures.layout-table-flow]
+matched = 45
+total = 136
+
+[fixtures.layout-table-pages]
+matched = 1006
+total = 1208
+
+[fixtures.layout-table-rows]
+matched = 127
+total = 143
+
+[fixtures.layout-table-width]
+matched = 211
+total = 217
+
 [fixtures.layout-tabs]
 matched = 9
 total = 18
@@ -97,8 +117,8 @@ matched = 3
 total = 3
 
 [fixtures.table-merged-cells]
-matched = 0
-total = 5
+matched = 3
+total = 31
 
 [fixtures.tracked-changes]
 matched = 1
@@ -184,6 +204,26 @@ total = 383
 matched = 221
 total = 221
 
+[system.layout-table-basic]
+matched = 114
+total = 138
+
+[system.layout-table-flow]
+matched = 45
+total = 136
+
+[system.layout-table-pages]
+matched = 1006
+total = 1208
+
+[system.layout-table-rows]
+matched = 127
+total = 143
+
+[system.layout-table-width]
+matched = 211
+total = 217
+
 [system.layout-tabs]
 matched = 17
 total = 18
@@ -209,8 +249,8 @@ matched = 2
 total = 4
 
 [system.table-merged-cells]
-matched = 0
-total = 5
+matched = 3
+total = 31
 
 [system.tracked-changes]
 matched = 1

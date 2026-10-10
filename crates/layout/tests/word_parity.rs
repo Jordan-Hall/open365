@@ -33,6 +33,10 @@ use open365_text::{FontLibrary, FontMatch};
 use serde_json::Value;
 
 const TOLERANCE: f64 = 0.5;
+/// Table cell rectangles are compared much tighter than text: the PDF writes five significant
+/// digits and Word snaps edges to its 600 dpi device grid (0.12 pt), so 0.1 pt is one device pixel
+/// less the rounding of the numbers.
+const CELL_TOLERANCE: f64 = 0.25;
 /// Word's PDF places glyph origins 0.024 pt (1/3000 in) right of the layout position.
 const PDF_X_OFFSET: f64 = 0.024;
 
@@ -51,6 +55,35 @@ struct RefLine {
     last_x: Option<f64>,
     baseline: Option<f64>,
     text: String,
+}
+
+/// A table cell rectangle Word drew (PDF clip rectangle), page coordinates.
+struct RefCell {
+    page: u64,
+    x: f64,
+    y: f64,
+    w: f64,
+    h: f64,
+}
+
+fn load_cells(path: &Path) -> Vec<RefCell> {
+    let text = fs::read_to_string(path).expect("read reference json");
+    let v: Value = serde_json::from_str(&text).expect("parse reference json");
+    v["cells"]
+        .as_array()
+        .map(|cells| {
+            cells
+                .iter()
+                .map(|c| RefCell {
+                    page: c["page"].as_u64().expect("cell page"),
+                    x: c["x"].as_f64().expect("cell x"),
+                    y: c["y"].as_f64().expect("cell y"),
+                    w: c["w"].as_f64().expect("cell w"),
+                    h: c["h"].as_f64().expect("cell h"),
+                })
+                .collect()
+        })
+        .unwrap_or_default()
 }
 
 fn load_reference(path: &Path) -> Vec<RefLine> {
@@ -97,7 +130,9 @@ fn show(s: &str) -> String {
 /// `Err` carries the families that keep the fixture from being scored in this mode.
 fn score(name: &str, detail: bool, mode: Mode, fonts: &FontLibrary) -> Result<Score, String> {
     let root = root();
-    let reference = load_reference(&root.join(format!("fixtures/reference/layout/{name}.json")));
+    let ref_path = root.join(format!("fixtures/reference/layout/{name}.json"));
+    let reference = load_reference(&ref_path);
+    let ref_cells = load_cells(&ref_path);
     let bytes = fs::read(root.join(format!("fixtures/docx/{name}.docx"))).expect("read docx");
     let doc = Document::open(&bytes, &Limits::default()).expect("open docx");
     let layout = layout_document(&doc, fonts, LayoutOptions::default());
@@ -114,15 +149,23 @@ fn score(name: &str, detail: bool, mode: Mode, fonts: &FontLibrary) -> Result<Sc
         return Err(unusable.join(", "));
     }
 
-    let engine: BTreeMap<usize, (usize, &open365_layout::Line)> =
-        layout.lines().map(|(p, l)| (l.start, (p, l))).collect();
+    // Lines by first-character offset; a repeated table header row shares its offset with the
+    // original, so there can be several per key.
+    let mut engine: BTreeMap<usize, Vec<(usize, &open365_layout::Line)>> = BTreeMap::new();
+    for (p, l) in layout.lines() {
+        engine.entry(l.start).or_default().push((p, l));
+    }
     let mut s = Score {
-        total: reference.len(),
+        total: reference.len() + ref_cells.len(),
         ..Score::default()
     };
     let mut report = String::new();
     for r in &reference {
-        let found = engine.get(&(r.start as usize));
+        let found = engine.get(&(r.start as usize)).and_then(|c| {
+            c.iter()
+                .find(|(p, _)| *p as u64 == r.page)
+                .or_else(|| c.first())
+        });
         let mut ok = false;
         if let Some((page, l)) = found {
             let page_ok = *page as u64 == r.page;
@@ -178,6 +221,61 @@ fn score(name: &str, detail: bool, mode: Mode, fonts: &FontLibrary) -> Result<Sc
             );
         }
         s.matched += usize::from(ok);
+    }
+    // Table cell rectangles: each reference rectangle needs an unused engine rectangle that agrees.
+    let mut used: Vec<(usize, usize)> = Vec::new();
+    for c in &ref_cells {
+        let hit = layout
+            .pages
+            .iter()
+            .filter(|p| p.number as u64 == c.page)
+            .flat_map(|p| {
+                p.cells
+                    .iter()
+                    .enumerate()
+                    .map(move |(i, b)| (p.number, i, b))
+            })
+            .find(|(pn, i, b)| {
+                !used.contains(&(*pn, *i))
+                    && (b.x - (c.x - PDF_X_OFFSET)).abs() <= CELL_TOLERANCE
+                    && (b.y - c.y).abs() <= CELL_TOLERANCE
+                    && (b.width - c.w).abs() <= CELL_TOLERANCE
+                    && (b.height - c.h).abs() <= CELL_TOLERANCE
+            });
+        if let Some((pn, i, _)) = hit {
+            used.push((pn, i));
+            s.matched += 1;
+        }
+        if detail {
+            let near = layout
+                .pages
+                .iter()
+                .filter(|p| p.number as u64 == c.page)
+                .flat_map(|p| p.cells.iter())
+                .min_by(|a, b| {
+                    let d = |q: &open365_layout::CellBox| {
+                        (q.x - c.x).abs()
+                            + (q.y - c.y).abs()
+                            + (q.width - c.w).abs()
+                            + (q.height - c.h).abs()
+                    };
+                    d(a).total_cmp(&d(b))
+                });
+            let _ = writeln!(
+                report,
+                "{} cell p{} x {:>7.2} y {:>7.2} w {:>7.2} h {:>7.2}   engine {}",
+                if hit.is_some() { "ok  " } else { "FAIL" },
+                c.page,
+                c.x - PDF_X_OFFSET,
+                c.y,
+                c.w,
+                c.h,
+                near.map_or("-".to_owned(), |b| format!(
+                    "x {:.2} y {:.2} w {:.2} h {:.2}",
+                    b.x, b.y, b.width, b.height
+                )),
+            );
+        }
     }
     if detail {
         println!("--- {name}\n{report}");

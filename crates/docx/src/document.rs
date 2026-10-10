@@ -8,6 +8,7 @@ use open365_opc::{
 
 use crate::DocxError;
 use crate::model::{Body, DocumentRoot, Paragraph};
+use crate::numbering::Numbering;
 use crate::ppr::Alignment;
 use crate::props::RunPropsPatch;
 use crate::ranges::{DocPos, EditLogEntry};
@@ -131,6 +132,7 @@ pub struct Document {
     dropped: Vec<DroppedItem>,
     hygiene: Vec<HygieneAction>,
     styles: Option<Styles>,
+    numbering: Option<Numbering>,
     settings: Settings,
     kind: DocumentKind,
     pub(crate) edit_log: Vec<EditLogEntry>,
@@ -160,6 +162,7 @@ impl Document {
         let parsed = xml::parse(part.data())?;
         let root = DocumentRoot::from_xml(parsed.root).map_err(DocxError::NotWordprocessing)?;
         let styles = load_styles(&package, &main_part);
+        let numbering = load_numbering(&package, &main_part);
         let settings = load_settings(&package, &main_part);
         let kind = detect_kind(&package, &main_part);
         Ok(Self {
@@ -173,6 +176,7 @@ impl Document {
             dropped: Vec::new(),
             hygiene: Vec::new(),
             styles,
+            numbering,
             settings,
             kind,
             edit_log: Vec::new(),
@@ -182,6 +186,11 @@ impl Document {
     /// The document's styles, when it has a (valid) styles part.
     pub fn styles(&self) -> Option<&Styles> {
         self.styles.as_ref()
+    }
+
+    /// The document's numbering definitions, when it has a numbering part.
+    pub fn numbering(&self) -> Option<&Numbering> {
+        self.numbering.as_ref()
     }
 
     /// Layout-relevant settings from `word/settings.xml` (defaults when there is none).
@@ -613,6 +622,20 @@ const STYLES_TYPES: [&str; 1] =
     ["http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles"];
 const THEME_TYPES: [&str; 1] =
     ["http://schemas.openxmlformats.org/officeDocument/2006/relationships/theme"];
+
+const NUMBERING_TYPES: [&str; 1] =
+    ["http://schemas.openxmlformats.org/officeDocument/2006/relationships/numbering"];
+
+/// Finds and parses the numbering part through the main part's relationships.
+fn load_numbering(package: &Package, main: &PartName) -> Option<Numbering> {
+    let rels =
+        Relationships::parse(package.part(rels_part_name(Some(main)).as_str())?.data()).ok()?;
+    let rel = rels.iter().find(|r| {
+        r.target_mode == TargetMode::Internal && NUMBERING_TYPES.contains(&r.rel_type.as_str())
+    })?;
+    let name = resolve_target(Some(main), &rel.target).ok()?;
+    Numbering::parse(package.part(name.as_str())?.data())
+}
 
 /// Finds and parses the styles and theme parts through the main part's relationships.
 /// A missing or unreadable styles part gives `None`: editing still works without styles.

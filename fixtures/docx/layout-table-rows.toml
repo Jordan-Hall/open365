@@ -1,0 +1,5 @@
+feature = "layout-table-rows"
+made_with = "Microsoft Word 16.0.20430 (Windows)"
+author = "project member"
+expect_dropped = []
+notes = "row heights (auto, at least, exact), vertical alignment, paragraph spacing and multiple paragraphs in cells, horizontal and vertical merges"

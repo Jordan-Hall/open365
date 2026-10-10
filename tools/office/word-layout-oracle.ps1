@@ -29,6 +29,13 @@ HOW (fast path; ~0.4 s for a 7-line page, ~0.05 s per additional page, no per-ch
   4. `lastX` is Information(5) at the line's last character (its left edge): the right end of the text
      for a line ending in a paragraph mark or a space, so it exposes justification, centring, right
      alignment and tab widths. Quantised like `left`.
+  5. Tables. Word reports a whole table row as one "line", so table content is read from the PDF instead: Word clips
+     the content of each table cell to the cell rectangle, so every drawn text row is known to be in a cell, and the
+     clip rectangles are the cell boxes ("cells": page, x, y (top), w, h in points; one per cell fragment per page).
+     Row text is decoded with the font's ToUnicode map and matched to the table paragraph (and offset) whose
+     unconsumed text starts with it, which gives every cell line the same `start` key as a body line; fixtures use
+     unique tokens per cell. A row that matches no unconsumed text but occurs in a paragraph is a repeated header row
+     ("repeat": true). Lines in cells carry "cell": true. Rectangles carry the 0.024 pt PDF origin offset as glyphs do.
   Slower alternatives rejected: per-character Range.Information (thousands of COM calls), and
   Selection.HomeKey/EndKey/MoveDown stepping (3-4 calls per line plus selection side effects).
 #>
@@ -92,38 +99,112 @@ function Open-Doc($path) {
     [string[]]@('FileName', 'ConfirmConversions', 'ReadOnly', 'AddToRecentFiles', 'Revert', 'Visible', 'OpenAndRepair', 'NoEncodingDialog'))
 }
 
-# Parse a Word-exported PDF: per page, the distinct text baselines (points from page top) and the left-most
-# first-ink x of each baseline group, top to bottom.
-function Read-PdfLines([string]$pdf) {
+# Parse a Word-exported PDF into pages. Each page: width/height (points), rows (text lines in drawing order) and cells
+# (the distinct clip rectangles of table cells). A row: y = baseline from the page top, x = left-most first-ink x,
+# text (decoded through the font's ToUnicode map), clip = index into the page's cells, or -1 for text outside any
+# table cell. Word clips the content of every table cell to the cell rectangle and all other text to the page.
+function Read-PdfPages([string]$pdf) {
   $bytes = [IO.File]::ReadAllBytes($pdf)
   $txt = [Text.Encoding]::Latin1.GetString($bytes)
-  $pages = New-Object System.Collections.Generic.List[object]
-  $idx = 0
-  while (($s = $txt.IndexOf('stream', $idx, [StringComparison]::Ordinal)) -ge 0) {
-    $e = $txt.IndexOf('endstream', $s, [StringComparison]::Ordinal); if ($e -lt 0) { break }
-    $st = $s + 6; if ($txt[$st] -eq "`r") { $st++ }; if ($txt[$st] -eq "`n") { $st++ }
-    $idx = $e + 9
-    $len = $e - $st; if ($len -lt 8) { continue }
+  $streams = @{}   # object number -> decoded stream text
+  foreach ($m in [regex]::Matches($txt, '(\d+) 0 obj\s*<<((?:(?!endobj).)*?)>>\s*stream\r?\n', 'Singleline')) {
+    $st = $m.Index + $m.Length
+    $e = $txt.IndexOf('endstream', $st, [StringComparison]::Ordinal); if ($e -lt 0) { continue }
+    $len = $e - $st; if ($len -lt 3) { continue }
     try {
-      $ms = New-Object IO.MemoryStream($bytes, ($st + 2), ($len - 2))
-      $ds = New-Object IO.Compression.DeflateStream($ms, [IO.Compression.CompressionMode]::Decompress)
-      $o = New-Object IO.MemoryStream; $ds.CopyTo($o)
-      $c = [Text.Encoding]::Latin1.GetString($o.ToArray())
-    } catch { continue }
-    if ($c -notmatch '\bBT\b' -or $c -notmatch ' Tm') { continue }
-    $ph = 792.0
-    $m = [regex]::Match($c, '(?m)^[\d.\-]+ [\d.\-]+ ([\d.\-]+) ([\d.\-]+) re')
-    if ($m.Success) { $ph = [double]::Parse($m.Groups[2].Value, $inv) }
-    $byY = [ordered]@{}
-    foreach ($t in [regex]::Matches($c, '1 0 0 1 ([\d.\-]+) ([\d.\-]+) Tm')) {
-      $x = [double]::Parse($t.Groups[1].Value, $inv); $y = [double]::Parse($t.Groups[2].Value, $inv)
-      $key = [math]::Round($y, 2).ToString($inv)
-      if (-not $byY.Contains($key)) { $byY[$key] = @{ y = $y; x = $x } } elseif ($x -lt $byY[$key].x) { $byY[$key].x = $x }
+      if ($m.Groups[2].Value -match 'FlateDecode') {
+        $ms = New-Object IO.MemoryStream($bytes, ($st + 2), ($len - 2))
+        $ds = New-Object IO.Compression.DeflateStream($ms, [IO.Compression.CompressionMode]::Decompress)
+        $o = New-Object IO.MemoryStream; $ds.CopyTo($o)
+        $streams[[int]$m.Groups[1].Value] = [Text.Encoding]::Latin1.GetString($o.ToArray())
+      } else { $streams[[int]$m.Groups[1].Value] = $txt.Substring($st, $len) }
+    } catch { }
+  }
+  $objs = @{}
+  foreach ($m in [regex]::Matches($txt, '(\d+) 0 obj\s*<<((?:(?!endobj).)*?)>>\s*(?:endobj|stream)', 'Singleline')) { $objs[[int]$m.Groups[1].Value] = $m.Groups[2].Value }
+  # ToUnicode maps by font object
+  $cmaps = @{}
+  foreach ($k in $objs.Keys) {
+    $tu = [regex]::Match($objs[$k], '/ToUnicode (\d+) 0 R')
+    if (-not $tu.Success -or -not $streams.ContainsKey([int]$tu.Groups[1].Value)) { continue }
+    $cm = $streams[[int]$tu.Groups[1].Value]; $map = @{}
+    foreach ($b in [regex]::Matches($cm, 'beginbfchar(.*?)endbfchar', 'Singleline')) {
+      foreach ($p in [regex]::Matches($b.Groups[1].Value, '<([0-9A-Fa-f]+)>\s*<([0-9A-Fa-f]+)>')) {
+        $s = ''; $h = $p.Groups[2].Value
+        for ($i = 0; $i -lt $h.Length; $i += 4) { $s += [char][Convert]::ToInt32($h.Substring($i, [math]::Min(4, $h.Length - $i)), 16) }
+        $map[[Convert]::ToInt32($p.Groups[1].Value, 16)] = $s
+      }
     }
-    $rows = @($byY.Values | Sort-Object { - $_.y } | ForEach-Object { @{ baseline = $ph - $_.y; x = $_.x } })
-    $pages.Add($rows)
+    foreach ($b in [regex]::Matches($cm, 'beginbfrange(.*?)endbfrange', 'Singleline')) {
+      foreach ($p in [regex]::Matches($b.Groups[1].Value, '<([0-9A-Fa-f]+)>\s*<([0-9A-Fa-f]+)>\s*<([0-9A-Fa-f]+)>')) {
+        $lo = [Convert]::ToInt32($p.Groups[1].Value, 16); $hi = [Convert]::ToInt32($p.Groups[2].Value, 16); $d = [Convert]::ToInt32($p.Groups[3].Value, 16)
+        for ($c = $lo; $c -le $hi; $c++) { $map[$c] = [string][char]($d + $c - $lo) }
+      }
+    }
+    $cmaps[$k] = $map
+  }
+  $pagesObj = $objs.Keys | Where-Object { $objs[$_] -match '/Type\s*/Pages' } | Select-Object -First 1
+  $kids = @([regex]::Matches([regex]::Match($objs[$pagesObj], '/Kids\s*\[(.*?)\]', 'Singleline').Groups[1].Value, '(\d+) 0 R') | ForEach-Object { [int]$_.Groups[1].Value })
+  $rx = '(?<rx>[\d.\-]+) (?<ry>[\d.\-]+) (?<rw>[\d.\-]+) (?<rh>[\d.\-]+) re\r?\nW\* n|/(?<fn>F\d+) [\d.]+ Tf|1 0 0 1 (?<tx>[\d.\-]+) (?<ty>[\d.\-]+) Tm|\[(?<tj>[^\]]*)\] TJ'
+  $pages = New-Object System.Collections.Generic.List[object]
+  foreach ($po in $kids) {
+    $pd = $objs[$po]
+    $mb = [regex]::Match($pd, '/MediaBox\s*\[\s*[\d.\-]+\s+[\d.\-]+\s+([\d.\-]+)\s+([\d.\-]+)\s*\]')
+    $pw = [double]::Parse($mb.Groups[1].Value, $inv); $ph = [double]::Parse($mb.Groups[2].Value, $inv)
+    $fonts = @{}
+    foreach ($fm in [regex]::Matches([regex]::Match($pd, '/Font\s*<<(.*?)>>', 'Singleline').Groups[1].Value, '/(F\d+) (\d+) 0 R')) { $fonts[$fm.Groups[1].Value] = [int]$fm.Groups[2].Value }
+    $content = ''
+    $cm = [regex]::Match($pd, '/Contents\s*(?:\[([^\]]*)\]|(\d+) 0 R)')
+    if ($cm.Groups[2].Success) { $content = $streams[[int]$cm.Groups[2].Value] }
+    else { foreach ($r in [regex]::Matches($cm.Groups[1].Value, '(\d+) 0 R')) { $content += $streams[[int]$r.Groups[1].Value] } }
+    $cells = New-Object System.Collections.Generic.List[object]
+    $rows = New-Object System.Collections.Generic.List[object]
+    $clip = -1; $font = $null; $tx = 0.0; $ty = 0.0
+    $byKey = @{}
+    foreach ($m in [regex]::Matches($content, $rx)) {
+      if ($m.Groups['rx'].Success) {
+        $x = [double]::Parse($m.Groups['rx'].Value, $inv); $y = [double]::Parse($m.Groups['ry'].Value, $inv)
+        $w = [double]::Parse($m.Groups['rw'].Value, $inv); $h = [double]::Parse($m.Groups['rh'].Value, $inv)
+        if ($w -ge $pw - 2 -and $h -ge $ph - 2) { $clip = -1 }
+        else {
+          $clip = -1; $top = $ph - $y - $h
+          for ($i = 0; $i -lt $cells.Count; $i++) { $c = $cells[$i]; if ([math]::Abs($c.x - $x) -lt 0.0005 -and [math]::Abs($c.w - $w) -lt 0.0005 -and [math]::Abs($c.top - $top) -lt 0.0005 -and [math]::Abs($c.h - $h) -lt 0.0005) { $clip = $i; break } }
+          if ($clip -lt 0) { $cells.Add(@{ x = $x; top = $top; w = $w; h = $h }); $clip = $cells.Count - 1 }
+        }
+      } elseif ($m.Groups['fn'].Success) { $font = $m.Groups['fn'].Value }
+      elseif ($m.Groups['tx'].Success) { $tx = [double]::Parse($m.Groups['tx'].Value, $inv); $ty = [double]::Parse($m.Groups['ty'].Value, $inv) }
+      elseif ($m.Groups['tj'].Success) {
+        $map = if ($font -and $fonts.ContainsKey($font) -and $cmaps.ContainsKey($fonts[$font])) { $cmaps[$fonts[$font]] } else { $null }
+        $s = ''
+        foreach ($t in [regex]::Matches($m.Groups['tj'].Value, '<([0-9A-Fa-f]*)>|\(((?:[^\\)]|\\.)*)\)')) {
+          if ($t.Groups[1].Success) {
+            $h = $t.Groups[1].Value
+            for ($i = 0; $i + 3 -lt $h.Length; $i += 4) { $code = [Convert]::ToInt32($h.Substring($i, 4), 16); if ($map -and $map.ContainsKey($code)) { $s += $map[$code] } else { $s += ' ' } }
+          } else { $s += ([regex]::Replace($t.Groups[2].Value, '\\(.)', '$1')) }
+        }
+        $yb = [math]::Round($ph - $ty, 3)
+        $key = "$clip|$yb"
+        if ($byKey.ContainsKey($key)) { $r = $byKey[$key]; $r.parts.Add(@{ x = $tx; text = $s }); if ($tx -lt $r.x) { $r.x = $tx } }
+        else { $r = @{ y = $ph - $ty; x = $tx; clip = $clip; parts = (New-Object System.Collections.Generic.List[object]) }; $r.parts.Add(@{ x = $tx; text = $s }); $byKey[$key] = $r; $rows.Add($r) }
+      }
+    }
+    foreach ($r in $rows) { $r['text'] = (($r.parts | Sort-Object { $_.x } | ForEach-Object { $_.text }) -join '').Trim() }
+    $pages.Add(@{ pw = $pw; ph = $ph; rows = $rows; cells = $cells })
   }
   , $pages
+}
+
+# Paragraphs inside tables (nested ones included), by story start, with their text without the end mark.
+function Walk-Table($t, $out, $seen) {
+  foreach ($cell in $t.Range.Cells) {
+    foreach ($p in $cell.Range.Paragraphs) {
+      $rg = $p.Range; $s = [int]$rg.Start
+      if ($seen.ContainsKey($s)) { continue }
+      $seen[$s] = 1
+      $out.Add(@{ start = $s; text = (([string]$rg.Text) -replace '[\r\a]+$', ''); used = 0; lines = 0 })
+    }
+  }
+  foreach ($n in $t.Tables) { Walk-Table $n $out $seen }
 }
 
 function Ref-Layout($f) {
@@ -135,6 +216,7 @@ function Ref-Layout($f) {
     $doc.Repaginate()
     $pane = $w.ActiveWindow.Panes.Item(1)
     $pcount = [int]$pane.Pages.Count
+    $hasTables = [int]$doc.Tables.Count -gt 0
     $lines = New-Object System.Collections.Generic.List[object]
     for ($pi = 1; $pi -le $pcount; $pi++) {
       $page = $pane.Pages.Item($pi)
@@ -148,6 +230,8 @@ function Ref-Layout($f) {
           $r = $ls.Item($li).Range
           $s = [int]$r.Start; $e = [int]$r.End
           $c = $doc.Range($s, $s)
+          # Word reports a whole table row as one line; table text is read from the PDF instead (below).
+          if ($hasTables -and $c.Information(12)) { continue }
           $lines.Add([ordered]@{
               page = $pi; start = $s; end = $e
               top = [double]$c.Information(6); left = [double]$c.Information(5)
@@ -158,44 +242,84 @@ function Ref-Layout($f) {
       }
     }
     # exact baselines from the print layout
-    $baselines = $null
+    $pdfPages = $null
     if (-not $NoPdf) {
       $pdf = Join-Path $env:TEMP ("o365_layout_{0}_{1}.pdf" -f $name, $PID)
       $doc.ExportAsFixedFormat($pdf, 17)
-      $baselines = Read-PdfLines $pdf
+      $pdfPages = Read-PdfPages $pdf
     }
     $byPage = @{}; foreach ($l in $lines) { if (-not $byPage.ContainsKey($l.page)) { $byPage[$l.page] = New-Object System.Collections.Generic.List[object] }; $byPage[$l.page].Add($l) }
     foreach ($l in $lines) { $l['baseline'] = $null; $l['inkLeft'] = $null }
     $warn = @()
-    if ($baselines) {
-      if ($baselines.Count -ne $pcount) { $warn += "PDF has $($baselines.Count) text pages, Word layout has $pcount" }
-      for ($pi = 1; $pi -le [math]::Min($pcount, $baselines.Count); $pi++) {
+    $cellRects = New-Object System.Collections.Generic.List[object]
+    if ($pdfPages) {
+      if ($pdfPages.Count -ne $pcount) { $warn += "PDF has $($pdfPages.Count) text pages, Word layout has $pcount" }
+      for ($pi = 1; $pi -le [math]::Min($pcount, $pdfPages.Count); $pi++) {
+        $pg = $pdfPages[$pi - 1]
+        # A clip that reaches the page edge is the page clipping a cell that runs off the page: not a cell box.
+        foreach ($c in $pg.cells) { if ($c.x + $c.w -ge $pg.pw - 0.01) { continue }; $cellRects.Add([ordered]@{ page = $pi; x = $c.x; y = $c.top; w = $c.w; h = $c.h }) }
         if (-not $byPage.ContainsKey($pi)) { continue }
         $inked = $byPage[$pi].ToArray()   # every line, even an empty paragraph, prints a space glyph for its mark
-        $rows = @($baselines[$pi - 1])
+        $rows = @($pg.rows | Where-Object { $_.clip -lt 0 } | Sort-Object { $_.y })
         if ($inked.Count -ne $rows.Count) { $warn += "page ${pi}: $($inked.Count) inked lines vs $($rows.Count) PDF baselines; baselines left null"; continue }
-        for ($k = 0; $k -lt $inked.Count; $k++) { $inked[$k]['baseline'] = $rows[$k].baseline; $inked[$k]['inkLeft'] = $rows[$k].x }
+        for ($k = 0; $k -lt $inked.Count; $k++) { $inked[$k]['baseline'] = $rows[$k].y; $inked[$k]['inkLeft'] = $rows[$k].x }
+      }
+      # Table text: each drawn row is matched to the paragraph (and offset) whose unconsumed text starts with it.
+      if ($hasTables) {
+        $tp = New-Object System.Collections.Generic.List[object]; $seen = @{}
+        foreach ($t in $doc.Tables) { Walk-Table $t $tp $seen }
+        for ($pi = 1; $pi -le [math]::Min($pcount, $pdfPages.Count); $pi++) {
+          foreach ($row in @($pdfPages[$pi - 1].rows | Where-Object { $_.clip -ge 0 })) {
+            $t = $row.text; $hit = $null; $off = 0
+            foreach ($p in $tp) {
+              $rem = $p.text.Substring($p.used); $trim = $rem.TrimStart()
+              if ($t -eq '') { if ($trim -eq '' -and $p.lines -eq 0) { $hit = $p; $off = $p.used; break } }
+              elseif ($trim.StartsWith($t, [StringComparison]::Ordinal)) { $hit = $p; $off = $p.used + ($rem.Length - $trim.Length); break }
+            }
+            $repeat = $false
+            if (-not $hit) {
+              foreach ($p in $tp) { $ix = if ($t -eq '') { -1 } else { $p.text.IndexOf($t, [StringComparison]::Ordinal) }; if ($ix -ge 0) { $hit = $p; $off = $ix; $repeat = $true; break } }
+            }
+            if (-not $hit) { $warn += "page ${pi}: table row '$t' matches no paragraph"; continue }
+            if (-not $repeat) { $hit.used = $off + $t.Length; $hit.lines++ }
+            $st = $hit.start + $off
+            $lines.Add([ordered]@{ page = $pi; start = $st; end = $st + $t.Length; top = $row.y; left = $row.x; lastX = $null; baseline = $row.y; inkLeft = $row.x; text = $t; cell = $true; repeat = $repeat })
+          }
+        }
       }
     }
+    $lines = @($lines | Sort-Object @{ Expression = { $_.page } }, @{ Expression = { $_.start } }, @{ Expression = { $_.top } })
     $sb = New-Object Text.StringBuilder
     [void]$sb.Append("{`n")
     [void]$sb.Append('  "source": ' + (Jstr (Rel $f)) + ",`n")
     [void]$sb.Append('  "oracle": "Microsoft Word 16.0 (' + $w.Build + '), Print Layout, tools/office/word-layout-oracle.ps1"' + ",`n")
     [void]$sb.Append('  "units": "points; page and top/left/baseline measured from the page top-left corner; start/end are UTF-16 offsets in the main story"' + ",`n")
-    [void]$sb.Append('  "precision": "top/left/lastX are screen-quantised (+-0.3 pt); baseline/inkLeft come from the 600 dpi PDF and are exact"' + ",`n")
+    [void]$sb.Append('  "precision": "top/left/lastX are screen-quantised (+-0.3 pt); baseline/inkLeft and cell rectangles come from the 600 dpi PDF and are exact"' + ",`n")
     [void]$sb.Append('  "pageCount": ' + $pcount + ",`n")
+    if ($cellRects.Count -gt 0) {
+      [void]$sb.Append('  "cells": [' + "`n")
+      for ($i = 0; $i -lt $cellRects.Count; $i++) {
+        $c = $cellRects[$i]
+        $row = '    {"page": ' + $c.page + ', "x": ' + (Num $c.x) + ', "y": ' + (Num $c.y) + ', "w": ' + (Num $c.w) + ', "h": ' + (Num $c.h) + '}'
+        if ($i -lt $cellRects.Count - 1) { $row += ',' }
+        [void]$sb.Append($row + "`n")
+      }
+      [void]$sb.Append("  ],`n")
+    }
     [void]$sb.Append('  "lines": [' + "`n")
     for ($i = 0; $i -lt $lines.Count; $i++) {
       $l = $lines[$i]
       $row = '    {"page": ' + $l.page + ', "start": ' + $l.start + ', "end": ' + $l.end + ', "top": ' + (Num $l.top) + ', "left": ' + (Num $l.left) +
-        ', "lastX": ' + (Num $l.lastX) + ', "baseline": ' + (Num $l.baseline) + ', "inkLeft": ' + (Num $l.inkLeft) + ', "text": ' + (Jstr $l.text) + '}'
+        ', "lastX": ' + (Num $l.lastX) + ', "baseline": ' + (Num $l.baseline) + ', "inkLeft": ' + (Num $l.inkLeft) + ', "text": ' + (Jstr $l.text)
+      if ($l.Contains('cell')) { $row += ', "cell": true' + $(if ($l.repeat) { ', "repeat": true' } else { '' }) }
+      $row += '}'
       if ($i -lt $lines.Count - 1) { $row += ',' }
       [void]$sb.Append($row + "`n")
     }
     [void]$sb.Append("  ]`n}`n")
     $jsonPath = if ($perDocDirs) { New-Item -ItemType Directory -Force (Join-Path $outDir $name) | Out-Null; Join-Path $outDir "$name\layout.json" } else { Join-Path $outDir "$name.json" }
     [IO.File]::WriteAllText($jsonPath, $sb.ToString().Replace("`r`n", "`n"), (New-Object Text.UTF8Encoding $false))
-    $produced.Add("layout/$name ($($lines.Count) lines, $pcount pages)")
+    $produced.Add("layout/$name ($($lines.Count) lines, $($cellRects.Count) cells, $pcount pages)")
     foreach ($m in $warn) { Write-Output "WARN $name : $m" }
   } finally {
     if ($doc) { try { $doc.Close(0) } catch {}; Release $doc }

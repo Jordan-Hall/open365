@@ -3,8 +3,8 @@
 use std::ops::Range;
 
 use open365_docx::{
-    Alignment, EffectiveParagraph, EffectiveRun, Inline, Paragraph, ParagraphProps, Run,
-    RunContent, RunLayoutProps, Styles,
+    Alignment, EffectiveParagraph, EffectiveRun, IndentOverride, Inline, Paragraph, ParagraphProps,
+    Run, RunContent, RunLayoutProps, Styles, TableCellFormat,
 };
 use open365_text::{
     BreakKind, FaceId, FontChain, FontLibrary, FontStyle, ShapeFeatures, break_opportunities,
@@ -12,7 +12,7 @@ use open365_text::{
 };
 
 use crate::metrics::{LineMetricModel, line_height};
-use crate::numbering::{IndentOverride, LabelAlign, ListLabel, Suffix, direct_indent};
+use crate::numbering::{LabelAlign, ListLabel, Suffix};
 use crate::props::{TabKind, TabLeader, TabStop};
 
 const EPS: f64 = 1e-6;
@@ -118,9 +118,12 @@ pub(crate) struct ParaLayout {
     pub story_end: usize,
 }
 
+#[derive(Clone, Copy)]
 pub(crate) struct Context<'a> {
     pub fonts: &'a FontLibrary,
     pub styles: Option<&'a Styles>,
+    /// Formatting the table style gives the paragraphs of the cell being laid out.
+    pub table: Option<&'a TableCellFormat>,
     /// `w:defaultTabStop` in points.
     pub default_tab: f64,
     pub model: LineMetricModel,
@@ -191,12 +194,12 @@ impl Collector<'_, '_> {
         let eff = self
             .ctx
             .styles
-            .map(|s| s.effective_run_props(self.para, run));
+            .map(|s| s.effective_run_props_in(self.para, run, self.ctx.table));
         let er = fallback_run(eff);
         let lay = self
             .ctx
             .styles
-            .map(|s| s.effective_run_layout(self.para, run))
+            .map(|s| s.effective_run_layout_in(self.para, run, self.ctx.table))
             .unwrap_or_default();
         let style = {
             let st = style_from(self.ctx, &er, &lay);
@@ -243,7 +246,7 @@ pub(crate) fn layout_paragraph(
 ) -> ParaLayout {
     let mut props = ctx
         .styles
-        .map(|s| s.effective_para_props(para))
+        .map(|s| s.effective_para_props_in(para, ctx.table))
         .unwrap_or_default();
     if let Some(l) = label {
         // Numbering level indents sit between the style's and the paragraph's own.
@@ -252,14 +255,14 @@ pub(crate) fn layout_paragraph(
             right: Some(f64::from(props.indent_right_pt)),
             first_line: Some(f64::from(props.first_line_pt)),
         };
-        let merged = direct_indent(para).over(l.indent).over(below);
+        let merged = para.direct_indent().over(l.indent).over(below);
         props.indent_left_pt = merged.left.unwrap_or_default() as f32;
         props.indent_right_pt = merged.right.unwrap_or_default() as f32;
         props.first_line_pt = merged.first_line.unwrap_or_default() as f32;
     }
     let flow = ctx
         .styles
-        .map(|s| s.paragraph_flow_props(para))
+        .map(|s| s.paragraph_flow_props_in(para, ctx.table))
         .unwrap_or_default();
     let style_id = para.style_id().map(str::to_owned).or_else(|| {
         ctx.styles
@@ -277,7 +280,9 @@ pub(crate) fn layout_paragraph(
 
     // Paragraph mark style: defaults, the paragraph style's run properties, then the mark's own
     // `w:pPr/w:rPr`.
-    let mark = ctx.styles.map(|s| s.paragraph_mark_props(para));
+    let mark = ctx
+        .styles
+        .map(|s| s.paragraph_mark_props_in(para, ctx.table));
     let mark_lay = mark.as_ref().map(|m| m.layout).unwrap_or_default();
     let mark_er = fallback_run(mark.map(|m| m.run));
     let mark_style = {

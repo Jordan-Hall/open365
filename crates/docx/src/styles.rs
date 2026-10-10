@@ -15,8 +15,10 @@ use crate::layout_props::{
     LayoutFmt, ParagraphMark, ParagraphProps, RunLayoutProps, TabOp, resolve_tabs, tab_ops,
 };
 use crate::model::{Paragraph, Run};
+use crate::numbering::{NumPr, StyleNumPr};
 use crate::ppr::Alignment;
 use crate::props::RunProps;
+use crate::table::{CellPosition, CellProps, TableProps, TableStyleCondition};
 use crate::xml::{self, ParsedXml, RawXml, XmlElement};
 
 const WORD_NS: &str = crate::xml::W_NS;
@@ -277,6 +279,39 @@ struct StyleDef {
     info: StyleInfo,
     run: RunFmt,
     para: ParaFmt,
+    /// `w:pPr/w:numPr` as written in this style.
+    num_pr: NumPr,
+    table: Option<TableStyleDef>,
+}
+
+/// Table-specific parts of a table style.
+#[derive(Debug, Clone, PartialEq)]
+struct TableStyleDef {
+    /// `w:tblPr`.
+    props: TableProps,
+    /// `w:tcPr` of the style itself.
+    cell: CellProps,
+    conditional: Vec<ConditionalDef>,
+}
+
+/// One `w:tblStylePr`.
+#[derive(Debug, Clone, PartialEq)]
+struct ConditionalDef {
+    condition: TableStyleCondition,
+    props: TableProps,
+    cell: CellProps,
+    para: ParaFmt,
+    run: RunFmt,
+}
+
+/// What a table style adds to one cell: its cell properties and the paragraph and run
+/// formatting that sits between the document defaults and the paragraph style.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct TableCellFormat {
+    /// Borders, shading, margins and vertical alignment the style gives the cell.
+    pub cell: CellProps,
+    para: ParaFmt,
+    run: RunFmt,
 }
 
 /// Theme fonts (`a:fontScheme` of the theme part): the Latin typeface of each slot.
@@ -375,6 +410,41 @@ fn parse_style(e: &XmlElement) -> Option<StyleDef> {
         para: child_el(e, "pPr")
             .map(ParaFmt::from_ppr)
             .unwrap_or_default(),
+        num_pr: child_el(e, "pPr")
+            .and_then(|p| child_el(p, "numPr"))
+            .map(NumPr::from_element)
+            .unwrap_or_default(),
+        table: (kind == StyleKind::Table).then(|| TableStyleDef {
+            props: child_el(e, "tblPr")
+                .map(TableProps::from_element)
+                .unwrap_or_default(),
+            cell: child_el(e, "tcPr")
+                .map(CellProps::from_element)
+                .unwrap_or_default(),
+            conditional: e
+                .children
+                .iter()
+                .filter_map(RawXml::as_element)
+                .filter(|c| c.head.is_w("tblStylePr"))
+                .filter_map(|c| {
+                    Some(ConditionalDef {
+                        condition: TableStyleCondition::parse(c.head.attr_w("type")?)?,
+                        props: child_el(c, "tblPr")
+                            .map(TableProps::from_element)
+                            .unwrap_or_default(),
+                        cell: child_el(c, "tcPr")
+                            .map(CellProps::from_element)
+                            .unwrap_or_default(),
+                        para: child_el(c, "pPr")
+                            .map(ParaFmt::from_ppr)
+                            .unwrap_or_default(),
+                        run: child_el(c, "rPr")
+                            .map(|r| RunFmt::from_props(&RunProps::from_element(r.clone())))
+                            .unwrap_or_default(),
+                    })
+                })
+                .collect(),
+        }),
     })
 }
 
@@ -500,8 +570,16 @@ impl Styles {
         para.style_id().or(self.default_paragraph.as_deref())
     }
 
-    fn resolved_run_fmt(&self, para: &Paragraph, direct: &RunProps) -> RunFmt {
+    fn resolved_run_fmt(
+        &self,
+        para: &Paragraph,
+        direct: &RunProps,
+        table: Option<&TableCellFormat>,
+    ) -> RunFmt {
         let mut fmt = self.defaults_run.clone();
+        if let Some(t) = table {
+            fmt.overlay(&t.run);
+        }
         if let Some(id) = self.paragraph_style_id(para) {
             for def in self.chain(id).into_iter().rev() {
                 fmt.overlay(&def.run);
@@ -530,25 +608,57 @@ impl Styles {
 
     /// Formatting of `run` inside `para` after defaults, styles and direct formatting.
     pub fn effective_run_props(&self, para: &Paragraph, run: &Run) -> EffectiveRun {
-        self.effective_from(&self.resolved_run_fmt(para, &run.props))
+        self.effective_run_props_in(para, run, None)
+    }
+
+    /// [`Styles::effective_run_props`] for a paragraph inside a table cell: the table
+    /// style's run formatting sits between the document defaults and the paragraph style.
+    pub fn effective_run_props_in(
+        &self,
+        para: &Paragraph,
+        run: &Run,
+        table: Option<&TableCellFormat>,
+    ) -> EffectiveRun {
+        self.effective_from(&self.resolved_run_fmt(para, &run.props, table))
     }
 
     /// Kerning, ligatures, position, character spacing and scale of `run` inside `para`
     /// after defaults, styles and direct formatting (ECMA-376 Part 1 §17.3.2).
     pub fn effective_run_layout(&self, para: &Paragraph, run: &Run) -> RunLayoutProps {
-        self.resolved_run_fmt(para, &run.props).layout.finish()
+        self.effective_run_layout_in(para, run, None)
+    }
+
+    /// [`Styles::effective_run_layout`] inside a table cell.
+    pub fn effective_run_layout_in(
+        &self,
+        para: &Paragraph,
+        run: &Run,
+        table: Option<&TableCellFormat>,
+    ) -> RunLayoutProps {
+        self.resolved_run_fmt(para, &run.props, table)
+            .layout
+            .finish()
     }
 
     /// Run properties of the paragraph mark (`w:pPr/w:rPr`, §17.3.1.29): defaults, the
     /// paragraph style's run properties, then the mark's own direct formatting.
     pub fn paragraph_mark_props(&self, para: &Paragraph) -> ParagraphMark {
+        self.paragraph_mark_props_in(para, None)
+    }
+
+    /// [`Styles::paragraph_mark_props`] inside a table cell.
+    pub fn paragraph_mark_props_in(
+        &self,
+        para: &Paragraph,
+        table: Option<&TableCellFormat>,
+    ) -> ParagraphMark {
         let direct = para
             .props
             .as_ref()
             .and_then(|p| child_el(p, "rPr"))
             .map(|r| RunProps::from_element(r.clone()))
             .unwrap_or_default();
-        let fmt = self.resolved_run_fmt(para, &direct);
+        let fmt = self.resolved_run_fmt(para, &direct, table);
         ParagraphMark {
             run: self.effective_from(&fmt),
             layout: fmt.layout.finish(),
@@ -559,7 +669,16 @@ impl Styles {
     /// auto-hyphenation suppression and tab stops of `para` after style resolution
     /// (ECMA-376 Part 1 §17.3.1).
     pub fn paragraph_flow_props(&self, para: &Paragraph) -> ParagraphProps {
-        let fmt = self.resolved_para_fmt(para);
+        self.paragraph_flow_props_in(para, None)
+    }
+
+    /// [`Styles::paragraph_flow_props`] inside a table cell.
+    pub fn paragraph_flow_props_in(
+        &self,
+        para: &Paragraph,
+        table: Option<&TableCellFormat>,
+    ) -> ParagraphProps {
+        let fmt = self.resolved_para_fmt(para, table);
         ParagraphProps {
             widow_control: fmt.widow_control.unwrap_or(true),
             keep_next: fmt.keep_next.unwrap_or(false),
@@ -571,8 +690,11 @@ impl Styles {
         }
     }
 
-    fn resolved_para_fmt(&self, para: &Paragraph) -> ParaFmt {
+    fn resolved_para_fmt(&self, para: &Paragraph, table: Option<&TableCellFormat>) -> ParaFmt {
         let mut fmt = self.defaults_para.clone();
+        if let Some(t) = table {
+            fmt.overlay(&t.para);
+        }
         if let Some(id) = self.paragraph_style_id(para) {
             for def in self.chain(id).into_iter().rev() {
                 fmt.overlay(&def.para);
@@ -586,7 +708,16 @@ impl Styles {
 
     /// Formatting of the paragraph itself after defaults, style chain and direct formatting.
     pub fn effective_para_props(&self, para: &Paragraph) -> EffectiveParagraph {
-        let fmt = self.resolved_para_fmt(para);
+        self.effective_para_props_in(para, None)
+    }
+
+    /// [`Styles::effective_para_props`] inside a table cell.
+    pub fn effective_para_props_in(
+        &self,
+        para: &Paragraph,
+        table: Option<&TableCellFormat>,
+    ) -> EffectiveParagraph {
+        let fmt = self.resolved_para_fmt(para, table);
         EffectiveParagraph {
             alignment: fmt.alignment.unwrap_or(Alignment::Left),
             space_before_pt: fmt.before.unwrap_or(0.0),
@@ -598,6 +729,86 @@ impl Styles {
             keep_next: fmt.keep_next.unwrap_or(false),
             keep_lines: fmt.keep_lines.unwrap_or(false),
         }
+    }
+
+    /// Id of the default table style (`w:type="table" w:default="1"`).
+    pub fn default_table_style(&self) -> Option<&str> {
+        self.order
+            .iter()
+            .filter_map(|id| self.index.get(id))
+            .find(|d| d.info.kind == StyleKind::Table && d.info.is_default)
+            .map(|d| d.info.id.as_str())
+    }
+
+    /// The table's effective properties: its own `w:tblPr` over its table style (and the
+    /// styles that one is based on), over the default table style.
+    pub fn table_props(&self, direct: &TableProps) -> TableProps {
+        let mut out = direct.clone();
+        let style = direct
+            .style_id
+            .as_deref()
+            .or_else(|| self.default_table_style());
+        if let Some(id) = style {
+            for def in self.chain(id) {
+                if let Some(t) = &def.table {
+                    out = out.over(t.props.clone());
+                }
+            }
+        }
+        out
+    }
+
+    /// What the table style of `table` (already resolved with [`Styles::table_props`])
+    /// gives the cell at `pos`: whole-table formatting of the style chain, then each
+    /// condition that applies, base styles first.
+    pub fn table_cell_format(&self, table: &TableProps, pos: CellPosition) -> TableCellFormat {
+        let mut out = TableCellFormat::default();
+        let Some(id) = table
+            .style_id
+            .as_deref()
+            .or_else(|| self.default_table_style())
+        else {
+            return out;
+        };
+        let look = table.look.unwrap_or_default();
+        let band = (
+            table.row_band_size.unwrap_or(1),
+            table.col_band_size.unwrap_or(1),
+        );
+        let conditions = TableStyleCondition::applying(look, band, pos);
+        for def in self.chain(id).into_iter().rev() {
+            let Some(t) = &def.table else { continue };
+            // The style's own pPr/rPr/tcPr are its whole-table formatting.
+            out.para.overlay(&def.para);
+            out.run.overlay(&def.run);
+            out.cell = merge_cell(&t.cell, &out.cell);
+            for cond in &conditions {
+                for c in t.conditional.iter().filter(|c| c.condition == *cond) {
+                    out.para.overlay(&c.para);
+                    out.run.overlay(&c.run);
+                    let mut cell = c.cell.clone();
+                    cell.margins = cell.margins.over(c.props.cell_margins);
+                    out.cell = merge_cell(&cell, &out.cell);
+                }
+            }
+        }
+        out
+    }
+
+    /// The list a paragraph style assigns through `w:numPr`, looking through `w:basedOn`:
+    /// the first style of the chain with a `w:numId` wins and supplies the level too.
+    /// `None` for an unknown or non-paragraph style, or when no style in the chain numbers.
+    pub fn style_num_pr(&self, id: &str) -> Option<StyleNumPr> {
+        if self.index.get(id)?.info.kind != StyleKind::Paragraph {
+            return None;
+        }
+        self.chain(id).into_iter().find_map(|def| {
+            Some(StyleNumPr {
+                num_id: def.num_pr.num_id?,
+                ilvl: def.num_pr.ilvl,
+                holder: def.info.id.clone(),
+            })
+        })
     }
 
     /// Ensures a definition exists for one of the built-in styles the editor offers
@@ -649,4 +860,18 @@ fn builtin_style(id: &str) -> Option<&'static str> {
         }
         _ => return None,
     })
+}
+
+/// `top` over `lower`, field by field.
+fn merge_cell(top: &CellProps, lower: &CellProps) -> CellProps {
+    CellProps {
+        width: top.width.or(lower.width),
+        grid_span: top.grid_span,
+        v_merge: top.v_merge,
+        margins: top.margins.over(lower.margins),
+        v_align: top.v_align.or(lower.v_align),
+        borders: top.borders.clone().over(lower.borders.clone()),
+        shading: top.shading.clone().or_else(|| lower.shading.clone()),
+        no_wrap: top.no_wrap || lower.no_wrap,
+    }
 }

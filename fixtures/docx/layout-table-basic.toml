@@ -1,0 +1,5 @@
+feature = "layout-table-basic"
+made_with = "Microsoft Word 16.0.20430 (Windows)"
+author = "project member"
+expect_dropped = []
+notes = "fixed-layout tables: equal and uneven columns, wrapping cell text, cell padding, table indent, centred and right aligned tables, borderless and thick-bordered tables; 6pt space after in Normal"
