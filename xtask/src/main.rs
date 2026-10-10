@@ -10,6 +10,7 @@ use cargo_metadata::{DependencyKind, MetadataCommand};
 /// build dependency) only on crates in the same or a lower layer. Dev
 /// dependencies are exempt so tests can use `open365-testkit`.
 const LAYERS: &[(&str, u8)] = &[
+    ("open365-locale", 0),
     ("open365-opc", 0),
     ("open365-docx", 1),
     ("open365-xlsx", 1),

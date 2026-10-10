@@ -2,6 +2,7 @@
 resolver = "3"
 exclude = ["fuzz"]
 members = [
+    "crates/locale",
     "crates/opc",
     "crates/docx",
     "crates/xlsx",
@@ -24,6 +25,7 @@ license = "MIT"
 publish = false
 
 [workspace.dependencies]
+open365-locale = { path = "crates/locale" }
 open365-opc = { path = "crates/opc" }
 open365-docx = { path = "crates/docx" }
 open365-xlsx = { path = "crates/xlsx" }

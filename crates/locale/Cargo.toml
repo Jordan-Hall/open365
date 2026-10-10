@@ -1,0 +1,26 @@
+[package]
+name = "open365-locale"
+description = "Locale data for Office semantics: LCID mapping, number/date conventions, casing and collation, backed by ICU4X (CLDR) plus measured Office overrides."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+icu_calendar = "2.3"
+icu_casemap = "2.3"
+icu_collator = "2.3"
+icu_datetime = "2.3"
+icu_decimal = "2.3"
+icu_experimental = "0.6"
+icu_locale = "2.3"
+icu_provider = "2.3"
+writeable = "0.6"
+
+[dev-dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+[lints]
+workspace = true
