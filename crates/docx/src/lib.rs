@@ -13,6 +13,7 @@ mod edit;
 mod error;
 mod layout_props;
 mod model;
+mod notes;
 mod numbering;
 mod ppr;
 mod props;
@@ -33,6 +34,7 @@ pub use model::{
     Block, Body, Break, BreakKind, Cell, DocChild, DocumentRoot, Group, Inline, Paragraph, Row,
     RowChild, Run, RunContent, Table, TableChild,
 };
+pub use notes::{Note, NoteKind};
 pub use numbering::{
     AbstractNum, IndentOverride, LEVELS, LevelJustification, LevelOverride, LevelRun, LevelSuffix,
     Num, NumLevel, NumPr, Numbering, ParagraphNumbering, ResolvedNum, StyleNumPr,
@@ -41,7 +43,8 @@ pub use ppr::Alignment;
 pub use props::{RunPropItem, RunPropKind, RunProps, RunPropsPatch};
 pub use ranges::{DocPos, EditLogEntry, Snapshot};
 pub use section::{
-    Column, Columns, DocGrid, DocGridType, Orientation, PageMargins, PageSize, Section, SectionType,
+    Column, Columns, DocGrid, DocGridType, HeaderFooterRef, HeaderFooterType, Orientation,
+    PageMargins, PageSize, Section, SectionType,
 };
 pub use settings::{DEFAULT_COMPATIBILITY_MODE, Settings};
 pub use styles::{

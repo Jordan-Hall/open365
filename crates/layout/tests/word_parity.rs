@@ -48,6 +48,8 @@ fn root() -> PathBuf {
 }
 
 struct RefLine {
+    /// Word's `WdStoryType` of the line's story (1, the main story, unless the oracle says).
+    story: u8,
     page: u64,
     start: u64,
     end: u64,
@@ -97,6 +99,7 @@ fn load_reference(path: &Path) -> Vec<RefLine> {
         .expect("lines array")
         .iter()
         .map(|l| RefLine {
+            story: l["story"].as_u64().map_or(1, |v| v as u8),
             page: l["page"].as_u64().expect("page"),
             start: l["start"].as_u64().expect("start"),
             end: l["end"].as_u64().expect("end"),
@@ -154,9 +157,12 @@ fn score(name: &str, detail: bool, mode: Mode, fonts: &FontLibrary) -> Result<Sc
 
     // Lines by first-character offset; a repeated table header row shares its offset with the
     // original, so there can be several per key.
-    let mut engine: BTreeMap<usize, Vec<(usize, &open365_layout::Line)>> = BTreeMap::new();
-    for (p, l) in layout.lines() {
-        engine.entry(l.start).or_default().push((p, l));
+    let mut engine: BTreeMap<(u8, usize), Vec<(usize, &open365_layout::Line)>> = BTreeMap::new();
+    for (p, l) in layout.all_lines() {
+        engine
+            .entry((l.story.word_code(), l.start))
+            .or_default()
+            .push((p, l));
     }
     let mut s = Score {
         total: reference.len() + ref_cells.len(),
@@ -164,7 +170,7 @@ fn score(name: &str, detail: bool, mode: Mode, fonts: &FontLibrary) -> Result<Sc
     };
     let mut report = String::new();
     for r in &reference {
-        let found = engine.get(&(r.start as usize)).and_then(|c| {
+        let found = engine.get(&(r.story, r.start as usize)).and_then(|c| {
             c.iter()
                 .find(|(p, _)| *p as u64 == r.page)
                 .or_else(|| c.first())

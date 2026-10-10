@@ -145,7 +145,7 @@ function Read-PdfPages([string]$pdf) {
   }
   $pagesObj = $objs.Keys | Where-Object { $objs[$_] -match '/Type\s*/Pages' } | Select-Object -First 1
   $kids = @([regex]::Matches([regex]::Match($objs[$pagesObj], '/Kids\s*\[(.*?)\]', 'Singleline').Groups[1].Value, '(\d+) 0 R') | ForEach-Object { [int]$_.Groups[1].Value })
-  $rx = '(?<rx>[\d.\-]+) (?<ry>[\d.\-]+) (?<rw>[\d.\-]+) (?<rh>[\d.\-]+) re\r?\nW\* n|/(?<fn>F\d+) [\d.]+ Tf|1 0 0 1 (?<tx>[\d.\-]+) (?<ty>[\d.\-]+) Tm|\[(?<tj>[^\]]*)\] TJ'
+  $rx = '(?<rx>[\d.\-]+) (?<ry>[\d.\-]+) (?<rw>[\d.\-]+) (?<rh>[\d.\-]+) re\r?\nW\* n|/(?<fn>F\d+) (?<fs>[\d.]+) Tf|1 0 0 1 (?<tx>[\d.\-]+) (?<ty>[\d.\-]+) Tm|\[(?<tj>[^\]]*)\] TJ'
   $pages = New-Object System.Collections.Generic.List[object]
   foreach ($po in $kids) {
     $pd = $objs[$po]
@@ -159,7 +159,7 @@ function Read-PdfPages([string]$pdf) {
     else { foreach ($r in [regex]::Matches($cm.Groups[1].Value, '(\d+) 0 R')) { $content += $streams[[int]$r.Groups[1].Value] } }
     $cells = New-Object System.Collections.Generic.List[object]
     $rows = New-Object System.Collections.Generic.List[object]
-    $clip = -1; $font = $null; $tx = 0.0; $ty = 0.0
+    $clip = -1; $font = $null; $fsize = ''; $tx = 0.0; $ty = 0.0
     $byKey = @{}
     foreach ($m in [regex]::Matches($content, $rx)) {
       if ($m.Groups['rx'].Success) {
@@ -171,7 +171,7 @@ function Read-PdfPages([string]$pdf) {
           for ($i = 0; $i -lt $cells.Count; $i++) { $c = $cells[$i]; if ([math]::Abs($c.x - $x) -lt 0.0005 -and [math]::Abs($c.w - $w) -lt 0.0005 -and [math]::Abs($c.top - $top) -lt 0.0005 -and [math]::Abs($c.h - $h) -lt 0.0005) { $clip = $i; break } }
           if ($clip -lt 0) { $cells.Add(@{ x = $x; top = $top; w = $w; h = $h }); $clip = $cells.Count - 1 }
         }
-      } elseif ($m.Groups['fn'].Success) { $font = $m.Groups['fn'].Value }
+      } elseif ($m.Groups['fn'].Success) { $font = $m.Groups['fn'].Value; $fsize = $m.Groups['fs'].Value }
       elseif ($m.Groups['tx'].Success) { $tx = [double]::Parse($m.Groups['tx'].Value, $inv); $ty = [double]::Parse($m.Groups['ty'].Value, $inv) }
       elseif ($m.Groups['tj'].Success) {
         $map = if ($font -and $fonts.ContainsKey($font) -and $cmaps.ContainsKey($fonts[$font])) { $cmaps[$fonts[$font]] } else { $null }
@@ -185,13 +185,25 @@ function Read-PdfPages([string]$pdf) {
         $yb = [math]::Round($ph - $ty, 3)
         $key = "$clip|$yb"
         if ($byKey.ContainsKey($key)) { $r = $byKey[$key]; $r.parts.Add(@{ x = $tx; text = $s }); if ($tx -lt $r.x) { $r.x = $tx } }
-        else { $r = @{ y = $ph - $ty; x = $tx; clip = $clip; parts = (New-Object System.Collections.Generic.List[object]) }; $r.parts.Add(@{ x = $tx; text = $s }); $byKey[$key] = $r; $rows.Add($r) }
+        else { $r = @{ y = $ph - $ty; x = $tx; clip = $clip; size = $fsize; parts = (New-Object System.Collections.Generic.List[object]) }; $r.parts.Add(@{ x = $tx; text = $s }); $byKey[$key] = $r; $rows.Add($r) }
       }
     }
     foreach ($r in $rows) { $r['text'] = (($r.parts | Sort-Object { $_.x } | ForEach-Object { $_.text }) -join '').Trim() }
     $pages.Add(@{ pw = $pw; ph = $ph; rows = $rows; cells = $cells })
   }
   , $pages
+}
+
+# Vertical order of the stories on a page (WdStoryType): headers, body, endnotes, footnotes, footers.
+function Story-Rank($l) {
+  if (-not $l.Contains('story')) { return 1.0 }
+  switch ([int]$l.story) {
+    { $_ -in 6, 7, 10 } { 0.0 }
+    15 { 2.0 } 16 { 2.0 } 17 { 2.1 } 3 { 2.5 }
+    12 { 3.0 } 13 { 3.0 } 14 { 3.1 } 2 { 3.5 }
+    { $_ -in 8, 9, 11 } { 4.0 }
+    default { 1.5 }
+  }
 }
 
 # Paragraphs inside tables (nested ones included), by story start, with their text without the end mark.
@@ -229,12 +241,31 @@ function Ref-Layout($f) {
         for ($li = 1; $li -le $lc; $li++) {
           $r = $ls.Item($li).Range
           $s = [int]$r.Start; $e = [int]$r.End
+          $st = [int]$r.StoryType
+          if ($st -ne 1) {
+            # Headers, footers, footnotes, endnotes and their separators: another story, so the offsets are
+            # relative to that story and the position is read from a range inside it. Optional `story` output
+            # (Word's WdStoryType). Word lists some notes twice; a repeated line is dropped.
+            $c = $r.Duplicate; $c.Collapse(1)
+            $ce = $r.Duplicate; $ce.SetRange([math]::Max($s, $e - 1), [math]::Max($s, $e - 1))
+            $top = [double]$c.Information(6)
+            if ($lines.Exists([Predicate[object]]{ param($o) $o.page -eq $pi -and $o.Contains('story') -and $o.story -eq $st -and $o.start -eq $s -and $o.end -eq $e -and $o.top -eq $top })) { continue }
+            $lines.Add([ordered]@{
+                page = $pi; start = $s; end = $e; story = $st
+                top = $top; left = [double]$c.Information(5)
+                lastX = [double]$ce.Information(5)
+                text = [string]$r.Text
+              })
+            continue
+          }
           $c = $doc.Range($s, $s)
           # Word reports a whole table row as one line; table text is read from the PDF instead (below).
           if ($hasTables -and $c.Information(12)) { continue }
+          $mtop = [double]$c.Information(6)
+          if ($lines.Exists([Predicate[object]]{ param($o) $o.page -eq $pi -and -not $o.Contains('story') -and $o.start -eq $s -and $o.end -eq $e -and $o.top -eq $mtop })) { continue }
           $lines.Add([ordered]@{
               page = $pi; start = $s; end = $e
-              top = [double]$c.Information(6); left = [double]$c.Information(5)
+              top = $mtop; left = [double]$c.Information(5)
               lastX = [double]$doc.Range([math]::Max($s, $e - 1), [math]::Max($s, $e - 1)).Information(5)
               text = [string]$r.Text
             })
@@ -260,7 +291,32 @@ function Ref-Layout($f) {
         foreach ($c in $pg.cells) { if ($c.x + $c.w -ge $pg.pw - 0.01) { continue }; $cellRects.Add([ordered]@{ page = $pi; x = $c.x; y = $c.top; w = $c.w; h = $c.h }) }
         if (-not $byPage.ContainsKey($pi)) { continue }
         $inked = $byPage[$pi].ToArray()   # every line, even an empty paragraph, prints a space glyph for its mark
+        if (@($inked | Where-Object { $_.Contains('story') }).Count -gt 0) {
+          # Lines of other stories: top-to-bottom order is header, body, endnotes, footnotes, footer.
+          $inked = @($inked | Sort-Object @{ Expression = { Story-Rank $_ } }, @{ Expression = { $_.start } })
+        }
         $rows = @($pg.rows | Where-Object { $_.clip -lt 0 } | Sort-Object { $_.y })
+        # Superscript marks (note references) are separate small rows just above their line: not lines.
+        if (@($inked | Where-Object { $_.Contains('story') -or $_.text -match '[]' }).Count -gt 0) {
+          $rows = @($rows | Where-Object {
+              $r0 = $_
+              -not ($r0.text.Length -le 3 -and $r0.text -ne '' -and @($rows | Where-Object { $_.y -gt $r0.y -and $_.y - $r0.y -le 5 -and [double]$_.size -gt 1.3 * [double]$r0.size }).Count -gt 0)
+            })
+          # Word prints the empty header and footer paragraphs of a page that has notes without listing them.
+          $firstIsHeader = $inked.Count -gt 0 -and $inked[0].Contains('story') -and $inked[0].story -in 6, 7, 10
+          $lastIsFooter = $inked.Count -gt 0 -and $inked[-1].Contains('story') -and $inked[-1].story -in 8, 9, 11
+          while ($rows.Count -gt $inked.Count) {
+            if ($rows[0].text -eq '' -and -not $firstIsHeader) { $rows = @($rows | Select-Object -Skip 1) }
+            elseif ($rows[-1].text -eq '' -and -not $lastIsFooter) { $rows = @($rows | Select-Object -SkipLast 1) }
+            else { break }
+          }
+        }
+        if ($env:O365_ORACLE_DEBUG) { foreach ($d in $rows) { Write-Output ("PDF p{0} y={1:N3} x={2:N3} size={3} '{4}'" -f $pi, $d.y, $d.x, $d.size, $d.text) } }
+        if ($inked.Count -ne $rows.Count) {
+          # Separators draw a rule, not a glyph: pair the rest.
+          $inkedText = @($inked | Where-Object { -not ($_.Contains('story') -and $_.story -in 12, 13, 15, 16) })
+          if ($inkedText.Count -eq $rows.Count) { $inked = $inkedText }
+        }
         if ($inked.Count -ne $rows.Count) { $warn += "page ${pi}: $($inked.Count) inked lines vs $($rows.Count) PDF baselines; baselines left null"; continue }
         for ($k = 0; $k -lt $inked.Count; $k++) { $inked[$k]['baseline'] = $rows[$k].y; $inked[$k]['inkLeft'] = $rows[$k].x }
       }
@@ -288,7 +344,7 @@ function Ref-Layout($f) {
         }
       }
     }
-    $lines = @($lines | Sort-Object @{ Expression = { $_.page } }, @{ Expression = { $_.start } }, @{ Expression = { $_.top } })
+    $lines = @($lines | Sort-Object @{ Expression = { $_.page } }, @{ Expression = { Story-Rank $_ } }, @{ Expression = { $_.start } }, @{ Expression = { $_.top } })
     $sb = New-Object Text.StringBuilder
     [void]$sb.Append("{`n")
     [void]$sb.Append('  "source": ' + (Jstr (Rel $f)) + ",`n")
@@ -311,6 +367,7 @@ function Ref-Layout($f) {
       $l = $lines[$i]
       $row = '    {"page": ' + $l.page + ', "start": ' + $l.start + ', "end": ' + $l.end + ', "top": ' + (Num $l.top) + ', "left": ' + (Num $l.left) +
         ', "lastX": ' + (Num $l.lastX) + ', "baseline": ' + (Num $l.baseline) + ', "inkLeft": ' + (Num $l.inkLeft) + ', "text": ' + (Jstr $l.text)
+      if ($l.Contains('story')) { $row += ', "story": ' + $l.story }
       if ($l.Contains('cell')) { $row += ', "cell": true' + $(if ($l.repeat) { ', "repeat": true' } else { '' }) }
       $row += '}'
       if ($i -lt $lines.Count - 1) { $row += ',' }

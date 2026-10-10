@@ -152,6 +152,25 @@ impl Default for DocGrid {
     }
 }
 
+/// Which header or footer of a section a reference names (`w:type`, §17.10.5). Default
+/// `w:default`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum HeaderFooterType {
+    Default,
+    First,
+    Even,
+}
+
+/// A `w:headerReference` or `w:footerReference` (§17.10.5, §17.10.2) of a section.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct HeaderFooterRef {
+    /// True for a footer, false for a header.
+    pub footer: bool,
+    pub kind: HeaderFooterType,
+    /// Relationship id (`r:id`) of the header or footer part.
+    pub rel_id: String,
+}
+
 /// One section of the document.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Section {
@@ -168,6 +187,9 @@ pub struct Section {
     pub title_pg: bool,
     pub kind: SectionType,
     pub doc_grid: DocGrid,
+    /// Header and footer references in document order. A kind a section does not name is
+    /// inherited from the previous section (§17.10.5); resolving that is the reader's job.
+    pub header_footer_refs: Vec<HeaderFooterRef>,
 }
 
 impl Default for Section {
@@ -181,6 +203,7 @@ impl Default for Section {
             title_pg: false,
             kind: SectionType::NextPage,
             doc_grid: DocGrid::default(),
+            header_footer_refs: Vec::new(),
         }
     }
 }
@@ -251,6 +274,27 @@ impl Section {
                             })
                         })
                         .collect();
+                }
+                "headerReference" | "footerReference"
+                    if c.head.is_w("headerReference") || c.head.is_w("footerReference") =>
+                {
+                    let rel_id = c
+                        .head
+                        .attrs
+                        .iter()
+                        .find(|a| a.local_name() == "id")
+                        .map(|a| a.value.clone());
+                    if let Some(rel_id) = rel_id {
+                        out.header_footer_refs.push(HeaderFooterRef {
+                            footer: c.head.is_w("footerReference"),
+                            kind: match c.head.attr_w("type") {
+                                Some("first") => HeaderFooterType::First,
+                                Some("even") => HeaderFooterType::Even,
+                                _ => HeaderFooterType::Default,
+                            },
+                            rel_id,
+                        });
+                    }
                 }
                 "titlePg" if c.head.is_w("titlePg") => {
                     out.title_pg = on(c, "val").unwrap_or(true);

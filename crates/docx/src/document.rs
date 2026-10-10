@@ -527,7 +527,7 @@ fn invalidate_stale_parts(package: &mut Package, log: &mut Vec<HygieneAction>) {
         });
         if rel.target_mode == TargetMode::Internal
             && let Ok(target) = resolve_target(None, &rel.target)
-            && package.remove_part(target.as_str()).is_some()
+            && package.remove_part_and_override(target.as_str()).is_some()
         {
             log.push(HygieneAction::RemovedPart {
                 name: target.to_string(),
@@ -546,7 +546,7 @@ fn invalidate_stale_parts(package: &mut Package, log: &mut Vec<HygieneAction>) {
         .filter(|n| n.to_ascii_lowercase().starts_with("_xmlsignatures/"))
         .collect();
     for name in signature_parts {
-        if package.remove_part(&name).is_some() {
+        if package.remove_part_and_override(&name).is_some() {
             log.push(HygieneAction::RemovedPart {
                 name,
                 reason: "digital signature no longer matches the edited package",

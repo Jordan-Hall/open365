@@ -1,0 +1,5 @@
+feature = "layout-hf-distance"
+made_with = "Microsoft Word 16.0.20430 (Windows)"
+author = "project member"
+expect_dropped = []
+notes = "header/footer distances of 0.3 in; a three-paragraph header taller than the top margin pushes the body down, and a tall footer lifts the body bottom"

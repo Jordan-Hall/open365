@@ -438,3 +438,54 @@ fn first_edit_removes_thumbnail_and_signatures_and_nothing_else() {
     doc.insert_text(0, 0, "x").expect("insert");
     assert_eq!(doc.hygiene_log().len(), count);
 }
+
+#[test]
+fn first_edit_leaves_no_dangling_content_type_override() {
+    let document = format!(
+        r#"<w:document xmlns:w="{}"><w:body><w:p><w:r><w:t>hello</w:t></w:r></w:p></w:body></w:document>"#,
+        common::W
+    );
+    let rels = root_rels(
+        "word/document.xml",
+        r#"<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/package/2006/relationships/metadata/thumbnail" Target="docProps/thumbnail.jpeg"/><Relationship Id="rId3" Type="http://schemas.openxmlformats.org/package/2006/relationships/digital-signature/origin" Target="_xmlsignatures/origin.sigs"/>"#,
+    );
+    let bytes = build(
+        &document,
+        "word/document.xml",
+        &rels,
+        &[
+            ("docProps/thumbnail.jpeg", b"JPEGDATA"),
+            ("_xmlsignatures/origin.sigs", b""),
+            ("_xmlsignatures/sig1.xml", b"<Signature/>"),
+        ],
+    );
+    // Declare the thumbnail and a signature part with explicit overrides.
+    let mut package = Package::read(&bytes, &Limits::default()).expect("pkg");
+    let types = String::from_utf8(
+        package
+            .part("[Content_Types].xml")
+            .expect("types")
+            .data()
+            .to_vec(),
+    )
+    .expect("utf-8")
+    .replace(
+        "</Types>",
+        r#"<Override PartName="/docProps/thumbnail.jpeg" ContentType="image/jpeg"/><Override PartName="/_xmlsignatures/sig1.xml" ContentType="application/vnd.openxmlformats-package.digital-signature-xmlsignature+xml"/></Types>"#,
+    );
+    let name = open365_opc::PartName::new("[Content_Types].xml").expect("name");
+    package.set_part(name, types.into_bytes());
+    let bytes = package.write().expect("write");
+
+    let mut doc = Document::open(&bytes, &Limits::default()).expect("opens");
+    doc.insert_text(0, 5, "!").expect("insert");
+    let saved = Package::read(&doc.save().expect("save"), &Limits::default()).expect("pkg");
+    assert!(saved.part("docProps/thumbnail.jpeg").is_none());
+    assert!(saved.part("_xmlsignatures/sig1.xml").is_none());
+    let dangling: Vec<_> = saved
+        .check_integrity()
+        .into_iter()
+        .filter(|i| matches!(i, open365_opc::IntegrityIssue::DanglingOverride { .. }))
+        .collect();
+    assert!(dangling.is_empty(), "{dangling:?}");
+}

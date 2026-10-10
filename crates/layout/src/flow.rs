@@ -5,10 +5,18 @@
 use std::sync::Arc;
 
 use crate::build::UnitLayout;
+use crate::furniture::{Furniture, NoteStore};
 use crate::para::{AtomClass, LineBox, ParaLayout};
 use crate::props::SectionProps;
 use crate::table::{CellLayout, FlowLine, RowLayout, TableLayout};
-use crate::{CellBox, GlyphRun, Line, Page, PlacedGlyph};
+use crate::{CellBox, GlyphRun, Line, NoteSlot, Page, PlacedGlyph, StoryKind};
+
+/// What pagination needs besides the items: section geometry, header and footer sizes, notes.
+pub(crate) struct Env<'a> {
+    pub sections: &'a [SectionProps],
+    pub furniture: &'a Furniture,
+    pub notes: &'a NoteStore,
+}
 
 const EPS: f64 = 1e-6;
 
@@ -21,6 +29,8 @@ pub(crate) struct FlowItem {
     pub para_base: usize,
     /// Story offset of the unit's first character.
     pub story_base: usize,
+    /// The story the unit belongs to (the main story, or the endnotes after it).
+    pub story: StoryKind,
 }
 
 impl FlowItem {
@@ -58,9 +68,9 @@ impl FlowItem {
 
 /// Offsets that turn a unit's relative paragraph and story numbers into document ones.
 #[derive(Clone, Copy)]
-struct Base {
-    para: usize,
-    story: usize,
+pub(crate) struct Base {
+    pub para: usize,
+    pub story: usize,
 }
 
 #[derive(Debug, Clone, PartialEq, Default)]
@@ -83,6 +93,8 @@ pub(crate) struct Checkpoint {
     pub hard_start: bool,
     pub force_break: bool,
     pub section_index: usize,
+    /// Footnotes on the current page.
+    pub notes: usize,
 }
 
 struct PageBuild {
@@ -91,6 +103,13 @@ struct PageBuild {
     section_index: usize,
     lines: Vec<Line>,
     cells: Vec<CellBox>,
+    first_in_section: bool,
+    /// Top and bottom of the body area before footnotes take room.
+    top: f64,
+    frame_bottom: f64,
+    slots: Vec<NoteSlot>,
+    notes_h: f64,
+    sep_h: f64,
     /// Cursor: top of the next line.
     y: f64,
     /// Space after the previous paragraph on this page, not yet applied.
@@ -103,14 +122,28 @@ struct PageBuild {
 }
 
 impl PageBuild {
-    fn new(number: usize, section_index: usize, section: SectionProps, hard_start: bool) -> Self {
+    fn new(
+        number: usize,
+        section_index: usize,
+        section: SectionProps,
+        hard_start: bool,
+        first_in_section: bool,
+        env: &Env<'_>,
+    ) -> Self {
+        let frame = env.furniture.frame(section_index, number, first_in_section);
         Self {
             number,
             section,
             section_index,
             lines: Vec::new(),
             cells: Vec::new(),
-            y: section.margin_top,
+            first_in_section,
+            top: frame.top,
+            frame_bottom: frame.bottom,
+            slots: Vec::new(),
+            notes_h: 0.0,
+            sep_h: env.notes.sep_height(section_index),
+            y: frame.top,
             pending_after: 0.0,
             prev_style: None,
             prev_contextual: false,
@@ -118,8 +151,32 @@ impl PageBuild {
         }
     }
 
+    /// Where the body ends on this page: the frame's bottom less the footnote area.
     fn bottom(&self) -> f64 {
-        self.section.page_height - self.section.margin_bottom
+        if self.slots.is_empty() {
+            self.frame_bottom
+        } else {
+            self.frame_bottom - self.notes_h - self.sep_h
+        }
+    }
+
+    /// Puts lines `from..to` of footnote `id` on the page.
+    fn add_slot(&mut self, slot: NoteSlot, env: &Env<'_>) {
+        let h = env.notes.slot_height(self.section_index, slot);
+        if h > 0.0
+            && !self
+                .slots
+                .iter()
+                .any(|s| s.id == slot.id && s.from == slot.from)
+        {
+            self.slots.push(slot);
+            self.notes_h += h;
+        }
+    }
+
+    fn add_note(&mut self, id: i64, env: &Env<'_>) {
+        let to = env.notes.line_count(self.section_index, id);
+        self.add_slot(NoteSlot { id, from: 0, to }, env);
     }
 
     fn has_content(&self) -> bool {
@@ -131,12 +188,26 @@ impl PageBuild {
         self.section.margin_left + self.section.gutter
     }
 
-    fn finish(self) -> Page {
+    fn finish(self, env: &Env<'_>) -> Page {
+        let notes = env.notes.page_lines(
+            self.section_index,
+            &self.slots,
+            self.section.margin_left + self.section.gutter,
+            self.frame_bottom,
+        );
         Page {
             number: self.number,
             section: self.section,
             lines: self.lines,
             cells: self.cells.into_iter().map(snap_cell).collect(),
+            section_index: self.section_index,
+            first_in_section: self.first_in_section,
+            body_top: self.top,
+            body_bottom: self.frame_bottom,
+            note_slots: self.slots,
+            notes,
+            header: Vec::new(),
+            footer: Vec::new(),
         }
     }
 }
@@ -158,14 +229,103 @@ fn lines_fitting(heights: impl Iterator<Item = f64>, y0: f64, bottom: f64) -> us
 struct Placement {
     /// Lines of the paragraph's remaining range that go on this page.
     take: usize,
+    /// The footnote of the last taken line that continues on the next page: its id and the
+    /// number of its lines that stay on this page.
+    split: Option<(i64, usize)>,
+}
+
+/// The footnote state of a page while a paragraph's lines are tried on it.
+struct NotesAt<'a> {
+    env: &'a Env<'a>,
+    section: usize,
+    /// The page's body bottom before footnotes, the footnotes already on it and their height.
+    frame_bottom: f64,
+    count: usize,
+    height: f64,
+    sep: f64,
+}
+
+/// How many of `para.lines[from..]` fit above the frame bottom once the footnotes their
+/// references bring (and the separator, for the first) are placed.
+fn lines_fitting_notes(
+    para: &ParaLayout,
+    from: usize,
+    y0: f64,
+    n: &NotesAt<'_>,
+) -> (usize, Option<(i64, usize)>) {
+    let (mut y, mut nh, mut has, mut k) = (y0, n.height, n.count > 0, 0);
+    for l in &para.lines[from..] {
+        let mut add = 0.0;
+        let mut any = false;
+        let mut ids = Vec::new();
+        for (a, id) in &para.foot_refs {
+            if l.atoms.contains(a) {
+                let h = n.env.notes.height(n.section, *id);
+                any |= h > 0.0;
+                add += h;
+                ids.push(*id);
+            }
+        }
+        let has2 = has || any;
+        let total = nh + add + if has2 { n.sep } else { 0.0 };
+        if y + l.height + total > n.frame_bottom + EPS {
+            // A single long footnote may start here and go on in the next page's notes.
+            if let [id] = ids[..] {
+                let lines = n.env.notes.line_count(n.section, id);
+                let avail = n.frame_bottom - (y + l.height) - nh - if has { 0.0 } else { n.sep };
+                let mut m = 0;
+                let mut used = 0.0;
+                while m < lines {
+                    let h = n.env.notes.slot_height(
+                        n.section,
+                        NoteSlot {
+                            id,
+                            from: m,
+                            to: m + 1,
+                        },
+                    );
+                    if used + h > avail + EPS {
+                        break;
+                    }
+                    used += h;
+                    m += 1;
+                }
+                if lines - m == 1 && m > 2 {
+                    m -= 1;
+                }
+                if m >= 2.min(lines) && m < lines {
+                    return (k + 1, Some((id, m)));
+                }
+            }
+            break;
+        }
+        y += l.height;
+        nh += add;
+        has = has2;
+        k += 1;
+    }
+    (k, None)
 }
 
 /// Decides how many of `lines[from..]` to put on a page where `y0` is where the first would
 /// go. `at_top` means nothing is on the page yet, so no rule may push everything away.
-fn decide(para: &ParaLayout, from: usize, y0: f64, bottom: f64, at_top: bool) -> Placement {
+fn decide(
+    para: &ParaLayout,
+    from: usize,
+    y0: f64,
+    bottom: f64,
+    at_top: bool,
+    notes: Option<&NotesAt<'_>>,
+) -> Placement {
     let lines = &para.lines[from..];
     let n = lines.len();
-    let raw = lines_fitting(lines.iter().map(|l| l.height), y0, bottom);
+    let (raw, split) = match notes {
+        Some(nt) => lines_fitting_notes(para, from, y0, nt),
+        None => (
+            lines_fitting(lines.iter().map(|l| l.height), y0, bottom),
+            None,
+        ),
+    };
     let mut k = raw;
     if k < n {
         let first_segment = from == 0;
@@ -188,7 +348,11 @@ fn decide(para: &ParaLayout, from: usize, y0: f64, bottom: f64, at_top: bool) ->
     } else if n > 0 && raw == 0 && at_top {
         k = 1;
     }
-    Placement { take: k }
+    // A pulled-back line count (widow control, keep rules) drops the split with its line.
+    Placement {
+        take: k,
+        split: split.filter(|_| k == raw),
+    }
 }
 
 /// Whether item `p` (and, when it is kept with the next, its followers) can start on a page
@@ -226,7 +390,7 @@ fn can_start(
     }
     // Space between paragraphs is the larger of space after and space before.
     let y0 = y + prev_after.max(f64::from(para.props.space_before_pt));
-    let place = decide(para, 0, y0, bottom, false);
+    let place = decide(para, 0, y0, bottom, false, None);
     if place.take == 0 {
         return false;
     }
@@ -268,7 +432,13 @@ fn snap_cell(c: CellBox) -> CellBox {
 }
 
 /// Builds the placed line `lb` of `para`, its text area starting at `origin_x` on the page.
-fn build_line(para: &ParaLayout, lb: &LineBox, origin_x: f64, top: f64, base: Base) -> Line {
+pub(crate) fn build_line(
+    para: &ParaLayout,
+    lb: &LineBox,
+    origin_x: f64,
+    top: f64,
+    base: Base,
+) -> Line {
     let left_origin = origin_x;
     let mut runs: Vec<GlyphRun> = Vec::new();
     let mut cur_style: Option<usize> = None;
@@ -300,6 +470,7 @@ fn build_line(para: &ParaLayout, lb: &LineBox, origin_x: f64, top: f64, base: Ba
             underline: st.underline,
             strike: st.strike,
             color: st.color,
+            superscript: false,
             glyphs,
         });
     }
@@ -318,6 +489,7 @@ fn build_line(para: &ParaLayout, lb: &LineBox, origin_x: f64, top: f64, base: Ba
                 underline: st.underline,
                 strike: st.strike,
                 color: st.color,
+                superscript: st.superscript,
                 glyphs: Vec::new(),
             });
             cur_style = Some(atom.style);
@@ -336,7 +508,34 @@ fn build_line(para: &ParaLayout, lb: &LineBox, origin_x: f64, top: f64, base: Ba
             }
         }
     }
+    if para.separator
+        && let Some(st) = para.styles.first()
+    {
+        // The separator character is a rule Word draws 144 pt long; the paragraph mark after
+        // it is the first glyph the PDF shows.
+        runs.insert(
+            0,
+            GlyphRun {
+                face: st.face,
+                size: st.size,
+                bold: false,
+                italic: false,
+                underline: false,
+                strike: false,
+                color: None,
+                superscript: false,
+                glyphs: vec![PlacedGlyph {
+                    face: st.face,
+                    glyph_id: 0,
+                    x: left_origin + crate::para::SEPARATOR_WIDTH,
+                    y_offset: 0.0,
+                    advance: 0.0,
+                }],
+            },
+        );
+    }
     Line {
+        story: StoryKind::Main,
         paragraph: base.para + para.index,
         start: base.story + lb.start,
         end: base.story + lb.end,
@@ -360,7 +559,7 @@ struct ActiveSpan {
 }
 
 struct Paginator<'a> {
-    sections: &'a [SectionProps],
+    env: &'a Env<'a>,
     done: Vec<Page>,
     page: PageBuild,
     /// The table unit being placed and its offsets.
@@ -370,14 +569,49 @@ struct Paginator<'a> {
 impl Paginator<'_> {
     fn new_page(&mut self, hard: bool, section: usize) {
         let number = self.page.number + 1;
-        let next = PageBuild::new(
+        let first = section != self.page.section_index;
+        let mut next = PageBuild::new(
             number,
             section,
-            self.sections.get(section).copied().unwrap_or_default(),
+            self.env.sections.get(section).copied().unwrap_or_default(),
             hard,
+            first,
+            self.env,
         );
-        self.done
-            .push(std::mem::replace(&mut self.page, next).finish());
+        // A footnote that went on past its page continues at the top of the next page's notes.
+        if let Some(last) = self.page.slots.last().copied() {
+            let total = self.env.notes.line_count(self.page.section_index, last.id);
+            if last.to < total && section == self.page.section_index {
+                let avail = next.frame_bottom - next.top - next.sep_h;
+                let mut to = last.to;
+                let mut used = 0.0;
+                while to < total {
+                    let h = self.env.notes.slot_height(
+                        section,
+                        NoteSlot {
+                            id: last.id,
+                            from: to,
+                            to: to + 1,
+                        },
+                    );
+                    if used + h > avail + EPS && to > last.to {
+                        break;
+                    }
+                    used += h;
+                    to += 1;
+                }
+                next.add_slot(
+                    NoteSlot {
+                        id: last.id,
+                        from: last.to,
+                        to,
+                    },
+                    self.env,
+                );
+            }
+        }
+        let done = std::mem::replace(&mut self.page, next).finish(self.env);
+        self.done.push(done);
     }
 
     /// Emits the lines of `cell` that start within `[row.top, row.top + row.height)` of the
@@ -666,6 +900,7 @@ impl Checkpoint {
     fn same_future(&self, other: &Self) -> bool {
         self.lines == other.lines
             && self.cells == other.cells
+            && self.notes == other.notes
             && self.y == other.y
             && self.hard_start == other.hard_start
             && self.force_break == other.force_break
@@ -715,6 +950,7 @@ fn checkpoint(pg: &Paginator<'_>, force_break: bool) -> Checkpoint {
         hard_start: pg.page.hard_start,
         force_break,
         section_index: pg.page.section_index,
+        notes: pg.page.slots.len(),
     }
 }
 
@@ -722,7 +958,7 @@ fn checkpoint(pg: &Paginator<'_>, force_break: bool) -> Checkpoint {
 /// as the state equals the earlier run's at the same item (see [`Paginated::converged`]).
 pub(crate) fn paginate<'a>(
     items: &'a [FlowItem],
-    sections: &'a [SectionProps],
+    env: &'a Env<'a>,
     resume: Option<Resume>,
     previous: Option<&Previous<'_>>,
 ) -> Paginated {
@@ -733,12 +969,24 @@ pub(crate) fn paginate<'a>(
                 .checked_sub(1)
                 .map(|i| items[i].carry())
                 .unwrap_or_default();
+            let mut slots = r.page.note_slots;
+            slots.truncate(r.checkpoint.notes);
+            let section_index = r.checkpoint.section_index;
             let page = PageBuild {
                 number: r.page.number,
                 section: r.page.section,
-                section_index: r.checkpoint.section_index,
+                section_index,
                 lines: r.page.lines,
                 cells: r.page.cells,
+                first_in_section: r.page.first_in_section,
+                top: r.page.body_top,
+                frame_bottom: r.page.body_bottom,
+                notes_h: slots
+                    .iter()
+                    .map(|s| env.notes.slot_height(section_index, *s))
+                    .sum(),
+                sep_h: env.notes.sep_height(section_index),
+                slots,
                 y: r.checkpoint.y,
                 pending_after: carry.after,
                 prev_style: carry.style,
@@ -746,7 +994,7 @@ pub(crate) fn paginate<'a>(
                 hard_start: r.checkpoint.hard_start,
             };
             let pg = Paginator {
-                sections,
+                env,
                 done: r.prior,
                 page,
                 cur: None,
@@ -758,11 +1006,13 @@ pub(crate) fn paginate<'a>(
             let page = PageBuild::new(
                 1,
                 first_section,
-                sections.get(first_section).copied().unwrap_or_default(),
+                env.sections.get(first_section).copied().unwrap_or_default(),
                 true,
+                true,
+                env,
             );
             let pg = Paginator {
-                sections,
+                env,
                 done: Vec::new(),
                 page,
                 cur: None,
@@ -787,7 +1037,7 @@ pub(crate) fn paginate<'a>(
             if same {
                 return Paginated {
                     pages: pg.done,
-                    open: Some(pg.page.finish()),
+                    open: Some(pg.page.finish(env)),
                     checkpoints,
                     converged: Some(p),
                 };
@@ -855,7 +1105,15 @@ pub(crate) fn paginate<'a>(
             };
             let y0 = pg.page.y + gap(&pg.page);
             let at_top = !pg.page.has_content();
-            let mut place = decide(para, from, y0, pg.page.bottom(), at_top);
+            let notes_at = NotesAt {
+                env,
+                section: pg.page.section_index,
+                frame_bottom: pg.page.frame_bottom,
+                count: pg.page.slots.len(),
+                height: pg.page.notes_h,
+                sep: pg.page.sep_h,
+            };
+            let mut place = decide(para, from, y0, pg.page.bottom(), at_top, Some(&notes_at));
             if first_segment
                 && place.take == para.lines.len()
                 && para.flow.keep_next
@@ -894,14 +1152,33 @@ pub(crate) fn paginate<'a>(
                 pg.new_page(false, section);
                 continue;
             }
+            let split = place.split;
             let mut y = y0;
             let mut placed = 0usize;
             let mut broke = false;
             let origin = pg.page.origin_x();
             for lb in &para.lines[from..from + place.take] {
-                let line = build_line(para, lb, origin, y, base);
+                let mut line = build_line(para, lb, origin, y, base);
+                line.story = item.story;
                 y += lb.height;
                 pg.page.lines.push(line);
+                for (a, id) in &para.foot_refs {
+                    if lb.atoms.contains(a) {
+                        match split {
+                            Some((sid, m)) if sid == *id && placed + 1 == place.take => {
+                                pg.page.add_slot(
+                                    NoteSlot {
+                                        id: sid,
+                                        from: 0,
+                                        to: m,
+                                    },
+                                    env,
+                                );
+                            }
+                            _ => pg.page.add_note(*id, env),
+                        }
+                    }
+                }
                 placed += 1;
                 if lb.page_break_after {
                     broke = true;
@@ -921,7 +1198,8 @@ pub(crate) fn paginate<'a>(
         pg.page.prev_contextual = para.flow.contextual_spacing;
     }
     checkpoints.push(checkpoint(&pg, force_break));
-    pg.done.push(pg.page.finish());
+    let last = pg.page.finish(env);
+    pg.done.push(last);
     Paginated {
         pages: pg.done,
         open: None,

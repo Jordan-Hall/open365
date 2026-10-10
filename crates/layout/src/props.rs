@@ -16,6 +16,10 @@ pub struct SectionProps {
     pub margin_bottom: f64,
     pub margin_left: f64,
     pub gutter: f64,
+    /// Distance from the page top to the header (`w:pgMar w:header`).
+    pub header_distance: f64,
+    /// Distance from the page bottom to the footer (`w:pgMar w:footer`).
+    pub footer_distance: f64,
 }
 
 impl Default for SectionProps {
@@ -39,6 +43,8 @@ impl From<&Section> for SectionProps {
             margin_bottom: pt(s.margins.bottom_twips),
             margin_left: pt(s.margins.left_twips),
             gutter: pt(s.margins.gutter_twips),
+            header_distance: pt(s.margins.header_twips),
+            footer_distance: pt(s.margins.footer_twips),
         }
     }
 }

@@ -665,6 +665,110 @@ try {
     L-Para 'Closing paragraph.'
   }
 
+  # ---- headers, footers, footnotes, endnotes and fields (layout-hf-*, layout-fn-*) ----
+  # Text of the story `$kind` (1 primary, 2 first page, 3 even pages) of section `$sec`.
+  function HF-Header($sec, $kind, $text) { $script:doc.Sections.Item($sec).Headers.Item($kind).Range.Text = $text }
+  function HF-Footer($sec, $kind, $text) { $script:doc.Sections.Item($sec).Footers.Item($kind).Range.Text = $text }
+  # Footer "<prefix>PAGE<middle>NUMPAGES|SECTIONPAGES" built from real fields (wdFieldPage 33, NumPages 26, SectionPages 25).
+  function HF-FieldFooter($sec, $kind, $prefix, $middle, $second) {
+    $r = $script:doc.Sections.Item($sec).Footers.Item($kind).Range
+    $r.Text = $prefix
+    $r.Collapse(0); [void]$script:doc.Fields.Add($r, 33)
+    $r = $script:doc.Sections.Item($sec).Footers.Item($kind).Range; $r.MoveEnd(1, -1) | Out-Null; $r.Collapse(0)
+    if ($middle) { $r.InsertAfter($middle); $r.Collapse(0) }
+    if ($second) { [void]$script:doc.Fields.Add($r, $second) }
+  }
+  # A footnote (or endnote when $end) at the end of the last body paragraph before the trailing empty one.
+  function N-Add($text, $end = $false) {
+    $d = $script:doc
+    $r = $d.Paragraphs.Item($d.Paragraphs.Count - 1).Range
+    [void]$r.MoveEnd(1, -1); $r.Collapse(0)
+    if ($end) { [void]$d.Endnotes.Add($r, $script:M, $text) } else { [void]$d.Footnotes.Add($r, $script:M, $text) }
+  }
+  $PARAS = 24   # body paragraphs that fill about three Letter pages with 6 pt after
+
+  L-Fixture 'layout-hf-basic' 'layout-hf-basic' 'one section: header text, footer with PAGE and NUMPAGES, three pages of body text' {
+    Init-Doc 6
+    for ($i = 0; $i -lt $PARAS; $i++) { L-Para $(if ($i % 2) { $B } else { $A }) }
+    HF-Header 1 1 'Quarterly harbour survey'
+    HF-FieldFooter 1 1 'Page ' ' of ' 26
+  }
+
+  L-Fixture 'layout-hf-first-even' 'layout-hf-first-even' 'titlePg and evenAndOddHeaders: distinct first, even and primary headers and footers over five pages' {
+    Init-Doc 6
+    $doc.PageSetup.DifferentFirstPageHeaderFooter = -1
+    $doc.PageSetup.OddAndEvenPagesHeaderFooter = -1
+    for ($i = 0; $i -lt 40; $i++) { L-Para $(if ($i % 2) { $B } else { $A }) }
+    HF-Header 1 2 'First page header'
+    HF-Header 1 1 'Odd page header'
+    HF-Header 1 3 'Even page header'
+    HF-Footer 1 2 'First page footer'
+    HF-FieldFooter 1 1 'Odd footer page ' '' 0
+    HF-FieldFooter 1 3 'Even footer page ' '' 0
+  }
+
+  L-Fixture 'layout-hf-distance' 'layout-hf-distance' 'header/footer distances of 0.3 in; a three-paragraph header taller than the top margin pushes the body down, and a tall footer lifts the body bottom' {
+    Init-Doc 6
+    $ps = $doc.PageSetup
+    $ps.TopMargin = 54; $ps.BottomMargin = 54; $ps.HeaderDistance = 21.6; $ps.FooterDistance = 21.6
+    for ($i = 0; $i -lt 16; $i++) { L-Para $(if ($i % 2) { $B } else { $A }) }
+    HF-Header 1 1 ("Report header line one`rSecond header line in 14 pt`rThird header line")
+    $doc.Sections.Item(1).Headers.Item(1).Range.Paragraphs.Item(2).Range.Font.Size = 14
+    $doc.Sections.Item(1).Headers.Item(1).Range.Paragraphs.Item(3).Format.SpaceAfter = 12
+    HF-Footer 1 1 ("Footer line one`rFooter line two`rFooter line three")
+  }
+
+  L-Fixture 'layout-hf-sections' 'layout-hf-sections' 'three sections: own header in section 2, section 3 linked to section 2; footers with PAGE and SECTIONPAGES' {
+    Init-Doc 6
+    for ($i = 0; $i -lt 8; $i++) { L-Para $(if ($i % 2) { $B } else { $A }) }
+    $s = $word.Selection; [void]$s.EndKey(6); $s.InsertBreak(2)
+    for ($i = 0; $i -lt 16; $i++) { L-Para $(if ($i % 2) { $B } else { $A }) }
+    $s = $word.Selection; [void]$s.EndKey(6); $s.InsertBreak(2)
+    for ($i = 0; $i -lt 8; $i++) { L-Para $(if ($i % 2) { $B } else { $A }) }
+    HF-Header 1 1 'Section one header'
+    $doc.Sections.Item(2).Headers.Item(1).LinkToPrevious = $false
+    HF-Header 2 1 'Section two header'
+    HF-FieldFooter 1 1 'Page ' ' of section ' 25
+    $doc.Sections.Item(2).Footers.Item(1).LinkToPrevious = $true
+    $doc.Sections.Item(3).Footers.Item(1).LinkToPrevious = $true
+  }
+
+  L-Fixture 'layout-fn-basic' 'layout-fn-basic' 'a footnote on most paragraphs over several pages: the notes reduce the body height and stay on their reference page' {
+    Init-Doc 6
+    for ($i = 0; $i -lt 18; $i++) {
+      L-Para $(if ($i % 2) { $B } else { $A })
+      if ($i % 3 -ne 2) { N-Add ("Note $($i + 1): a short explanatory remark for the paragraph above.") }
+    }
+  }
+
+  L-Fixture 'layout-fn-long' 'layout-fn-long' 'a very long footnote that must continue on the next page, with the continuation separator' {
+    Init-Doc 6
+    for ($i = 0; $i -lt 6; $i++) { L-Para $(if ($i % 2) { $B } else { $A }) }
+    L-Para $A; N-Add ($B + ' ' + $A + ' ' + $B + ' ' + $A + ' ' + $B + ' ' + $A + ' ' + $B)
+    L-Para $B; N-Add ($A + ' ' + $B + ' ' + $A + ' ' + $B)
+    for ($i = 0; $i -lt 9; $i++) { L-Para $(if ($i % 2) { $B } else { $A }) }
+    L-Para $A; N-Add 'Short closing note.'
+  }
+
+  L-Fixture 'layout-fn-endnotes' 'layout-fn-endnotes' 'endnotes collect at the end of the document after the body text, over a page break' {
+    Init-Doc 6
+    for ($i = 0; $i -lt 16; $i++) {
+      L-Para $(if ($i % 2) { $B } else { $A })
+      N-Add ("Endnote $($i + 1): a source reference for the paragraph above, with a few more words.") $true
+    }
+  }
+
+  L-Fixture 'layout-fn-mixed' 'layout-fn-mixed' 'footnotes and endnotes together with a header and a PAGE footer' {
+    Init-Doc 6
+    for ($i = 0; $i -lt 14; $i++) {
+      L-Para $(if ($i % 2) { $B } else { $A })
+      N-Add ("Footnote $($i + 1) text.")
+      if ($i % 2) { N-Add ("Endnote $($i + 1) text.") $true }
+    }
+    HF-Header 1 1 'Notes and furniture'
+    HF-FieldFooter 1 1 'Page ' '' 0
+  }
+
 } finally {
   if ($word) {
     try { $word.UserName = $oldUser; $word.UserInitials = $oldInit; $word.Options.UseLocalUserInfo = $oldLocal } catch {}

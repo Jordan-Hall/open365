@@ -1,10 +1,11 @@
 //! Paragraph layout: text and runs to shaped atoms to lines (independent of the page).
 
+use std::collections::HashMap;
 use std::ops::Range;
 
 use open365_docx::{
     Alignment, EffectiveParagraph, EffectiveRun, IndentOverride, Inline, Paragraph, ParagraphProps,
-    Run, RunContent, RunLayoutProps, Styles, TableCellFormat,
+    RawXml, Run, RunContent, RunLayoutProps, Styles, TableCellFormat,
 };
 use open365_text::{
     BreakKind, FaceId, FontChain, FontLibrary, FontStyle, ShapeFeatures, break_opportunities,
@@ -41,6 +42,8 @@ pub(crate) struct RunStyle {
     pub spacing: f64,
     /// Horizontal glyph scale, 1.0 for 100 percent (`w:w`).
     pub scale: f64,
+    /// A note reference mark.
+    pub superscript: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -118,6 +121,69 @@ pub(crate) struct ParaLayout {
     pub glyphs: Vec<PlacedGlyphRaw>,
     pub styles: Vec<RunStyle>,
     pub story_end: usize,
+    /// Footnote references: the atom of the mark and the footnote id.
+    pub foot_refs: Vec<(usize, i64)>,
+    /// The paragraph is a note separator: Word draws a rule of [`SEPARATOR_WIDTH`] where the
+    /// separator character stands.
+    pub separator: bool,
+}
+
+/// Length of the footnote and endnote separator rule in points (measured: the paragraph mark
+/// after it lands 144 pt from the text area's left edge, for any page width).
+pub(crate) const SEPARATOR_WIDTH: f64 = 144.0;
+
+/// The values Word recomputes in headers and footers when it lays a page out.
+#[derive(Clone, Copy, Default)]
+pub(crate) struct FieldEnv {
+    /// `None` keeps every field's cached result (body text, which is laid out page-independently).
+    pub page: Option<usize>,
+    pub num_pages: usize,
+    pub section_pages: usize,
+    pub section: usize,
+}
+
+/// Ordinals of the note references in document order.
+#[derive(Default, Debug)]
+pub(crate) struct NoteOrder {
+    pub foot: HashMap<i64, usize>,
+    pub end: HashMap<i64, usize>,
+}
+
+impl NoteOrder {
+    /// The mark text: footnotes count 1, 2, 3; endnotes i, ii, iii.
+    pub(crate) fn label(&self, end: bool, id: i64) -> String {
+        let map = if end { &self.end } else { &self.foot };
+        mark_text(end, map.get(&id).copied().unwrap_or(0))
+    }
+}
+
+pub(crate) fn mark_text(end: bool, ordinal: usize) -> String {
+    if !end {
+        return ordinal.to_string();
+    }
+    let mut n = ordinal;
+    let mut out = String::new();
+    for (v, r) in [
+        (1000, "m"),
+        (900, "cm"),
+        (500, "d"),
+        (400, "cd"),
+        (100, "c"),
+        (90, "xc"),
+        (50, "l"),
+        (40, "xl"),
+        (10, "x"),
+        (9, "ix"),
+        (5, "v"),
+        (4, "iv"),
+        (1, "i"),
+    ] {
+        while n >= v {
+            out.push_str(r);
+            n -= v;
+        }
+    }
+    out
 }
 
 #[derive(Clone, Copy)]
@@ -129,6 +195,10 @@ pub(crate) struct Context<'a> {
     /// `w:defaultTabStop` in points.
     pub default_tab: f64,
     pub model: LineMetricModel,
+    pub fields: FieldEnv,
+    pub order: Option<&'a NoteOrder>,
+    /// (is endnote, ordinal) of the note being laid out: what its `w:footnoteRef` shows.
+    pub own_mark: Option<(bool, usize)>,
 }
 
 fn fallback_run(er: Option<EffectiveRun>) -> EffectiveRun {
@@ -167,6 +237,7 @@ fn style_from(ctx: &Context<'_>, er: &EffectiveRun, lay: &RunLayoutProps) -> Run
         kerning: lay.kern_half_points > 0 && er.size_half_points >= lay.kern_half_points,
         spacing: f64::from(lay.spacing_pt()),
         scale: f64::from(lay.scale_percent) / 100.0,
+        superscript: false,
     }
 }
 
@@ -176,6 +247,24 @@ struct Collector<'a, 'b> {
     text: String,
     spans: Vec<(Range<usize>, usize)>,
     styles: Vec<RunStyle>,
+    /// Story characters that are not drawn (field codes, the separator character) as
+    /// (byte position in `text`, UTF-16 units); a note mark of n characters counts as one.
+    hidden: Vec<(usize, isize)>,
+    /// Open fields, innermost last.
+    fields: Vec<FieldState>,
+    /// Note references: byte position of the mark, endnote or not, id.
+    refs: Vec<(usize, bool, i64)>,
+    separator: bool,
+}
+
+#[derive(Default)]
+struct FieldState {
+    instr: String,
+    in_result: bool,
+    /// Text Word computes for the field, still to be shown.
+    replacement: Option<String>,
+    /// The replacement was shown: the cached result is dropped.
+    suppress: bool,
 }
 
 impl Collector<'_, '_> {
@@ -189,6 +278,112 @@ impl Collector<'_, '_> {
         match self.spans.last_mut() {
             Some((r, st)) if *st == style && r.end == start => r.end = end,
             _ => self.spans.push((start..end, style)),
+        }
+    }
+
+    fn hide(&mut self, units: usize) {
+        if units > 0 {
+            self.hidden.push((self.text.len(), units as isize));
+        }
+    }
+
+    /// What Word shows for a field in a header or footer, from its instruction.
+    fn computed(&self, instr: &str) -> Option<String> {
+        let env = self.ctx.fields;
+        let page = env.page?;
+        let word = instr.split_whitespace().next()?.to_ascii_uppercase();
+        match word.as_str() {
+            "PAGE" => Some(page.to_string()),
+            "NUMPAGES" => Some(env.num_pages.to_string()),
+            "SECTIONPAGES" => Some(env.section_pages.to_string()),
+            "SECTION" => Some((env.section + 1).to_string()),
+            _ => None,
+        }
+    }
+
+    fn suppressed(&self) -> bool {
+        self.fields.iter().any(|f| f.in_result && f.suppress)
+    }
+
+    fn mark(&mut self, text: &str, style_of: &RunStyle) {
+        let mut st = style_of.clone();
+        let half = (st.size * 2.0 * 0.65).round().max(1.0);
+        st.size = half / 2.0;
+        st.superscript = true;
+        self.styles.push(st);
+        let style = self.styles.len() - 1;
+        self.push(text, style);
+        let extra = text.chars().count() as isize - 1;
+        if extra > 0 {
+            self.hidden.push((self.text.len(), -extra));
+        }
+    }
+
+    fn raw(&mut self, e: &open365_docx::XmlElement, style: usize) {
+        let h = &e.head;
+        if h.is_w("fldChar") {
+            match h.attr_w("fldCharType") {
+                Some("begin") => {
+                    self.hide(1);
+                    self.fields.push(FieldState::default());
+                }
+                Some("separate") => {
+                    self.hide(1);
+                    let instr = self
+                        .fields
+                        .last()
+                        .map(|f| f.instr.clone())
+                        .unwrap_or_default();
+                    let rep = self.computed(&instr);
+                    if let Some(f) = self.fields.last_mut() {
+                        f.in_result = true;
+                        f.replacement = rep;
+                    }
+                }
+                Some("end") => {
+                    self.hide(1);
+                    if let Some(f) = self.fields.pop()
+                        && let Some(rep) = f.replacement
+                    {
+                        self.push(&rep, style);
+                    }
+                }
+                _ => {}
+            }
+        } else if h.is_w("instrText") {
+            let t: String = e
+                .children
+                .iter()
+                .filter_map(|c| match c {
+                    RawXml::Text(t) => Some(t.as_str()),
+                    _ => None,
+                })
+                .collect();
+            self.hide(utf16_len(&t));
+            if let Some(f) = self.fields.last_mut()
+                && !f.in_result
+            {
+                f.instr.push_str(&t);
+            }
+        } else if (h.is_w("footnoteReference") || h.is_w("endnoteReference"))
+            && let Some(id) = h.attr_w("id").and_then(|v| v.trim().parse::<i64>().ok())
+        {
+            let end = h.is_w("endnoteReference");
+            let label = self.ctx.order.map(|o| o.label(end, id)).unwrap_or_default();
+            self.refs.push((self.text.len(), end, id));
+            let base = self.styles[style].clone();
+            self.mark(&label, &base);
+        } else if h.is_w("footnoteRef") || h.is_w("endnoteRef") {
+            let label = self
+                .ctx
+                .own_mark
+                .map(|(end, n)| mark_text(end, n))
+                .unwrap_or_default();
+            let base = self.styles[style].clone();
+            self.mark(&label, &base);
+        } else if h.is_w("separator") || h.is_w("continuationSeparator") {
+            self.separator = true;
+            self.hide(1);
         }
     }
 
@@ -210,22 +405,67 @@ impl Collector<'_, '_> {
         };
         for item in &run.content {
             match item {
-                RunContent::Text { text, .. } => self.push(text, style),
-                RunContent::Tab => self.push("\t", style),
-                RunContent::Break(b) => match b.kind() {
-                    open365_docx::BreakKind::TextWrapping => self.push("\u{b}", style),
-                    open365_docx::BreakKind::Page => self.push("\u{c}", style),
-                    open365_docx::BreakKind::Column => self.push("\u{e}", style),
-                },
+                RunContent::Text { text, .. } => {
+                    if !self.suppressed() {
+                        self.show_or_replace(text, style);
+                    }
+                }
+                RunContent::Tab => {
+                    if !self.suppressed() {
+                        self.push("\t", style);
+                    }
+                }
+                RunContent::Break(b) => {
+                    if self.suppressed() {
+                        continue;
+                    }
+                    match b.kind() {
+                        open365_docx::BreakKind::TextWrapping => self.push("\u{b}", style),
+                        open365_docx::BreakKind::Page => self.push("\u{c}", style),
+                        open365_docx::BreakKind::Column => self.push("\u{e}", style),
+                    }
+                }
+                RunContent::Raw(RawXml::Element(e)) => self.raw(e, style),
                 RunContent::Raw(_) => {}
             }
         }
+    }
+
+    /// Shows `text`, or the field value Word computes when the run is the first of a result.
+    fn show_or_replace(&mut self, text: &str, style: usize) {
+        if let Some(f) = self.fields.iter_mut().rev().find(|f| f.in_result)
+            && let Some(rep) = f.replacement.take()
+        {
+            f.suppress = true;
+            self.push(&rep, style);
+            return;
+        }
+        self.push(text, style);
     }
 
     fn inlines(&mut self, content: &[Inline]) {
         for inline in content {
             match inline {
                 Inline::Run(r) => self.run(r),
+                Inline::Group(g) if g.head.is_w("fldSimple") => {
+                    let instr = g.head.attr_w("instr").unwrap_or_default().to_owned();
+                    self.hide(1 + utf16_len(&instr) + 1);
+                    let rep = self.computed(&instr);
+                    self.fields.push(FieldState {
+                        instr,
+                        in_result: true,
+                        replacement: rep,
+                        suppress: false,
+                    });
+                    self.inlines(&g.content);
+                    if let Some(f) = self.fields.pop()
+                        && let Some(rep) = f.replacement
+                    {
+                        let style = self.styles.len().saturating_sub(1);
+                        self.push(&rep, style);
+                    }
+                    self.hide(1);
+                }
                 Inline::Group(g) => self.inlines(&g.content),
                 Inline::Raw(_) => {}
             }
@@ -277,6 +517,10 @@ pub(crate) fn layout_paragraph(
         text: String::new(),
         spans: Vec::new(),
         styles: Vec::new(),
+        hidden: Vec::new(),
+        fields: Vec::new(),
+        refs: Vec::new(),
+        separator: false,
     };
     col.inlines(&para.content);
 
@@ -314,6 +558,9 @@ pub(crate) fn layout_paragraph(
         text,
         spans,
         styles,
+        hidden,
+        refs,
+        separator,
         ..
     } = col;
 
@@ -378,22 +625,40 @@ pub(crate) fn layout_paragraph(
         }
     }
 
-    // Story offsets of every atom start (UTF-16 units), via a running count.
+    // Story offsets of every atom start (UTF-16 units): the drawn text plus the characters Word
+    // counts but does not draw (field codes). Hidden characters at an atom's own position
+    // belong to the line before it, so a line that starts at a field starts at the field code.
     let mut story_of: Vec<usize> = Vec::with_capacity(atoms.len() + 1);
     {
-        let mut u = story_start;
+        let mut u = story_start as isize;
         let mut b = 0usize;
+        let mut h = 0usize;
         for a in &atoms {
             if a.byte_start > b {
-                u += utf16_len(&text[b..a.byte_start]);
+                u += utf16_len(&text[b..a.byte_start]) as isize;
                 b = a.byte_start;
             }
-            story_of.push(u);
+            while h < hidden.len() && hidden[h].0 < a.byte_start {
+                u += hidden[h].1;
+                h += 1;
+            }
+            story_of.push(u.max(0) as usize);
         }
-        u += utf16_len(&text[b..]);
-        story_of.push(u);
+        u += utf16_len(&text[b..]) as isize;
+        u += hidden[h..].iter().map(|x| x.1).sum::<isize>();
+        story_of.push(u.max(0) as usize);
     }
     let story_end = *story_of.last().unwrap_or(&story_start);
+    let foot_refs: Vec<(usize, i64)> = refs
+        .iter()
+        .filter(|r| !r.1)
+        .filter_map(|r| {
+            atoms
+                .iter()
+                .position(|a| a.byte_start == r.0)
+                .map(|i| (i, r.2))
+        })
+        .collect();
 
     let breaks = break_opportunities(&text);
     let mut opp: Vec<(usize, BreakKind)> = breaks.iter().map(|b| (b.offset, b.kind)).collect();
@@ -452,6 +717,8 @@ pub(crate) fn layout_paragraph(
         glyphs,
         styles,
         story_end,
+        foot_refs,
+        separator,
     }
 }
 

@@ -237,7 +237,7 @@ impl Body {
     }
 }
 
-fn blocks_from(children: Vec<RawXml>) -> Vec<Block> {
+pub(crate) fn blocks_from(children: Vec<RawXml>) -> Vec<Block> {
     children
         .into_iter()
         .map(|child| match child {

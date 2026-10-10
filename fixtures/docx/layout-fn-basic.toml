@@ -1,0 +1,5 @@
+feature = "layout-fn-basic"
+made_with = "Microsoft Word 16.0.20430 (Windows)"
+author = "project member"
+expect_dropped = []
+notes = "a footnote on most paragraphs over several pages: the notes reduce the body height and stay on their reference page"

@@ -13,11 +13,11 @@ matched = 2
 total = 2
 
 [fixtures.footnotes-endnotes]
-matched = 5
+matched = 7
 total = 7
 
 [fixtures.header-footer]
-matched = 1
+matched = 8
 total = 8
 
 [fixtures.hidden-text]
@@ -35,6 +35,38 @@ total = 2
 [fixtures.layout-align]
 matched = 5
 total = 22
+
+[fixtures.layout-fn-basic]
+matched = 97
+total = 101
+
+[fixtures.layout-fn-endnotes]
+matched = 86
+total = 93
+
+[fixtures.layout-fn-long]
+matched = 126
+total = 130
+
+[fixtures.layout-fn-mixed]
+matched = 90
+total = 92
+
+[fixtures.layout-hf-basic]
+matched = 115
+total = 115
+
+[fixtures.layout-hf-distance]
+matched = 85
+total = 85
+
+[fixtures.layout-hf-first-even]
+matched = 191
+total = 191
+
+[fixtures.layout-hf-sections]
+matched = 153
+total = 153
 
 [fixtures.layout-indents-spacing]
 matched = 88
@@ -133,15 +165,15 @@ matched = 2
 total = 2
 
 [system.fields]
-matched = 4
+matched = 6
 total = 10
 
 [system.footnotes-endnotes]
-matched = 5
+matched = 7
 total = 7
 
 [system.header-footer]
-matched = 1
+matched = 8
 total = 8
 
 [system.hidden-text]
@@ -159,6 +191,38 @@ total = 2
 [system.layout-align]
 matched = 22
 total = 22
+
+[system.layout-fn-basic]
+matched = 97
+total = 101
+
+[system.layout-fn-endnotes]
+matched = 86
+total = 93
+
+[system.layout-fn-long]
+matched = 126
+total = 130
+
+[system.layout-fn-mixed]
+matched = 90
+total = 92
+
+[system.layout-hf-basic]
+matched = 115
+total = 115
+
+[system.layout-hf-distance]
+matched = 85
+total = 85
+
+[system.layout-hf-first-even]
+matched = 191
+total = 191
+
+[system.layout-hf-sections]
+matched = 153
+total = 153
 
 [system.layout-indents-spacing]
 matched = 98

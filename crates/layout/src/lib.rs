@@ -11,11 +11,14 @@
 //! mark, a tab and a break as one each, which is how Word's `Range.Start` counts.
 //!
 //! Tables are laid out with Word's column, row and page-splitting rules (`table.rs`,
-//! `flow.rs`). Not supported yet (reported in [`Layout::notes`]): images, fields,
-//! footnotes, headers, footers, columns, right-to-left text and bidi are ignored.
+//! `flow.rs`). Headers, footers (`furniture.rs`), footnotes and endnotes are laid out as Word
+//! does; PAGE, NUMPAGES and SECTIONPAGES fields are recomputed in headers and footers, every
+//! other field keeps its cached result. Not supported yet (reported in [`Layout::notes`]):
+//! images, columns, right-to-left text and bidi are ignored.
 
 mod build;
 mod flow;
+mod furniture;
 mod incremental;
 mod metrics;
 mod numbering;
@@ -66,12 +69,52 @@ pub struct GlyphRun {
     pub underline: bool,
     pub strike: bool,
     pub color: Option<[u8; 3]>,
+    /// A note reference mark: drawn small and raised, on its own baseline in Word's PDF.
+    pub superscript: bool,
     pub glyphs: Vec<PlacedGlyph>,
 }
 
-/// One line of the main story on a page.
+/// The story a line belongs to; the discriminants-as-codes are Word's `WdStoryType`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+pub enum StoryKind {
+    #[default]
+    Main,
+    Footnotes,
+    Endnotes,
+    EvenHeader,
+    PrimaryHeader,
+    EvenFooter,
+    PrimaryFooter,
+    FirstHeader,
+    FirstFooter,
+    FootnoteSeparator,
+    EndnoteSeparator,
+}
+
+impl StoryKind {
+    /// Word's `WdStoryType` value.
+    pub fn word_code(self) -> u8 {
+        match self {
+            Self::Main => 1,
+            Self::Footnotes => 2,
+            Self::Endnotes => 3,
+            Self::EvenHeader => 6,
+            Self::PrimaryHeader => 7,
+            Self::EvenFooter => 8,
+            Self::PrimaryFooter => 9,
+            Self::FirstHeader => 10,
+            Self::FirstFooter => 11,
+            Self::FootnoteSeparator => 12,
+            Self::EndnoteSeparator => 15,
+        }
+    }
+}
+
+/// One line of a story on a page (the main story unless [`Line::story`] says otherwise).
 #[derive(Debug, Clone, PartialEq)]
 pub struct Line {
+    /// The story the offsets `start` and `end` count in.
+    pub story: StoryKind,
     /// Paragraph index in document order (tables included).
     pub paragraph: usize,
     /// Story offset of the first character.
@@ -91,10 +134,12 @@ pub struct Line {
 }
 
 impl Line {
-    /// X of the first drawn glyph's origin, or of the line start when nothing is drawn.
+    /// X of the first drawn glyph's origin, or of the line start when nothing is drawn. A note
+    /// reference mark is not counted: Word's PDF draws it as a row of its own.
     pub fn first_glyph_x(&self) -> f64 {
         self.runs
             .iter()
+            .filter(|r| !r.superscript)
             .find_map(|r| r.glyphs.first())
             .map_or(self.left, |g| g.x)
     }
@@ -110,6 +155,15 @@ pub struct CellBox {
     pub height: f64,
 }
 
+/// Lines `from..to` of footnote `id`, placed on one page. A footnote that does not fit goes on
+/// in the next page's first slot.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct NoteSlot {
+    pub id: i64,
+    pub from: usize,
+    pub to: usize,
+}
+
 /// One page of the main story.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Page {
@@ -119,6 +173,21 @@ pub struct Page {
     pub lines: Vec<Line>,
     /// Table cell rectangles on this page, in drawing order.
     pub cells: Vec<CellBox>,
+    /// Index of the page's section.
+    pub section_index: usize,
+    /// Whether this is the first page of its section (`titlePg` pages).
+    pub first_in_section: bool,
+    /// Top and bottom of the body area: the margins, moved by a tall header or footer.
+    pub body_top: f64,
+    pub body_bottom: f64,
+    /// The footnotes (or the parts of footnotes) placed on this page, in order.
+    pub note_slots: Vec<NoteSlot>,
+    /// The footnote separator and footnote lines, at the bottom of the body area.
+    pub notes: Vec<Line>,
+    /// Header lines, top of the page.
+    pub header: Vec<Line>,
+    /// Footer lines, bottom of the page.
+    pub footer: Vec<Line>,
 }
 
 /// A font family the document asked for and how the library satisfied it.
@@ -139,11 +208,23 @@ pub struct Layout {
 }
 
 impl Layout {
-    /// All lines in reading order.
+    /// All body lines in reading order.
     pub fn lines(&self) -> impl Iterator<Item = (usize, &Line)> {
         self.pages
             .iter()
             .flat_map(|p| p.lines.iter().map(move |l| (p.number, l)))
+    }
+
+    /// Every line of every story on every page: header, body, notes, footer.
+    pub fn all_lines(&self) -> impl Iterator<Item = (usize, &Line)> {
+        self.pages.iter().flat_map(|p| {
+            p.header
+                .iter()
+                .chain(&p.lines)
+                .chain(&p.notes)
+                .chain(&p.footer)
+                .map(move |l| (p.number, l))
+        })
     }
 }
 

@@ -1,0 +1,5 @@
+feature = "layout-hf-sections"
+made_with = "Microsoft Word 16.0.20430 (Windows)"
+author = "project member"
+expect_dropped = []
+notes = "three sections: own header in section 2, section 3 linked to section 2; footers with PAGE and SECTIONPAGES"
