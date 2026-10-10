@@ -4,6 +4,7 @@ mod arith;
 mod criteria;
 mod datecalc;
 mod datetime;
+mod finance;
 mod info;
 mod letters;
 mod logical;
@@ -126,6 +127,30 @@ static TABLE: &[(&str, Func)] = &[
     ("AVERAGEA", Func::Res(stats::averagea)),
     ("MAXA", Func::Res(stats::maxa)),
     ("MINA", Func::Res(stats::mina)),
+    // financial
+    ("PV", Func::Res(finance::pv)),
+    ("FV", Func::Res(finance::fv)),
+    ("PMT", Func::Res(finance::pmt)),
+    ("NPER", Func::Res(finance::nper)),
+    ("IPMT", Func::Res(finance::ipmt)),
+    ("PPMT", Func::Res(finance::ppmt)),
+    ("CUMIPMT", Func::Res(finance::cumipmt)),
+    ("CUMPRINC", Func::Res(finance::cumprinc)),
+    ("RATE", Func::Res(finance::rate)),
+    ("NPV", Func::Res(finance::npv)),
+    ("XNPV", Func::Res(finance::xnpv)),
+    ("IRR", Func::Res(finance::irr)),
+    ("XIRR", Func::Res(finance::xirr)),
+    ("MIRR", Func::Res(finance::mirr)),
+    ("SLN", Func::Res(finance::sln)),
+    ("SYD", Func::Res(finance::syd)),
+    ("DB", Func::Res(finance::db)),
+    ("DDB", Func::Res(finance::ddb)),
+    ("VDB", Func::Res(finance::vdb)),
+    ("EFFECT", Func::Res(finance::effect)),
+    ("NOMINAL", Func::Res(finance::nominal)),
+    ("DOLLARDE", Func::Res(finance::dollarde)),
+    ("DOLLARFR", Func::Res(finance::dollarfr)),
     // logical and information
     ("IF", Func::Arg(logical::if_)),
     ("IFERROR", Func::Arg(logical::iferror)),
@@ -336,6 +361,24 @@ const fn lift(scalar_param: fn(usize) -> bool) -> Lifting {
 const ALWAYS: Lifting = lift(all_params);
 
 static LIFTING: &[(&str, Lifting)] = &[
+    ("PV", ALWAYS),
+    ("FV", ALWAYS),
+    ("PMT", ALWAYS),
+    ("NPER", ALWAYS),
+    ("IPMT", ALWAYS),
+    ("PPMT", ALWAYS),
+    ("CUMIPMT", ALWAYS),
+    ("CUMPRINC", ALWAYS),
+    ("RATE", ALWAYS),
+    ("SLN", ALWAYS),
+    ("SYD", ALWAYS),
+    ("DB", ALWAYS),
+    ("DDB", ALWAYS),
+    ("VDB", ALWAYS),
+    ("EFFECT", ALWAYS),
+    ("NOMINAL", ALWAYS),
+    ("DOLLARDE", ALWAYS),
+    ("DOLLARFR", ALWAYS),
     ("ABS", ALWAYS),
     ("INT", ALWAYS),
     ("SQRT", ALWAYS),

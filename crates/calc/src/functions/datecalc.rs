@@ -80,7 +80,7 @@ fn trunc_arg(ctx: &EvalContext<'_>, arg: &Arg) -> Res<i64> {
 
 /// A scalar argument of the Analysis ToolPak style functions: an omitted argument is `#N/A`, a boolean or a
 /// multi-cell range is `#VALUE!` (no implicit intersection).
-fn atp_value(ctx: &EvalContext<'_>, arg: &Arg) -> Res<Value> {
+pub(super) fn atp_value(ctx: &EvalContext<'_>, arg: &Arg) -> Res<Value> {
     match arg {
         Arg::Missing => Err(ErrorKind::NA),
         Arg::Range(r) if !r.is_single_cell() => Err(ErrorKind::Value),
@@ -92,7 +92,7 @@ fn atp_value(ctx: &EvalContext<'_>, arg: &Arg) -> Res<Value> {
     }
 }
 
-fn atp_num(ctx: &EvalContext<'_>, arg: &Arg) -> Res<f64> {
+pub(super) fn atp_num(ctx: &EvalContext<'_>, arg: &Arg) -> Res<f64> {
     atp_value(ctx, arg)?.to_number_in(ctx.date1904)
 }
 

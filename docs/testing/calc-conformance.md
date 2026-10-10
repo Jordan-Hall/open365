@@ -5,7 +5,7 @@ never needs Excel.
 
 | File | Role |
 |---|---|
-| `fixtures/calc/conformance.json` | The corpus: 20,501 cases. Edited by hand or by script; one case per line. |
+| `fixtures/calc/conformance.json` | The corpus: 22,269 cases. Edited by hand or by script; one case per line. |
 | `tools/office/calc-oracle.ps1` | Local-only tool. Runs every case in Excel over COM and writes the results. |
 | `fixtures/reference/calc/conformance-results.json` | Excel's answers, committed. Includes Excel version, build and decimal separator. |
 | `fixtures/calc/known-differences.toml` | Cases where Open365 intentionally or temporarily differs, each with a reason. |
@@ -66,7 +66,7 @@ forms; the corpus has no case for them.
 
 ## Current state
 
-20,501 cases, 20,433 pass (99.67%), 68 known differences (listed with reasons in `known-differences.toml`: the `**` parse
+22,269 cases, 22,201 pass (99.69%), 68 known differences (listed with reasons in `known-differences.toml`: the `**` parse
 quirk, XLOOKUP array results (no spill), a few undocumented Excel quirks, large COMBIN, trigonometric last digits, variance
 accumulation order, accounting fill, and arrays of references returned by `OFFSET`/`INDIRECT`
 for array arguments, which Open365 does not model). The test also fails for a corpus case without an Excel
@@ -212,7 +212,21 @@ Added with the error-literal batch: `ErrorKind` now has all 14 `ERROR.TYPE` kind
 literals; Excel refuses the others (`ErrorKind::is_formula_literal`). The oracle names unknown error codes `#UNKNOWN(code)`; the test
 reads the name from `Range.Text`. `ISFORMULA(A1)` watches A1 without depending on its value, so `ISFORMULA` of its own cell is TRUE.
 
-Measured, not implemented yet (financial batch): Excel computes `(1+r)^n` for integer `n` by right-to-left binary exponentiation
-(120 of 120 probes bit-exact; fractional `n` is `exp(n*ln x)`), and `PV` is `-(fv + pmt*((q-1)/r*(1+r))) / q` (type 1 multiplies the
-annuity factor), `FV` likewise. `PMT` does not follow the closed form `-(fv+pv*q)*r/((q-1)*k)`; its last digits differ (for example
-`PMT(0.05,1,-1,0)` is 1.0499999999999998). Numeric literals are cut to 15 digits, so test with the cut value.
+Financial batch, verified (groups `pv`, `fv`, `sln`, `effect`, `nominal`, `dollarde`, `dollarfr`; 1,768 cases, all bit-exact):
+
+* `(1+r)^n` for integer `n` is right-to-left binary exponentiation, for fractional `n` it is `exp(n*ln x)` and for `n = 0.5` it is
+  `sqrt`. `PV` is `-(fv + pmt*a) / q` and `FV` is `-(pv*q + pmt*a)` with `q = (1+r)^n`, `a = (q-1)/r`, times `1+r` for type != 0.
+  `rate = -1` is `#DIV/0!` when `q` is 0 and `#NUM!` for `0^0`; the rate 0 case is the linear sum.
+* `EFFECT`/`NOMINAL`/`DOLLARDE`/`DOLLARFR` are Analysis ToolPak style (boolean and multi-cell range arguments are `#VALUE!`); `n` and the
+  fraction are truncated. `SYD` rejects a negative salvage, not a negative cost.
+
+Implemented but NOT verified (no corpus cases; generators `gen_fin1.py`..`gen_fin3.py` kept outside the repository): `PMT`, `NPER`, `RATE`,
+`IPMT`, `PPMT`, `CUMIPMT`, `CUMPRINC`, `NPV`, `XNPV`, `IRR`, `XIRR`, `MIRR`, `SYD`, `DB`, `DDB`, `VDB`. Measured so far:
+
+* `PMT` matches the closed form `-r*(pv + (pv+fv)/expm1(n*log1p(r)))/(1+r*type)` only in about half of the cases; Excel's fv-only results
+  carry an error that grows with `(1+r)^n` (80 ulp at q = 140), so its algorithm is not a plain double evaluation. `NPER` is
+  `ln(num/den)/ln(1+r)` (93% exact); the rest differ because Excel's `ln(1.05)` is one ulp above the C library's.
+* `RATE`/`IRR`/`XIRR` are Newton iterations. Plain Newton (guess 0.1, 20 iterations, step < 1e-7) reproduces about 40% of `RATE` results
+  bit for bit; Excel's final iterate is noise-limited, so its exact stopping rule is unknown. Excel's `XIRR` result is the true root
+  (`XIRR({-100,150},{43831,44562})` = 0.2244052527 in exact arithmetic, Excel 0.22440524697), so its tolerance is looser than 1e-8.
+  `XNPV` needs `rate > 0`. `CUMIPMT` takes `ceil(start)` and `trunc(end)`. `DDB` is `cost*(1-f/life)^(period-1)*f/life`, capped at salvage.
