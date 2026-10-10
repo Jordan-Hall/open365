@@ -1,0 +1,21 @@
+{
+  "source": "fixtures/docx/layout-mixed-sizes.docx",
+  "oracle": "Microsoft Word 16.0 (16.0.20430), Print Layout, tools/office/word-layout-oracle.ps1",
+  "units": "points; page and top/left/baseline measured from the page top-left corner; start/end are UTF-16 offsets in the main story",
+  "precision": "top/left/lastX are screen-quantised (+-0.3 pt); baseline/inkLeft come from the 600 dpi PDF and are exact",
+  "pageCount": 1,
+  "lines": [
+    {"page": 1, "start": 0, "end": 65, "top": 72.0, "left": 72.0, "lastX": 511.2, "baseline": 98.66, "inkLeft": 72.024, "text": "Small Normal Large Cambria bold tiny and a huge word followed by "},
+    {"page": 1, "start": 65, "end": 165, "top": 106.2, "left": 72.0, "lastX": 523.8, "baseline": 119.33, "inkLeft": 72.024, "text": "ordinary text that keeps going so that the line must wrap at least a couple of times italic Cambria "},
+    {"page": 1, "start": 165, "end": 205, "top": 122.4, "left": 72.0, "lastX": 271.2, "baseline": 135.17, "inkLeft": 72.024, "text": "and a closing phrase in thirteen point.\u000d"},
+    {"page": 1, "start": 205, "end": 264, "top": 144.6, "left": 72.0, "lastX": 334.8, "baseline": 155.09, "inkLeft": 72.024, "text": "A second paragraph where only a few characters are large: \u000d"},
+    {"page": 1, "start": 264, "end": 353, "top": 163.8, "left": 72.0, "lastX": 419.4, "baseline": 198.29, "inkLeft": 72.024, "text": "XL then small again, with enough words after it to need another line or two of wrapping.\u000d"},
+    {"page": 1, "start": 353, "end": 468, "top": 213.6, "left": 72.0, "lastX": 537.6, "baseline": 223.51, "inkLeft": 72.024, "text": "The quick survey of a quiet harbour town begins at dawn, when the fishing boats drift back past the lighthouse and "},
+    {"page": 1, "start": 468, "end": 474, "top": 225.6, "left": 72.0, "lastX": 96.0, "baseline": 235.75, "inkLeft": 72.024, "text": "the m\u000d"},
+    {"page": 1, "start": 474, "end": 565, "top": 244.2, "left": 72.0, "lastX": 532.2, "baseline": 256.15, "inkLeft": 72.024, "text": "The quick survey of a quiet harbour town begins at dawn, when the fishing boats drift back "},
+    {"page": 1, "start": 565, "end": 595, "top": 259.2, "left": 72.0, "lastX": 223.8, "baseline": 271.51, "inkLeft": 72.024, "text": "past the lighthouse and the m\u000d"},
+    {"page": 1, "start": 595, "end": 661, "top": 280.8, "left": 72.0, "lastX": 510.0, "baseline": 296.02, "inkLeft": 72.024, "text": "The quick survey of a quiet harbour town begins at dawn, when the "},
+    {"page": 1, "start": 661, "end": 716, "top": 300.6, "left": 72.0, "lastX": 417.0, "baseline": 315.46, "inkLeft": 72.024, "text": "fishing boats drift back past the lighthouse and the m\u000d"},
+    {"page": 1, "start": 716, "end": 717, "top": 325.8, "left": 72.0, "lastX": 72.0, "baseline": 336.58, "inkLeft": 72.024, "text": "\u000d"}
+  ]
+}

@@ -1,0 +1,5 @@
+feature = "layout-indents-spacing"
+made_with = "Microsoft Word 16.0.20430 (Windows)"
+author = "project member"
+expect_dropped = []
+notes = "left/right/first-line/hanging indents; space before/after; single, 1.15, exact, at-least, multiple line spacing; contextual spacing"

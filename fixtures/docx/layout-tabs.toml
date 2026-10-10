@@ -1,0 +1,5 @@
+feature = "layout-tabs"
+made_with = "Microsoft Word 16.0.20430 (Windows)"
+author = "project member"
+expect_dropped = []
+notes = "default 0.5in tab stops; custom left/centre/right/decimal stops with dot, hyphen and underscore leaders"

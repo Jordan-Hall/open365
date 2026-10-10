@@ -20,3 +20,14 @@ What they prove:
 
 Fixtures are opened read-only and never saved. JSON holds repo-relative paths only. Failing fixtures are
 reported as `SKIPPED` and the run continues. Only Office processes started by the script are killed.
+
+## Word layout parity
+
+```powershell
+pwsh -NoProfile -File tools/office/make-layout-fixtures.ps1          # (re)creates fixtures/docx/layout-*.docx
+pwsh -NoProfile -File tools/office/word-layout-oracle.ps1 -Path fixtures/docx/layout-wrap.docx
+```
+`word-layout-oracle.ps1` writes `fixtures/reference/layout/<name>.json`: per main-story line the page, first
+character offset, top, left, lastX (screen-quantised +-0.3 pt) and exact baseline/inkLeft read from Word's PDF.
+Method and speed are documented in the script header. Only `layout-*` references are committed; the older
+fixtures use theme fonts (Aptos) that the bundled metric-compatible fonts cannot reproduce.

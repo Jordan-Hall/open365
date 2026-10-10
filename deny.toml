@@ -4,6 +4,8 @@
 [advisories]
 yanked = "deny"
 
+# Text stack (open365-text): harfrust MIT, skrifa/read-fonts MIT OR Apache-2.0, unicode-linebreak Apache-2.0,
+# all covered by the allow list below; no new licence was needed.
 [licenses]
 allow = [
     "MIT",

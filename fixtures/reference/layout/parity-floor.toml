@@ -1,0 +1,27 @@
+# Ratchet for crates/layout/tests/word_parity.rs: lines that must match Word.
+# Raise `matched` when the engine improves (UPDATE_PARITY_FLOOR=1 cargo test -p open365-layout
+# --test word_parity); never lower it. `total` is the number of reference lines.
+
+[fixtures.layout-align]
+matched = 4
+total = 22
+
+[fixtures.layout-indents-spacing]
+matched = 11
+total = 98
+
+[fixtures.layout-mixed-sizes]
+matched = 1
+total = 12
+
+[fixtures.layout-pagination]
+matched = 261
+total = 383
+
+[fixtures.layout-tabs]
+matched = 9
+total = 18
+
+[fixtures.layout-wrap]
+matched = 9
+total = 34
