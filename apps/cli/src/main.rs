@@ -1,7 +1,8 @@
-//! `open365` CLI: `docx|xlsx inspect`, `apply`, `roundtrip --check` and `inspect`.
+//! `open365` CLI: `docx|xlsx inspect`, `apply`, `roundtrip --check`, `mcp` and `inspect`.
 
 mod apply_cmd;
 mod inspect_cmd;
+mod mcp_cmd;
 
 use std::fmt;
 use std::path::{Path, PathBuf};
@@ -72,6 +73,27 @@ enum Command {
         /// Permit destructive and egress commands.
         #[arg(long)]
         allow_destructive: bool,
+    },
+    /// Serve document tools to an agent over stdio (MCP). Read-only unless --allow-edit.
+    ///
+    /// Every tool call appends one JSON line to --audit-log. There is no native confirmation
+    /// prompt yet, so destructive and egress effects are refused unless --allow-destructive.
+    Mcp {
+        /// Folder agents may open and save in (repeatable). Relative paths use the first.
+        #[arg(long = "root", required = true)]
+        roots: Vec<PathBuf>,
+        /// Audit log file (appended; one JSON line per call).
+        #[arg(long)]
+        audit_log: PathBuf,
+        /// Permit apply_commands and save_as.
+        #[arg(long)]
+        allow_edit: bool,
+        /// Permit destructive and egress commands and overwriting other files.
+        #[arg(long, requires = "allow_edit")]
+        allow_destructive: bool,
+        /// Include hidden text, hidden sheets, rows and columns, and hidden-content findings.
+        #[arg(long)]
+        include_hidden: bool,
     },
     /// Verify that files survive read -> write -> read unchanged.
     Roundtrip {
@@ -203,6 +225,19 @@ fn main() -> ExitCode {
                 }
             }
         }
+        Command::Mcp {
+            roots,
+            audit_log,
+            allow_edit,
+            allow_destructive,
+            include_hidden,
+        } => finish(mcp_cmd::run(mcp_cmd::Options {
+            roots,
+            audit_log,
+            allow_edit,
+            allow_destructive,
+            include_hidden,
+        })),
         Command::Roundtrip { files, .. } => {
             let results: Vec<bool> = files.iter().map(|f| check_file(f)).collect();
             if results.iter().all(|&ok| ok) {
