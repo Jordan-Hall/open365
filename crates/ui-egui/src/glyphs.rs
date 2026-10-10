@@ -6,7 +6,7 @@
 //! egui's own text path would re-shape the text with its own fonts and drift from layout.
 
 use std::collections::HashMap;
-use std::sync::Arc;
+use std::path::PathBuf;
 
 use egui::epaint::Mesh;
 use egui::{Color32, ColorImage, Context, Pos2, Rect, TextureHandle, TextureId, TextureOptions};
@@ -20,35 +20,30 @@ const MAX_PAGES: usize = 6;
 /// Fixed-point steps per pixel of the cached glyph size.
 const SIZE_STEPS: f32 = 8.0;
 
-/// The font files of a [`FontLibrary`], kept so outlines can be read from the same bytes
-/// layout measured with.
+/// The fonts the canvas draws with. Outlines are read from the very bytes the
+/// [`FontLibrary`] measured with, so what is drawn is what layout placed.
 pub struct FontSet {
     pub library: FontLibrary,
-    data: Vec<Arc<[u8]>>,
 }
 
-macro_rules! bundled {
-    ($file:literal) => {
-        include_bytes!(concat!("../../../assets/fonts/", $file)) as &'static [u8]
-    };
-}
-
-/// (family, bold, italic, bytes): the same files `FontLibrary::bundled` loads.
-const BUNDLED: [(&str, bool, bool, &[u8]); 8] = [
-    ("Carlito", false, false, bundled!("Carlito-Regular.ttf")),
-    ("Carlito", true, false, bundled!("Carlito-Bold.ttf")),
-    ("Carlito", false, true, bundled!("Carlito-Italic.ttf")),
-    ("Carlito", true, true, bundled!("Carlito-BoldItalic.ttf")),
-    ("Caladea", false, false, bundled!("Caladea-Regular.ttf")),
-    ("Caladea", true, false, bundled!("Caladea-Bold.ttf")),
-    ("Caladea", false, true, bundled!("Caladea-Italic.ttf")),
-    ("Caladea", true, true, bundled!("Caladea-BoldItalic.ttf")),
+/// Families loaded from the machine in system mode: the ones Word documents ask for most.
+pub const SYSTEM_FAMILIES: [&str; 10] = [
+    "Calibri",
+    "Calibri Light",
+    "Cambria",
+    "Aptos",
+    "Aptos Display",
+    "Aptos Narrow",
+    "Arial",
+    "Times New Roman",
+    "Segoe UI",
+    "Symbol",
 ];
 
 impl std::fmt::Debug for FontSet {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("FontSet")
-            .field("faces", &self.data.len())
+            .field("faces", &self.library.len())
             .finish()
     }
 }
@@ -56,24 +51,29 @@ impl std::fmt::Debug for FontSet {
 impl FontSet {
     /// The deterministic bundled set (Carlito, Caladea; Calibri and Cambria alias to them).
     pub fn bundled() -> Self {
-        let mut library = FontLibrary::empty("Carlito");
-        let mut data = Vec::new();
-        for (family, bold, italic, bytes) in BUNDLED {
-            let bytes: Arc<[u8]> = Arc::from(bytes);
-            if library
-                .add_bytes(Arc::clone(&bytes), 0, family, bold, italic)
-                .is_ok()
-            {
-                data.push(bytes);
-            }
+        Self {
+            library: FontLibrary::bundled(),
         }
-        library.add_alias("Calibri", "Carlito");
-        library.add_alias("Cambria", "Caladea");
-        Self { library, data }
+    }
+
+    /// The bundled set plus the installed faces of [`SYSTEM_FAMILIES`], the same library the
+    /// layout parity test builds in its system mode. Installed faces win over the bundled
+    /// substitutes whenever a family is found; the rest falls back to the bundled fonts.
+    pub fn system() -> Self {
+        let mut set = Self::bundled();
+        set.library
+            .add_system_families(&SYSTEM_FAMILIES, &font_dirs());
+        set
+    }
+
+    /// Adds the installed faces of `families`; returns how many were found.
+    pub fn add_system_families(&mut self, families: &[&str]) -> usize {
+        self.library.add_system_families(families, &font_dirs())
     }
 
     fn font(&self, face: FaceId) -> Option<FontRef<'_>> {
-        FontRef::from_index(self.data.get(face.index())?, 0).ok()
+        let face = self.library.try_face(face)?;
+        FontRef::from_index(face.bytes(), face.index()).ok()
     }
 
     /// The face a family name resolves to, and its family name (for status messages).
@@ -460,6 +460,18 @@ fn accumulate(acc: &mut [f32], stride: usize, height: usize, p0: [f32; 2], p1: [
         }
         x = xnext;
     }
+}
+
+/// Extra font folders: Office's cloud font cache, where Aptos lives on Windows.
+fn font_dirs() -> Vec<PathBuf> {
+    let mut dirs = Vec::new();
+    if let Some(local) = std::env::var_os("LOCALAPPDATA") {
+        let cloud = PathBuf::from(local).join("Microsoft/FontCache/4/CloudFonts");
+        if cloud.is_dir() {
+            dirs.push(cloud);
+        }
+    }
+    dirs
 }
 
 #[cfg(test)]

@@ -57,6 +57,8 @@ pub struct App {
     status: String,
     title: String,
     fonts: Rc<RefCell<FontBook>>,
+    /// Documents use installed system fonts before the bundled ones.
+    system_fonts: bool,
 }
 
 impl App {
@@ -69,11 +71,21 @@ impl App {
             status: "Open a .docx or .xlsx file (Ctrl+O)".to_owned(),
             title: String::new(),
             fonts,
+            system_fonts: false,
         };
         if let Some(path) = initial {
             app.open_path(&path);
         }
         app
+    }
+
+    /// Lays documents out with the fonts installed on this machine, falling back to the bundled
+    /// ones, so the screen matches Word's layout when its fonts are installed.
+    #[must_use]
+    pub fn with_system_fonts(mut self) -> Self {
+        self.system_fonts = true;
+        self.doc.use_system_fonts();
+        self
     }
 
     pub fn target(&self) -> Option<&Target> {
@@ -91,6 +103,9 @@ impl App {
                 self.status = format!("Opened {}", path.display());
                 self.target = Some(target);
                 self.doc = DocView::new();
+                if self.system_fonts {
+                    self.doc.use_system_fonts();
+                }
                 self.grid = GridView::with_fonts(Rc::clone(&self.fonts));
             }
             Err(e) => self.status = format!("Could not open {}: {e}", path.display()),

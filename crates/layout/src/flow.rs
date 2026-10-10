@@ -2,32 +2,87 @@
 //! widow and orphan control, keep-with-next, keep-lines, page breaks, sections, table row
 //! splitting and repeated header rows.
 
-use crate::para::{AtomClass, Context, LineBox, ParaLayout};
+use std::sync::Arc;
+
+use crate::build::UnitLayout;
+use crate::para::{AtomClass, LineBox, ParaLayout};
 use crate::props::SectionProps;
 use crate::table::{CellLayout, FlowLine, RowLayout, TableLayout};
 use crate::{CellBox, GlyphRun, Line, Page, PlacedGlyph};
 
 const EPS: f64 = 1e-6;
 
-/// A block of the main story in layout order.
-pub(crate) enum FlowItem {
-    /// A body paragraph: index into the paragraph arena.
-    Para {
-        arena: usize,
-        section: usize,
-    },
-    Table {
-        table: TableLayout,
-        section: usize,
-    },
+/// A block of the main story in layout order: a laid-out unit and where it sits in the story.
+#[derive(Debug, Clone)]
+pub(crate) struct FlowItem {
+    pub unit: Arc<UnitLayout>,
+    pub section: usize,
+    /// Document-order index of the unit's first paragraph.
+    pub para_base: usize,
+    /// Story offset of the unit's first character.
+    pub story_base: usize,
 }
 
 impl FlowItem {
     fn section(&self) -> usize {
-        match self {
-            Self::Para { section, .. } | Self::Table { section, .. } => *section,
+        self.section
+    }
+
+    fn para(&self) -> Option<&ParaLayout> {
+        self.unit.para()
+    }
+
+    fn table(&self) -> Option<&TableLayout> {
+        self.unit.table.as_ref()
+    }
+
+    fn base(&self) -> Base {
+        Base {
+            para: self.para_base,
+            story: self.story_base,
         }
     }
+
+    /// What the next item sees of this one: space after, style id and contextual spacing.
+    fn carry(&self) -> Carry {
+        match self.para() {
+            Some(p) => Carry {
+                after: f64::from(p.props.space_after_pt),
+                style: Some(p.style_id.clone()),
+                contextual: p.flow.contextual_spacing,
+            },
+            None => Carry::default(),
+        }
+    }
+}
+
+/// Offsets that turn a unit's relative paragraph and story numbers into document ones.
+#[derive(Clone, Copy)]
+struct Base {
+    para: usize,
+    story: usize,
+}
+
+#[derive(Debug, Clone, PartialEq, Default)]
+struct Carry {
+    after: f64,
+    style: Option<Option<String>>,
+    contextual: bool,
+}
+
+/// The paginator's state at the start of a flow item, enough to resume from there given the
+/// pages before it.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub(crate) struct Checkpoint {
+    /// Pages finished before the current one.
+    pub pages_done: usize,
+    /// Lines and cell boxes already on the current page.
+    pub lines: usize,
+    pub cells: usize,
+    pub y: f64,
+    pub hard_start: bool,
+    pub force_break: bool,
+    pub section_index: usize,
 }
 
 struct PageBuild {
@@ -139,7 +194,6 @@ fn decide(para: &ParaLayout, from: usize, y0: f64, bottom: f64, at_top: bool) ->
 /// Whether item `p` (and, when it is kept with the next, its followers) can start on a page
 /// whose cursor is at `y`.
 fn can_start(
-    arena: &[ParaLayout],
     items: &[FlowItem],
     p: usize,
     y: f64,
@@ -147,19 +201,20 @@ fn can_start(
     bottom: f64,
     depth: usize,
 ) -> bool {
-    let (para, section) = match &items[p] {
-        FlowItem::Para { arena: a, section } => (&arena[*a], *section),
-        FlowItem::Table { table, .. } => {
-            // A table starts with its first row's first line.
-            let first = table.rows.first().map_or(0.0, |r| {
+    let section = items[p].section;
+    let Some(para) = items[p].para() else {
+        // A table starts with its first row's first line.
+        let first = items[p]
+            .table()
+            .and_then(|t| t.rows.first())
+            .map_or(0.0, |r| {
                 r.cells
                     .iter()
                     .filter_map(|c| c.lines.first())
                     .map(|l| l.dy + l.height)
                     .fold(0.0, f64::max)
             });
-            return y + prev_after + first <= bottom + EPS;
-        }
+        return y + prev_after + first <= bottom + EPS;
     };
     // A follower that starts its own page (page-break-before, a new section) is not kept with.
     if para.flow.page_break_before
@@ -178,7 +233,6 @@ fn can_start(
     if para.flow.keep_next && place.take == para.lines.len() && p + 1 < items.len() && depth < 8 {
         let used: f64 = para.lines.iter().map(|l| l.height).sum();
         return can_start(
-            arena,
             items,
             p + 1,
             y0 + used,
@@ -200,7 +254,7 @@ fn snap_baseline(y: f64) -> f64 {
 }
 
 /// Builds the placed line `lb` of `para`, its text area starting at `origin_x` on the page.
-fn build_line(para: &ParaLayout, lb: &LineBox, origin_x: f64, top: f64) -> Line {
+fn build_line(para: &ParaLayout, lb: &LineBox, origin_x: f64, top: f64, base: Base) -> Line {
     let left_origin = origin_x;
     let mut runs: Vec<GlyphRun> = Vec::new();
     let mut cur_style: Option<usize> = None;
@@ -214,6 +268,7 @@ fn build_line(para: &ParaLayout, lb: &LineBox, origin_x: f64, top: f64) -> Line 
             .iter()
             .map(|g| {
                 let placed = PlacedGlyph {
+                    face: g.face,
                     glyph_id: g.glyph_id,
                     x: x + g.x_offset,
                     y_offset: g.y_offset,
@@ -257,6 +312,7 @@ fn build_line(para: &ParaLayout, lb: &LineBox, origin_x: f64, top: f64) -> Line 
         if let Some(run) = runs.last_mut() {
             for g in &para.glyphs[atom.glyphs.clone()] {
                 run.glyphs.push(PlacedGlyph {
+                    face: g.face,
                     glyph_id: g.glyph_id,
                     x: x + g.x_offset,
                     y_offset: g.y_offset,
@@ -267,9 +323,9 @@ fn build_line(para: &ParaLayout, lb: &LineBox, origin_x: f64, top: f64) -> Line 
         }
     }
     Line {
-        paragraph: para.index,
-        start: lb.start,
-        end: lb.end,
+        paragraph: base.para + para.index,
+        start: base.story + lb.start,
+        end: base.story + lb.end,
         top,
         baseline: snap_baseline(top + lb.baseline_off),
         height: lb.height,
@@ -290,10 +346,11 @@ struct ActiveSpan {
 }
 
 struct Paginator<'a> {
-    arena: &'a [ParaLayout],
     sections: &'a [SectionProps],
     done: Vec<Page>,
     page: PageBuild,
+    /// The table unit being placed and its offsets.
+    cur: Option<(&'a UnitLayout, Base)>,
 }
 
 impl Paginator<'_> {
@@ -336,8 +393,9 @@ impl Paginator<'_> {
     }
 
     fn push_line(&mut self, ln: &FlowLine, origin: f64, top: f64) {
-        let para = &self.arena[ln.para];
-        let line = build_line(para, &para.lines[ln.line], origin + ln.dx, top);
+        let Some((unit, base)) = self.cur else { return };
+        let para = &unit.arena[ln.para];
+        let line = build_line(para, &para.lines[ln.line], origin + ln.dx, top, base);
         self.page.lines.push(line);
     }
 
@@ -589,33 +647,144 @@ impl Paginator<'_> {
     }
 }
 
-pub(crate) fn paginate(
-    _ctx: &Context<'_>,
-    arena: &[ParaLayout],
-    items: &[FlowItem],
-    sections: &[SectionProps],
-) -> Vec<Page> {
-    let first_section = items.first().map_or(0, FlowItem::section);
-    let page = PageBuild::new(
-        1,
-        first_section,
-        sections.get(first_section).copied().unwrap_or_default(),
-        true,
-    );
-    let mut pg = Paginator {
-        arena,
-        sections,
-        done: Vec::new(),
-        page,
+impl Checkpoint {
+    /// Whether two states lead to the same pages from here on. The page count may differ.
+    fn same_future(&self, other: &Self) -> bool {
+        self.lines == other.lines
+            && self.cells == other.cells
+            && self.y == other.y
+            && self.hard_start == other.hard_start
+            && self.force_break == other.force_break
+            && self.section_index == other.section_index
+            && (self.pages_done > 0) == (other.pages_done > 0)
+    }
+}
+
+/// Where a pagination run picks up: the pages before it and the state at its first item.
+pub(crate) struct Resume {
+    /// Index of the first item to place.
+    pub item: usize,
+    /// Pages finished before the current one.
+    pub prior: Vec<Page>,
+    /// The current page, cut back to the lines and boxes the checkpoint counts.
+    pub page: Page,
+    pub checkpoint: Checkpoint,
+    /// Checkpoints of the items before `item`.
+    pub checkpoints: Vec<Checkpoint>,
+}
+
+/// An earlier run whose pages may be reused once this run's state matches it again.
+pub(crate) struct Previous<'a> {
+    pub items: &'a [FlowItem],
+    /// One per item plus one for the end.
+    pub checkpoints: &'a [Checkpoint],
+    /// Items from this index on are the earlier run's last items, unchanged.
+    pub first: usize,
+}
+
+pub(crate) struct Paginated {
+    /// Finished pages. When the run converged, the page in progress is in `open`.
+    pub pages: Vec<Page>,
+    pub open: Option<Page>,
+    /// One per item placed or skipped over, plus the end when the run did not converge.
+    pub checkpoints: Vec<Checkpoint>,
+    /// The item at which the state matched the earlier run.
+    pub converged: Option<usize>,
+}
+
+fn checkpoint(pg: &Paginator<'_>, force_break: bool) -> Checkpoint {
+    Checkpoint {
+        pages_done: pg.done.len(),
+        lines: pg.page.lines.len(),
+        cells: pg.page.cells.len(),
+        y: pg.page.y,
+        hard_start: pg.page.hard_start,
+        force_break,
+        section_index: pg.page.section_index,
+    }
+}
+
+/// Places `items` on pages, from the start or from `resume`. With `previous` it stops as soon
+/// as the state equals the earlier run's at the same item (see [`Paginated::converged`]).
+pub(crate) fn paginate<'a>(
+    items: &'a [FlowItem],
+    sections: &'a [SectionProps],
+    resume: Option<Resume>,
+    previous: Option<&Previous<'_>>,
+) -> Paginated {
+    let (start, mut checkpoints, mut pg, mut force_break) = match resume {
+        Some(r) => {
+            let carry = r
+                .item
+                .checked_sub(1)
+                .map(|i| items[i].carry())
+                .unwrap_or_default();
+            let page = PageBuild {
+                number: r.page.number,
+                section: r.page.section,
+                section_index: r.checkpoint.section_index,
+                lines: r.page.lines,
+                cells: r.page.cells,
+                y: r.checkpoint.y,
+                pending_after: carry.after,
+                prev_style: carry.style,
+                prev_contextual: carry.contextual,
+                hard_start: r.checkpoint.hard_start,
+            };
+            let pg = Paginator {
+                sections,
+                done: r.prior,
+                page,
+                cur: None,
+            };
+            (r.item, r.checkpoints, pg, r.checkpoint.force_break)
+        }
+        None => {
+            let first_section = items.first().map_or(0, FlowItem::section);
+            let page = PageBuild::new(
+                1,
+                first_section,
+                sections.get(first_section).copied().unwrap_or_default(),
+                true,
+            );
+            let pg = Paginator {
+                sections,
+                done: Vec::new(),
+                page,
+                cur: None,
+            };
+            (0, Vec::with_capacity(items.len() + 1), pg, false)
+        }
     };
 
-    let mut force_break = false;
-    for (p, item) in items.iter().enumerate() {
+    for p in start..items.len() {
+        let ck = checkpoint(&pg, force_break);
+        if let Some(prev) = previous
+            && p >= prev.first
+            && p > 0
+        {
+            let o = p + prev.items.len() - items.len();
+            let same = prev.checkpoints.get(o).is_some_and(|c| ck.same_future(c))
+                && Carry {
+                    after: pg.page.pending_after,
+                    style: pg.page.prev_style.clone(),
+                    contextual: pg.page.prev_contextual,
+                } == prev.items[o - 1].carry();
+            if same {
+                return Paginated {
+                    pages: pg.done,
+                    open: Some(pg.page.finish()),
+                    checkpoints,
+                    converged: Some(p),
+                };
+            }
+        }
+        checkpoints.push(ck);
+
+        let item = &items[p];
         let section = item.section();
-        let (para, table) = match item {
-            FlowItem::Para { arena: a, .. } => (Some(&arena[*a]), None),
-            FlowItem::Table { table, .. } => (None, Some(table)),
-        };
+        let base = item.base();
+        let (para, table) = (item.para(), item.table());
         let wants_break = force_break || para.is_some_and(|p| p.flow.page_break_before);
         if section != pg.page.section_index || (wants_break && pg.page.has_content()) {
             // Space before is dropped at the top of every page after the first, whether the page
@@ -631,6 +800,7 @@ pub(crate) fn paginate(
             } else {
                 0.0
             };
+            pg.cur = Some((item.unit.as_ref(), base));
             pg.place_table(table, gap);
             pg.page.pending_after = 0.0;
             pg.page.prev_style = None;
@@ -680,7 +850,6 @@ pub(crate) fn paginate(
             {
                 let used: f64 = para.lines.iter().map(|l| l.height).sum();
                 let ok = can_start(
-                    arena,
                     items,
                     p + 1,
                     y0 + used,
@@ -716,7 +885,7 @@ pub(crate) fn paginate(
             let mut broke = false;
             let origin = pg.page.origin_x();
             for lb in &para.lines[from..from + place.take] {
-                let line = build_line(para, lb, origin, y);
+                let line = build_line(para, lb, origin, y, base);
                 y += lb.height;
                 pg.page.lines.push(line);
                 placed += 1;
@@ -737,6 +906,12 @@ pub(crate) fn paginate(
         pg.page.prev_style = Some(para.style_id.clone());
         pg.page.prev_contextual = para.flow.contextual_spacing;
     }
+    checkpoints.push(checkpoint(&pg, force_break));
     pg.done.push(pg.page.finish());
-    pg.done
+    Paginated {
+        pages: pg.done,
+        open: None,
+        checkpoints,
+        converged: None,
+    }
 }

@@ -235,6 +235,11 @@ impl FontLibrary {
         &self.faces[id.0]
     }
 
+    /// The face `id`, or `None` when it is not in this library.
+    pub fn try_face(&self, id: FaceId) -> Option<&FontFace> {
+        self.faces.get(id.0)
+    }
+
     pub fn len(&self) -> usize {
         self.faces.len()
     }

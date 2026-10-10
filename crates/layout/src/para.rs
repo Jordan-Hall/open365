@@ -66,6 +66,7 @@ pub(crate) struct Atom {
 
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct PlacedGlyphRaw {
+    pub face: FaceId,
     pub glyph_id: u32,
     pub x_offset: f64,
     pub y_offset: f64,
@@ -105,6 +106,7 @@ pub(crate) struct LabelLayout {
 /// A paragraph laid out into lines, ready for pagination.
 #[derive(Debug)]
 pub(crate) struct ParaLayout {
+    /// Position among the paragraphs of its layout unit (a body paragraph or a whole table).
     pub index: usize,
     pub props: EffectiveParagraph,
     pub flow: ParagraphProps,
@@ -355,6 +357,7 @@ pub(crate) fn layout_paragraph(
                     let upem = f64::from(ctx.fonts.face(g.face).units_per_em());
                     let adv = f64::from(g.x_advance) * st.size / upem * st.scale + st.spacing;
                     glyphs.push(PlacedGlyphRaw {
+                        face: g.face,
                         glyph_id: g.glyph_id,
                         x_offset: f64::from(g.x_offset) * st.size / upem * st.scale,
                         y_offset: f64::from(g.y_offset) * st.size / upem,
@@ -803,6 +806,7 @@ fn shape_glyphs(ctx: &Context<'_>, st: &RunStyle, text: &str) -> (Vec<PlacedGlyp
             let adv = f64::from(g.x_advance) * st.size / upem * st.scale + st.spacing;
             width += adv;
             PlacedGlyphRaw {
+                face: g.face,
                 glyph_id: g.glyph_id,
                 x_offset: f64::from(g.x_offset) * st.size / upem * st.scale,
                 y_offset: f64::from(g.y_offset) * st.size / upem,

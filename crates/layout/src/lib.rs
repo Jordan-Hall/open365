@@ -16,22 +16,19 @@
 
 mod build;
 mod flow;
+mod incremental;
 mod metrics;
 mod numbering;
 mod para;
 mod props;
 mod table;
 
-use open365_docx::{Block, Document, Paragraph, Styles};
+use open365_docx::{Block, Document, Paragraph};
 use open365_text::{FaceId, FontLibrary, FontMatch};
 
+pub use incremental::{IncrementalLayout, UpdateStats};
 pub use metrics::LineMetricModel;
 pub use props::{SectionProps, TabKind, TabLeader, TabStop};
-
-use build::Builder;
-use flow::FlowItem;
-use numbering::{Labeler, NumberingState};
-use para::Context;
 
 /// Knobs for layout. The defaults are the measured Word behaviour.
 #[derive(Debug, Clone, Copy)]
@@ -50,6 +47,9 @@ impl Default for LayoutOptions {
 /// A positioned glyph; `x` is in page coordinates (the glyph origin).
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct PlacedGlyph {
+    /// The face the glyph comes from: the run's face, or a fallback face that covers the
+    /// character.
+    pub face: FaceId,
     pub glyph_id: u32,
     pub x: f64,
     pub y_offset: f64,
@@ -180,90 +180,23 @@ fn collect_items<'a>(blocks: &'a [Block], items: &mut Vec<Item<'a>>) {
 /// paragraph that is not numbered. Bullets carry their symbol character as written in the
 /// numbering definition (often a private-use code point of the Symbol font).
 pub fn list_labels(doc: &Document) -> Vec<Option<String>> {
-    let mut items: Vec<Item<'_>> = Vec::new();
-    collect_items(&doc.body().blocks, &mut items);
-    let numbering = Labeler::new(doc);
-    let mut state = NumberingState::default();
-    items
-        .iter()
-        .map(|i| {
-            numbering
-                .as_ref()
-                .and_then(|n| n.label(&mut state, i.para))
-                .map(|l| l.text)
-        })
-        .collect()
+    let mut labels: Vec<Option<String>> = incremental::all_labels(doc)
+        .into_iter()
+        .map(|l| l.map(|l| l.text))
+        .collect();
+    if labels.is_empty() {
+        // No numbering part: every paragraph is unnumbered.
+        labels.resize(doc.paragraph_count(), None);
+    }
+    labels
 }
 
 /// Lays out the main story of `doc` with `fonts`.
 ///
-/// Returns an empty layout when `fonts` has no faces.
+/// Returns an empty layout when `fonts` has no faces. To keep a layout up to date while the
+/// document is edited use [`IncrementalLayout`], which gives the same result faster.
 pub fn layout_document(doc: &Document, fonts: &FontLibrary, options: LayoutOptions) -> Layout {
-    let mut layout = Layout::default();
-    if fonts.is_empty() {
-        layout.notes.push("font library is empty".to_owned());
-        return layout;
-    }
-    let styles: Option<&Styles> = doc.styles();
-    let ctx = Context {
-        fonts,
-        styles,
-        table: None,
-        default_tab: f64::from(doc.settings().default_tab_stop_twips) / 20.0,
-        model: options.metric_model,
-    };
-
-    let doc_sections = doc.sections();
-    let sections: Vec<SectionProps> = doc_sections.iter().map(SectionProps::from).collect();
-    for (i, s) in doc_sections.iter().enumerate() {
-        if s.columns.count > 1 && !layout.notes.iter().any(|n| n.starts_with("columns")) {
-            layout
-                .notes
-                .push(format!("columns are ignored (section {i})"));
-        }
-    }
-
-    let mut builder = Builder::new(doc, ctx);
-    let mut flow: Vec<FlowItem> = Vec::new();
-    let mut section = 0usize;
-    for block in &doc.body().blocks {
-        match block {
-            Block::Paragraph(p) => {
-                let width = sections[section].text_width();
-                let index = builder.paragraph(p, width, None);
-                flow.push(FlowItem::Para {
-                    arena: index,
-                    section,
-                });
-                // The paragraph that carries a `w:sectPr` is the last of its section.
-                if doc_sections[section].end_paragraph == Some(index) {
-                    section += 1;
-                }
-            }
-            Block::Table(t) => {
-                let width = sections[section].text_width();
-                let table = table::layout_table(&mut builder, t, width);
-                flow.push(FlowItem::Table { table, section });
-            }
-            Block::Raw(_) => {}
-        }
-    }
-    let arena = std::mem::take(&mut builder.arena);
-
-    let mut requested: Vec<&str> = arena
-        .iter()
-        .flat_map(|pl| pl.styles.iter().map(|s| s.requested.as_str()))
-        .collect();
-    requested.sort_unstable();
-    requested.dedup();
-    layout.fonts = requested
-        .into_iter()
-        .map(|r| FontUse {
-            requested: r.to_owned(),
-            matched: fonts.match_kind(r),
-        })
-        .collect();
-
-    layout.pages = flow::paginate(&ctx, &arena, &flow, &sections);
-    layout
+    let mut layout = IncrementalLayout::new();
+    layout.update(doc, fonts, options);
+    layout.into_layout()
 }

@@ -109,6 +109,16 @@ impl FontFace {
         self.italic
     }
 
+    /// The font file this face was loaded from (the whole file, also for a collection).
+    pub fn bytes(&self) -> &[u8] {
+        &self.data
+    }
+
+    /// Index of the face inside its font file (non-zero for a collection member).
+    pub fn index(&self) -> u32 {
+        self.index
+    }
+
     pub fn metrics(&self) -> &FaceMetrics {
         &self.metrics
     }

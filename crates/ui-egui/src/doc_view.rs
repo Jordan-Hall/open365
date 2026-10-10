@@ -11,6 +11,7 @@
 //! positions. All edits go through [`Target::apply`]; the view keeps only the caret, the
 //! selection and the layout.
 
+use std::collections::HashSet;
 use std::time::Instant;
 
 use egui::output::IMEOutput;
@@ -20,7 +21,7 @@ use egui::{
 };
 use open365_commands::{Command, Outcome, Target};
 use open365_docx::{Alignment, RunPropsPatch};
-use open365_layout::{Layout, LayoutOptions, Line, PlacedGlyph, layout_document, list_labels};
+use open365_layout::{IncrementalLayout, Layout, LayoutOptions, Line, PlacedGlyph};
 use open365_text::{FaceId, FontStyle, ShapeFeatures, shape_run};
 
 use self::glyphs::{Atlas, FontSet, GlyphBatch};
@@ -179,8 +180,12 @@ pub struct DocView {
     model_revision: Option<u64>,
     fonts: FontSet,
     atlas: Atlas,
-    layout: Layout,
-    labels: Vec<Option<String>>,
+    /// The layout, kept up to date incrementally as the document is edited.
+    engine: IncrementalLayout,
+    /// Whether installed system fonts are used before the bundled ones.
+    system_fonts: bool,
+    /// Families already looked up on the system, found or not.
+    probed: HashSet<String>,
     index: LayoutIndex,
     layout_dirty: bool,
     caret: DocPos,
@@ -230,8 +235,9 @@ impl DocView {
             model_revision: None,
             fonts: FontSet::bundled(),
             atlas: Atlas::default(),
-            layout: Layout::default(),
-            labels: Vec::new(),
+            engine: IncrementalLayout::new(),
+            system_fonts: false,
+            probed: HashSet::new(),
             index: LayoutIndex::default(),
             layout_dirty: true,
             caret: DocPos::default(),
@@ -288,7 +294,7 @@ impl DocView {
     }
 
     pub fn page_count(&self) -> usize {
-        self.layout.pages.len().max(1)
+        self.engine.layout().pages.len().max(1)
     }
 
     /// The page (0-based) a paragraph starts on.
@@ -302,7 +308,7 @@ impl DocView {
 
     /// The laid-out document the view draws.
     pub fn layout(&self) -> &Layout {
-        &self.layout
+        self.engine.layout()
     }
 
     /// How many paragraphs had lines painted last frame (the visible ones).
@@ -359,11 +365,54 @@ impl DocView {
     /// Throws away everything derived from the document (after open, undo or redo).
     pub fn reset(&mut self) {
         self.model_revision = None;
+        self.engine.invalidate();
+    }
+
+    /// Uses the fonts installed on this machine before the bundled ones, so the layout on
+    /// screen is Word's whenever the document's fonts are installed. Loads the system fonts
+    /// now (it takes a moment). The default, and what the tests use, is the bundled set only.
+    pub fn use_system_fonts(&mut self) {
+        if self.system_fonts {
+            return;
+        }
+        self.system_fonts = true;
+        self.fonts = FontSet::system();
+        self.probed = glyphs::SYSTEM_FAMILIES
+            .iter()
+            .map(|f| (*f).to_owned())
+            .collect();
+        self.engine.invalidate();
+        self.layout_dirty = true;
+    }
+
+    /// Looks up, once, the document's fonts that are not loaded yet among the installed ones.
+    /// True when faces were added.
+    fn probe_system_fonts(&mut self) -> bool {
+        if !self.system_fonts {
+            return false;
+        }
+        let missing: Vec<String> = self
+            .engine
+            .layout()
+            .fonts
+            .iter()
+            .filter(|f| {
+                f.matched != open365_text::FontMatch::Exact && !self.probed.contains(&f.requested)
+            })
+            .map(|f| f.requested.clone())
+            .collect();
+        if missing.is_empty() {
+            return false;
+        }
+        self.probed.extend(missing.iter().cloned());
+        let names: Vec<&str> = missing.iter().map(String::as_str).collect();
+        self.fonts.add_system_families(&names) > 0
     }
 
     /// Fonts the document asks for that the bundled set stands in for, as (requested, used).
     pub fn font_substitutions(&self) -> Vec<(String, String)> {
-        self.layout
+        self.engine
+            .layout()
             .fonts
             .iter()
             .filter(|f| f.matched != open365_text::FontMatch::Exact)
@@ -385,6 +434,9 @@ impl DocView {
             return;
         };
         self.models = build_models(doc);
+        // The document changed in a way the edit helpers did not follow (undo, redo, a
+        // replaced document): nothing cached can be trusted.
+        self.engine.invalidate();
         self.caret = self.clamp(self.caret);
         self.anchor = self.clamp(self.anchor);
         self.layout_dirty = true;
@@ -434,13 +486,17 @@ impl DocView {
         }
         let started = Instant::now();
         if let Some(doc) = target.docx() {
-            self.layout = layout_document(doc, &self.fonts.library, LayoutOptions::default());
-            self.labels = list_labels(doc);
+            let options = LayoutOptions::default();
+            self.engine.update(doc, &self.fonts.library, options);
+            if self.probe_system_fonts() {
+                // New faces came in: lay everything out again with them.
+                self.engine.invalidate();
+                self.engine.update(doc, &self.fonts.library, options);
+            }
         } else {
-            self.layout = Layout::default();
-            self.labels.clear();
+            self.engine = IncrementalLayout::new();
         }
-        self.index = LayoutIndex::build(&self.layout, self.models.len());
+        self.index = LayoutIndex::build(self.engine.layout(), self.models.len());
         self.layout_dirty = false;
         self.last_layout_ms = started.elapsed().as_secs_f32() * 1000.0;
     }
@@ -449,7 +505,7 @@ impl DocView {
 
     fn line(&self, ri: usize) -> &Line {
         let r = self.index.refs[ri];
-        &self.layout.pages[r.page as usize].lines[r.line as usize]
+        &self.engine.layout().pages[r.page as usize].lines[r.line as usize]
     }
 
     fn line_range_of(&self, para: usize) -> std::ops::Range<usize> {
@@ -535,13 +591,13 @@ impl DocView {
             .get(para)
             .map(|m| m.text.chars().skip(cs).take(ce - cs).collect())
             .unwrap_or_default();
-        let skip_label = self.index.para_first.get(para) == Some(&ri)
-            && self.labels.get(para).is_some_and(Option::is_some);
+        let skip_label =
+            self.index.para_first.get(para) == Some(&ri) && self.engine.list_label(para).is_some();
         let glyphs: Vec<(FaceId, &PlacedGlyph)> = line
             .runs
             .iter()
             .skip(usize::from(skip_label))
-            .flat_map(|r| r.glyphs.iter().map(move |g| (r.face, g)))
+            .flat_map(|r| r.glyphs.iter().map(|g| (g.face, g)))
             .collect();
         let no_glyph = |c: char| matches!(c, '\t' | '\n' | '\u{b}' | '\u{c}' | '\u{e}' | '\r');
         let wanted = chars.iter().filter(|c| !no_glyph(**c)).count();
@@ -626,7 +682,7 @@ impl DocView {
 
     /// The position nearest to document point (`x`, `y`) on `page` (`y` from the page top).
     fn hit_page(&self, page: usize, x: f64, y: f64) -> DocPos {
-        let Some(p) = self.layout.pages.get(page) else {
+        let Some(p) = self.engine.layout().pages.get(page) else {
             return DocPos::default();
         };
         let first = self.index.page_first[page];
@@ -646,7 +702,8 @@ impl DocView {
     /// Screen position of the top-left corner of `page` on a canvas.
     fn page_origin(&self, canvas: Rect, page: usize) -> Pos2 {
         let width = self
-            .layout
+            .engine
+            .layout()
             .pages
             .get(page)
             .map_or(612.0, |p| p.section.page_width) as f32
@@ -665,11 +722,14 @@ impl DocView {
     }
 
     fn hit_test(&self, canvas: Rect, pos: Pos2) -> DocPos {
-        if self.models.is_empty() || self.layout.pages.is_empty() {
+        if self.models.is_empty() || self.engine.layout().pages.is_empty() {
             return DocPos::default();
         }
         let gy = f64::from((pos.y - canvas.min.y) / self.scale);
-        let page = self.index.page_at(gy).min(self.layout.pages.len() - 1);
+        let page = self
+            .index
+            .page_at(gy)
+            .min(self.engine.layout().pages.len() - 1);
         let origin = self.page_origin(canvas, page);
         let x = f64::from((pos.x - origin.x) / self.scale);
         let y = gy - self.index.page_top[page];
@@ -1355,7 +1415,10 @@ impl DocView {
             let last = self.models.len() - 1;
             return DocPos::new(last, self.models[last].char_len);
         }
-        let target = self.index.page_at(gy).min(self.layout.pages.len() - 1);
+        let target = self
+            .index
+            .page_at(gy)
+            .min(self.engine.layout().pages.len() - 1);
         self.hit_page(target, gx, gy - self.index.page_top[target])
     }
 
@@ -1424,18 +1487,18 @@ impl DocView {
                 let paint_started = Instant::now();
                 let top_pt = f64::from((clip.min.y - canvas.min.y) / scale);
                 let bottom_pt = f64::from((clip.max.y - canvas.min.y) / scale);
-                let (first, last) = if self.layout.pages.is_empty() {
+                let (first, last) = if self.engine.layout().pages.is_empty() {
                     (0, 0)
                 } else {
                     (
                         self.index.page_at(top_pt),
                         self.index
                             .page_at(bottom_pt)
-                            .min(self.layout.pages.len() - 1),
+                            .min(self.engine.layout().pages.len() - 1),
                     )
                 };
                 self.painted.clear();
-                if self.layout.pages.is_empty() {
+                if self.engine.layout().pages.is_empty() {
                     let origin = self.page_origin(canvas, 0);
                     let size = vec2(612.0, 792.0) * scale;
                     painter.rect_filled(Rect::from_min_size(origin, size), 0.0, Color32::WHITE);
@@ -1525,7 +1588,7 @@ impl DocView {
         let s = self.scale;
         let ppp = ctx.pixels_per_point();
         let origin = self.page_origin(canvas, page);
-        let section = self.layout.pages[page].section;
+        let section = self.engine.layout().pages[page].section;
         let size = vec2(section.page_width as f32, section.page_height as f32) * s;
         let rect = Rect::from_min_size(origin, size);
         painter.rect_filled(
@@ -1559,9 +1622,9 @@ impl DocView {
         }
 
         let first_ri = self.index.page_first[page];
-        let line_count = self.layout.pages[page].lines.len();
+        let line_count = self.engine.layout().pages[page].lines.len();
         let (lo, hi) = {
-            let lines = &self.layout.pages[page].lines;
+            let lines = &self.engine.layout().pages[page].lines;
             (
                 lines.partition_point(|l| origin.y + ((l.top + l.height) as f32) * s < clip.min.y),
                 lines.partition_point(|l| origin.y + (l.top as f32) * s <= clip.max.y),
@@ -1573,7 +1636,7 @@ impl DocView {
             let sel = self.selection();
             for li in lo..hi {
                 if let Some((x0, x1)) = self.selection_span(first_ri + li, sel) {
-                    let line = &self.layout.pages[page].lines[li];
+                    let line = &self.engine.layout().pages[page].lines[li];
                     painter.rect_filled(
                         Rect::from_min_max(
                             Pos2::new(origin.x + x0 as f32 * s, origin.y + line.top as f32 * s),
@@ -1603,7 +1666,7 @@ impl DocView {
         let mut last_para = usize::MAX;
         let mut painted = Vec::new();
         for li in lo..hi {
-            let line = &self.layout.pages[page].lines[li];
+            let line = &self.engine.layout().pages[page].lines[li];
             if line.paragraph != last_para {
                 last_para = line.paragraph;
                 painted.push(last_para);
@@ -1630,7 +1693,7 @@ impl DocView {
                         base_y - g.y_offset as f32 * s,
                     );
                     atlas.push(
-                        ctx, fonts, &mut batch, run.face, g.glyph_id, px, at, ppp, color,
+                        ctx, fonts, &mut batch, g.face, g.glyph_id, px, at, ppp, color,
                     );
                 }
                 if run.underline || run.strike {
@@ -1896,11 +1959,7 @@ impl DocView {
         let mut entries = Vec::new();
         for para in paras {
             let lines = self.a11y_lines(para, canvas);
-            let label = self
-                .labels
-                .get(para)
-                .and_then(|l| l.as_deref())
-                .map(list_label_text);
+            let label = self.engine.list_label(para).map(list_label_text);
             entries.extend(a11y::publish_paragraph(
                 &mut run_ui,
                 doc_id,

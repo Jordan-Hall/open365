@@ -365,6 +365,12 @@ fn three_hundred_pages_scroll_with_a_small_paint_budget() {
         "relayout after one keystroke: {:.1} ms",
         h.state().view.last_layout_ms
     );
+    let relayout = h.state().view.last_layout_ms;
+    let layout_budget = if cfg!(debug_assertions) { 400.0 } else { 16.0 };
+    assert!(
+        relayout < layout_budget,
+        "relayout after a keystroke {relayout} ms over {layout_budget} ms"
+    );
     assert!(h.state().view.layout().pages.len() >= before);
     assert!(
         h.state()
