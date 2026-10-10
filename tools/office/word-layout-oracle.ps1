@@ -33,13 +33,17 @@ HOW (fast path; ~0.4 s for a 7-line page, ~0.05 s per additional page, no per-ch
   Selection.HomeKey/EndKey/MoveDown stepping (3-4 calls per line plus selection side effects).
 #>
 param(
-  [Parameter(Mandatory)][string[]]$Path,
+  [string[]]$Path,
+  [string]$InputDir,  # optional: scan this directory (in addition to -Path)
+  [string]$OutDir,    # optional: write <OutDir>/<name>/layout.json instead of fixtures/reference/layout/<name>.json
   [switch]$NoPdf   # skip the PDF baseline pass (then baseline/inkLeft are null)
 )
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 $refRoot = Join-Path $root 'fixtures\reference'
-$outDir = Join-Path $refRoot 'layout'
+$perDocDirs = [bool]$OutDir
+$outDir = if ($OutDir) { [IO.Path]::GetFullPath($OutDir) } else { Join-Path $refRoot 'layout' }
+if ($InputDir) { $Path = @(@($Path) | Where-Object { $_ }) + $InputDir }
 $inv = [Globalization.CultureInfo]::InvariantCulture
 $skipped = New-Object System.Collections.Generic.List[string]
 $produced = New-Object System.Collections.Generic.List[string]
@@ -189,7 +193,8 @@ function Ref-Layout($f) {
       [void]$sb.Append($row + "`n")
     }
     [void]$sb.Append("  ]`n}`n")
-    [IO.File]::WriteAllText((Join-Path $outDir "$name.json"), $sb.ToString().Replace("`r`n", "`n"), (New-Object Text.UTF8Encoding $false))
+    $jsonPath = if ($perDocDirs) { New-Item -ItemType Directory -Force (Join-Path $outDir $name) | Out-Null; Join-Path $outDir "$name\layout.json" } else { Join-Path $outDir "$name.json" }
+    [IO.File]::WriteAllText($jsonPath, $sb.ToString().Replace("`r`n", "`n"), (New-Object Text.UTF8Encoding $false))
     $produced.Add("layout/$name ($($lines.Count) lines, $pcount pages)")
     foreach ($m in $warn) { Write-Output "WARN $name : $m" }
   } finally {

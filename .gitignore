@@ -1,5 +1,9 @@
 /target
 **/*.rs.bk
-/fixtures/external/
+/fixtures/external/*
+!/fixtures/external/ms-templates.toml
 /fuzz/artifacts/
 /fuzz/corpus/
+
+# Derived from Microsoft templates (all rights reserved): local only, regenerate with tools/corpus/fetch-ms-templates.ps1 -Reference
+/fixtures/reference/ms-templates/

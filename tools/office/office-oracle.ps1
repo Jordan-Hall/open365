@@ -12,7 +12,9 @@ JSON contains repo-relative paths only.
 #>
 param(
   [Parameter(Mandatory)][ValidateSet('verify', 'reference')][string]$Mode,
-  [Parameter(Mandatory)][string[]]$Path,
+  [string[]]$Path,
+  [string]$InputDir,  # optional: scan this directory (in addition to -Path)
+  [string]$OutDir,    # optional: write <OutDir>/<name>/ instead of fixtures/reference/<docx|xlsx>/<name>/
   [switch]$XlsxPdf  # opt-in: Excel PDF export hangs when no usable printer driver exists (observed on this machine)
 )
 $ErrorActionPreference = 'Stop'
@@ -34,7 +36,9 @@ function Write-Json($obj, $file) {
 
 # collect files
 $files = New-Object System.Collections.Generic.List[string]
-foreach ($p in $Path) {
+if ($InputDir) { $Path = @(@($Path) | Where-Object { $_ }) + $InputDir }
+if ($OutDir) { $OutDir = [IO.Path]::GetFullPath($OutDir) }
+foreach ($p in @($Path)) {
   $rp = (Resolve-Path -LiteralPath $p).Path
   if (Test-Path -LiteralPath $rp -PathType Container) {
     Get-ChildItem -LiteralPath $rp -Recurse -File -Include *.docx, *.xlsx |
@@ -103,7 +107,7 @@ function Test-File($f) {
 
 function Ref-Docx($f) {
   $name = [IO.Path]::GetFileNameWithoutExtension($f)
-  $out = Join-Path $refRoot "docx\$name"; New-Item -ItemType Directory -Force $out | Out-Null
+  $out = if ($OutDir) { Join-Path $OutDir $name } else { Join-Path $refRoot "docx\$name" }; New-Item -ItemType Directory -Force $out | Out-Null
   $doc = $null
   try {
     $doc = Open-Doc $f
@@ -136,7 +140,7 @@ function Ref-Docx($f) {
 
 function Ref-Xlsx($f) {
   $name = [IO.Path]::GetFileNameWithoutExtension($f)
-  $out = Join-Path $refRoot "xlsx\$name"; New-Item -ItemType Directory -Force $out | Out-Null
+  $out = if ($OutDir) { Join-Path $OutDir $name } else { Join-Path $refRoot "xlsx\$name" }; New-Item -ItemType Directory -Force $out | Out-Null
   $wb = $null
   try {
     $wb = Open-Book $f

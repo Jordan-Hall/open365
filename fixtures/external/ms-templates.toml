@@ -1,0 +1,1362 @@
+# Microsoft template corpus manifest. Files are NOT committed; fetch with tools/corpus/fetch-ms-templates.ps1.
+# Source: Microsoft's public template catalog (create.microsoft.com). Terms: docs/research/corpus-licensing.md
+
+[[template]]
+id = "dcb1bbfe-6172-435d-bb30-3d21de287a1a"
+title = "Academic club budget"
+category = "budgets"
+kind = "xlsx"
+url = "https://createcatalog.public.onecdn.static.microsoft/catalog-assets/en-us/dcb1bbfe-6172-435d-bb30-3d21de287a1a/TFdcb1bbfe-6172-435d-bb30-3d21de287a1ad8854359_wac-ef29ea824f50.xlsx"
+sha256 = "9cbcb6f1a3241e9cbb5b6de7113a31760634271efc719dba91341d03c3028c70"
+size = 21687
+licence = "Copyright Microsoft. Downloaded from Microsoft's public template catalog for local interoperability testing only; not redistributed and not committed. See docs/research/corpus-licensing.md."
+
+[[template]]
+id = "a146c834-f9db-4f07-9545-eb00257688cb"
+title = "Basic monthly budget"
+category = "budgets"
+kind = "xlsx"
+url = "https://createcatalog.public.onecdn.static.microsoft/catalog-assets/en-us/a146c834-f9db-4f07-9545-eb00257688cb/TFa146c834-f9db-4f07-9545-eb00257688cb48bf0126_wac-b8b8ce183be8.xlsx"
+sha256 = "68156f069c9a140495dad90d1cd72557c0736dcae29d75881dee89f7419aae90"
+size = 26052
+licence = "Copyright Microsoft. Downloaded from Microsoft's public template catalog for local interoperability testing only; not redistributed and not committed. See docs/research/corpus-licensing.md."
+
+[[template]]
+id = "b0a247ff-298f-400f-9d2b-e6be95011bc1"
+title = "Basic personal budget"
+category = "budgets"
+kind = "xlsx"
+url = "https://createcatalog.public.onecdn.static.microsoft/catalog-assets/en-us/b0a247ff-298f-400f-9d2b-e6be95011bc1/TFb0a247ff-298f-400f-9d2b-e6be95011bc1ce9147e7_wac-9e4b4d89a604.xlsx"
+sha256 = "40d747fb5d9e5bd186ead97e159ccb9d09c29dc792281ef26bdcc58e3a2e86fd"
+size = 23197
+licence = "Copyright Microsoft. Downloaded from Microsoft's public template catalog for local interoperability testing only; not redistributed and not committed. See docs/research/corpus-licensing.md."
+
+[[template]]
+id = "d14f83e2-f49d-4080-9e95-0bd4849fa63f"
+title = "Business expense budget"
+category = "budgets"
+kind = "xlsx"
+url = "https://createcatalog.public.onecdn.static.microsoft/catalog-assets/en-us/d14f83e2-f49d-4080-9e95-0bd4849fa63f/TFd14f83e2-f49d-4080-9e95-0bd4849fa63f10bd17a5_wac-6d185d203a9f.xlsx"
+sha256 = "f3a462783621ea3d1280f6639c78c8ac3811e3d4229e03ac2a94c2274d51febb"
+size = 97184
+licence = "Copyright Microsoft. Downloaded from Microsoft's public template catalog for local interoperability testing only; not redistributed and not committed. See docs/research/corpus-licensing.md."
+
+[[template]]
+id = "6667de34-e27d-4c5e-8a86-151e798da560"
+title = "Channel marketing budget"
+category = "budgets"
+kind = "xlsx"
+url = "https://createcatalog.public.onecdn.static.microsoft/catalog-assets/en-us/6667de34-e27d-4c5e-8a86-151e798da560/TF6667de34-e27d-4c5e-8a86-151e798da560f18adb42_wac-0e88e74524b0.xlsx"
+sha256 = "02be3935468092abe51b1490268f83d044ffa62563eb92d4b932a7d954d9b477"
+size = 29124
+licence = "Copyright Microsoft. Downloaded from Microsoft's public template catalog for local interoperability testing only; not redistributed and not committed. See docs/research/corpus-licensing.md."
+
+[[template]]
+id = "d75b85c4-1d95-41cf-a47e-81b8c0907101"
+title = "Expense budget"
+category = "budgets"
+kind = "xlsx"
+url = "https://createcatalog.public.onecdn.static.microsoft/catalog-assets/en-us/d75b85c4-1d95-41cf-a47e-81b8c0907101/TFd75b85c4-1d95-41cf-a47e-81b8c0907101deedd032_wac-6c840c8e10f8.xlsx"
+sha256 = "6dc6a9fcbf7bebe0cae7f7d0d913651a0cc63d509db7c540baa46fa90e9d9c84"
+size = 21345
+licence = "Copyright Microsoft. Downloaded from Microsoft's public template catalog for local interoperability testing only; not redistributed and not committed. See docs/research/corpus-licensing.md."
+
+[[template]]
+id = "8eb8ecb2-3517-422f-a00d-cb63faea9048"
+title = "Household monthly budget"
+category = "budgets"
+kind = "xlsx"
+url = "https://createcatalog.public.onecdn.static.microsoft/catalog-assets/en-us/8eb8ecb2-3517-422f-a00d-cb63faea9048/TF8eb8ecb2-3517-422f-a00d-cb63faea9048916faff4_wac-6a95383e83a3.xlsx"
+sha256 = "7fe86628af6fdffa3d3321c0627210511a0baee1a73931166db1491224771b8e"
+size = 55782
+licence = "Copyright Microsoft. Downloaded from Microsoft's public template catalog for local interoperability testing only; not redistributed and not committed. See docs/research/corpus-licensing.md."
+
+[[template]]
+id = "91b9548b-6080-4dbc-bbe0-35bd56e81311"
+title = "Monthly budget"
+category = "budgets"
+kind = "xlsx"
+url = "https://createcatalog.public.onecdn.static.microsoft/catalog-assets/en-us/91b9548b-6080-4dbc-bbe0-35bd56e81311/TF91b9548b-6080-4dbc-bbe0-35bd56e81311eea35d9f_wac-7bd53a5584d9.xlsx"
+sha256 = "64b717c1d1a58da2d658904cf2e517086a920d61184fde69b7b2931e534e9965"
+size = 27229
+licence = "Copyright Microsoft. Downloaded from Microsoft's public template catalog for local interoperability testing only; not redistributed and not committed. See docs/research/corpus-licensing.md."
+
+[[template]]
+id = "1cbd5c5c-4e0d-41ba-981f-5d9dc99ffbf6"
+title = "Monthly college budget"
+category = "budgets"
+kind = "xlsx"
+url = "https://createcatalog.public.onecdn.static.microsoft/catalog-assets/en-us/1cbd5c5c-4e0d-41ba-981f-5d9dc99ffbf6/TF1cbd5c5c-4e0d-41ba-981f-5d9dc99ffbf6b91d3fbc_wac-996ed2b7e171.xlsx"
+sha256 = "3084c059181495c5f3698d832282ba0e76eaeeeadc583e9af3ffec14bdabdf77"
+size = 46339
+licence = "Copyright Microsoft. Downloaded from Microsoft's public template catalog for local interoperability testing only; not redistributed and not committed. See docs/research/corpus-licensing.md."
+
+[[template]]
+id = "94d2de40-69ce-4a0f-bce8-5a38b9cd710a"
+title = "My college budget"
+category = "budgets"
+kind = "xlsx"
+url = "https://createcatalog.public.onecdn.static.microsoft/catalog-assets/en-us/94d2de40-69ce-4a0f-bce8-5a38b9cd710a/TF94d2de40-69ce-4a0f-bce8-5a38b9cd710a6c51cfa5_wac-84c12940a5ee.xlsx"
+sha256 = "c5d9b4396f3836d870eb36d28b32d44ee3fd73b42d14449fb1e3134ac8cfb567"
+size = 31219
+licence = "Copyright Microsoft. Downloaded from Microsoft's public template catalog for local interoperability testing only; not redistributed and not committed. See docs/research/corpus-licensing.md."
+
+[[template]]
+id = "d8df692e-a5b8-41b7-8c6e-65a38009a5ab"
+title = "Personal monthly budget spreadsheet"
+category = "budgets"
+kind = "xlsx"
+url = "https://createcatalog.public.onecdn.static.microsoft/catalog-assets/en-us/d8df692e-a5b8-41b7-8c6e-65a38009a5ab/TFd8df692e-a5b8-41b7-8c6e-65a38009a5ab63eff550_wac-9f74b9e4a760.xlsx"
+sha256 = "dc74aafbdb57d4aea0af7867348af5a022445feacc7094b2788a0a4794c00ddf"
+size = 88349
+licence = "Copyright Microsoft. Downloaded from Microsoft's public template catalog for local interoperability testing only; not redistributed and not committed. See docs/research/corpus-licensing.md."
+
+[[template]]
+id = "60c5b272-ef3b-44bb-babc-c0caea29057d"
+title = "Simple annual budget"
+category = "budgets"
+kind = "xlsx"
+url = "https://createcatalog.public.onecdn.static.microsoft/catalog-assets/en-us/60c5b272-ef3b-44bb-babc-c0caea29057d/TF60c5b272-ef3b-44bb-babc-c0caea29057d2d1d62a0_wac-db5fa709ec2c.xlsx"
+sha256 = "30324a978f927c1d06bdb678b53af29aebb2d24ce3222909a89589c8baa22cab"
+size = 34347
+licence = "Copyright Microsoft. Downloaded from Microsoft's public template catalog for local interoperability testing only; not redistributed and not committed. See docs/research/corpus-licensing.md."
+
+[[template]]
+id = "b6c07597-04ed-458a-93ef-786081eb4999"
+title = "Simple personal budget"
+category = "budgets"
+kind = "xlsx"
+url = "https://createcatalog.public.onecdn.static.microsoft/catalog-assets/en-us/b6c07597-04ed-458a-93ef-786081eb4999/TFb6c07597-04ed-458a-93ef-786081eb4999816a6dd5_wac-ad6248cb157d.xlsx"
+sha256 = "3cf9b1afb6359a9603951ea8dd2300d128d03fb1b8a81475796ba8ad3b007b1a"
+size = 41769
+licence = "Copyright Microsoft. Downloaded from Microsoft's public template catalog for local interoperability testing only; not redistributed and not committed. See docs/research/corpus-licensing.md."
+
+[[template]]
+id = "142337c5-35f0-4e42-ab85-0643840d738c"
+title = "Website budget"
+category = "budgets"
+kind = "xlsx"
+url = "https://createcatalog.public.onecdn.static.microsoft/catalog-assets/en-us/142337c5-35f0-4e42-ab85-0643840d738c/TF142337c5-35f0-4e42-ab85-0643840d738cc294162e_wac-5de1b9d4193f.xlsx"
+sha256 = "d13be03b89b75ff8fe08ec6424cabc282227c4598b1c26fc6ab2262cb26d7de2"
+size = 25317
+licence = "Copyright Microsoft. Downloaded from Microsoft's public template catalog for local interoperability testing only; not redistributed and not committed. See docs/research/corpus-licensing.md."
+
+[[template]]
+id = "220529be-9f6e-483a-88f5-703eff93a9e7"
+title = "Any year at a glance calendar (portrait)"
+category = "calendars"
+kind = "xlsx"
+url = "https://createcatalog.public.onecdn.static.microsoft/catalog-assets/en-us/220529be-9f6e-483a-88f5-703eff93a9e7/TF220529be-9f6e-483a-88f5-703eff93a9e72a9efa89_wac-409ee611066f.xlsx"
+sha256 = "4d4219d64c485718ae2b4e0f4fb7e98dacb2b723527982ed6d985152511b351f"
+size = 26734
+licence = "Copyright Microsoft. Downloaded from Microsoft's public template catalog for local interoperability testing only; not redistributed and not committed. See docs/research/corpus-licensing.md."
+
+[[template]]
+id = "b1eea1e2-2c33-4a7b-bf0f-b9e2f88f1d6e"
+title = "Any year calendar (ion theme)"
+category = "calendars"
+kind = "xlsx"
+url = "https://createcatalog.public.onecdn.static.microsoft/catalog-assets/en-us/b1eea1e2-2c33-4a7b-bf0f-b9e2f88f1d6e/TFb1eea1e2-2c33-4a7b-bf0f-b9e2f88f1d6ef3e03fc5_wac-52febb4cf7e6.xlsx"
+sha256 = "1eb67b4f73b9f5d8f4df280aa51a135383a7c251984a6daf6d3ac06d9027089e"
+size = 1224370
+licence = "Copyright Microsoft. Downloaded from Microsoft's public template catalog for local interoperability testing only; not redistributed and not committed. See docs/research/corpus-licensing.md."
+
+[[template]]
+id = "90e1e4c9-80f7-4176-986d-c73167e6c0f0"
+title = "Any year custom calendar"
+category = "calendars"
+kind = "xlsx"
+url = "https://createcatalog.public.onecdn.static.microsoft/catalog-assets/en-us/90e1e4c9-80f7-4176-986d-c73167e6c0f0/TF90e1e4c9-80f7-4176-986d-c73167e6c0f0a51d8282_wac-a57fa61b4ded.xlsx"
+sha256 = "9e10b2ae0c09d2e76e72ce83722eaece68d13d1f84580d119cc4e30f97dc48bd"
+size = 104841
+licence = "Copyright Microsoft. Downloaded from Microsoft's public template catalog for local interoperability testing only; not redistributed and not committed. See docs/research/corpus-licensing.md."
+
+[[template]]
+id = "14a0058b-54c0-4793-b5e1-7d438e7bf2c2"
+title = "Playful calendar for any year"
+category = "calendars"
+kind = "xlsx"
+url = "https://createcatalog.public.onecdn.static.microsoft/catalog-assets/en-us/14a0058b-54c0-4793-b5e1-7d438e7bf2c2/TF14a0058b-54c0-4793-b5e1-7d438e7bf2c2adfc3c53_wac-f426c94eec06.xlsx"
+sha256 = "8677d7a90b106a6ed22bfdb0858f545e091385ef33d4e5362a7650c9ea9e06c0"
+size = 123400
+licence = "Copyright Microsoft. Downloaded from Microsoft's public template catalog for local interoperability testing only; not redistributed and not committed. See docs/research/corpus-licensing.md."
+
+[[template]]
+id = "f5e29f68-524f-4e52-9b09-e68871fc720b"
+title = "Student calendar (Mon)"
+category = "calendars"
+kind = "xlsx"
+url = "https://createcatalog.public.onecdn.static.microsoft/catalog-assets/en-us/f5e29f68-524f-4e52-9b09-e68871fc720b/TFf5e29f68-524f-4e52-9b09-e68871fc720b7ba5afa6_wac-497e6673409f.xlsx"
+sha256 = "e3dddf4b4107b3c80c8d5c504d6b616d10bac4e2a627cafa4b7282b7a3bebdb1"
+size = 92631
+licence = "Copyright Microsoft. Downloaded from Microsoft's public template catalog for local interoperability testing only; not redistributed and not committed. See docs/research/corpus-licensing.md."
+
+[[template]]
+id = "b795847d-eab5-40e7-b041-63c454160fc7"
+title = "Baby growth chart"
+category = "charts"
+kind = "xlsx"
+url = "https://createcatalog.public.onecdn.static.microsoft/catalog-assets/en-us/b795847d-eab5-40e7-b041-63c454160fc7/TFb795847d-eab5-40e7-b041-63c454160fc754372033_wac-473edf5b0259.xlsx"
+sha256 = "bb9cd67281ce6244590645887397865502e35e84e037e8b6a37645db41d77079"
+size = 85109
+licence = "Copyright Microsoft. Downloaded from Microsoft's public template catalog for local interoperability testing only; not redistributed and not committed. See docs/research/corpus-licensing.md."
+
+[[template]]
+id = "86466670-3e9e-4baa-a47b-7ddd073708d0"
+title = "Check register with chart"
+category = "charts"
+kind = "xlsx"
+url = "https://createcatalog.public.onecdn.static.microsoft/catalog-assets/en-us/86466670-3e9e-4baa-a47b-7ddd073708d0/TF86466670-3e9e-4baa-a47b-7ddd073708d0b0a09420_wac-0f3732a6279a.xlsx"
+sha256 = "4becb8a0fee930466d1865e9f418d6d169050da24a635e356ab0a79e1e5d2c29"
+size = 347253
+licence = "Copyright Microsoft. Downloaded from Microsoft's public template catalog for local interoperability testing only; not redistributed and not committed. See docs/research/corpus-licensing.md."
+
+[[template]]
+id = "f79af0fb-8ddb-4dfa-aae1-22f8ae7de1e3"
+title = "Cost analysis with Pareto chart"
+category = "charts"
+kind = "xlsx"
+url = "https://createcatalog.public.onecdn.static.microsoft/catalog-assets/en-us/f79af0fb-8ddb-4dfa-aae1-22f8ae7de1e3/TFf79af0fb-8ddb-4dfa-aae1-22f8ae7de1e3749e84e8_wac-4ddf47a82b8d.xlsx"
+sha256 = "7db5ef692b118cc795f2f2592a9520b4edc2be1584b4192588f68a1288b419c7"
+size = 54960
+licence = "Copyright Microsoft. Downloaded from Microsoft's public template catalog for local interoperability testing only; not redistributed and not committed. See docs/research/corpus-licensing.md."
+
+[[template]]
+id = "9d91ef48-a0d0-41b8-9ae0-4d9b6033dd6e"
+title = "Manufacturer defect analysis"
+category = "charts"
+kind = "xlsx"
+url = "https://createcatalog.public.onecdn.static.microsoft/catalog-assets/en-us/9d91ef48-a0d0-41b8-9ae0-4d9b6033dd6e/TF9d91ef48-a0d0-41b8-9ae0-4d9b6033dd6e1b88fa2d_wac-0a953b130bae.xlsx"
+sha256 = "53db27eacf3b981312323fbf5399074a6ca45782e95e8dd0790480d2a7d02c1d"
+size = 94995
+licence = "Copyright Microsoft. Downloaded from Microsoft's public template catalog for local interoperability testing only; not redistributed and not committed. See docs/research/corpus-licensing.md."
+
+[[template]]
+id = "09eef93c-0551-4864-9f87-312b1e0b1eb2"
+title = "Manufacturing output chart"
+category = "charts"
+kind = "xlsx"
+url = "https://createcatalog.public.onecdn.static.microsoft/catalog-assets/en-us/09eef93c-0551-4864-9f87-312b1e0b1eb2/TF09eef93c-0551-4864-9f87-312b1e0b1eb258f03578_wac-49881a630475.xlsx"
+sha256 = "88570318286c81a015fc73d25c9db6816c2e3adbcf06fc8f3c1e8b413297fc41"
+size = 23284
+licence = "Copyright Microsoft. Downloaded from Microsoft's public template catalog for local interoperability testing only; not redistributed and not committed. See docs/research/corpus-licensing.md."
+
+[[template]]
+id = "6abb6cbd-cdaa-4f51-af17-796e15ea9c80"
+title = "Milestone and task project timeline"
+category = "charts"
+kind = "xlsx"
+url = "https://createcatalog.public.onecdn.static.microsoft/catalog-assets/en-us/6abb6cbd-cdaa-4f51-af17-796e15ea9c80/TF6abb6cbd-cdaa-4f51-af17-796e15ea9c8086cb24c1_wac-159c465b6930.xlsx"
+sha256 = "24f1e8f18fd340f54c68b7c47b2c5e390e84ed6e7fdf37800ce08d368e4309bb"
+size = 25943
+licence = "Copyright Microsoft. Downloaded from Microsoft's public template catalog for local interoperability testing only; not redistributed and not committed. See docs/research/corpus-licensing.md."
+
+[[template]]
+id = "ab449fed-18a0-4af2-844b-0beecceecf83"
+title = "Org charts (visual)"
+category = "charts"
+kind = "xlsx"
+url = "https://createcatalog.public.onecdn.static.microsoft/catalog-assets/en-us/ab449fed-18a0-4af2-844b-0beecceecf83/TFab449fed-18a0-4af2-844b-0beecceecf83f8c7631e_wac-ad915be403f2.xlsx"
+sha256 = "248d1dcfb767bb2c07f0e155da6277c42a3ff6b5aded5ea29f911e99e7771f06"
+size = 33758
+licence = "Copyright Microsoft. Downloaded from Microsoft's public template catalog for local interoperability testing only; not redistributed and not committed. See docs/research/corpus-licensing.md."
+
+[[template]]
+id = "4eec2072-a2d7-43fe-baa2-1cc1ee4e84cc"
+title = "Problem analysis with Pareto chart"
+category = "charts"
+kind = "xlsx"
+url = "https://createcatalog.public.onecdn.static.microsoft/catalog-assets/en-us/4eec2072-a2d7-43fe-baa2-1cc1ee4e84cc/TF4eec2072-a2d7-43fe-baa2-1cc1ee4e84cc93acfb9a_wac-bdb0a94d473e.xlsx"
+sha256 = "11058329e2942081d4406c0fb8b1c3ed232c1ba58c293b2b7d55a85d5d11300b"
+size = 22598
+licence = "Copyright Microsoft. Downloaded from Microsoft's public template catalog for local interoperability testing only; not redistributed and not committed. See docs/research/corpus-licensing.md."
+
+[[template]]
+id = "1ed52567-f187-484c-8bad-0ff5eb2f1e22"
+title = "Regional sales chart"
+category = "charts"
+kind = "xlsx"
+url = "https://createcatalog.public.onecdn.static.microsoft/catalog-assets/en-us/1ed52567-f187-484c-8bad-0ff5eb2f1e22/TF1ed52567-f187-484c-8bad-0ff5eb2f1e22bbe82ea9_wac-8420722240d4.xlsx"
+sha256 = "cb9eb69038b4d3cecb475ca11987d3c86fd2661df37e513788315cdc4e5d4786"
+size = 23419
+licence = "Copyright Microsoft. Downloaded from Microsoft's public template catalog for local interoperability testing only; not redistributed and not committed. See docs/research/corpus-licensing.md."
+
+[[template]]
+id = "098a0353-643d-4b2e-9eac-ea919d7f3361"
+title = "Run chart"
+category = "charts"
+kind = "xlsx"
+url = "https://createcatalog.public.onecdn.static.microsoft/catalog-assets/en-us/098a0353-643d-4b2e-9eac-ea919d7f3361/TF098a0353-643d-4b2e-9eac-ea919d7f3361c7bafa77_wac-f13238602ab3.xlsx"
+sha256 = "cb7476ea0e9f88573675a465599388586ff549b0b2816c3cc5ca0cc223017050"
+size = 25098
+licence = "Copyright Microsoft. Downloaded from Microsoft's public template catalog for local interoperability testing only; not redistributed and not committed. See docs/research/corpus-licensing.md."
+
+[[template]]
+id = "1c4bd473-9f92-4725-926d-3f198b6152b4"
+title = "Sales pipeline"
+category = "charts"
+kind = "xlsx"
+url = "https://createcatalog.public.onecdn.static.microsoft/catalog-assets/en-us/1c4bd473-9f92-4725-926d-3f198b6152b4/TF1c4bd473-9f92-4725-926d-3f198b6152b4e98ec321_wac-f53f9d8c8aa1.xlsx"
+sha256 = "aec5701315c1cc447ac46eb6a6f31183785b9a80c3715812c239c813b8e46981"
+size = 24019
+licence = "Copyright Microsoft. Downloaded from Microsoft's public template catalog for local interoperability testing only; not redistributed and not committed. See docs/research/corpus-licensing.md."
+
+[[template]]
+id = "4bf6b793-490f-4623-84ca-c9c6251a91fc"
+title = "Simple Gantt chart"
+category = "charts"
+kind = "xlsx"
+url = "https://createcatalog.public.onecdn.static.microsoft/catalog-assets/en-us/4bf6b793-490f-4623-84ca-c9c6251a91fc/TF4bf6b793-490f-4623-84ca-c9c6251a91fcccfc8a17_wac-90da771544e0.xlsx"
+sha256 = "d65b8377a4209154a99d5861efca8f0341ba480afd073bfd47f2730eb9d8f7ea"
+size = 36798
+licence = "Copyright Microsoft. Downloaded from Microsoft's public template catalog for local interoperability testing only; not redistributed and not committed. See docs/research/corpus-licensing.md."
+
+[[template]]
+id = "8c4be8ed-3202-4365-acfd-63ea7c279aeb"
+title = "Social media engagement data"
+category = "charts"
+kind = "xlsx"
+url = "https://createcatalog.public.onecdn.static.microsoft/catalog-assets/en-us/8c4be8ed-3202-4365-acfd-63ea7c279aeb/TF8c4be8ed-3202-4365-acfd-63ea7c279aeb02a72943_wac-bcda87e1fc4b.xlsx"
+sha256 = "cfa1cb18d8af413076c5caeafdb7626a4f0e45aaee04c8f37eb79ec998f2fe7d"
+size = 23198
+licence = "Copyright Microsoft. Downloaded from Microsoft's public template catalog for local interoperability testing only; not redistributed and not committed. See docs/research/corpus-licensing.md."
+
+[[template]]
+id = "cc8f8a79-96c3-4a3f-9398-5fdcfa9b27e9"
+title = "Sales invoice (simple lines design)"
+category = "invoices"
+kind = "xlsx"
+url = "https://createcatalog.public.onecdn.static.microsoft/catalog-assets/en-us/cc8f8a79-96c3-4a3f-9398-5fdcfa9b27e9/TFcc8f8a79-96c3-4a3f-9398-5fdcfa9b27e93382434e_wac-6d730e0d4479.xlsx"
+sha256 = "ce9db918197187f4095235464337fb5214cd19b748874c99e3723c7e8e3efd54"
+size = 20398
+licence = "Copyright Microsoft. Downloaded from Microsoft's public template catalog for local interoperability testing only; not redistributed and not committed. See docs/research/corpus-licensing.md."
+
+[[template]]
+id = "02f1e98d-bd90-4353-a769-f6709a432f3c"
+title = "Service invoice (blocky design)"
+category = "invoices"
+kind = "xlsx"
+url = "https://createcatalog.public.onecdn.static.microsoft/catalog-assets/en-us/02f1e98d-bd90-4353-a769-f6709a432f3c/TF02f1e98d-bd90-4353-a769-f6709a432f3cd3bc8094_wac-63f46fd0b36b.xlsx"
+sha256 = "e99df8c93e226f94eb9ff4f2a7ea1af88bba37ffa59089d9016af7a9056ad764"
+size = 19214
+licence = "Copyright Microsoft. Downloaded from Microsoft's public template catalog for local interoperability testing only; not redistributed and not committed. See docs/research/corpus-licensing.md."
+
+[[template]]
+id = "cc4028ec-32a3-4310-9127-8050fd0e7c05"
+title = "Service invoice (simple design)"
+category = "invoices"
+kind = "xlsx"
+url = "https://createcatalog.public.onecdn.static.microsoft/catalog-assets/en-us/cc4028ec-32a3-4310-9127-8050fd0e7c05/TFcc4028ec-32a3-4310-9127-8050fd0e7c05a0895eaf_wac-c083bc5ab7fa.xlsx"
+sha256 = "3340fe0a8b583badda054a7c625a8890872e2c5f5a87909e5085c22446ad94dd"
+size = 22309
+licence = "Copyright Microsoft. Downloaded from Microsoft's public template catalog for local interoperability testing only; not redistributed and not committed. See docs/research/corpus-licensing.md."
+
+[[template]]
+id = "94db67f1-b638-4ed2-a9a2-e77a9221d8db"
+title = "Simple business invoice"
+category = "invoices"
+kind = "xlsx"
+url = "https://createcatalog.public.onecdn.static.microsoft/catalog-assets/en-us/94db67f1-b638-4ed2-a9a2-e77a9221d8db/TF94db67f1-b638-4ed2-a9a2-e77a9221d8db3794e846_wac-fe962b22011d.xlsx"
+sha256 = "b3fed0103224031313137c03b5040fd037991f2d9018dc97bb1750afde245147"
+size = 19838
+licence = "Copyright Microsoft. Downloaded from Microsoft's public template catalog for local interoperability testing only; not redistributed and not committed. See docs/research/corpus-licensing.md."
+
+[[template]]
+id = "7c5c0318-8bc0-4ec9-8be3-2683dbf8adae"
+title = "Simple invoice"
+category = "invoices"
+kind = "xlsx"
+url = "https://createcatalog.public.onecdn.static.microsoft/catalog-assets/en-us/7c5c0318-8bc0-4ec9-8be3-2683dbf8adae/TF7c5c0318-8bc0-4ec9-8be3-2683dbf8adae007ae15d_wac-0fed86f99f5b.xlsx"
+sha256 = "3d0991a6af168d47e027bfacd7c61248625015b6308c66904ce294c6dcd6d4af"
+size = 36860
+licence = "Copyright Microsoft. Downloaded from Microsoft's public template catalog for local interoperability testing only; not redistributed and not committed. See docs/research/corpus-licensing.md."
+
+[[template]]
+id = "ba55235e-4140-4e28-abf8-bb45d8db4934"
+title = "Small business sales invoice"
+category = "invoices"
+kind = "xlsx"
+url = "https://createcatalog.public.onecdn.static.microsoft/catalog-assets/en-us/ba55235e-4140-4e28-abf8-bb45d8db4934/TFba55235e-4140-4e28-abf8-bb45d8db4934ab497ff2_wac-d6f69b616e09.xlsx"
+sha256 = "26f8fef7d6d7acac95816a480cff54c17825e2dd1122fac946de130f1fe2607e"
+size = 33770
+licence = "Copyright Microsoft. Downloaded from Microsoft's public template catalog for local interoperability testing only; not redistributed and not committed. See docs/research/corpus-licensing.md."
+
+[[template]]
+id = "e93a3c0c-ed4b-4c33-98b7-73b82ffa6397"
+title = "ATS finance cover letter"
+category = "letters"
+kind = "docx"
+url = "https://createcatalog.public.onecdn.static.microsoft/catalog-assets/en-us/e93a3c0c-ed4b-4c33-98b7-73b82ffa6397/TFe93a3c0c-ed4b-4c33-98b7-73b82ffa63973be95e49_wac-b09ed4e73b45.docx"
+sha256 = "a2290723173a7aaeb9d88ae2ff87d41e6ca30852c414356f198c35c7eb401c77"
+size = 24848
+licence = "Copyright Microsoft. Downloaded from Microsoft's public template catalog for local interoperability testing only; not redistributed and not committed. See docs/research/corpus-licensing.md."
+
+[[template]]
+id = "938d0510-ae51-479a-98d3-6a9fe5ba8c9f"
+title = "ATS healthcare cover letter"
+category = "letters"
+kind = "docx"
+url = "https://createcatalog.public.onecdn.static.microsoft/catalog-assets/en-us/938d0510-ae51-479a-98d3-6a9fe5ba8c9f/TF938d0510-ae51-479a-98d3-6a9fe5ba8c9f2dfc8656_wac-c1d75b3fcf40.docx"
+sha256 = "ee4a73db06467a02a7ff53d4311a91e214733dae0971e0a4b8433c388ae46cef"
+size = 5719492
+licence = "Copyright Microsoft. Downloaded from Microsoft's public template catalog for local interoperability testing only; not redistributed and not committed. See docs/research/corpus-licensing.md."
+
+[[template]]
+id = "e5418ab0-a274-4997-b880-24230d938372"
+title = "ATS simple classic cover letter"
+category = "letters"
+kind = "docx"
+url = "https://createcatalog.public.onecdn.static.microsoft/catalog-assets/en-us/e5418ab0-a274-4997-b880-24230d938372/TFe5418ab0-a274-4997-b880-24230d93837244b4c5ee_wac-b269760ac20c.docx"
+sha256 = "4f057b6b26027336314e8b1a0fb0144967efcdb69552b0c962a2c55ae5aa85bd"
+size = 46932
+licence = "Copyright Microsoft. Downloaded from Microsoft's public template catalog for local interoperability testing only; not redistributed and not committed. See docs/research/corpus-licensing.md."
+
+[[template]]
+id = "1907b7c8-c14a-492f-a2d5-9dbf1d4f4b0d"
+title = "ATS stylish accounting cover letter"
+category = "letters"
+kind = "docx"
+url = "https://createcatalog.public.onecdn.static.microsoft/catalog-assets/en-us/1907b7c8-c14a-492f-a2d5-9dbf1d4f4b0d/TF1907b7c8-c14a-492f-a2d5-9dbf1d4f4b0de8eb85c2_wac-8e26c058836b.docx"
+sha256 = "9e1e9c3fa07af9ef27e2aa867d013d1b4d42b843706f8b21152d9f91a70fe548"
+size = 25089
+licence = "Copyright Microsoft. Downloaded from Microsoft's public template catalog for local interoperability testing only; not redistributed and not committed. See docs/research/corpus-licensing.md."
+
+[[template]]
+id = "5559888d-e34b-4ae1-9505-bfe741291f71"
+title = "Bold food service cover letter"
+category = "letters"
+kind = "docx"
+url = "https://createcatalog.public.onecdn.static.microsoft/catalog-assets/en-us/5559888d-e34b-4ae1-9505-bfe741291f71/TF5559888d-e34b-4ae1-9505-bfe741291f7136cca8fd_wac-4cb2b01aaf07.docx"
+sha256 = "c8a0cb60377ed00bb0c0ae96fd078efc6288c2136a06a9b95a6feefb81425c03"
+size = 45939
+licence = "Copyright Microsoft. Downloaded from Microsoft's public template catalog for local interoperability testing only; not redistributed and not committed. See docs/research/corpus-licensing.md."
+
+[[template]]
+id = "c0651bb6-b39b-4919-91c4-1b031ad4dc0c"
+title = "Bold nursing cover letter"
+category = "letters"
+kind = "docx"
+url = "https://createcatalog.public.onecdn.static.microsoft/catalog-assets/en-us/c0651bb6-b39b-4919-91c4-1b031ad4dc0c/TFc0651bb6-b39b-4919-91c4-1b031ad4dc0c7b68c311_wac-5b6e6f6f8e7c.docx"
+sha256 = "fc5bb565f3f8e678a31051b304c174bdec9b266228b6d6813507ef6e1a186e1f"
+size = 230579
+licence = "Copyright Microsoft. Downloaded from Microsoft's public template catalog for local interoperability testing only; not redistributed and not committed. See docs/research/corpus-licensing.md."
+
+[[template]]
+id = "04bbacdc-34ff-4b89-ab9e-e5503f74b32a"
+title = "Elegant graphic design cover letter"
+category = "letters"
+kind = "docx"
+url = "https://createcatalog.public.onecdn.static.microsoft/catalog-assets/en-us/04bbacdc-34ff-4b89-ab9e-e5503f74b32a/TF04bbacdc-34ff-4b89-ab9e-e5503f74b32ac0910878_wac-51d285202be6.docx"
+sha256 = "f09121bddecae099805f6e0c3da91edb08ca5bb82c846b42b85341c36cbf2ac4"
+size = 43705
+licence = "Copyright Microsoft. Downloaded from Microsoft's public template catalog for local interoperability testing only; not redistributed and not committed. See docs/research/corpus-licensing.md."
+
+[[template]]
+id = "1dd4b3a8-9564-4143-813b-da0628316a8c"
+title = "Geometric cover letter"
+category = "letters"
+kind = "docx"
+url = "https://createcatalog.public.onecdn.static.microsoft/catalog-assets/en-us/1dd4b3a8-9564-4143-813b-da0628316a8c/TF1dd4b3a8-9564-4143-813b-da0628316a8cc224a050_wac-21c2e51b8da3.docx"
+sha256 = "5748ad0aed5fa9924e10941954543428fc5f5d2dfa73fb8e36dd2961fa945889"
+size = 84289
+licence = "Copyright Microsoft. Downloaded from Microsoft's public template catalog for local interoperability testing only; not redistributed and not committed. See docs/research/corpus-licensing.md."
+
+[[template]]
+id = "5c624cb4-bcf0-433e-8d06-329ca778a50b"
+title = "Modern UI/UX designer cover letter"
+category = "letters"
+kind = "docx"
+url = "https://createcatalog.public.onecdn.static.microsoft/catalog-assets/en-us/5c624cb4-bcf0-433e-8d06-329ca778a50b/TF5c624cb4-bcf0-433e-8d06-329ca778a50b88d4ca01_wac-15cd582a67a6.docx"
+sha256 = "6cd150fbf1a568297a8f6c6b53336546bd513e4b50798032fdbc115594ed8c20"
+size = 61578
+licence = "Copyright Microsoft. Downloaded from Microsoft's public template catalog for local interoperability testing only; not redistributed and not committed. See docs/research/corpus-licensing.md."
+
+[[template]]
+id = "6158e9a0-e929-469e-b015-c5d218807bf2"
+title = "Playful business cover letter"
+category = "letters"
+kind = "docx"
+url = "https://createcatalog.public.onecdn.static.microsoft/catalog-assets/en-us/6158e9a0-e929-469e-b015-c5d218807bf2/TF6158e9a0-e929-469e-b015-c5d218807bf207de5c44_wac-e3b3318f230f.docx"
+sha256 = "d794edfb05cd5463f561074bb30b699679acfc533aef9a49a03d1cc24e0fb717"
+size = 817330
+licence = "Copyright Microsoft. Downloaded from Microsoft's public template catalog for local interoperability testing only; not redistributed and not committed. See docs/research/corpus-licensing.md."
+
+[[template]]
+id = "4f837650-9a96-434c-839f-bb412db5f497"
+title = "Playful letterhead"
+category = "letters"
+kind = "docx"
+url = "https://createcatalog.public.onecdn.static.microsoft/catalog-assets/en-us/4f837650-9a96-434c-839f-bb412db5f497/TF4f837650-9a96-434c-839f-bb412db5f497fc7235ca_wac-997307308f9e.docx"
+sha256 = "cf6ceb30cec2471e974c66498dc56664b2f8a1615c4dfc41c7a962f248a5a0a3"
+size = 98490
+licence = "Copyright Microsoft. Downloaded from Microsoft's public template catalog for local interoperability testing only; not redistributed and not committed. See docs/research/corpus-licensing.md."
+
+[[template]]
+id = "164be44f-892e-4713-b71c-e27c99934606"
+title = "Simple ATS healthcare cover letter"
+category = "letters"
+kind = "docx"
+url = "https://createcatalog.public.onecdn.static.microsoft/catalog-assets/en-us/164be44f-892e-4713-b71c-e27c99934606/TF164be44f-892e-4713-b71c-e27c99934606a1e69a83_wac-1ea56f7f6808.docx"
+sha256 = "a69d1e6ba3325c46c9040d98e45fa650900fba938977c9d160e61f5b6cbb51bc"
+size = 30039
+licence = "Copyright Microsoft. Downloaded from Microsoft's public template catalog for local interoperability testing only; not redistributed and not committed. See docs/research/corpus-licensing.md."
+
+[[template]]
+id = "91c3b989-adc7-42c3-99c5-6d8c7f3a5c0a"
+title = "Simple UI/UX designer cover letter"
+category = "letters"
+kind = "docx"
+url = "https://createcatalog.public.onecdn.static.microsoft/catalog-assets/en-us/91c3b989-adc7-42c3-99c5-6d8c7f3a5c0a/TF91c3b989-adc7-42c3-99c5-6d8c7f3a5c0a96fe9f4d_wac-b743f74833e5.docx"
+sha256 = "4bf01364decdf7d82acae55b78e9fc8060932b54cd0f0779dd566a2740f2ad8a"
+size = 81404
+licence = "Copyright Microsoft. Downloaded from Microsoft's public template catalog for local interoperability testing only; not redistributed and not committed. See docs/research/corpus-licensing.md."
+
+[[template]]
+id = "e41daea3-53c8-4ab5-9e9c-c7837b7c95cd"
+title = "Stylish teaching cover letter"
+category = "letters"
+kind = "docx"
+url = "https://createcatalog.public.onecdn.static.microsoft/catalog-assets/en-us/e41daea3-53c8-4ab5-9e9c-c7837b7c95cd/TFe41daea3-53c8-4ab5-9e9c-c7837b7c95cd693ce7f6_wac-4560152b6192.docx"
+sha256 = "5c2565a3a8fed2de36125ddcb9d1c8d72695b247f74ca136a7a8fba4e1e050f6"
+size = 3124788
+licence = "Copyright Microsoft. Downloaded from Microsoft's public template catalog for local interoperability testing only; not redistributed and not committed. See docs/research/corpus-licensing.md."
+
+[[template]]
+id = "463abd5c-3d84-43d5-baac-0a41cfac14d3"
+title = "Architecture newsletter"
+category = "newsletters"
+kind = "docx"
+url = "https://createcatalog.public.onecdn.static.microsoft/catalog-assets/en-us/463abd5c-3d84-43d5-baac-0a41cfac14d3/TF463abd5c-3d84-43d5-baac-0a41cfac14d355a1f33c_wac-d3687719b3e8.docx"
+sha256 = "b727ec90432795939c2fbbc403479f69f18da866c9995eb2e5dcee2bc10c6058"
+size = 5509802
+licence = "Copyright Microsoft. Downloaded from Microsoft's public template catalog for local interoperability testing only; not redistributed and not committed. See docs/research/corpus-licensing.md."
+
+[[template]]
+id = "7fc3ccc4-5d2f-4656-a0a3-eaf00540c4b4"
+title = "Back to school newsletter"
+category = "newsletters"
+kind = "docx"
+url = "https://createcatalog.public.onecdn.static.microsoft/catalog-assets/en-us/7fc3ccc4-5d2f-4656-a0a3-eaf00540c4b4/TF7fc3ccc4-5d2f-4656-a0a3-eaf00540c4b4a4803369_wac-8ffd735fbe72.docx"
+sha256 = "675a36a4b2e1a5c8918ed9e8e95cf0f87fcd862d3cf0b60e83b0e63ed5ad7641"
+size = 991731
+licence = "Copyright Microsoft. Downloaded from Microsoft's public template catalog for local interoperability testing only; not redistributed and not committed. See docs/research/corpus-licensing.md."
+
+[[template]]
+id = "741ee369-f6fc-40a7-8969-ddaee72c0442"
+title = "Classroom newsletter"
+category = "newsletters"
+kind = "docx"
+url = "https://createcatalog.public.onecdn.static.microsoft/catalog-assets/en-us/741ee369-f6fc-40a7-8969-ddaee72c0442/TF741ee369-f6fc-40a7-8969-ddaee72c04428b4d4ab4_wac-6cd97d2122ca.docx"
+sha256 = "7ddbaea3c06b2f38288ff7143de1226984052103d509cf5e3ca4a3924c6035ca"
+size = 231323
+licence = "Copyright Microsoft. Downloaded from Microsoft's public template catalog for local interoperability testing only; not redistributed and not committed. See docs/research/corpus-licensing.md."
+
+[[template]]
+id = "0a90ca9d-f486-4165-81d8-f92784cb975b"
+title = "College newsletter"
+category = "newsletters"
+kind = "docx"
+url = "https://createcatalog.public.onecdn.static.microsoft/catalog-assets/en-us/0a90ca9d-f486-4165-81d8-f92784cb975b/TF0a90ca9d-f486-4165-81d8-f92784cb975b40638653_wac-2cea6aa2841f.docx"
+sha256 = "99f0e6fc3d457f4c6e8a32b0478bf827ba3b5d8e086af0ab97ad422d8a7d3995"
+size = 4402691
+licence = "Copyright Microsoft. Downloaded from Microsoft's public template catalog for local interoperability testing only; not redistributed and not committed. See docs/research/corpus-licensing.md."
+
+[[template]]
+id = "371fe1a1-54c3-477c-9fb2-1b14c284b079"
+title = "Corporate newsletter"
+category = "newsletters"
+kind = "docx"
+url = "https://createcatalog.public.onecdn.static.microsoft/catalog-assets/en-us/371fe1a1-54c3-477c-9fb2-1b14c284b079/TF371fe1a1-54c3-477c-9fb2-1b14c284b07930e7914f_wac-5853d426b899.docx"
+sha256 = "40f405ac54d358ad639d8b4b593ca201f93fa1017d82548965d64cb948738c2a"
+size = 232977
+licence = "Copyright Microsoft. Downloaded from Microsoft's public template catalog for local interoperability testing only; not redistributed and not committed. See docs/research/corpus-licensing.md."
+
+[[template]]
+id = "fd5e4022-7fee-46b1-b7bd-65f6f26bdbd4"
+title = "Family Christmas newsletter"
+category = "newsletters"
+kind = "docx"
+url = "https://createcatalog.public.onecdn.static.microsoft/catalog-assets/en-us/fd5e4022-7fee-46b1-b7bd-65f6f26bdbd4/TFfd5e4022-7fee-46b1-b7bd-65f6f26bdbd4d188b9c1_wac-7547da5b15d8.docx"
+sha256 = "11fd9bfbacea76279d9eaf307cb5ed87a130c06371b566c9620ff5a23d88b7ae"
+size = 1657109
+licence = "Copyright Microsoft. Downloaded from Microsoft's public template catalog for local interoperability testing only; not redistributed and not committed. See docs/research/corpus-licensing.md."
+
+[[template]]
+id = "a2a7720e-9d4b-4ea1-8ace-6f8064829d23"
+title = "Handy-person newsletter"
+category = "newsletters"
+kind = "docx"
+url = "https://createcatalog.public.onecdn.static.microsoft/catalog-assets/en-us/a2a7720e-9d4b-4ea1-8ace-6f8064829d23/TFa2a7720e-9d4b-4ea1-8ace-6f8064829d2388a2ec74_wac-98d156dd1b0c.docx"
+sha256 = "15ba280d2cf093fccb71ccbab89c12846ee5e1e3f80cdbdb8e74ecbd830fa160"
+size = 247831
+licence = "Copyright Microsoft. Downloaded from Microsoft's public template catalog for local interoperability testing only; not redistributed and not committed. See docs/research/corpus-licensing.md."
+
+[[template]]
+id = "b72b748c-ce40-4de7-8c0b-f2ae9b669eeb"
+title = "Landscaping newsletter"
+category = "newsletters"
+kind = "docx"
+url = "https://createcatalog.public.onecdn.static.microsoft/catalog-assets/en-us/b72b748c-ce40-4de7-8c0b-f2ae9b669eeb/TFb72b748c-ce40-4de7-8c0b-f2ae9b669eeb327b8f5e_wac-eded3b46056f.docx"
+sha256 = "3adc0b57ff716fc7523499e866c33bcf5c09cbe24bda2c4acf3eb87cd4350e3b"
+size = 552929
+licence = "Copyright Microsoft. Downloaded from Microsoft's public template catalog for local interoperability testing only; not redistributed and not committed. See docs/research/corpus-licensing.md."
+
+[[template]]
+id = "65cf689e-03c5-47f2-80bf-a489d7b9d54e"
+title = "Lifestyle newspaper"
+category = "newsletters"
+kind = "docx"
+url = "https://createcatalog.public.onecdn.static.microsoft/catalog-assets/en-us/65cf689e-03c5-47f2-80bf-a489d7b9d54e/TF65cf689e-03c5-47f2-80bf-a489d7b9d54e03ddb7bf_wac-329a931a3f0b.docx"
+sha256 = "f4358194d37cb1adb100331214b136a7d20906d839409358b7cc1d74f8b14873"
+size = 2540098
+licence = "Copyright Microsoft. Downloaded from Microsoft's public template catalog for local interoperability testing only; not redistributed and not committed. See docs/research/corpus-licensing.md."
+
+[[template]]
+id = "b0e9c2cf-5846-4100-b673-e7322a90f1e2"
+title = "My daily journal"
+category = "newsletters"
+kind = "docx"
+url = "https://createcatalog.public.onecdn.static.microsoft/catalog-assets/en-us/b0e9c2cf-5846-4100-b673-e7322a90f1e2/TFb0e9c2cf-5846-4100-b673-e7322a90f1e296063c52_wac-2c02b420af07.docx"
+sha256 = "ba715dfd623789cb378dff7426aa2a11c4a3e9aa2ce88799d3d77fbd671443d8"
+size = 214538
+licence = "Copyright Microsoft. Downloaded from Microsoft's public template catalog for local interoperability testing only; not redistributed and not committed. See docs/research/corpus-licensing.md."
+
+[[template]]
+id = "86e768be-2d8d-49c5-ad69-eb7cdf4a973d"
+title = "Realtor newsletter"
+category = "newsletters"
+kind = "docx"
+url = "https://createcatalog.public.onecdn.static.microsoft/catalog-assets/en-us/86e768be-2d8d-49c5-ad69-eb7cdf4a973d/TF86e768be-2d8d-49c5-ad69-eb7cdf4a973d5e60430e_wac-280b1d6b304a.docx"
+sha256 = "9d0868e356ef050a6f3d7c810596d85f46d0c930a4f1848c7d7e1d88a4c731be"
+size = 330700
+licence = "Copyright Microsoft. Downloaded from Microsoft's public template catalog for local interoperability testing only; not redistributed and not committed. See docs/research/corpus-licensing.md."
+
+[[template]]
+id = "f5b49e76-2031-4fce-852f-1185a53ea762"
+title = "School newsletter"
+category = "newsletters"
+kind = "docx"
+url = "https://createcatalog.public.onecdn.static.microsoft/catalog-assets/en-us/f5b49e76-2031-4fce-852f-1185a53ea762/TFf5b49e76-2031-4fce-852f-1185a53ea762ce18ab24_wac-1c8c9908a65c.docx"
+sha256 = "118f2a2854a5536fad173f9051dcf28e4e5d7562cf30546b8cd4279a6201e266"
+size = 1218744
+licence = "Copyright Microsoft. Downloaded from Microsoft's public template catalog for local interoperability testing only; not redistributed and not committed. See docs/research/corpus-licensing.md."
+
+[[template]]
+id = "ad265748-351c-4e2e-939a-1ff919a1a2a0"
+title = "Traditional newspaper"
+category = "newsletters"
+kind = "docx"
+url = "https://createcatalog.public.onecdn.static.microsoft/catalog-assets/en-us/ad265748-351c-4e2e-939a-1ff919a1a2a0/TFad265748-351c-4e2e-939a-1ff919a1a2a0b270d156_wac-90b3507ba529.docx"
+sha256 = "de469cda279544d9f1c4ee2a23648385c9b31731a126f3bb1a6a9c2485c6d794"
+size = 3593860
+licence = "Copyright Microsoft. Downloaded from Microsoft's public template catalog for local interoperability testing only; not redistributed and not committed. See docs/research/corpus-licensing.md."
+
+[[template]]
+id = "d52c20af-1aa7-4957-b3e2-92a57bb4e8f7"
+title = "Travel newsletter"
+category = "newsletters"
+kind = "docx"
+url = "https://createcatalog.public.onecdn.static.microsoft/catalog-assets/en-us/d52c20af-1aa7-4957-b3e2-92a57bb4e8f7/TFd52c20af-1aa7-4957-b3e2-92a57bb4e8f7af5d752a_wac-0ffab08f43ca.docx"
+sha256 = "e1d6faca13c39f1bb3c549f937e7fa19d0e503e64ac4298c7b61e1f6da08a50c"
+size = 5504748
+licence = "Copyright Microsoft. Downloaded from Microsoft's public template catalog for local interoperability testing only; not redistributed and not committed. See docs/research/corpus-licensing.md."
+
+[[template]]
+id = "2d87354f-fa0f-46c8-88b6-0514450b980a"
+title = "Bridal shower invitation"
+category = "planners"
+kind = "docx"
+url = "https://createcatalog.public.onecdn.static.microsoft/catalog-assets/en-us/2d87354f-fa0f-46c8-88b6-0514450b980a/TF2d87354f-fa0f-46c8-88b6-0514450b980abcfcad05_wac-6711d630a9ec.docx"
+sha256 = "e6ca0beb08f064ff64b3f9f0f9b1d2e051e15759a182c2ea3ec21fde9d5b5145"
+size = 1016884
+licence = "Copyright Microsoft. Downloaded from Microsoft's public template catalog for local interoperability testing only; not redistributed and not committed. See docs/research/corpus-licensing.md."
+
+[[template]]
+id = "d14ca19d-7956-4aa7-942b-732252bc3090"
+title = "Cake celebration card"
+category = "planners"
+kind = "docx"
+url = "https://createcatalog.public.onecdn.static.microsoft/catalog-assets/en-us/d14ca19d-7956-4aa7-942b-732252bc3090/TFd14ca19d-7956-4aa7-942b-732252bc3090937db711_wac-21d954d9109b.docx"
+sha256 = "33d26e6453dae5a938f2eedfc6c8b82d31b276ec88c94b3b2339290d430ce0b0"
+size = 180028
+licence = "Copyright Microsoft. Downloaded from Microsoft's public template catalog for local interoperability testing only; not redistributed and not committed. See docs/research/corpus-licensing.md."
+
+[[template]]
+id = "ee8d0c24-0878-4e72-bbbc-172b9f8bd443"
+title = "Elegant florals Mother's Day card"
+category = "planners"
+kind = "docx"
+url = "https://createcatalog.public.onecdn.static.microsoft/catalog-assets/en-us/ee8d0c24-0878-4e72-bbbc-172b9f8bd443/TFee8d0c24-0878-4e72-bbbc-172b9f8bd443ab051313_wac-7cfc912b579d.docx"
+sha256 = "5a2f7b1639040d6be636d2d6bece7af82b23dbf74433e793642af1d3f7afc4d6"
+size = 1537891
+licence = "Copyright Microsoft. Downloaded from Microsoft's public template catalog for local interoperability testing only; not redistributed and not committed. See docs/research/corpus-licensing.md."
+
+[[template]]
+id = "36057f4e-b8b5-4325-ac49-21023c33eebb"
+title = "Engagement wedding celebration card"
+category = "planners"
+kind = "docx"
+url = "https://createcatalog.public.onecdn.static.microsoft/catalog-assets/en-us/36057f4e-b8b5-4325-ac49-21023c33eebb/TF36057f4e-b8b5-4325-ac49-21023c33eebb68c9fb0c_wac-d1deda45afaa.docx"
+sha256 = "393f7642bf09ee9f860e707180a5df56e509597ced91beae5ae093da10b6f69b"
+size = 306739
+licence = "Copyright Microsoft. Downloaded from Microsoft's public template catalog for local interoperability testing only; not redistributed and not committed. See docs/research/corpus-licensing.md."
+
+[[template]]
+id = "4ebce9eb-5745-45e1-aef0-518b656b7284"
+title = "Floral bridal shower invitation"
+category = "planners"
+kind = "docx"
+url = "https://createcatalog.public.onecdn.static.microsoft/catalog-assets/en-us/4ebce9eb-5745-45e1-aef0-518b656b7284/TF4ebce9eb-5745-45e1-aef0-518b656b7284b1dcdc7c_wac-fc022c5c37a2.docx"
+sha256 = "e16c5158e67277b0076a40706e0505ddfdb5fa98874885d12c1e836cf4248939"
+size = 1130455
+licence = "Copyright Microsoft. Downloaded from Microsoft's public template catalog for local interoperability testing only; not redistributed and not committed. See docs/research/corpus-licensing.md."
+
+[[template]]
+id = "494a603b-70b3-42f9-bc91-413bfdf33826"
+title = "Floral heart Mother's Day card"
+category = "planners"
+kind = "docx"
+url = "https://createcatalog.public.onecdn.static.microsoft/catalog-assets/en-us/494a603b-70b3-42f9-bc91-413bfdf33826/TF494a603b-70b3-42f9-bc91-413bfdf33826c8ce818e_wac-c42c7313755b.docx"
+sha256 = "3c10552ea60814318fa670864deb3e620dedcbee85e13df95e7d148bedeced69"
+size = 990362
+licence = "Copyright Microsoft. Downloaded from Microsoft's public template catalog for local interoperability testing only; not redistributed and not committed. See docs/research/corpus-licensing.md."
+
+[[template]]
+id = "4c5d5d40-32a7-4440-9337-c639980b08c4"
+title = "Floral wedding invitation"
+category = "planners"
+kind = "docx"
+url = "https://createcatalog.public.onecdn.static.microsoft/catalog-assets/en-us/4c5d5d40-32a7-4440-9337-c639980b08c4/TF4c5d5d40-32a7-4440-9337-c639980b08c41aa26da8_wac-bfdd5f7287c8.docx"
+sha256 = "ebfda3f3e0cef1877ae0fbf85ebc8c43d0c7a4a00e921b8463e529d34c2943ac"
+size = 1037924
+licence = "Copyright Microsoft. Downloaded from Microsoft's public template catalog for local interoperability testing only; not redistributed and not committed. See docs/research/corpus-licensing.md."
+
+[[template]]
+id = "8583a4ca-c9b8-4b4a-9a8f-97117cc4ea58"
+title = "Floral wedding invitation (gender neutral)"
+category = "planners"
+kind = "docx"
+url = "https://createcatalog.public.onecdn.static.microsoft/catalog-assets/en-us/8583a4ca-c9b8-4b4a-9a8f-97117cc4ea58/TF8583a4ca-c9b8-4b4a-9a8f-97117cc4ea58530f4ed9_wac-0fd5c292fc1a.docx"
+sha256 = "c4db71f8ab6bbbed9eca4bf81d2c019e8deba48d9623aa94db8b4b0072149215"
+size = 1039540
+licence = "Copyright Microsoft. Downloaded from Microsoft's public template catalog for local interoperability testing only; not redistributed and not committed. See docs/research/corpus-licensing.md."
+
+[[template]]
+id = "ee25c76b-4333-436f-852e-d7e17c6b0f01"
+title = "Watercolor wash wedding invitation"
+category = "planners"
+kind = "docx"
+url = "https://createcatalog.public.onecdn.static.microsoft/catalog-assets/en-us/ee25c76b-4333-436f-852e-d7e17c6b0f01/TFee25c76b-4333-436f-852e-d7e17c6b0f01dd9de26d_wac-b7c63f7caa14.docx"
+sha256 = "d2ea5fd3de96601a8bdd3308b0e18c69d08790b646ad755c5f80a0a6010d69bd"
+size = 639541
+licence = "Copyright Microsoft. Downloaded from Microsoft's public template catalog for local interoperability testing only; not redistributed and not committed. See docs/research/corpus-licensing.md."
+
+[[template]]
+id = "4b9c352f-5be1-44f5-8ead-264f4585d82f"
+title = "Watercolor wash wedding program"
+category = "planners"
+kind = "docx"
+url = "https://createcatalog.public.onecdn.static.microsoft/catalog-assets/en-us/4b9c352f-5be1-44f5-8ead-264f4585d82f/TF4b9c352f-5be1-44f5-8ead-264f4585d82f35d975fc_wac-5f846ec40d1f.docx"
+sha256 = "7f057bbfa58479327699c235344e11158cae7af022ecec0db55e1bb4eed3780b"
+size = 1977658
+licence = "Copyright Microsoft. Downloaded from Microsoft's public template catalog for local interoperability testing only; not redistributed and not committed. See docs/research/corpus-licensing.md."
+
+[[template]]
+id = "3b40ec86-59ea-4e4d-83b2-c01ee5745df1"
+title = "Wedding checklist"
+category = "planners"
+kind = "docx"
+url = "https://createcatalog.public.onecdn.static.microsoft/catalog-assets/en-us/3b40ec86-59ea-4e4d-83b2-c01ee5745df1/TF3b40ec86-59ea-4e4d-83b2-c01ee5745df192127efb_wac-6cc1c9d135eb.docx"
+sha256 = "921cdea39a9013a95014df1d0e36ae27cad25289b89eb5d61444bf1b49047493"
+size = 775949
+licence = "Copyright Microsoft. Downloaded from Microsoft's public template catalog for local interoperability testing only; not redistributed and not committed. See docs/research/corpus-licensing.md."
+
+[[template]]
+id = "027ecc7a-145a-4eeb-82f0-ff551202963e"
+title = "Wedding invitations (watercolor design, 2 per page, works with Avery 5389)"
+category = "planners"
+kind = "docx"
+url = "https://createcatalog.public.onecdn.static.microsoft/catalog-assets/en-us/027ecc7a-145a-4eeb-82f0-ff551202963e/TF027ecc7a-145a-4eeb-82f0-ff551202963e75f3c9f8_wac-1243b47b53f4.docx"
+sha256 = "80ea1bcaed11d1258f62411708cca8a59a84c18317174fecb649462140f3aa67"
+size = 1703176
+licence = "Copyright Microsoft. Downloaded from Microsoft's public template catalog for local interoperability testing only; not redistributed and not committed. See docs/research/corpus-licensing.md."
+
+[[template]]
+id = "ca4e5536-5f4f-40f6-8c24-37e4a1f0d8f7"
+title = "Wedding photo checklist"
+category = "planners"
+kind = "docx"
+url = "https://createcatalog.public.onecdn.static.microsoft/catalog-assets/en-us/ca4e5536-5f4f-40f6-8c24-37e4a1f0d8f7/TFca4e5536-5f4f-40f6-8c24-37e4a1f0d8f749e0bb15_wac-c48cab48d2b4.docx"
+sha256 = "de82384710cbc9f66fe51c1dc711c190b90ecdef704550c57c8b89ebadbc4a44"
+size = 344949
+licence = "Copyright Microsoft. Downloaded from Microsoft's public template catalog for local interoperability testing only; not redistributed and not committed. See docs/research/corpus-licensing.md."
+
+[[template]]
+id = "54d00e5f-3f41-4a6c-b540-5763773e940e"
+title = "Wedding program template"
+category = "planners"
+kind = "docx"
+url = "https://createcatalog.public.onecdn.static.microsoft/catalog-assets/en-us/54d00e5f-3f41-4a6c-b540-5763773e940e/TF54d00e5f-3f41-4a6c-b540-5763773e940e615c1c02_wac-0352d4448673.docx"
+sha256 = "8486137e957efc1960aedc3e86c741bac63c89c8df8096f47bd49e4367ad7936"
+size = 41462
+licence = "Copyright Microsoft. Downloaded from Microsoft's public template catalog for local interoperability testing only; not redistributed and not committed. See docs/research/corpus-licensing.md."
+
+[[template]]
+id = "aae2ed66-a0df-4222-b732-502ad80e9ed0"
+title = "Basic business cards"
+category = "reports"
+kind = "docx"
+url = "https://createcatalog.public.onecdn.static.microsoft/catalog-assets/en-us/aae2ed66-a0df-4222-b732-502ad80e9ed0/TFaae2ed66-a0df-4222-b732-502ad80e9ed029271cda_wac-1f931772f9c2.docx"
+sha256 = "37022f5a98307251ce396ea9e0d5833f5b896ffaec39340c9d8a453b7cf2f5c9"
+size = 90325
+licence = "Copyright Microsoft. Downloaded from Microsoft's public template catalog for local interoperability testing only; not redistributed and not committed. See docs/research/corpus-licensing.md."
+
+[[template]]
+id = "9f1fce92-bc37-4819-9989-67b5593c3582"
+title = "Big wave business cards"
+category = "reports"
+kind = "docx"
+url = "https://createcatalog.public.onecdn.static.microsoft/catalog-assets/en-us/9f1fce92-bc37-4819-9989-67b5593c3582/TF9f1fce92-bc37-4819-9989-67b5593c358290afeee2_wac-38a649c18ec5.docx"
+sha256 = "578d2f3d7ecbe91513940d9031d19cd3cefb9d0ccc6eb90dcfa3215d3daa99d7"
+size = 73866
+licence = "Copyright Microsoft. Downloaded from Microsoft's public template catalog for local interoperability testing only; not redistributed and not committed. See docs/research/corpus-licensing.md."
+
+[[template]]
+id = "b5864d32-4451-4ff2-ab42-0f41296b2b4f"
+title = "Business cards (Bold design, 10 per page, for Avery 5371)"
+category = "reports"
+kind = "docx"
+url = "https://createcatalog.public.onecdn.static.microsoft/catalog-assets/en-us/b5864d32-4451-4ff2-ab42-0f41296b2b4f/TFb5864d32-4451-4ff2-ab42-0f41296b2b4f302ad6fa_wac-a435fc9fdab8.docx"
+sha256 = "aba753797c3716a419ed31efd0f3706e07bc1cf5811a13bbe8e583b163e7a503"
+size = 150634
+licence = "Copyright Microsoft. Downloaded from Microsoft's public template catalog for local interoperability testing only; not redistributed and not committed. See docs/research/corpus-licensing.md."
+
+[[template]]
+id = "0c8d491f-4710-463f-b965-b49a9c0730af"
+title = "Business letter (sales stripes design)"
+category = "reports"
+kind = "docx"
+url = "https://createcatalog.public.onecdn.static.microsoft/catalog-assets/en-us/0c8d491f-4710-463f-b965-b49a9c0730af/TF0c8d491f-4710-463f-b965-b49a9c0730afb9047d19_wac-672549f6beda.docx"
+sha256 = "e1d47d63c8a0fc8feabbda3a1037fa85c485529e96e2f4c7daf2b21d8d512af2"
+size = 424124
+licence = "Copyright Microsoft. Downloaded from Microsoft's public template catalog for local interoperability testing only; not redistributed and not committed. See docs/research/corpus-licensing.md."
+
+[[template]]
+id = "b30688e1-3cd6-47b6-b274-8c187e76b335"
+title = "Business letter (simple design)"
+category = "reports"
+kind = "docx"
+url = "https://createcatalog.public.onecdn.static.microsoft/catalog-assets/en-us/b30688e1-3cd6-47b6-b274-8c187e76b335/TFb30688e1-3cd6-47b6-b274-8c187e76b335e3a3e965_wac-eb5c722c16a6.docx"
+sha256 = "38260ab522f0f531122eb3ba425d74fe2a8e490aa3bf872b81b97c1b7815723b"
+size = 96789
+licence = "Copyright Microsoft. Downloaded from Microsoft's public template catalog for local interoperability testing only; not redistributed and not committed. See docs/research/corpus-licensing.md."
+
+[[template]]
+id = "114ed224-91a8-4b7e-bcf3-2248d12bffd7"
+title = "Business memo (bold design)"
+category = "reports"
+kind = "docx"
+url = "https://createcatalog.public.onecdn.static.microsoft/catalog-assets/en-us/114ed224-91a8-4b7e-bcf3-2248d12bffd7/TF114ed224-91a8-4b7e-bcf3-2248d12bffd727e5da3e_wac-c7c9025d9bdf.docx"
+sha256 = "db4918bfe60e9d88fbe4e342de20ca3dabd2c719dd224d5dc84af2e8557a43c2"
+size = 45020
+licence = "Copyright Microsoft. Downloaded from Microsoft's public template catalog for local interoperability testing only; not redistributed and not committed. See docs/research/corpus-licensing.md."
+
+[[template]]
+id = "4e493df5-736e-4f05-aa5a-ca93783f12a1"
+title = "Business report (graphic design)"
+category = "reports"
+kind = "docx"
+url = "https://createcatalog.public.onecdn.static.microsoft/catalog-assets/en-us/4e493df5-736e-4f05-aa5a-ca93783f12a1/TF4e493df5-736e-4f05-aa5a-ca93783f12a18c870539_wac-d5ec3476e18a.docx"
+sha256 = "7c657cc6e1de2acc2e4504bfcbd1d3834bb389fea2992bc74384ad5171a7689c"
+size = 8528065
+licence = "Copyright Microsoft. Downloaded from Microsoft's public template catalog for local interoperability testing only; not redistributed and not committed. See docs/research/corpus-licensing.md."
+
+[[template]]
+id = "15d030a7-4d0a-4c1c-8a3e-3a7590a124ce"
+title = "Business report (professional design)"
+category = "reports"
+kind = "docx"
+url = "https://createcatalog.public.onecdn.static.microsoft/catalog-assets/en-us/15d030a7-4d0a-4c1c-8a3e-3a7590a124ce/TF15d030a7-4d0a-4c1c-8a3e-3a7590a124cee1ac38eb_wac-8ff0377e5197.docx"
+sha256 = "114aaf6641c1121bae8a7d9810a526468d332c42fcba1158f9794e54393d3acb"
+size = 1352329
+licence = "Copyright Microsoft. Downloaded from Microsoft's public template catalog for local interoperability testing only; not redistributed and not committed. See docs/research/corpus-licensing.md."
+
+[[template]]
+id = "1b4c752f-b419-4ae7-850a-9bb757ac1b75"
+title = "Executive summary"
+category = "reports"
+kind = "docx"
+url = "https://createcatalog.public.onecdn.static.microsoft/catalog-assets/en-us/1b4c752f-b419-4ae7-850a-9bb757ac1b75/TF1b4c752f-b419-4ae7-850a-9bb757ac1b75024a8109-ae47179cf116.docx"
+sha256 = "0eb9b638b22b339c1c0580075626f099888e1aa81972175f2cebd04afa604572"
+size = 45097
+licence = "Copyright Microsoft. Downloaded from Microsoft's public template catalog for local interoperability testing only; not redistributed and not committed. See docs/research/corpus-licensing.md."
+
+[[template]]
+id = "9986a0d9-9022-4d2d-b6e2-32852f14bae5"
+title = "Formal business letter"
+category = "reports"
+kind = "docx"
+url = "https://createcatalog.public.onecdn.static.microsoft/catalog-assets/en-us/9986a0d9-9022-4d2d-b6e2-32852f14bae5/TF9986a0d9-9022-4d2d-b6e2-32852f14bae548af8d5d_wac-5f738399055b.docx"
+sha256 = "8529dff891f090b1bd07ba0d0c2050f473805f1bcd54ab592339429bfb7fb0e0"
+size = 33705
+licence = "Copyright Microsoft. Downloaded from Microsoft's public template catalog for local interoperability testing only; not redistributed and not committed. See docs/research/corpus-licensing.md."
+
+[[template]]
+id = "c5871878-ab3d-4671-adf7-af65b58cf429"
+title = "Logo memo"
+category = "reports"
+kind = "docx"
+url = "https://createcatalog.public.onecdn.static.microsoft/catalog-assets/en-us/c5871878-ab3d-4671-adf7-af65b58cf429/TFc5871878-ab3d-4671-adf7-af65b58cf4296ece7a1d_wac-b86ca461e44d.docx"
+sha256 = "7bc632ff3aafde2a00a3c2b6dbbc5e1d758b643ba918b628e403a9b8a2f7fbbe"
+size = 44706
+licence = "Copyright Microsoft. Downloaded from Microsoft's public template catalog for local interoperability testing only; not redistributed and not committed. See docs/research/corpus-licensing.md."
+
+[[template]]
+id = "7e53ee0d-dd7d-4335-8cfd-efae5a747b05"
+title = "Metro report"
+category = "reports"
+kind = "docx"
+url = "https://createcatalog.public.onecdn.static.microsoft/catalog-assets/en-us/7e53ee0d-dd7d-4335-8cfd-efae5a747b05/TF7e53ee0d-dd7d-4335-8cfd-efae5a747b05fa08fba7_wac-edec2a9f9dc3.docx"
+sha256 = "1c2161843f249cb5a208012fb245c4dcb38ef8c1d9f2d0f2d020f6603737c904"
+size = 723224
+licence = "Copyright Microsoft. Downloaded from Microsoft's public template catalog for local interoperability testing only; not redistributed and not committed. See docs/research/corpus-licensing.md."
+
+[[template]]
+id = "95a2391d-2fc7-44e3-ba55-d9c55fdee70b"
+title = "Modern business cards"
+category = "reports"
+kind = "docx"
+url = "https://createcatalog.public.onecdn.static.microsoft/catalog-assets/en-us/95a2391d-2fc7-44e3-ba55-d9c55fdee70b/TF95a2391d-2fc7-44e3-ba55-d9c55fdee70b5843bae6_wac-9d8dd0b09497.docx"
+sha256 = "9ee8b664410f43260bf0d8e88e047cb7f9bad631b96627fb6cd4c53e5776b0c8"
+size = 173390
+licence = "Copyright Microsoft. Downloaded from Microsoft's public template catalog for local interoperability testing only; not redistributed and not committed. See docs/research/corpus-licensing.md."
+
+[[template]]
+id = "eab22234-d811-47a9-aeb3-45a0291477c9"
+title = "Pinstripes business cards"
+category = "reports"
+kind = "docx"
+url = "https://createcatalog.public.onecdn.static.microsoft/catalog-assets/en-us/eab22234-d811-47a9-aeb3-45a0291477c9/TFeab22234-d811-47a9-aeb3-45a0291477c922f7a53d_wac-3bd7ffe67a0e.docx"
+sha256 = "9ec1319144f6ae2ff45e45fdc230e1da9a7d6dd0ce3e6cfdc79ddd1f9ef7f89d"
+size = 346360
+licence = "Copyright Microsoft. Downloaded from Microsoft's public template catalog for local interoperability testing only; not redistributed and not committed. See docs/research/corpus-licensing.md."
+
+[[template]]
+id = "f81d6387-e06d-4719-9d92-8189f7582b1f"
+title = "ATS Bold accounting resume"
+category = "resumes"
+kind = "docx"
+url = "https://createcatalog.public.onecdn.static.microsoft/catalog-assets/en-us/f81d6387-e06d-4719-9d92-8189f7582b1f/TFf81d6387-e06d-4719-9d92-8189f7582b1f6fe21db2_wac-36ac6a094f05.docx"
+sha256 = "695793abe6115c1e898c098a88d369409d0de1a15be25b6e12a58992de2fb6b6"
+size = 44212
+licence = "Copyright Microsoft. Downloaded from Microsoft's public template catalog for local interoperability testing only; not redistributed and not committed. See docs/research/corpus-licensing.md."
+
+[[template]]
+id = "59ab7c0a-01b4-4a8b-8704-1629ef74476b"
+title = "ATS healthcare resume"
+category = "resumes"
+kind = "docx"
+url = "https://createcatalog.public.onecdn.static.microsoft/catalog-assets/en-us/59ab7c0a-01b4-4a8b-8704-1629ef74476b/TF59ab7c0a-01b4-4a8b-8704-1629ef74476b217f4526_wac-e5cb2f7654bf.docx"
+sha256 = "fde5eaa85f01acd00f78f54dd6c97501e353a1773ffc299f0bdac33f31eec3b0"
+size = 5718782
+licence = "Copyright Microsoft. Downloaded from Microsoft's public template catalog for local interoperability testing only; not redistributed and not committed. See docs/research/corpus-licensing.md."
+
+[[template]]
+id = "677f5c66-2320-431a-b04f-e13165d80e78"
+title = "ATS office manager resume"
+category = "resumes"
+kind = "docx"
+url = "https://createcatalog.public.onecdn.static.microsoft/catalog-assets/en-us/677f5c66-2320-431a-b04f-e13165d80e78/TF677f5c66-2320-431a-b04f-e13165d80e78de28c20b_wac-07d9a01704ce.docx"
+sha256 = "e05409172f68118828b60c7298e0d9b3dbf4cf719aa73e471d734ef40c2af1d6"
+size = 50318
+licence = "Copyright Microsoft. Downloaded from Microsoft's public template catalog for local interoperability testing only; not redistributed and not committed. See docs/research/corpus-licensing.md."
+
+[[template]]
+id = "b97c34b7-bcc4-4366-92c6-8b5a08ba27cc"
+title = "ATS stylish accounting resume"
+category = "resumes"
+kind = "docx"
+url = "https://createcatalog.public.onecdn.static.microsoft/catalog-assets/en-us/b97c34b7-bcc4-4366-92c6-8b5a08ba27cc/TFb97c34b7-bcc4-4366-92c6-8b5a08ba27cc7b6784e7_wac-1406ae744f4d.docx"
+sha256 = "69bf8b9c22164abad2d794a26cd9beeae807f266b2c8203839d38410437342e8"
+size = 25909
+licence = "Copyright Microsoft. Downloaded from Microsoft's public template catalog for local interoperability testing only; not redistributed and not committed. See docs/research/corpus-licensing.md."
+
+[[template]]
+id = "33449d14-b590-4c13-929a-4931b797f8f9"
+title = "Attorney resume"
+category = "resumes"
+kind = "docx"
+url = "https://createcatalog.public.onecdn.static.microsoft/catalog-assets/en-us/33449d14-b590-4c13-929a-4931b797f8f9/TF33449d14-b590-4c13-929a-4931b797f8f9b566f62c_wac-99bc5570f84d.docx"
+sha256 = "75a2fd37f4494635acf3688d7bccd08f450fdc436522ef434969f88545b73b49"
+size = 54926
+licence = "Copyright Microsoft. Downloaded from Microsoft's public template catalog for local interoperability testing only; not redistributed and not committed. See docs/research/corpus-licensing.md."
+
+[[template]]
+id = "a60c389b-9052-4d35-bcfe-b7918b8aad5e"
+title = "Bold nursing resume"
+category = "resumes"
+kind = "docx"
+url = "https://createcatalog.public.onecdn.static.microsoft/catalog-assets/en-us/a60c389b-9052-4d35-bcfe-b7918b8aad5e/TFa60c389b-9052-4d35-bcfe-b7918b8aad5ef91b55f3_wac-ad7a8f1bc209.docx"
+sha256 = "8e4a563e90b1f90014c606df3c7bf36631071ea3ef708c8b7603e7fad6889fde"
+size = 237924
+licence = "Copyright Microsoft. Downloaded from Microsoft's public template catalog for local interoperability testing only; not redistributed and not committed. See docs/research/corpus-licensing.md."
+
+[[template]]
+id = "2f858f7d-3675-4a8c-9728-c9fcd31d5649"
+title = "Classic management resume"
+category = "resumes"
+kind = "docx"
+url = "https://createcatalog.public.onecdn.static.microsoft/catalog-assets/en-us/2f858f7d-3675-4a8c-9728-c9fcd31d5649/TF2f858f7d-3675-4a8c-9728-c9fcd31d56491c482f7c_wac-c5ca0c9ceb0c.docx"
+sha256 = "e7e2dacd66712983ba5c0688656e22cb237ad4661987588a0a1f90c0d9617405"
+size = 58940
+licence = "Copyright Microsoft. Downloaded from Microsoft's public template catalog for local interoperability testing only; not redistributed and not committed. See docs/research/corpus-licensing.md."
+
+[[template]]
+id = "ae0aba0c-0162-4fc9-9ae2-05bb68899b85"
+title = "Classic office manager resume"
+category = "resumes"
+kind = "docx"
+url = "https://createcatalog.public.onecdn.static.microsoft/catalog-assets/en-us/ae0aba0c-0162-4fc9-9ae2-05bb68899b85/TFae0aba0c-0162-4fc9-9ae2-05bb68899b858de91df1_wac-5899bbb1e3e0.docx"
+sha256 = "83cd9708f499af0c9c1e149d4c5088b2619883521f3162e076e53b432276bf14"
+size = 160381
+licence = "Copyright Microsoft. Downloaded from Microsoft's public template catalog for local interoperability testing only; not redistributed and not committed. See docs/research/corpus-licensing.md."
+
+[[template]]
+id = "67792a9e-d689-4239-a9e8-5e0519041839"
+title = "Extended ATS healthcare resume"
+category = "resumes"
+kind = "docx"
+url = "https://createcatalog.public.onecdn.static.microsoft/catalog-assets/en-us/67792a9e-d689-4239-a9e8-5e0519041839/TF67792a9e-d689-4239-a9e8-5e0519041839de29e554_wac-5e1e667135b5.docx"
+sha256 = "9e5fe2a9bf0ef96200d088da063e85fa26d2f8a2e829a9ffaa40bd1306679b51"
+size = 32045
+licence = "Copyright Microsoft. Downloaded from Microsoft's public template catalog for local interoperability testing only; not redistributed and not committed. See docs/research/corpus-licensing.md."
+
+[[template]]
+id = "7c0a9cf6-906b-4a30-9ddc-41f41c2202ad"
+title = "Healthcare resume"
+category = "resumes"
+kind = "docx"
+url = "https://createcatalog.public.onecdn.static.microsoft/catalog-assets/en-us/7c0a9cf6-906b-4a30-9ddc-41f41c2202ad/TF7c0a9cf6-906b-4a30-9ddc-41f41c2202ad71a552d6_wac-7ea53ff8aee6.docx"
+sha256 = "018c07d3ce1b7e5231b280aa913ed8618c0c07b02c658566ef6aa60d483cce28"
+size = 23272
+licence = "Copyright Microsoft. Downloaded from Microsoft's public template catalog for local interoperability testing only; not redistributed and not committed. See docs/research/corpus-licensing.md."
+
+[[template]]
+id = "57cae682-222c-4646-9a80-c404ee5c5d7e"
+title = "Industry manager resume"
+category = "resumes"
+kind = "docx"
+url = "https://createcatalog.public.onecdn.static.microsoft/catalog-assets/en-us/57cae682-222c-4646-9a80-c404ee5c5d7e/TF57cae682-222c-4646-9a80-c404ee5c5d7e394a39ab_wac-08402e1a51c0.docx"
+sha256 = "4b91a9abc605a4851937eefe119f80732a06a0f3c291fdd41e6fafb91d686083"
+size = 30206
+licence = "Copyright Microsoft. Downloaded from Microsoft's public template catalog for local interoperability testing only; not redistributed and not committed. See docs/research/corpus-licensing.md."
+
+[[template]]
+id = "ce343500-4aff-4dfa-b337-57c78459c6ee"
+title = "Modern nursing resume"
+category = "resumes"
+kind = "docx"
+url = "https://createcatalog.public.onecdn.static.microsoft/catalog-assets/en-us/ce343500-4aff-4dfa-b337-57c78459c6ee/TFce343500-4aff-4dfa-b337-57c78459c6eee67d8704_wac-b3f5ca4c5fb0.docx"
+sha256 = "7d0dc8deb224664642330ae6f3bc8fe0b98e12cd9c2bd48a60bdeb68048c1a50"
+size = 102524
+licence = "Copyright Microsoft. Downloaded from Microsoft's public template catalog for local interoperability testing only; not redistributed and not committed. See docs/research/corpus-licensing.md."
+
+[[template]]
+id = "5ff67a28-3747-45d8-ab40-465bf569783b"
+title = "Project management resume"
+category = "resumes"
+kind = "docx"
+url = "https://createcatalog.public.onecdn.static.microsoft/catalog-assets/en-us/5ff67a28-3747-45d8-ab40-465bf569783b/TF5ff67a28-3747-45d8-ab40-465bf569783b93ee1a09_wac-55f14b3d4414.docx"
+sha256 = "e7a61480b798511222082877224e0ec5acdae803de63e94f195bc711dfcdaa33"
+size = 64791
+licence = "Copyright Microsoft. Downloaded from Microsoft's public template catalog for local interoperability testing only; not redistributed and not committed. See docs/research/corpus-licensing.md."
+
+[[template]]
+id = "591e685e-fff1-400f-9fdf-92cb88141bbd"
+title = "Simple ATS healthcare resume"
+category = "resumes"
+kind = "docx"
+url = "https://createcatalog.public.onecdn.static.microsoft/catalog-assets/en-us/591e685e-fff1-400f-9fdf-92cb88141bbd/TF591e685e-fff1-400f-9fdf-92cb88141bbdea26a1be_wac-40916a07dd28.docx"
+sha256 = "8bba99f73ecc79f204316366fb0c4f1b61f2f960899a403e6b8e9b0ea9cfe536"
+size = 30761
+licence = "Copyright Microsoft. Downloaded from Microsoft's public template catalog for local interoperability testing only; not redistributed and not committed. See docs/research/corpus-licensing.md."
+
+[[template]]
+id = "25409d45-e3c3-4656-a565-7e955c695cb9"
+title = "Classic meeting agenda"
+category = "schedules"
+kind = "docx"
+url = "https://createcatalog.public.onecdn.static.microsoft/catalog-assets/en-us/25409d45-e3c3-4656-a565-7e955c695cb9/TF25409d45-e3c3-4656-a565-7e955c695cb976e8e6c6_wac-4a104d7d6ff3.docx"
+sha256 = "546e8a40275aff4a8bd2b980248f96a1a112b2af2f421d5d2174060501fa40d6"
+size = 64624
+licence = "Copyright Microsoft. Downloaded from Microsoft's public template catalog for local interoperability testing only; not redistributed and not committed. See docs/research/corpus-licensing.md."
+
+[[template]]
+id = "792c56ff-5931-4f2e-bbd3-a00d737f9b57"
+title = "Daily schedule"
+category = "schedules"
+kind = "xlsx"
+url = "https://createcatalog.public.onecdn.static.microsoft/catalog-assets/en-us/792c56ff-5931-4f2e-bbd3-a00d737f9b57/TF792c56ff-5931-4f2e-bbd3-a00d737f9b57f490ba94_wac-084bd93fcd07.xlsx"
+sha256 = "bde87c368afde9777640fab4973a7f6b3527a3d03cddc67f73d192dc7a61f996"
+size = 13361
+licence = "Copyright Microsoft. Downloaded from Microsoft's public template catalog for local interoperability testing only; not redistributed and not committed. See docs/research/corpus-licensing.md."
+
+[[template]]
+id = "a6f9b007-de86-4fbd-9192-3fe31c2873cc"
+title = "Double stripe agenda"
+category = "schedules"
+kind = "docx"
+url = "https://createcatalog.public.onecdn.static.microsoft/catalog-assets/en-us/a6f9b007-de86-4fbd-9192-3fe31c2873cc/TFa6f9b007-de86-4fbd-9192-3fe31c2873cc283ec83d_wac-32823ef3c7d7.docx"
+sha256 = "c580fa8dbb835a570afc9f6d58f33ae27f8a58973e055881342d9488e2d1ab40"
+size = 97993
+licence = "Copyright Microsoft. Downloaded from Microsoft's public template catalog for local interoperability testing only; not redistributed and not committed. See docs/research/corpus-licensing.md."
+
+[[template]]
+id = "54d4fddf-e282-4682-8cd9-b8e56604e0e5"
+title = "Employee shift schedule"
+category = "schedules"
+kind = "xlsx"
+url = "https://createcatalog.public.onecdn.static.microsoft/catalog-assets/en-us/54d4fddf-e282-4682-8cd9-b8e56604e0e5/TF54d4fddf-e282-4682-8cd9-b8e56604e0e54fc0540d_wac-57e573c49285.xlsx"
+sha256 = "5a5f1e740a60c2a14764d44c4e0b4dfc8147b29edcb4618cf1caf1a0bf00c976"
+size = 42193
+licence = "Copyright Microsoft. Downloaded from Microsoft's public template catalog for local interoperability testing only; not redistributed and not committed. See docs/research/corpus-licensing.md."
+
+[[template]]
+id = "cc8dfa38-e399-4f59-9f4b-03eb2c124f9d"
+title = "Event schedule"
+category = "schedules"
+kind = "xlsx"
+url = "https://createcatalog.public.onecdn.static.microsoft/catalog-assets/en-us/cc8dfa38-e399-4f59-9f4b-03eb2c124f9d/TFcc8dfa38-e399-4f59-9f4b-03eb2c124f9d3234b7e2_wac-a85988a13734.xlsx"
+sha256 = "e7a312474848a31f29897631f66f46516987d8efdd1e3c199b5b8ed64ccd2dff"
+size = 18459
+licence = "Copyright Microsoft. Downloaded from Microsoft's public template catalog for local interoperability testing only; not redistributed and not committed. See docs/research/corpus-licensing.md."
+
+[[template]]
+id = "2228e0d1-b139-4b3c-89ef-4892b23b5e90"
+title = "Financial meeting agenda"
+category = "schedules"
+kind = "docx"
+url = "https://createcatalog.public.onecdn.static.microsoft/catalog-assets/en-us/2228e0d1-b139-4b3c-89ef-4892b23b5e90/TF2228e0d1-b139-4b3c-89ef-4892b23b5e90233d5100_wac-e8beea6d7857.docx"
+sha256 = "7702444568f11489d7a06265df7ce4151c7914c028a1b75a38aa33c1435e09a9"
+size = 870939
+licence = "Copyright Microsoft. Downloaded from Microsoft's public template catalog for local interoperability testing only; not redistributed and not committed. See docs/research/corpus-licensing.md."
+
+[[template]]
+id = "369564be-c72a-4eb8-a1f8-27dc5256c0ed"
+title = "Five-day event schedule"
+category = "schedules"
+kind = "xlsx"
+url = "https://createcatalog.public.onecdn.static.microsoft/catalog-assets/en-us/369564be-c72a-4eb8-a1f8-27dc5256c0ed/TF369564be-c72a-4eb8-a1f8-27dc5256c0ed8b5d2ddd_wac-b6e23275af5d.xlsx"
+sha256 = "6224942925407092b048aced8d4a4b5ef650a4820f485ec187c45fbb458cbdf9"
+size = 46748
+licence = "Copyright Microsoft. Downloaded from Microsoft's public template catalog for local interoperability testing only; not redistributed and not committed. See docs/research/corpus-licensing.md."
+
+[[template]]
+id = "31cdcf05-df3b-49ad-9932-71b89e4a0759"
+title = "My class schedule"
+category = "schedules"
+kind = "xlsx"
+url = "https://createcatalog.public.onecdn.static.microsoft/catalog-assets/en-us/31cdcf05-df3b-49ad-9932-71b89e4a0759/TF31cdcf05-df3b-49ad-9932-71b89e4a0759a80811b2_wac-561a3b672b7f.xlsx"
+sha256 = "6b2157d33769873aaaf41013ec0b0d2b427968e1fb1d453711a0d4ff5e6c81e3"
+size = 112021
+licence = "Copyright Microsoft. Downloaded from Microsoft's public template catalog for local interoperability testing only; not redistributed and not committed. See docs/research/corpus-licensing.md."
+
+[[template]]
+id = "f4999261-76bc-4806-a05c-0120522311a2"
+title = "Sports roster and schedule"
+category = "schedules"
+kind = "xlsx"
+url = "https://createcatalog.public.onecdn.static.microsoft/catalog-assets/en-us/f4999261-76bc-4806-a05c-0120522311a2/TFf4999261-76bc-4806-a05c-0120522311a25596d958_wac-4478e050944d.xlsx"
+sha256 = "96b9476f7fb25773af5d5c248c33b28aa2be5f05be1b77c10f801994b45dfcea"
+size = 212285
+licence = "Copyright Microsoft. Downloaded from Microsoft's public template catalog for local interoperability testing only; not redistributed and not committed. See docs/research/corpus-licensing.md."
+
+[[template]]
+id = "48f98fd1-a81d-4d08-9d99-6cb0fa8c5b52"
+title = "Student schedule"
+category = "schedules"
+kind = "xlsx"
+url = "https://createcatalog.public.onecdn.static.microsoft/catalog-assets/en-us/48f98fd1-a81d-4d08-9d99-6cb0fa8c5b52/TF48f98fd1-a81d-4d08-9d99-6cb0fa8c5b5267fd7b36_wac-855066b79da9.xlsx"
+sha256 = "afb1fd63f081d46bdf3de8e3244e022468afc232965cf2d336b72819994a7dd8"
+size = 31729
+licence = "Copyright Microsoft. Downloaded from Microsoft's public template catalog for local interoperability testing only; not redistributed and not committed. See docs/research/corpus-licensing.md."
+
+[[template]]
+id = "3e07a89b-bbd4-4998-892f-8b480e1fe7d4"
+title = "Team roster, schedule, and calendar"
+category = "schedules"
+kind = "xlsx"
+url = "https://createcatalog.public.onecdn.static.microsoft/catalog-assets/en-us/3e07a89b-bbd4-4998-892f-8b480e1fe7d4/TF3e07a89b-bbd4-4998-892f-8b480e1fe7d45a5eb816_wac-e16f67690d76.xlsx"
+sha256 = "5a33cbca586f089537be5332b4c6e505533ccd2ac48038217185ee872579a536"
+size = 59020
+licence = "Copyright Microsoft. Downloaded from Microsoft's public template catalog for local interoperability testing only; not redistributed and not committed. See docs/research/corpus-licensing.md."
+
+[[template]]
+id = "2f890747-6bef-4925-841c-82b764415856"
+title = "Triangles agenda"
+category = "schedules"
+kind = "docx"
+url = "https://createcatalog.public.onecdn.static.microsoft/catalog-assets/en-us/2f890747-6bef-4925-841c-82b764415856/TF2f890747-6bef-4925-841c-82b7644158560033716c_wac-7385d01818de.docx"
+sha256 = "7fe261e07be9e0ea6775eb6b0c97a7325abdcf6083dc0631674dcf692b2bb660"
+size = 93444
+licence = "Copyright Microsoft. Downloaded from Microsoft's public template catalog for local interoperability testing only; not redistributed and not committed. See docs/research/corpus-licensing.md."
+
+[[template]]
+id = "9ac62cd3-d82b-412b-a9d0-66bda0b70165"
+title = "Weekly college schedule"
+category = "schedules"
+kind = "xlsx"
+url = "https://createcatalog.public.onecdn.static.microsoft/catalog-assets/en-us/9ac62cd3-d82b-412b-a9d0-66bda0b70165/TF9ac62cd3-d82b-412b-a9d0-66bda0b701650766cdcd_wac-d552cb61e2cb.xlsx"
+sha256 = "385b8b81ce63418373d056e7e5d6eea8c45675229348737a50eb9453987cf500"
+size = 20169
+licence = "Copyright Microsoft. Downloaded from Microsoft's public template catalog for local interoperability testing only; not redistributed and not committed. See docs/research/corpus-licensing.md."
+
+[[template]]
+id = "de27afd1-55a2-404a-af1b-0e4de8fefd24"
+title = "Weekly task schedule"
+category = "schedules"
+kind = "xlsx"
+url = "https://createcatalog.public.onecdn.static.microsoft/catalog-assets/en-us/de27afd1-55a2-404a-af1b-0e4de8fefd24/TFde27afd1-55a2-404a-af1b-0e4de8fefd246f2bdd8b_wac-e85af397c376.xlsx"
+sha256 = "dbf05a27cdbf26458c682da2567060f963c7bdc833782a3882a3dc511a5c50f5"
+size = 26124
+licence = "Copyright Microsoft. Downloaded from Microsoft's public template catalog for local interoperability testing only; not redistributed and not committed. See docs/research/corpus-licensing.md."
+
+[[template]]
+id = "e6ae6c3f-7542-4b5a-80ce-d131a04ae548"
+title = "Back to School Planner"
+category = "trackers"
+kind = "xlsx"
+url = "https://createcatalog.public.onecdn.static.microsoft/catalog-assets/en-us/e6ae6c3f-7542-4b5a-80ce-d131a04ae548/TFe6ae6c3f-7542-4b5a-80ce-d131a04ae54880b3e4b5_wac-034cc1abfa54.xlsx"
+sha256 = "f4cd9b0d72e7f69190f809474a8386568b44dcf7ec969f06f721a02ac6dc8ed0"
+size = 142621
+licence = "Copyright Microsoft. Downloaded from Microsoft's public template catalog for local interoperability testing only; not redistributed and not committed. See docs/research/corpus-licensing.md."
+
+[[template]]
+id = "9e1c479f-d30e-46d3-a816-131e292c12e9"
+title = "Credit card tracker"
+category = "trackers"
+kind = "xlsx"
+url = "https://createcatalog.public.onecdn.static.microsoft/catalog-assets/en-us/9e1c479f-d30e-46d3-a816-131e292c12e9/TF9e1c479f-d30e-46d3-a816-131e292c12e9760a9e3a_wac-f9a741fc692b.xlsx"
+sha256 = "46f328526a7f0c25c0060fc0237771321e39f581368c27bd9bd8d4c15309d51f"
+size = 23343
+licence = "Copyright Microsoft. Downloaded from Microsoft's public template catalog for local interoperability testing only; not redistributed and not committed. See docs/research/corpus-licensing.md."
+
+[[template]]
+id = "c2b640a6-8ee1-4258-9669-a8ab0b41240f"
+title = "Event planner and timeline"
+category = "trackers"
+kind = "xlsx"
+url = "https://createcatalog.public.onecdn.static.microsoft/catalog-assets/en-us/c2b640a6-8ee1-4258-9669-a8ab0b41240f/TFc2b640a6-8ee1-4258-9669-a8ab0b41240f8a1eace0_wac-67297ebe40c5.xlsx"
+sha256 = "b02ba57be37a34e2a49a08546f62b42ce7dd40ba99a15508cebf96a0e85a404c"
+size = 107846
+licence = "Copyright Microsoft. Downloaded from Microsoft's public template catalog for local interoperability testing only; not redistributed and not committed. See docs/research/corpus-licensing.md."
+
+[[template]]
+id = "6aab7182-eafe-4373-8c7c-ca9b212ff512"
+title = "Expense tracker"
+category = "trackers"
+kind = "xlsx"
+url = "https://createcatalog.public.onecdn.static.microsoft/catalog-assets/en-us/6aab7182-eafe-4373-8c7c-ca9b212ff512/TF6aab7182-eafe-4373-8c7c-ca9b212ff5123aae1db5_wac-3d9ae9aa6563.xlsx"
+sha256 = "759ca50fb010d1c6d6703e652808034b0a69307fd0b0dd80dae1e2e0e97ec39e"
+size = 26828
+licence = "Copyright Microsoft. Downloaded from Microsoft's public template catalog for local interoperability testing only; not redistributed and not committed. See docs/research/corpus-licensing.md."
+
+[[template]]
+id = "2f29bdf2-fcff-4e7a-a9de-9459eb8f1b98"
+title = "Family travel planner"
+category = "trackers"
+kind = "xlsx"
+url = "https://createcatalog.public.onecdn.static.microsoft/catalog-assets/en-us/2f29bdf2-fcff-4e7a-a9de-9459eb8f1b98/TF2f29bdf2-fcff-4e7a-a9de-9459eb8f1b98fed4a64e_wac-930e1c544831.xlsx"
+sha256 = "7f46de41c46fec91eb8031a5758251ca754cc824222e4d91268c3f5a657397f4"
+size = 55717
+licence = "Copyright Microsoft. Downloaded from Microsoft's public template catalog for local interoperability testing only; not redistributed and not committed. See docs/research/corpus-licensing.md."
+
+[[template]]
+id = "5673dfc3-6f8f-4810-b7e5-a90ae5ff1123"
+title = "Idea planner"
+category = "trackers"
+kind = "xlsx"
+url = "https://createcatalog.public.onecdn.static.microsoft/catalog-assets/en-us/5673dfc3-6f8f-4810-b7e5-a90ae5ff1123/TF5673dfc3-6f8f-4810-b7e5-a90ae5ff112305fb1251_wac-1861a40c49dc.xlsx"
+sha256 = "bacaa12323b88734f3bdb527eb74f51b3711cd1feeb562a8085c45cd6bc67d25"
+size = 19081
+licence = "Copyright Microsoft. Downloaded from Microsoft's public template catalog for local interoperability testing only; not redistributed and not committed. See docs/research/corpus-licensing.md."
+
+[[template]]
+id = "684d3472-ad1c-4b10-b8e7-6f0757115700"
+title = "Idea planner (tasks)"
+category = "trackers"
+kind = "xlsx"
+url = "https://createcatalog.public.onecdn.static.microsoft/catalog-assets/en-us/684d3472-ad1c-4b10-b8e7-6f0757115700/TF684d3472-ad1c-4b10-b8e7-6f07571157008b05a068-52fb6be9416b.xlsx"
+sha256 = "f44ebd730e7333797e0163c6319f4c554a54a51cba4a3672ba8ee42f889785ab"
+size = 16869
+licence = "Copyright Microsoft. Downloaded from Microsoft's public template catalog for local interoperability testing only; not redistributed and not committed. See docs/research/corpus-licensing.md."
+
+[[template]]
+id = "97739ac3-cc1c-40fb-8682-f809e067145e"
+title = "Monthly personal planner"
+category = "trackers"
+kind = "xlsx"
+url = "https://createcatalog.public.onecdn.static.microsoft/catalog-assets/en-us/97739ac3-cc1c-40fb-8682-f809e067145e/TF97739ac3-cc1c-40fb-8682-f809e067145e321b2df5_wac-4ba4a55d0ea8.xlsx"
+sha256 = "0b29d8cc73d029823569d8537b9271e24cdee3c03c99e0052c7ab3ec3a8a9bc8"
+size = 203212
+licence = "Copyright Microsoft. Downloaded from Microsoft's public template catalog for local interoperability testing only; not redistributed and not committed. See docs/research/corpus-licensing.md."
+
+[[template]]
+id = "ebcaa05b-2f6c-4bb7-8e88-d33225dc8ec7"
+title = "Party planner"
+category = "trackers"
+kind = "xlsx"
+url = "https://createcatalog.public.onecdn.static.microsoft/catalog-assets/en-us/ebcaa05b-2f6c-4bb7-8e88-d33225dc8ec7/TFebcaa05b-2f6c-4bb7-8e88-d33225dc8ec772c2ea04_wac-8910088b02d2.xlsx"
+sha256 = "b182b4225fa04db56e3adc580131a9a05a39296e443642ebbd348bd4286769b7"
+size = 73882
+licence = "Copyright Microsoft. Downloaded from Microsoft's public template catalog for local interoperability testing only; not redistributed and not committed. See docs/research/corpus-licensing.md."
+
+[[template]]
+id = "502c3712-653b-42ab-8a75-4574f6040930"
+title = "Personal mileage tracker"
+category = "trackers"
+kind = "xlsx"
+url = "https://createcatalog.public.onecdn.static.microsoft/catalog-assets/en-us/502c3712-653b-42ab-8a75-4574f6040930/TF502c3712-653b-42ab-8a75-4574f604093067beea34_wac-a37137c3651e.xlsx"
+sha256 = "f4186cb1069cb65fabb03d7c82c2a24df20766627a0faabb5153e764b0950ca2"
+size = 13930
+licence = "Copyright Microsoft. Downloaded from Microsoft's public template catalog for local interoperability testing only; not redistributed and not committed. See docs/research/corpus-licensing.md."
+
+[[template]]
+id = "0ffdef6d-9a19-4593-bdde-924d9e0aba2d"
+title = "Retirement planner"
+category = "trackers"
+kind = "xlsx"
+url = "https://createcatalog.public.onecdn.static.microsoft/catalog-assets/en-us/0ffdef6d-9a19-4593-bdde-924d9e0aba2d/TF0ffdef6d-9a19-4593-bdde-924d9e0aba2d486fb12b_wac-5ef381801116.xlsx"
+sha256 = "f6a0b2619e7fe8f8cbee29166f08652f56f8393cd8f89976960272380e8ff655"
+size = 213730
+licence = "Copyright Microsoft. Downloaded from Microsoft's public template catalog for local interoperability testing only; not redistributed and not committed. See docs/research/corpus-licensing.md."
+
+[[template]]
+id = "2a72be1c-7be5-413d-b345-417c06878d3a"
+title = "Student assignment planner"
+category = "trackers"
+kind = "xlsx"
+url = "https://createcatalog.public.onecdn.static.microsoft/catalog-assets/en-us/2a72be1c-7be5-413d-b345-417c06878d3a/TF2a72be1c-7be5-413d-b345-417c06878d3ac9253d7f_wac-d425482f443f.xlsx"
+sha256 = "c3c7f7ce797528ec8a5c2da648df44f23c73d7550822265aa0737cd481544240"
+size = 36343
+licence = "Copyright Microsoft. Downloaded from Microsoft's public template catalog for local interoperability testing only; not redistributed and not committed. See docs/research/corpus-licensing.md."
+
+[[template]]
+id = "b86f671c-8d23-4af3-84ee-5d1d9fd9b07f"
+title = "Subscription and membership tracker"
+category = "trackers"
+kind = "xlsx"
+url = "https://createcatalog.public.onecdn.static.microsoft/catalog-assets/en-us/b86f671c-8d23-4af3-84ee-5d1d9fd9b07f/TFb86f671c-8d23-4af3-84ee-5d1d9fd9b07f60b735b7_wac-12278e74bb00.xlsx"
+sha256 = "9e7312bd8c2a108d555dfe4233d6ad5303bf5e681f11fc36bf092ccbdd101859"
+size = 17077
+licence = "Copyright Microsoft. Downloaded from Microsoft's public template catalog for local interoperability testing only; not redistributed and not committed. See docs/research/corpus-licensing.md."
+
+[[template]]
+id = "4b371a73-0346-4f26-a194-75ec59ca6c0e"
+title = "Weekly lesson planner"
+category = "trackers"
+kind = "xlsx"
+url = "https://createcatalog.public.onecdn.static.microsoft/catalog-assets/en-us/4b371a73-0346-4f26-a194-75ec59ca6c0e/TF4b371a73-0346-4f26-a194-75ec59ca6c0e7b456080_wac-ffe8bcc6d168.xlsx"
+sha256 = "725447724dfbef565e6ca64cc3240c9a5eefeb008906b3610754d1d96f82c98c"
+size = 27625
+licence = "Copyright Microsoft. Downloaded from Microsoft's public template catalog for local interoperability testing only; not redistributed and not committed. See docs/research/corpus-licensing.md."
