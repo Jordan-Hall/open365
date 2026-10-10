@@ -9,7 +9,7 @@ There is one Rust core and one **command layer**. Every user-visible action is a
 Limit, stated plainly: on a desktop, scopes protect against *prompt-injected or misbehaving agents* that use our surfaces. They do not protect against malicious code running as the same OS user, which can edit files directly. The command origin is recorded by the surface (stdio/pipe/process), never supplied by the caller. Remote CRDT updates (P2) are a second mutation path and must be decoded and authorised server-side (see threat model T6).
 
 ```
-        Native shell (ADR-004 spike)    CLI     MCP / JSON control    Open CoWorker (P2)
+        egui shell (ADR-004)            CLI     MCP / JSON control    Open CoWorker (P2)
                     \                    |               |                 /
                      +------------- Command layer (typed, scoped, audited) -------------+
                                          |                         |
@@ -35,7 +35,7 @@ Limit, stated plainly: on a desktop, scopes protect against *prompt-injected or 
 | `commands` | Command schema, validation, undo/redo, permission scopes, audit events | **P0** | Build |
 | `cli` | `open365 docx|xlsx <cmd>`: inspect, roundtrip --check, apply-commands, export-pdf | **P0** | Build |
 | `mcp` | Local stdio/loopback MCP server exposing commands; read/write path fencing (VectorCraft pattern); confirmation for destructive commands | **P1** | Build |
-| Desktop shell | App chrome, canvas host, IME, accessibility, clipboard, printing | **Spike in P0, product in P1** | Qt/cxx-qt vs Rust-native (ADR-004) |
+| Desktop shell | App chrome, canvas host, IME, accessibility, clipboard, printing | **Spike in P0, product in P1** | egui/eframe on wgpu, PhotoCraft pattern (ADR-004) |
 | `testkit` / `xtask` | Fixture corpus, cached-value oracles, ECMA-376 schema validator, invariants, fuzz targets, layering checks | **P0** | Build |
 | Sync/storage | Single-org file sync and sharing; own sync/storage service | P1–P2 | Build (ADR-009) |
 | Real-time co-edit | CRDT (Loro or Yrs) behind a `DocSync` trait, server as sole peer; OOXML stays import/export only | P2 | Reuse CRDT |

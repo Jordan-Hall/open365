@@ -36,9 +36,9 @@ Crates: `opc`, `docx`, `xlsx`, `calc` (own engine: parser, dependency graph, cor
 - Commands carry an effect class. Thumbnail and signature are invalidated on edit. Unreachable parts are GC'd with a log entry.
 - **Accept:** on 20 tier-A fixtures, invariants 1–7 in `../testing/fidelity-strategy.md` pass. Untouched parts are byte-identical. Our schema validator reports no new errors on any output. Recalc matches Excel-cached values. The dropped-content log is empty except for a deliberate unsupported-feature fixture. A 1 h fuzz run finds no panics or OOM. Zip-bomb and DTD fixtures are rejected.
 
-## M2: Shell spike, Qt/cxx-qt vs Rust-native (about 2–3 weeks, parallel to M1)
-- One paged rich-text view (plain layout, no floats) and one 100k-row grid view on the shared core, in both stacks.
-- **Accept:** the pass/fail sheet from `../research/agent-reports/native-ui.md` is completed for both (IME, NVDA/VoiceOver/Orca, scroll p95, typing p95, print-to-PDF, clipboard, high-DPI, packaging). ADR-004 is decided with that evidence.
+## M2: Desktop shell on the PhotoCraft stack (egui/eframe + wgpu), parallel to M1
+- `open365-ui-egui` + `apps/desktop`: one paged rich-text view (plain layout, no floats) and one 100k-row grid view on the shared core.
+- **Accept:** the pass/fail sheet from `../research/agent-reports/native-ui.md` is completed (IME, NVDA/VoiceOver/Orca, scroll p95, typing p95, print-to-PDF, clipboard, high-DPI, packaging); failures become tracked work items.
 
 ## M3: Native single-user editor alpha (about 8–10 weeks)
 - Chosen shell, basic paged layout (paragraph/run styles, lists, simple tables, inline images), grid editing with formulas, undo/redo through commands, PDF export.

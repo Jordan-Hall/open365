@@ -21,6 +21,8 @@ const LAYERS: &[(&str, u8)] = &[
     ("open365-pdf", 4),
     ("open365-mcp", 5),
     ("open365-testkit", 5),
+    ("open365-ui-egui", 5),
+    ("open365-desktop", 6),
     ("open365-cli", 6),
     ("xtask", 6),
 ];

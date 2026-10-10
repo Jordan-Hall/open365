@@ -23,12 +23,12 @@ Format: context, alternatives, decision, consequences, confidence, and what evid
 - **Consequences:** Two models must be kept in sync (ours ↔ engine). Fixture coverage measures the gaps.
 - **Confidence:** Medium. **Would change if:** coverage is below about 70% of functions in our corpus, the recalc design cannot do incremental updates, or governance stalls.
 
-## ADR-004 Desktop shell chosen by a head-to-head spike — Proposed (decision needed)
-- **Context:** Every option requires a custom document canvas. What differs is what the toolkit provides *around* the canvas: IME, accessibility, printing, clipboard. AccessKit 0.25 lacks rich-text support. No Rust toolkit documents printing. Dioxus desktop is a WebView, and dioxus-native/Blitz is alpha/beta with no IME or accessibility yet.
-- **Alternatives:** (A) Qt 6 via cxx-qt with a Rust canvas item; (B) winit + wgpu + vello + parley + AccessKit, with Slint for chrome; (C) per-OS native shells; (D) egui; (E) Dioxus native.
-- **Decision (proposed):** Spike A vs B on the same Rust core for 2–3 weeks against the pass/fail criteria in `../research/agent-reports/native-ui.md`. C is the long-term option if A and B both fail accessibility. D and E are rejected for the editor.
-- **Consequences:** The core must not depend on the UI (enforced by an xtask layering check).
-- **Confidence:** Medium. **Would change if:** Qt LGPL review fails (rules out A), or AccessKit gains text-range/rich-text support (strengthens B).
+## ADR-004 Desktop shell follows the Storytold PhotoCraft stack (egui/eframe on wgpu) — Accepted (owner, 2026-10-10)
+- **Context:** The owner named Storytold (PhotoCraft, VectorCraft) as the gold standard and asked to base the UI on PhotoCraft. PhotoCraft (MIT OR Apache-2.0) uses an engine-first design: pure-data document model + command engine, a thin swappable `ui-egui` crate on eframe/egui 0.36 + winit 0.30 + wgpu, `egui_kittest` UI tests, `rfd` file dialogs, a shared command registry used by UI/CLI/MCP, and an authenticated loopback `--control` JSON channel (sources: github.com/storytold/photocraft README and Cargo.toml, read 2026-10-10).
+- **Alternatives:** Qt/cxx-qt (LGPL, conflicts with ADR-008); winit+vello+parley+AccessKit hand-built shell; per-OS native shells.
+- **Decision:** Adopt the PhotoCraft pattern. Chrome (ribbon, panels, dialogs) in egui via `open365-ui-egui`; the document canvas (paged text) and grid are our own renderers drawn as custom egui widgets/wgpu paint callbacks, fed by the format-agnostic layout crates. The UI crate stays thin and replaceable; all mutations go through the command layer (ADR-002).
+- **Consequences / risks we test, not assume:** egui is immediate-mode, so large documents need virtualised layout caches; accessibility of the custom canvas (AccessKit text ranges), IME composition, and printing need explicit work and measurement on Windows/macOS/Linux. The native-UI pass/fail sheet in `../research/agent-reports/native-ui.md` remains the acceptance gate.
+- **Confidence:** Medium-high. **Would change if:** the canvas cannot meet screen-reader or IME criteria inside egui; then only the canvas host is swapped (the UI crate boundary exists for this).
 
 ## ADR-005 No other office suite anywhere, not even as a test oracle — Accepted (owner, 2026-10-10)
 - **Context:** The owner wants a complete suite of our own: "a full 365 not using anything else". The earlier proposal used LibreOffice headless as a test-only oracle.
@@ -54,7 +54,7 @@ Format: context, alternatives, decision, consequences, confidence, and what evid
 ## ADR-008 Open365 is MIT-licensed; dependencies must be permissive — Accepted (owner, 2026-10-10)
 - **Context:** The owner chose "same as VectorCraft" and then specified MIT.
 - **Decision:** The workspace is `license = "MIT"`. `deny.toml` allows only permissive dependency licences (MIT, Apache-2.0, BSD, ISC, Unicode-3.0, Zlib).
-- **Consequences:** Copyleft engines (LibreOffice MPL-2.0, ONLYOFFICE AGPL, Synapse AGPL) may only be used out of process: as a test oracle, or as a separately deployed service. Qt (LGPL) as a desktop dependency would need an explicit exception recorded here. This weakens ADR-004 option A.
+- **Consequences:** Copyleft engines (LibreOffice MPL-2.0, ONLYOFFICE AGPL, Synapse AGPL) may only be used out of process: as a test oracle, or as a separately deployed service. Qt (LGPL) as a desktop dependency would need an explicit exception recorded here. Superseded in practice by ADR-004 (egui stack).
 - **Confidence:** High.
 
 ## ADR-007 Developer CLIs are external agents, not inference backends — Proposed
