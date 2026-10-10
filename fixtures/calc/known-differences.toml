@@ -58,22 +58,6 @@ id = "combin.t19"
 reason = "COMBIN of large arguments: Excel's last digits come from an unidentified multiplication order (checked ascending/descending products, divide-first, factorial quotients); Open365 is within 1-4 ulp."
 
 [[difference]]
-id = "tan.t02"
-reason = "TAN after argument reduction differs from Excel in the last digit; Excel's sin/cos kernels are not reproduced bit for bit (reduction by the 64-bit pi is)."
-
-[[difference]]
-id = "tan.t03"
-reason = "TAN after argument reduction differs from Excel in the last digit; Excel's sin/cos kernels are not reproduced bit for bit (reduction by the 64-bit pi is)."
-
-[[difference]]
-id = "tan.t13"
-reason = "TAN after argument reduction differs from Excel in the last digit; Excel's sin/cos kernels are not reproduced bit for bit (reduction by the 64-bit pi is)."
-
-[[difference]]
-id = "tan.t15"
-reason = "TAN after argument reduction differs from Excel in the last digit; Excel's sin/cos kernels are not reproduced bit for bit (reduction by the 64-bit pi is)."
-
-[[difference]]
 id = "varfit.t03"
 reason = "Variance/standard deviation of values whose squares cancel: Excel's accumulation order is not identified (the two-pass and sum-of-squares forms each match some cases, neither all); results differ in the last digits."
 
@@ -120,74 +104,6 @@ reason = "Variance/standard deviation of values whose squares cancel: Excel's ac
 [[difference]]
 id = "varfit.t39"
 reason = "Variance/standard deviation of values whose squares cancel: Excel's accumulation order is not identified (the two-pass and sum-of-squares forms each match some cases, neither all); results differ in the last digits."
-
-[[difference]]
-id = "trigfit.t01"
-reason = "SIN/COS/TAN after the 64-bit-pi argument reduction (|x| > pi/4) differ from Excel by one ulp; the platform sin/cos kernels differ from Excel's."
-
-[[difference]]
-id = "trigfit.t02"
-reason = "SIN/COS/TAN after the 64-bit-pi argument reduction (|x| > pi/4) differ from Excel by one ulp; the platform sin/cos kernels differ from Excel's."
-
-[[difference]]
-id = "trigfit.t18"
-reason = "SIN/COS/TAN after the 64-bit-pi argument reduction (|x| > pi/4) differ from Excel by one ulp; the platform sin/cos kernels differ from Excel's."
-
-[[difference]]
-id = "trigfit.t23"
-reason = "SIN/COS/TAN after the 64-bit-pi argument reduction (|x| > pi/4) differ from Excel by one ulp; the platform sin/cos kernels differ from Excel's."
-
-[[difference]]
-id = "trigfit.t24"
-reason = "SIN/COS/TAN after the 64-bit-pi argument reduction (|x| > pi/4) differ from Excel by one ulp; the platform sin/cos kernels differ from Excel's."
-
-[[difference]]
-id = "trigfit.t25"
-reason = "SIN/COS/TAN after the 64-bit-pi argument reduction (|x| > pi/4) differ from Excel by one ulp; the platform sin/cos kernels differ from Excel's."
-
-[[difference]]
-id = "trigfit.t28"
-reason = "SIN/COS/TAN after the 64-bit-pi argument reduction (|x| > pi/4) differ from Excel by one ulp; the platform sin/cos kernels differ from Excel's."
-
-[[difference]]
-id = "trigfit.t37"
-reason = "SIN/COS/TAN after the 64-bit-pi argument reduction (|x| > pi/4) differ from Excel by one ulp; the platform sin/cos kernels differ from Excel's."
-
-[[difference]]
-id = "trigfit.t38"
-reason = "SIN/COS/TAN after the 64-bit-pi argument reduction (|x| > pi/4) differ from Excel by one ulp; the platform sin/cos kernels differ from Excel's."
-
-[[difference]]
-id = "trigfit.t47"
-reason = "SIN/COS/TAN after the 64-bit-pi argument reduction (|x| > pi/4) differ from Excel by one ulp; the platform sin/cos kernels differ from Excel's."
-
-[[difference]]
-id = "trigfit.t48"
-reason = "SIN/COS/TAN after the 64-bit-pi argument reduction (|x| > pi/4) differ from Excel by one ulp; the platform sin/cos kernels differ from Excel's."
-
-[[difference]]
-id = "trigfit.t51"
-reason = "SIN/COS/TAN after the 64-bit-pi argument reduction (|x| > pi/4) differ from Excel by one ulp; the platform sin/cos kernels differ from Excel's."
-
-[[difference]]
-id = "trigfit.t60"
-reason = "SIN/COS/TAN after the 64-bit-pi argument reduction (|x| > pi/4) differ from Excel by one ulp; the platform sin/cos kernels differ from Excel's."
-
-[[difference]]
-id = "trigfit.t64"
-reason = "SIN/COS/TAN after the 64-bit-pi argument reduction (|x| > pi/4) differ from Excel by one ulp; the platform sin/cos kernels differ from Excel's."
-
-[[difference]]
-id = "trigfit.t65"
-reason = "SIN/COS/TAN after the 64-bit-pi argument reduction (|x| > pi/4) differ from Excel by one ulp; the platform sin/cos kernels differ from Excel's."
-
-[[difference]]
-id = "trigfit.t68"
-reason = "SIN/COS/TAN after the 64-bit-pi argument reduction (|x| > pi/4) differ from Excel by one ulp; the platform sin/cos kernels differ from Excel's."
-
-[[difference]]
-id = "trigfit.t69"
-reason = "SIN/COS/TAN after the 64-bit-pi argument reduction (|x| > pi/4) differ from Excel by one ulp; the platform sin/cos kernels differ from Excel's."
 
 # The accounting formats pad with `*` fill. The fill count comes from glyph widths measured in the oracle's font
 # (crates/calc/src/numfmt/mod.rs, `glyph_units`); the negative section `_(* (#,##0)` ends in `)` instead of a
@@ -264,3 +180,179 @@ reason = "DB last (partial-year) period: Excel differs by 1-2 ulp in the evaluat
 [[difference]]
 id = "db.life_frac_per7"
 reason = "DB last (partial-year) period: Excel differs by 1-2 ulp in the evaluation order of book * rate * (12 - month) / 12; the exact order is unknown (13 orderings tried)."
+
+[[difference]]
+id = "mathfit_sinh.t014"
+reason = "SINH below |x| = 1 differs from Excel by 1-2 ulp in about a quarter of random arguments (a correctly rounded value matches 38 of 53); Excel's algorithm for small arguments (the large-argument form (e^x - e^-x)/2 is exact) is not identified."
+
+[[difference]]
+id = "mathfit_sinh.t098"
+reason = "SINH below |x| = 1 differs from Excel by 1-2 ulp in about a quarter of random arguments (a correctly rounded value matches 38 of 53); Excel's algorithm for small arguments (the large-argument form (e^x - e^-x)/2 is exact) is not identified."
+
+[[difference]]
+id = "mathfit_tanh.t006"
+reason = "TANH below |x| = 1 differs from Excel by 1-4 ulp in about a third of random arguments (sinh/cosh with a correctly rounded sinh matches 49 of 73); Excel's algorithm for small arguments is not identified."
+
+[[difference]]
+id = "mathfit_tanh.t012"
+reason = "TANH below |x| = 1 differs from Excel by 1-4 ulp in about a third of random arguments (sinh/cosh with a correctly rounded sinh matches 49 of 73); Excel's algorithm for small arguments is not identified."
+
+[[difference]]
+id = "mathfit_tanh.t014"
+reason = "TANH below |x| = 1 differs from Excel by 1-4 ulp in about a third of random arguments (sinh/cosh with a correctly rounded sinh matches 49 of 73); Excel's algorithm for small arguments is not identified."
+
+[[difference]]
+id = "mathfit_tanh.t033"
+reason = "TANH below |x| = 1 differs from Excel by 1-4 ulp in about a third of random arguments (sinh/cosh with a correctly rounded sinh matches 49 of 73); Excel's algorithm for small arguments is not identified."
+
+[[difference]]
+id = "mathfit_tanh.t039"
+reason = "TANH below |x| = 1 differs from Excel by 1-4 ulp in about a third of random arguments (sinh/cosh with a correctly rounded sinh matches 49 of 73); Excel's algorithm for small arguments is not identified."
+
+[[difference]]
+id = "mathfit_tanh.t046"
+reason = "TANH below |x| = 1 differs from Excel by 1-4 ulp in about a third of random arguments (sinh/cosh with a correctly rounded sinh matches 49 of 73); Excel's algorithm for small arguments is not identified."
+
+[[difference]]
+id = "mathfit_tanh.t060"
+reason = "TANH below |x| = 1 differs from Excel by 1-4 ulp in about a third of random arguments (sinh/cosh with a correctly rounded sinh matches 49 of 73); Excel's algorithm for small arguments is not identified."
+
+[[difference]]
+id = "mathfit_tanh.t067"
+reason = "TANH below |x| = 1 differs from Excel by 1-4 ulp in about a third of random arguments (sinh/cosh with a correctly rounded sinh matches 49 of 73); Excel's algorithm for small arguments is not identified."
+
+[[difference]]
+id = "mathfit_tanh.t072"
+reason = "TANH below |x| = 1 differs from Excel by 1-4 ulp in about a third of random arguments (sinh/cosh with a correctly rounded sinh matches 49 of 73); Excel's algorithm for small arguments is not identified."
+
+[[difference]]
+id = "mathfit_tanh.t074"
+reason = "TANH below |x| = 1 differs from Excel by 1-4 ulp in about a third of random arguments (sinh/cosh with a correctly rounded sinh matches 49 of 73); Excel's algorithm for small arguments is not identified."
+
+[[difference]]
+id = "mathfit_tanh.t079"
+reason = "TANH below |x| = 1 differs from Excel by 1-4 ulp in about a third of random arguments (sinh/cosh with a correctly rounded sinh matches 49 of 73); Excel's algorithm for small arguments is not identified."
+
+[[difference]]
+id = "mathfit_tanh.t100"
+reason = "TANH below |x| = 1 differs from Excel by 1-4 ulp in about a third of random arguments (sinh/cosh with a correctly rounded sinh matches 49 of 73); Excel's algorithm for small arguments is not identified."
+
+[[difference]]
+id = "mathfit_tanh.t115"
+reason = "TANH below |x| = 1 differs from Excel by 1-4 ulp in about a third of random arguments (sinh/cosh with a correctly rounded sinh matches 49 of 73); Excel's algorithm for small arguments is not identified."
+
+[[difference]]
+id = "mathfit_sinh.t121"
+reason = "SINH below |x| = 1 differs from Excel by 1-2 ulp in about a quarter of random arguments (a correctly rounded value matches 38 of 53); Excel's algorithm for small arguments (the large-argument form (e^x - e^-x)/2 is exact) is not identified."
+
+[[difference]]
+id = "mathfit_sinh.t122"
+reason = "SINH below |x| = 1 differs from Excel by 1-2 ulp in about a quarter of random arguments (a correctly rounded value matches 38 of 53); Excel's algorithm for small arguments (the large-argument form (e^x - e^-x)/2 is exact) is not identified."
+
+[[difference]]
+id = "mathfit_sinh.t123"
+reason = "SINH below |x| = 1 differs from Excel by 1-2 ulp in about a quarter of random arguments (a correctly rounded value matches 38 of 53); Excel's algorithm for small arguments (the large-argument form (e^x - e^-x)/2 is exact) is not identified."
+
+[[difference]]
+id = "mathfit_sinh.t129"
+reason = "SINH below |x| = 1 differs from Excel by 1-2 ulp in about a quarter of random arguments (a correctly rounded value matches 38 of 53); Excel's algorithm for small arguments (the large-argument form (e^x - e^-x)/2 is exact) is not identified."
+
+[[difference]]
+id = "mathfit_sinh.t134"
+reason = "SINH below |x| = 1 differs from Excel by 1-2 ulp in about a quarter of random arguments (a correctly rounded value matches 38 of 53); Excel's algorithm for small arguments (the large-argument form (e^x - e^-x)/2 is exact) is not identified."
+
+[[difference]]
+id = "mathfit_sinh.t135"
+reason = "SINH below |x| = 1 differs from Excel by 1-2 ulp in about a quarter of random arguments (a correctly rounded value matches 38 of 53); Excel's algorithm for small arguments (the large-argument form (e^x - e^-x)/2 is exact) is not identified."
+
+[[difference]]
+id = "mathfit_sinh.t136"
+reason = "SINH below |x| = 1 differs from Excel by 1-2 ulp in about a quarter of random arguments (a correctly rounded value matches 38 of 53); Excel's algorithm for small arguments (the large-argument form (e^x - e^-x)/2 is exact) is not identified."
+
+[[difference]]
+id = "mathfit_sinh.t141"
+reason = "SINH below |x| = 1 differs from Excel by 1-2 ulp in about a quarter of random arguments (a correctly rounded value matches 38 of 53); Excel's algorithm for small arguments (the large-argument form (e^x - e^-x)/2 is exact) is not identified."
+
+[[difference]]
+id = "mathfit_sinh.t143"
+reason = "SINH below |x| = 1 differs from Excel by 1-2 ulp in about a quarter of random arguments (a correctly rounded value matches 38 of 53); Excel's algorithm for small arguments (the large-argument form (e^x - e^-x)/2 is exact) is not identified."
+
+[[difference]]
+id = "mathfit_sinh.t146"
+reason = "SINH below |x| = 1 differs from Excel by 1-2 ulp in about a quarter of random arguments (a correctly rounded value matches 38 of 53); Excel's algorithm for small arguments (the large-argument form (e^x - e^-x)/2 is exact) is not identified."
+
+[[difference]]
+id = "mathfit_sinh.t150"
+reason = "SINH below |x| = 1 differs from Excel by 1-2 ulp in about a quarter of random arguments (a correctly rounded value matches 38 of 53); Excel's algorithm for small arguments (the large-argument form (e^x - e^-x)/2 is exact) is not identified."
+
+[[difference]]
+id = "mathfit_sinh.t153"
+reason = "SINH below |x| = 1 differs from Excel by 1-2 ulp in about a quarter of random arguments (a correctly rounded value matches 38 of 53); Excel's algorithm for small arguments (the large-argument form (e^x - e^-x)/2 is exact) is not identified."
+
+[[difference]]
+id = "mathfit_sinh.t158"
+reason = "SINH below |x| = 1 differs from Excel by 1-2 ulp in about a quarter of random arguments (a correctly rounded value matches 38 of 53); Excel's algorithm for small arguments (the large-argument form (e^x - e^-x)/2 is exact) is not identified."
+
+[[difference]]
+id = "mathfit_tanh.t124"
+reason = "TANH below |x| = 1 differs from Excel by 1-4 ulp in about a third of random arguments (sinh/cosh with a correctly rounded sinh matches 49 of 73); Excel's algorithm for small arguments is not identified."
+
+[[difference]]
+id = "mathfit_tanh.t127"
+reason = "TANH below |x| = 1 differs from Excel by 1-4 ulp in about a third of random arguments (sinh/cosh with a correctly rounded sinh matches 49 of 73); Excel's algorithm for small arguments is not identified."
+
+[[difference]]
+id = "mathfit_tanh.t129"
+reason = "TANH below |x| = 1 differs from Excel by 1-4 ulp in about a third of random arguments (sinh/cosh with a correctly rounded sinh matches 49 of 73); Excel's algorithm for small arguments is not identified."
+
+[[difference]]
+id = "mathfit_tanh.t130"
+reason = "TANH below |x| = 1 differs from Excel by 1-4 ulp in about a third of random arguments (sinh/cosh with a correctly rounded sinh matches 49 of 73); Excel's algorithm for small arguments is not identified."
+
+[[difference]]
+id = "mathfit_tanh.t131"
+reason = "TANH below |x| = 1 differs from Excel by 1-4 ulp in about a third of random arguments (sinh/cosh with a correctly rounded sinh matches 49 of 73); Excel's algorithm for small arguments is not identified."
+
+[[difference]]
+id = "mathfit_tanh.t132"
+reason = "TANH below |x| = 1 differs from Excel by 1-4 ulp in about a third of random arguments (sinh/cosh with a correctly rounded sinh matches 49 of 73); Excel's algorithm for small arguments is not identified."
+
+[[difference]]
+id = "mathfit_tanh.t137"
+reason = "TANH below |x| = 1 differs from Excel by 1-4 ulp in about a third of random arguments (sinh/cosh with a correctly rounded sinh matches 49 of 73); Excel's algorithm for small arguments is not identified."
+
+[[difference]]
+id = "mathfit_tanh.t143"
+reason = "TANH below |x| = 1 differs from Excel by 1-4 ulp in about a third of random arguments (sinh/cosh with a correctly rounded sinh matches 49 of 73); Excel's algorithm for small arguments is not identified."
+
+[[difference]]
+id = "mathfit_tanh.t146"
+reason = "TANH below |x| = 1 differs from Excel by 1-4 ulp in about a third of random arguments (sinh/cosh with a correctly rounded sinh matches 49 of 73); Excel's algorithm for small arguments is not identified."
+
+[[difference]]
+id = "mathfit_tanh.t148"
+reason = "TANH below |x| = 1 differs from Excel by 1-4 ulp in about a third of random arguments (sinh/cosh with a correctly rounded sinh matches 49 of 73); Excel's algorithm for small arguments is not identified."
+
+[[difference]]
+id = "mathfit_tanh.t149"
+reason = "TANH below |x| = 1 differs from Excel by 1-4 ulp in about a third of random arguments (sinh/cosh with a correctly rounded sinh matches 49 of 73); Excel's algorithm for small arguments is not identified."
+
+[[difference]]
+id = "mathfit_tanh.t150"
+reason = "TANH below |x| = 1 differs from Excel by 1-4 ulp in about a third of random arguments (sinh/cosh with a correctly rounded sinh matches 49 of 73); Excel's algorithm for small arguments is not identified."
+
+[[difference]]
+id = "mathfit_tanh.t151"
+reason = "TANH below |x| = 1 differs from Excel by 1-4 ulp in about a third of random arguments (sinh/cosh with a correctly rounded sinh matches 49 of 73); Excel's algorithm for small arguments is not identified."
+
+[[difference]]
+id = "mathfit_tanh.t152"
+reason = "TANH below |x| = 1 differs from Excel by 1-4 ulp in about a third of random arguments (sinh/cosh with a correctly rounded sinh matches 49 of 73); Excel's algorithm for small arguments is not identified."
+
+[[difference]]
+id = "mathfit_tanh.t156"
+reason = "TANH below |x| = 1 differs from Excel by 1-4 ulp in about a third of random arguments (sinh/cosh with a correctly rounded sinh matches 49 of 73); Excel's algorithm for small arguments is not identified."
+
+[[difference]]
+id = "mathfit_powbig.t166"
+reason = "x^-5000 with x = 0.944267: Excel's repeated-squaring result is 229 ulp from Open365's right-to-left binary exponentiation (which is exact in all 600 other integer-power probes); the cause is unknown."

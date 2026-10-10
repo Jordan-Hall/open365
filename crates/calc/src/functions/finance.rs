@@ -19,23 +19,11 @@ pub(super) fn xpow(x: f64, n: f64) -> Res<f64> {
         }
     }
     let r = if n == n.trunc() && n.abs() < 2_147_483_648.0 {
-        let mut m = n.abs() as u64;
-        let mut result = 1.0;
-        let mut base = x;
-        while m > 0 {
-            if m & 1 == 1 {
-                result *= base;
-            }
-            base *= base;
-            m >>= 1;
-        }
-        if n < 0.0 { 1.0 / result } else { result }
+        crate::xmath::pow_int(x, n)
     } else if x < 0.0 {
         return Err(ErrorKind::Num);
-    } else if n == 0.5 {
-        x.sqrt()
     } else {
-        (n * x.ln()).exp()
+        crate::xmath::pow_frac(x, n)
     };
     if r.is_finite() {
         Ok(r)
@@ -143,14 +131,14 @@ pub(super) fn nper(ctx: &EvalContext<'_>, args: &[Arg]) -> Res<Value> {
     let k = if t { pmt * (1.0 + r) } else { pmt };
     let num = k - fv * r;
     let den = k + pv * r;
-    let l = (1.0 + r).ln();
+    let l = crate::xmath::ln(1.0 + r);
     if l == 0.0 {
         return Err(ErrorKind::DivZero);
     }
     if l.is_infinite() {
         return Err(ErrorKind::Num);
     }
-    number((num / den).ln() / l)
+    number(crate::xmath::ln(num / den) / l)
 }
 
 // ---- IPMT, PPMT, CUMIPMT, CUMPRINC ---------------------------------------------------------

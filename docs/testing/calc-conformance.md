@@ -5,7 +5,7 @@ never needs Excel.
 
 | File | Role |
 |---|---|
-| `fixtures/calc/conformance.json` | The corpus: 24,696 cases. Edited by hand or by script; one case per line. |
+| `fixtures/calc/conformance.json` | The corpus: 29,868 cases. Edited by hand or by script; one case per line. |
 | `tools/office/calc-oracle.ps1` | Local-only tool. Runs every case in Excel over COM and writes the results. |
 | `fixtures/reference/calc/conformance-results.json` | Excel's answers, committed. Includes Excel version, build and decimal separator. |
 | `fixtures/calc/known-differences.toml` | Cases where Open365 intentionally or temporarily differs, each with a reason. |
@@ -66,10 +66,11 @@ forms; the corpus has no case for them.
 
 ## Current state
 
-24,696 cases, 24,638 pass, 58 known differences (listed with reasons in `known-differences.toml`: the `**` parse
-quirk, XLOOKUP array results (no spill), a few undocumented Excel quirks, large COMBIN, trigonometric last digits, variance
-accumulation order, accounting fill, and two `IFERROR` over arrays of references). The test also fails for a corpus case without an Excel
-result or a stored result without a case.
+29,868 cases, 29,780 pass, 88 known differences listed in `known-differences.toml` (44 older ones and 44 from the `mathfit_` probes).
+Older entries: the `**` parse quirk, XLOOKUP array results (no spill), a
+few undocumented Excel quirks, large COMBIN, variance accumulation order, accounting fill, `DB` last period and two `IFERROR`
+over arrays of references. New entries: SINH/TANH below |x| = 1 (last digits) and one `x^-5000` case. The test also fails for a
+corpus case without an Excel result or a stored result without a case.
 
 ## Behaviour measured against Excel
 
@@ -100,7 +101,7 @@ Added with the second function batch (math and statistics):
 
 * `SIN`, `COS` and `TAN` refuse `|x| >= 2^27` and reduce the argument with a pi of 64 mantissa bits
   (`0xC90FDAA22168C235 * 2^-62`): `SIN(PI())` is `1.22514845490862E-16`, `COS(PI()/2)` is `6.1257422745431E-17`.
-* `ACOS(x)` is `PI()/2 - ASIN(x)`; `COSH` is `(e^x + e^-x) / 2` and `SINH`/`COSH` return `#NUM!` when `e^|x|` overflows
+* `ACOS(x)` is `PI()/2 - ASIN(x)` (see "Math library" below); `COSH` is `(e^x + e^-x) / 2` and `SINH`/`COSH` return `#NUM!` when `e^|x|` overflows
   (`SINH(710)`); `DEGREES` is `x * (180/PI)`, `RADIANS` is `x * (PI/180)`; `LOG(x, base)` is `ln(x)/ln(base)`.
 * `FACT` multiplies from the top down, `PERMUT` from the bottom up. `FACT(-0.5)` is `#NUM!`.
 * The Analysis ToolPak functions (`GCD`, `LCM`, `QUOTIENT`) reject booleans with `#VALUE!`, `GCD(,4)` is `#N/A`.
@@ -225,10 +226,12 @@ Verified in the second financial batch (groups `npv`, `syd`, `ddb`, `db`; bit-ex
 * `DDB`: a period below 1 counts as 1, period > life is `#NUM!`, balance `old = cost*xpow(1-f/life, period-1)`, depreciation `old*rate`, cut to `old-salvage`; `rate >= 1` gives `cost` in period 1 and 0 afterwards. `SYD` gives `#DIV/0!` when `life*(life+1)` overflows.
 * `DB`: `rate = floor(1000*(1-(salvage/cost)^(1/life)) + 0.5)/1000`; period is truncated (below 1 counts as 1); the book value is tracked by subtraction, first period `cost*rate*(month/12)`, any period past the life `book*rate/12*(12-month)`; a life below 1 with period >= 1 runs one extra iteration.
 
-Implemented but NOT verified (no corpus cases; generators `gen_fin1.py`..`gen_fin3.py` kept outside the repository): `PMT`, `NPER`, `RATE`,
+`NPER` is verified (group `nper`, 408 cases, bit exact) now that `LN` is correctly rounded: `ln(num/den) / ln(1+r)`.
+Implemented but NOT verified (no corpus cases; generators `gen_fin1.py`..`gen_fin3.py` kept outside the repository): `PMT` (probed again with
+the correctly rounded power: 205 of 414 cases exact; 209 differ in the last digits, so the group was left out of the corpus), `RATE`,
 `IPMT`, `PPMT`, `CUMIPMT`, `CUMPRINC`, `XNPV`, `IRR`, `XIRR`, `MIRR`, `VDB`. Measured so far:
 
-* `PMT` structure is `-r*((pv+fv)*(q/e) - fv)` with `e = q-1` accurate for small rates (probes at r = 1 fit all 126 cases), but the bits of `q`/`e` for r != 1 are not reproduced (about 55% exact). Excel's `ln` is correctly rounded (`LN(1.05)` = 0.04879016416943205) whereas the Windows CRT/Rust `ln` is one ulp lower; with a correctly rounded `ln`, `NPER` is 376/397 exact, so a high-accuracy `ln` is the next step. `VDB` has 284 mismatches (fractional start/end and no_switch cases) and was not analysed.
+* `PMT` structure is `-r*((pv+fv)*(q/e) - fv)` with `e = q-1` accurate for small rates (probes at r = 1 fit all 126 cases), but the bits of `q`/`e` for r != 1 are not reproduced (about 55% exact). Excel's `ln` is correctly rounded (`LN(1.05)` = 0.04879016416943205) whereas the Windows CRT/Rust `ln` is one ulp lower (now `xmath::ln`); with a correctly rounded `ln`, `NPER` is exact. `VDB` has 284 mismatches (fractional start/end and no_switch cases) and was not analysed.
 * `PMT` matches the closed form `-r*(pv + (pv+fv)/expm1(n*log1p(r)))/(1+r*type)` only in about half of the cases; Excel's fv-only results
   carry an error that grows with `(1+r)^n` (80 ulp at q = 140), so its algorithm is not a plain double evaluation. `NPER` is
   `ln(num/den)/ln(1+r)` (93% exact); the rest differ because Excel's `ln(1.05)` is one ulp above the C library's.
@@ -236,6 +239,31 @@ Implemented but NOT verified (no corpus cases; generators `gen_fin1.py`..`gen_fi
   bit for bit; Excel's final iterate is noise-limited, so its exact stopping rule is unknown. Excel's `XIRR` result is the true root
   (`XIRR({-100,150},{43831,44562})` = 0.2244052527 in exact arithmetic, Excel 0.22440524697), so its tolerance is looser than 1e-8.
   `XNPV` needs `rate > 0`. `CUMIPMT` takes `ceil(start)` and `trunc(end)`. `DDB` is `cost*(1-f/life)^(period-1)*f/life`, capped at salvage.
+
+## Math library (`crates/calc/src/xmath.rs`)
+
+Excel's elementary functions are not the C library's. `xmath` evaluates in double-double arithmetic (about 106 bits, pure safe
+Rust, no dependencies) and rounds once. Probed with random arguments in the corpus groups `mathfit_*` (about 120 cases each,
+cells hold full-precision doubles, generator `gen_mathfit.py` kept outside the repository); all bit for bit unless noted:
+
+* `LN`, `LOG10`, `EXP`: correctly rounded. (`LOG(x,b)` is `ln(x) / ln(b)` with two rounded logarithms; a single division of
+  double-double logarithms matches only 101 of 120.) `SQRT` is the IEEE square root.
+* `SIN`, `COS`, `TAN`: the argument is reduced by the 64-bit pi *without rounding the reduced value* (double-double
+  remainder), then the function is correctly rounded (`TAN` as the double-double quotient): 200 of 200 each. The earlier
+  last-digit differences came from rounding the reduced argument to a double and from the platform kernels.
+* `ATAN` is correctly rounded. `ATAN2(x, y)` is `atan(y / x)` in doubles, plus or minus the double `PI()` for `x < 0`
+  (120 of 120; a correctly rounded `atan2` matches 87). `ASIN(x)` is `atan(x / sqrt((1 - x)(1 + x)))` (120 of 120, a correctly
+  rounded `asin` matches 98). `ACOS(x)` is `FRAC_PI_2 - ASIN(x)` (120 of 120).
+* `COSH` is `(e^x + e^-x) / 2` with correctly rounded `exp` (160 of 160). `SINH` for `|x| >= 1` is `(e^x - e^-x) / 2`
+  (exact); below 1 Excel uses another algorithm (the same form loses precision, a correctly rounded value matches 38 of 53,
+  libm 39 of 53; expm1 forms, fdlibm forms, Taylor series and x87-style 64-bit rounding of intermediates were tried).
+  `TANH` is `sinh / cosh` (exact for `|x| >= 1`, 49 of 73 below). These last-digit differences are in the known list.
+* `x^y`, integer `y`: right-to-left binary exponentiation in doubles with one final reciprocal for negative `y` (240 of 240
+  for `|y| <= 40`; for `|y|` up to 5000 all but one `x^-5000` case, 229 ulp off, unexplained). Base 10 is the exception:
+  `10^n` is the correctly rounded power, `10^-n` its reciprocal (`POWER(10,308)` is exactly `1E+308`).
+* `x^y`, fractional `y`: `exp(y ln x)` with correctly rounded `ln` and `exp`; for negative `y` it is `1 / exp(-y ln x)`
+  (240 of 240; plain `exp(y ln x)` is right for 86%). `y = 0.5` is `sqrt`.
+* Not implemented (no worksheet function yet): `ASINH`, `ACOSH`, `ATANH`, `COT` and the other reciprocal functions.
 
 ## Locale (ADR-011), arrays of references, long text
 

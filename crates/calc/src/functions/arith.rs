@@ -8,6 +8,7 @@ use super::math::{RoundMode, collect, round_decimal};
 use super::{Res, arity, int_arg, num_arg, number, optional};
 use crate::eval::{Arg, EvalContext};
 use crate::value::{ErrorKind, Value, round15};
+use crate::xmath;
 
 /// `a / b` with a quotient that is within 15 digits of a whole number treated as that whole number.
 fn snapped_quotient(a: f64, b: f64) -> f64 {
@@ -149,7 +150,7 @@ pub(super) fn sign(ctx: &EvalContext<'_>, args: &[Arg]) -> Res<Value> {
 
 pub(super) fn exp(ctx: &EvalContext<'_>, args: &[Arg]) -> Res<Value> {
     arity(args, 1, 1)?;
-    number(num_arg(ctx, &args[0])?.exp())
+    number(xmath::exp(num_arg(ctx, &args[0])?))
 }
 
 pub(super) fn ln(ctx: &EvalContext<'_>, args: &[Arg]) -> Res<Value> {
@@ -158,7 +159,7 @@ pub(super) fn ln(ctx: &EvalContext<'_>, args: &[Arg]) -> Res<Value> {
     if x <= 0.0 {
         return Err(ErrorKind::Num);
     }
-    number(x.ln())
+    number(xmath::ln(x))
 }
 
 pub(super) fn log10(ctx: &EvalContext<'_>, args: &[Arg]) -> Res<Value> {
@@ -167,7 +168,7 @@ pub(super) fn log10(ctx: &EvalContext<'_>, args: &[Arg]) -> Res<Value> {
     if x <= 0.0 {
         return Err(ErrorKind::Num);
     }
-    number(x.log10())
+    number(xmath::log10(x))
 }
 
 pub(super) fn log(ctx: &EvalContext<'_>, args: &[Arg]) -> Res<Value> {
@@ -177,7 +178,7 @@ pub(super) fn log(ctx: &EvalContext<'_>, args: &[Arg]) -> Res<Value> {
         if x <= 0.0 {
             return Err(ErrorKind::Num);
         }
-        return number(x.log10());
+        return number(xmath::log10(x));
     };
     let base = num_arg(ctx, base_arg)?;
     if x <= 0.0 || base <= 0.0 {
@@ -186,7 +187,7 @@ pub(super) fn log(ctx: &EvalContext<'_>, args: &[Arg]) -> Res<Value> {
     if base == 1.0 {
         return Err(ErrorKind::DivZero);
     }
-    number(x.ln() / base.ln())
+    number(xmath::ln(x) / xmath::ln(base))
 }
 
 /// Integer argument for the combinatorial functions: truncated, and negative values are `#NUM!`.
@@ -389,54 +390,27 @@ fn unary(ctx: &EvalContext<'_>, args: &[Arg], f: impl Fn(f64) -> Res<f64>) -> Re
     number(f(num_arg(ctx, &args[0])?)?)
 }
 
-/// Reduces `x` to `(r, quadrant)` with `x = r + quadrant * pi/2` using a pi of 64 mantissa bits
-/// (`0xC90FDAA22168C235 * 2^-62`), as Excel does: `SIN(PI())` is `1.22514845490862E-16`, not `1.2246E-16`.
-fn reduce(x: f64) -> Res<(f64, i64)> {
-    if x.abs() >= TRIG_LIMIT {
-        return Err(ErrorKind::Num);
-    }
-    const HALF_PI_HI: f64 = std::f64::consts::FRAC_PI_2;
-    // (pi_64bit - pi_double) / 2 = 565 * 2^-63
-    const HALF_PI_LO: f64 = 565.0 / 9_223_372_036_854_775_808.0;
-    let k = (x / HALF_PI_HI).round();
-    let r = (-k).mul_add(HALF_PI_HI, x) - k * HALF_PI_LO;
-    Ok((r, k as i64))
+/// `SIN`, `COS` and `TAN` reduce by a pi of 64 mantissa bits as Excel does (`SIN(PI())` is `1.22514845490862E-16`,
+/// not `1.2246E-16`) and round once: see `xmath::sin_cos_tan`.
+fn trig(ctx: &EvalContext<'_>, args: &[Arg], pick: impl Fn((f64, f64, f64)) -> f64) -> Res<Value> {
+    unary(ctx, args, |x| {
+        if x.abs() >= TRIG_LIMIT {
+            return Err(ErrorKind::Num);
+        }
+        Ok(pick(xmath::sin_cos_tan(x)))
+    })
 }
 
 pub(super) fn sin(ctx: &EvalContext<'_>, args: &[Arg]) -> Res<Value> {
-    unary(ctx, args, |x| {
-        let (r, k) = reduce(x)?;
-        Ok(match k.rem_euclid(4) {
-            0 => r.sin(),
-            1 => r.cos(),
-            2 => -r.sin(),
-            _ => -r.cos(),
-        })
-    })
+    trig(ctx, args, |t| t.0)
 }
 
 pub(super) fn cos(ctx: &EvalContext<'_>, args: &[Arg]) -> Res<Value> {
-    unary(ctx, args, |x| {
-        let (r, k) = reduce(x)?;
-        Ok(match k.rem_euclid(4) {
-            0 => r.cos(),
-            1 => -r.sin(),
-            2 => -r.cos(),
-            _ => r.sin(),
-        })
-    })
+    trig(ctx, args, |t| t.1)
 }
 
 pub(super) fn tan(ctx: &EvalContext<'_>, args: &[Arg]) -> Res<Value> {
-    unary(ctx, args, |x| {
-        let (r, k) = reduce(x)?;
-        Ok(match k.rem_euclid(4) {
-            0 => r.sin() / r.cos(),
-            1 => r.cos() / -r.sin(),
-            2 => -r.sin() / -r.cos(),
-            _ => -r.cos() / r.sin(),
-        })
-    })
+    trig(ctx, args, |t| t.2)
 }
 
 pub(super) fn asin(ctx: &EvalContext<'_>, args: &[Arg]) -> Res<Value> {
@@ -444,7 +418,7 @@ pub(super) fn asin(ctx: &EvalContext<'_>, args: &[Arg]) -> Res<Value> {
         if x.abs() > 1.0 {
             Err(ErrorKind::Num)
         } else {
-            Ok(x.asin())
+            Ok(xmath::asin(x))
         }
     })
 }
@@ -454,14 +428,13 @@ pub(super) fn acos(ctx: &EvalContext<'_>, args: &[Arg]) -> Res<Value> {
         if x.abs() > 1.0 {
             Err(ErrorKind::Num)
         } else {
-            // Excel computes ACOS as pi/2 - ASIN, which shows in the last digits.
-            Ok(std::f64::consts::FRAC_PI_2 - x.asin())
+            Ok(xmath::acos(x))
         }
     })
 }
 
 pub(super) fn atan(ctx: &EvalContext<'_>, args: &[Arg]) -> Res<Value> {
-    unary(ctx, args, |x| Ok(x.atan()))
+    unary(ctx, args, |x| Ok(xmath::atan(x)))
 }
 
 pub(super) fn atan2(ctx: &EvalContext<'_>, args: &[Arg]) -> Res<Value> {
@@ -471,7 +444,7 @@ pub(super) fn atan2(ctx: &EvalContext<'_>, args: &[Arg]) -> Res<Value> {
     if x == 0.0 && y == 0.0 {
         return Err(ErrorKind::DivZero);
     }
-    number(y.atan2(x))
+    number(xmath::atan2(y, x))
 }
 
 pub(super) fn degrees(ctx: &EvalContext<'_>, args: &[Arg]) -> Res<Value> {
@@ -482,28 +455,28 @@ pub(super) fn radians(ctx: &EvalContext<'_>, args: &[Arg]) -> Res<Value> {
     unary(ctx, args, |x| Ok(x * (std::f64::consts::PI / 180.0)))
 }
 
-/// `cosh` as Excel computes it, `(e^x + e^-x) / 2`; overflow of `e^|x|` is `#NUM!` for all three functions.
-fn exp_cosh(x: f64) -> Res<f64> {
-    let e = x.abs().exp();
-    if e.is_infinite() {
+/// Overflow of `e^|x|` is `#NUM!` for `SINH`, `COSH` and `TANH` alike.
+fn hyperbolic(x: f64, f: impl Fn(f64) -> f64) -> Res<f64> {
+    if x.abs() > 709.782_712_893_384 {
         return Err(ErrorKind::Num);
     }
-    Ok((e + (-x.abs()).exp()) / 2.0)
+    Ok(f(x))
 }
 
 pub(super) fn sinh(ctx: &EvalContext<'_>, args: &[Arg]) -> Res<Value> {
-    unary(ctx, args, |x| exp_cosh(x).map(|_| x.sinh()))
+    unary(ctx, args, |x| hyperbolic(x, xmath::sinh))
 }
 
 pub(super) fn cosh(ctx: &EvalContext<'_>, args: &[Arg]) -> Res<Value> {
-    unary(ctx, args, exp_cosh)
+    unary(ctx, args, |x| hyperbolic(x, xmath::cosh))
 }
 
 pub(super) fn tanh(ctx: &EvalContext<'_>, args: &[Arg]) -> Res<Value> {
     unary(ctx, args, |x| {
         if x.abs() > 22.0 {
-            return Ok(x.signum());
+            Ok(x.signum())
+        } else {
+            hyperbolic(x, xmath::tanh)
         }
-        Ok(x.sinh() / exp_cosh(x)?)
     })
 }

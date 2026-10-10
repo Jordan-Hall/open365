@@ -1265,8 +1265,8 @@ pub fn power(x: f64, y: f64) -> Result<f64, ErrorKind> {
     if x == 0.0 && y < 0.0 {
         return Err(ErrorKind::DivZero);
     }
-    let r = if y == y.trunc() {
-        x.powf(y)
+    let r = if y == y.trunc() && y.abs() < 9.2e18 {
+        crate::xmath::pow_int(x, y)
     } else if x < 0.0 {
         // A negative base only has a real root when the exponent is 1/odd.
         let inverse = 1.0 / y;
@@ -1285,13 +1285,9 @@ pub fn power(x: f64, y: f64) -> Result<f64, ErrorKind> {
     Ok(if r.abs() < f64::MIN_POSITIVE { 0.0 } else { r })
 }
 
-/// `x^y` for positive `x` and a fractional `y`. Excel evaluates this as `exp(y * ln x)` (square roots
-/// aside), which differs from a correctly rounded power in the last digit: `27^(1/3)` is
-/// 2.9999999999999996.
+/// `x^y` for positive `x` and a fractional `y`. Excel evaluates this as `exp(y * ln x)` with correctly rounded
+/// `ln` and `exp` (square roots aside), which differs from a correctly rounded power in the last digit: `27^(1/3)`
+/// is 2.9999999999999996.
 fn fractional_power(x: f64, y: f64) -> f64 {
-    if y == 0.5 {
-        x.sqrt()
-    } else {
-        (y * x.ln()).exp()
-    }
+    crate::xmath::pow_frac(x, y)
 }

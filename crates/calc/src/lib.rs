@@ -15,6 +15,7 @@ pub mod graph;
 pub mod numfmt;
 pub mod parser;
 pub mod value;
+pub mod xmath;
 
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
