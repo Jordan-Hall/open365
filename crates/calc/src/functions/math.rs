@@ -9,7 +9,7 @@ use crate::eval::{Arg, EvalContext, power as eval_power, snap_to_zero};
 use crate::value::{ErrorKind, Value, parse_number_text_in};
 
 /// Collects the numbers an aggregate function sees.
-fn collect(ctx: &EvalContext<'_>, args: &[Arg]) -> Res<Vec<f64>> {
+pub(super) fn collect(ctx: &EvalContext<'_>, args: &[Arg]) -> Res<Vec<f64>> {
     collect_with(ctx, args, true)
 }
 
@@ -49,7 +49,7 @@ fn collect_with(ctx: &EvalContext<'_>, args: &[Arg], missing_is_zero: bool) -> R
 
 /// Adds left to right. Like Excel, the last addition collapses a result within binary noise of zero to
 /// exactly zero (`SUM(0.1,0.2,-0.3)` is 0).
-fn total(nums: &[f64]) -> f64 {
+pub(super) fn total(nums: &[f64]) -> f64 {
     match nums.split_last() {
         None => 0.0,
         Some((last, head)) => {

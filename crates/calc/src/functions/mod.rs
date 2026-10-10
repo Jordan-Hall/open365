@@ -1,10 +1,12 @@
 //! Worksheet function registry and shared argument helpers.
 
+mod arith;
 mod criteria;
 mod datetime;
 mod logical;
 mod lookup;
 mod math;
+mod stats;
 mod text;
 
 use std::collections::HashMap;
@@ -51,6 +53,71 @@ static TABLE: &[(&str, Func)] = &[
     ("AVERAGEIF", Func::Res(criteria::averageif)),
     ("SUMIFS", Func::Res(criteria::sumifs)),
     ("COUNTIFS", Func::Res(criteria::countifs)),
+    ("SUMPRODUCT", Func::Res(stats::sumproduct)),
+    ("SUMSQ", Func::Res(arith::sumsq)),
+    ("CEILING", Func::Res(arith::ceiling)),
+    ("CEILING.MATH", Func::Res(arith::ceiling_math)),
+    ("FLOOR", Func::Res(arith::floor)),
+    ("FLOOR.MATH", Func::Res(arith::floor_math)),
+    ("MROUND", Func::Res(arith::mround)),
+    ("TRUNC", Func::Res(arith::trunc)),
+    ("SIGN", Func::Res(arith::sign)),
+    ("EXP", Func::Res(arith::exp)),
+    ("LN", Func::Res(arith::ln)),
+    ("LOG", Func::Res(arith::log)),
+    ("LOG10", Func::Res(arith::log10)),
+    ("FACT", Func::Res(arith::fact)),
+    ("COMBIN", Func::Res(arith::combin)),
+    ("PERMUT", Func::Res(arith::permut)),
+    ("GCD", Func::Res(arith::gcd)),
+    ("LCM", Func::Res(arith::lcm)),
+    ("QUOTIENT", Func::Res(arith::quotient)),
+    ("EVEN", Func::Res(arith::even)),
+    ("ODD", Func::Res(arith::odd)),
+    ("RAND", Func::Res(arith::rand)),
+    ("RANDBETWEEN", Func::Res(arith::randbetween)),
+    ("SIN", Func::Res(arith::sin)),
+    ("COS", Func::Res(arith::cos)),
+    ("TAN", Func::Res(arith::tan)),
+    ("ASIN", Func::Res(arith::asin)),
+    ("ACOS", Func::Res(arith::acos)),
+    ("ATAN", Func::Res(arith::atan)),
+    ("ATAN2", Func::Res(arith::atan2)),
+    ("DEGREES", Func::Res(arith::degrees)),
+    ("RADIANS", Func::Res(arith::radians)),
+    ("SINH", Func::Res(arith::sinh)),
+    ("COSH", Func::Res(arith::cosh)),
+    ("TANH", Func::Res(arith::tanh)),
+    ("MEDIAN", Func::Res(stats::median)),
+    ("MODE", Func::Res(stats::mode)),
+    ("MODE.SNGL", Func::Res(stats::mode)),
+    ("LARGE", Func::Res(stats::large)),
+    ("SMALL", Func::Res(stats::small)),
+    ("RANK", Func::Res(stats::rank)),
+    ("RANK.EQ", Func::Res(stats::rank)),
+    ("RANK.AVG", Func::Res(stats::rank_avg)),
+    ("PERCENTILE", Func::Res(stats::percentile)),
+    ("PERCENTILE.INC", Func::Res(stats::percentile)),
+    ("PERCENTILE.EXC", Func::Res(stats::percentile_exc)),
+    ("QUARTILE", Func::Res(stats::quartile)),
+    ("QUARTILE.INC", Func::Res(stats::quartile)),
+    ("QUARTILE.EXC", Func::Res(stats::quartile_exc)),
+    ("STDEV", Func::Res(stats::stdev_s)),
+    ("STDEV.S", Func::Res(stats::stdev_s)),
+    ("STDEV.P", Func::Res(stats::stdev_p)),
+    ("STDEVP", Func::Res(stats::stdev_p)),
+    ("VAR", Func::Res(stats::var_s)),
+    ("VAR.S", Func::Res(stats::var_s)),
+    ("VAR.P", Func::Res(stats::var_p)),
+    ("VARP", Func::Res(stats::var_p)),
+    ("AVERAGEIFS", Func::Res(criteria::averageifs)),
+    ("MAXIFS", Func::Res(criteria::maxifs)),
+    ("MINIFS", Func::Res(criteria::minifs)),
+    ("SUBTOTAL", Func::Res(stats::subtotal)),
+    ("AGGREGATE", Func::Res(stats::aggregate)),
+    ("AVERAGEA", Func::Res(stats::averagea)),
+    ("MAXA", Func::Res(stats::maxa)),
+    ("MINA", Func::Res(stats::mina)),
     // logical and information
     ("IF", Func::Arg(logical::if_)),
     ("IFERROR", Func::Arg(logical::iferror)),
@@ -114,15 +181,76 @@ pub fn lookup(name: &str) -> Option<&'static Func> {
 }
 
 /// Parameters whose argument expressions Excel evaluates over whole ranges instead of taking the
-/// implicit intersection (the array parameters of `INDEX` and `XLOOKUP`).
-pub(crate) fn array_params(name: &str) -> &'static [usize] {
+/// implicit intersection (the array parameters of `INDEX` and `XLOOKUP`, every parameter of `SUMPRODUCT`).
+pub(crate) fn is_array_param(name: &str, index: usize) -> bool {
     if name.eq_ignore_ascii_case("INDEX") {
-        &[0]
+        index == 0
     } else if name.eq_ignore_ascii_case("XLOOKUP") {
-        &[1, 2]
+        index == 1 || index == 2
     } else {
-        &[]
+        name.eq_ignore_ascii_case("SUMPRODUCT")
     }
+}
+
+/// Functions whose parameters are all scalars: in an array context they are applied element by element.
+pub(crate) fn is_elementwise(name: &str) -> bool {
+    const NAMES: &[&str] = &[
+        "ABS",
+        "INT",
+        "SQRT",
+        "ISNUMBER",
+        "ISTEXT",
+        "ISBLANK",
+        "ISERROR",
+        "ISNA",
+        "NOT",
+        "LEN",
+        "LEFT",
+        "RIGHT",
+        "MID",
+        "UPPER",
+        "LOWER",
+        "TRIM",
+        "ROUND",
+        "ROUNDUP",
+        "ROUNDDOWN",
+        "MOD",
+        "POWER",
+        "SIGN",
+        "EXP",
+        "LN",
+        "LOG",
+        "LOG10",
+        "SIN",
+        "COS",
+        "TAN",
+        "ASIN",
+        "ACOS",
+        "ATAN",
+        "ATAN2",
+        "SINH",
+        "COSH",
+        "TANH",
+        "DEGREES",
+        "RADIANS",
+        "CEILING",
+        "FLOOR",
+        "TRUNC",
+        "MROUND",
+        "FACT",
+        "EVEN",
+        "ODD",
+        "QUOTIENT",
+        "VALUE",
+        "SUBSTITUTE",
+        "REPT",
+        "FIND",
+        "SEARCH",
+        "YEAR",
+        "MONTH",
+        "DAY",
+    ];
+    NAMES.iter().any(|n| n.eq_ignore_ascii_case(name))
 }
 
 /// All implemented function names, sorted.

@@ -5,7 +5,7 @@ never needs Excel.
 
 | File | Role |
 |---|---|
-| `fixtures/calc/conformance.json` | The corpus: 3,690 cases. Edited by hand or by script; one case per line. |
+| `fixtures/calc/conformance.json` | The corpus: 5,035 cases. Edited by hand or by script; one case per line. |
 | `tools/office/calc-oracle.ps1` | Local-only tool. Runs every case in Excel over COM and writes the results. |
 | `fixtures/reference/calc/conformance-results.json` | Excel's answers, committed. Includes Excel version, build and decimal separator. |
 | `fixtures/calc/known-differences.toml` | Cases where Open365 intentionally or temporarily differs, each with a reason. |
@@ -16,6 +16,8 @@ never needs Excel.
 ```
 pwsh -NoProfile -File tools/office/calc-oracle.ps1          # about 2 minutes, needs desktop Excel
 cargo test -p open365-calc --test excel_conformance -- --nocapture
+pwsh -NoProfile -File tools/office/calc-oracle.ps1 -Update   # only cases without a stored result (about 20 s per 1,000)
+pwsh -NoProfile -File tools/office/calc-oracle.ps1 -Update -Only '^sin\.'   # rerun matching cases, keep the rest
 ```
 
 The script starts its own hidden Excel, remembers that process id and stops only that process; it restarts the
@@ -51,7 +53,7 @@ that differs fails the test; a listed case that now passes also fails, so the li
 
 ## Current state
 
-3,690 cases, 3,676 pass (99.62%), 14 known differences. Before the fixes driven by this corpus 3,311 of 3,700
+5,035 cases, 4,985 pass (99.01%), 50 known differences (14 older ones plus 36 in the new math/statistics groups: large COMBIN, trigonometric last digits after argument reduction, variance accumulation order). Before the fixes driven by this corpus 3,311 of 3,700
 passed (89.49%). The remaining differences are listed with reasons in `known-differences.toml`: the `**`
 parse quirk, XLOOKUP array results (no spill), a few undocumented Excel quirks (`DATE` with huge day numbers,
 CONCAT over the cell limit returning an unnamed error code, a 17-digit literal) and two formulas Excel
@@ -81,3 +83,18 @@ Findings that the corpus now locks in (see the module comments in `crates/calc/s
 * `VALUE` and arithmetic coercion accept ISO dates, times, `(12)`, `- 1`, `% 1` and misplaced thousands commas.
 * `ROUND` cuts the shortest decimal form at 15 digits (`ROUND(0.49999999999999994,0)` is 0); `ROUNDUP` and
   `ROUNDDOWN` round it first (`ROUNDDOWN(0.7+0.1,1)` is 0.8); `INT` snaps to 15 digits (`INT(0.57*100)` is 57).
+
+Added with the second function batch (math and statistics):
+
+* `SIN`, `COS` and `TAN` refuse `|x| >= 2^27` and reduce the argument with a pi of 64 mantissa bits
+  (`0xC90FDAA22168C235 * 2^-62`): `SIN(PI())` is `1.22514845490862E-16`, `COS(PI()/2)` is `6.1257422745431E-17`.
+* `ACOS(x)` is `PI()/2 - ASIN(x)`; `COSH` is `(e^x + e^-x) / 2` and `SINH`/`COSH` return `#NUM!` when `e^|x|` overflows
+  (`SINH(710)`); `DEGREES` is `x * (180/PI)`, `RADIANS` is `x * (PI/180)`; `LOG(x, base)` is `ln(x)/ln(base)`.
+* `FACT` multiplies from the top down, `PERMUT` from the bottom up. `FACT(-0.5)` is `#NUM!`.
+* The Analysis ToolPak functions (`GCD`, `LCM`, `QUOTIENT`) reject booleans with `#VALUE!`, `GCD(,4)` is `#N/A`.
+* `RANDBETWEEN` rounds both limits up. `SMALL` floors `k`; `LARGE` floors `n + 1 - k`.
+* `MODE` considers only numbers, even among direct arguments. `PERCENTILE.INC` forms the 1-based position first.
+* `SUBTOTAL`/`AGGREGATE` skip any cell whose formula contains `SUBTOTAL` or `AGGREGATE` anywhere (`AGGREGATE` options 4-7
+  keep them). `AGGREGATE` with function 1-13 refuses direct numbers and array constants.
+* `SUMPRODUCT` evaluates all arguments as arrays, and element-wise functions (`ISNUMBER`, `ABS`, ...) are lifted over
+  arrays inside array parameters.

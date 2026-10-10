@@ -39,6 +39,8 @@ struct Formula {
     names: Vec<String>,
     /// The outermost add/subtract may snap a near-zero result to zero (false for `=(A1-B1)`).
     snap_root: bool,
+    /// The formula contains `SUBTOTAL` or `AGGREGATE`; other subtotals ignore this cell.
+    has_subtotal: bool,
 }
 
 /// True when the whole formula text sits inside one pair of parentheses, as in `=(A1-B1)`.
@@ -323,6 +325,7 @@ impl Engine {
                     ast,
                     names: deps.names,
                     snap_root,
+                    has_subtotal: deps.subtotal,
                 }),
             },
         );
@@ -490,6 +493,12 @@ impl CellSource for Engine {
     fn sheet_exists(&self, sheet: &str) -> bool {
         self.find_sheet(sheet)
             .is_some_and(|i| self.sheets[i].exists)
+    }
+
+    fn is_subtotal(&self, sheet: &str, row: u32, col: u32) -> bool {
+        self.cell_data(sheet, row, col)
+            .and_then(|c| c.formula.as_ref())
+            .is_some_and(|f| f.has_subtotal)
     }
 
     fn used_bounds(&self, sheet: &str) -> (u32, u32) {

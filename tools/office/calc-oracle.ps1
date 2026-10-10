@@ -19,6 +19,11 @@ replaced and the current case is retried.
 
   pwsh -NoProfile -File tools/office/calc-oracle.ps1
   pwsh -NoProfile -File tools/office/calc-oracle.ps1 -Only '^(round|int)\.' -Output $env:TEMP\partial.json
+  pwsh -NoProfile -File tools/office/calc-oracle.ps1 -Update                   # only cases without a stored result
+  pwsh -NoProfile -File tools/office/calc-oracle.ps1 -Update -Only '^(sin|cos)\.'   # rerun these and keep the rest
+
+A case with "format" gets that number format on the formula cell (applied after the formula, so a text format
+cannot turn the formula into text); the recorded "text" is Range.Text, which the numfmt conformance group checks.
 
 Output is stable: corpus order, LF line endings, ASCII only, no absolute paths and no user information.
 #>
@@ -26,13 +31,14 @@ param(
   [string]$Corpus,
   [string]$Output,
   [string]$Only,        # regex over case ids; requires -Output so the committed file is never half-written
-  [int]$Limit = 0       # first N cases only (debugging); requires -Output
+  [int]$Limit = 0,      # first N cases only (debugging); requires -Output
+  [switch]$Update       # merge into the existing results file: run only missing cases (and those matching -Only)
 )
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 if (-not $Corpus) { $Corpus = Join-Path $root 'fixtures/calc/conformance.json' }
 $defaultOutput = Join-Path $root 'fixtures/reference/calc/conformance-results.json'
-if (($Only -or $Limit -gt 0) -and -not $Output) { throw '-Only and -Limit need an explicit -Output' }
+if (($Only -or $Limit -gt 0) -and -not $Output -and -not $Update) { throw '-Only and -Limit need an explicit -Output' }
 if (-not $Output) { $Output = $defaultOutput }
 
 Add-Type -Namespace Native -Name Win32 -MemberDefinition @'
@@ -172,6 +178,7 @@ function Invoke-Case($case) {
     }
     throw
   }
+  if ($case.format) { $target.NumberFormat = $case.format }
   $script:xl.Calculate()
   $v = $target.Value2
   $text = [string]$target.Text
@@ -208,8 +215,19 @@ function Format-Record($id, $r) {
 $doc = Get-Content -LiteralPath $Corpus -Raw -Encoding utf8 | ConvertFrom-Json -AsHashtable
 $script:defaultAt = $doc.default_formula_cell
 if ($doc.formula_property -ne 'Formula') { throw 'this script only implements Range.Formula' }
-$cases = @($doc.cases)
-if ($Only) { $cases = @($cases | Where-Object { $_.id -match $Only }) }
+$allCases = @($doc.cases)
+$cases = $allCases
+# -Update: keep the stored record of every case that is not selected (record lines are keyed by their id).
+$stored = New-Object 'System.Collections.Generic.Dictionary[string,string]' ([StringComparer]::Ordinal)   # ids differ by case, so no plain hashtable
+if ($Update) {
+  if (Test-Path -LiteralPath $Output) {
+    foreach ($line in [IO.File]::ReadAllLines($Output)) {
+      if ($line -match '^    \{"id": ("(?:[^"\\]|\\.)*")') { $stored[$Matches[1]] = $line.TrimEnd(',') }
+    }
+  }
+  $cases = @($allCases | Where-Object { -not $stored.ContainsKey((Json-Str $_.id)) -or ($Only -and $_.id -match $Only) })
+}
+elseif ($Only) { $cases = @($cases | Where-Object { $_.id -match $Only }) }
 if ($Limit -gt 0) { $cases = @($cases | Select-Object -First $Limit) }
 Write-Host "calc-oracle: $($cases.Count) cases"
 
@@ -257,6 +275,17 @@ finally {
   Stop-Excel
 }
 
+if ($Update) {
+  $fresh = New-Object 'System.Collections.Generic.Dictionary[string,string]' ([StringComparer]::Ordinal)
+  for ($i = 0; $i -lt $cases.Count; $i++) { $fresh[(Json-Str $cases[$i].id)] = $records[$i] }
+  $records = New-Object System.Collections.Generic.List[string]
+  foreach ($c in $allCases) {
+    $key = Json-Str $c.id
+    if ($fresh.ContainsKey($key)) { $records.Add($fresh[$key]) }
+    elseif ($stored.ContainsKey($key)) { $records.Add($stored[$key]) }
+    else { throw "no result for $($c.id)" }
+  }
+}
 $lines = New-Object System.Collections.Generic.List[string]
 $lines.Add('{')
 $lines.Add('  "format": 1,')

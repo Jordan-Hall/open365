@@ -30,6 +30,11 @@ pub trait CellSource {
         true
     }
 
+    /// Whether the cell holds a formula that calls `SUBTOTAL` or `AGGREGATE` (such cells are skipped by those functions).
+    fn is_subtotal(&self, _sheet: &str, _row: u32, _col: u32) -> bool {
+        false
+    }
+
     /// The last used `(row, col)` of a sheet (0 when empty). Whole-column and whole-row
     /// references only scan up to these bounds.
     fn used_bounds(&self, _sheet: &str) -> (u32, u32) {
@@ -447,7 +452,7 @@ impl Evaluator<'_, '_> {
             Ast::Ref(r) => self.eval_ref(r),
             Ast::Area(a) => self.eval_area(a),
             Ast::Name(n) => self.eval_name(n),
-            Ast::Func { name, args, .. } => self.eval_call(name, args),
+            Ast::Func { name, args, .. } => self.eval_call(name, args, array),
             Ast::Unary { op, operand } => {
                 let v = self.eval_in(operand, array);
                 self.unary(*op, v, array)
@@ -516,24 +521,86 @@ impl Evaluator<'_, '_> {
         result
     }
 
-    fn eval_call(&self, name: &str, args: &[Ast]) -> Arg {
+    fn eval_call(&self, name: &str, args: &[Ast], array: bool) -> Arg {
         let Some(func) = functions::lookup(name) else {
             return Arg::error(ErrorKind::Name);
         };
-        let array_params = functions::array_params(name);
+        // Inside an array context (an array parameter such as SUMPRODUCT's), element-wise functions
+        // are applied to every element of their array arguments.
+        let lift = array && functions::is_elementwise(name);
         let evaluated: Vec<Arg> = args
             .iter()
             .enumerate()
-            .map(|(i, a)| self.eval_in(a, array_params.contains(&i)))
+            .map(|(i, a)| self.eval_in(a, lift || functions::is_array_param(name, i)))
             .collect();
-        match func {
-            Func::Val(f) => Arg::from_value(f(self.ctx, &evaluated)),
-            Func::Res(f) => match f(self.ctx, &evaluated) {
-                Ok(v) => Arg::from_value(v),
-                Err(e) => Arg::error(e),
-            },
-            Func::Arg(f) => f(self.ctx, &evaluated),
+        if lift
+            && evaluated.iter().any(|a| match a {
+                Arg::Array(_) => true,
+                Arg::Range(r) => !r.is_single_cell(),
+                _ => false,
+            })
+        {
+            return self.lift_call(func, &evaluated);
         }
+        call_function(self.ctx, func, &evaluated)
+    }
+
+    /// Calls a scalar function once per element of its array arguments (scalars broadcast).
+    fn lift_call(&self, func: &Func, args: &[Arg]) -> Arg {
+        let operands: Vec<Operand> = args.iter().map(|a| self.operand(a.clone(), true)).collect();
+        let rows = operands
+            .iter()
+            .map(|o| match o {
+                Operand::Grid(g) => g.len(),
+                Operand::Scalar(_) => 1,
+            })
+            .max()
+            .unwrap_or(1);
+        let cols = operands
+            .iter()
+            .map(|o| match o {
+                Operand::Grid(g) => g.first().map_or(0, Vec::len),
+                Operand::Scalar(_) => 1,
+            })
+            .max()
+            .unwrap_or(1);
+        let pick = |o: &Operand, r: usize, c: usize| -> Value {
+            match o {
+                Operand::Scalar(v) => v.clone(),
+                Operand::Grid(g) => {
+                    let r = if g.len() == 1 { 0 } else { r };
+                    let c = if g.first().map_or(0, Vec::len) == 1 {
+                        0
+                    } else {
+                        c
+                    };
+                    g.get(r)
+                        .and_then(|row| row.get(c))
+                        .cloned()
+                        .unwrap_or(Value::Error(ErrorKind::NA))
+                }
+            }
+        };
+        let out = (0..rows)
+            .map(|r| {
+                (0..cols)
+                    .map(|c| {
+                        let call_args: Vec<Arg> =
+                            operands.iter().map(|o| Arg::Value(pick(o, r, c))).collect();
+                        match call_function(self.ctx, func, &call_args) {
+                            Arg::Value(v) => v,
+                            Arg::Array(rows) => rows
+                                .first()
+                                .and_then(|row| row.first())
+                                .cloned()
+                                .unwrap_or(Value::Error(ErrorKind::Value)),
+                            other => self.ctx.scalar(&other),
+                        }
+                    })
+                    .collect()
+            })
+            .collect();
+        Arg::Array(out)
     }
 
     fn operand(&self, arg: Arg, array: bool) -> Operand {
@@ -609,6 +676,17 @@ impl Evaluator<'_, '_> {
                 )
             }
         }
+    }
+}
+
+fn call_function(ctx: &EvalContext<'_>, func: &Func, args: &[Arg]) -> Arg {
+    match func {
+        Func::Val(f) => Arg::from_value(f(ctx, args)),
+        Func::Res(f) => match f(ctx, args) {
+            Ok(v) => Arg::from_value(v),
+            Err(e) => Arg::error(e),
+        },
+        Func::Arg(f) => f(ctx, args),
     }
 }
 

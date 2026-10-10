@@ -411,6 +411,53 @@ pub(super) fn sumifs(ctx: &EvalContext<'_>, args: &[Arg]) -> Res<Value> {
     number(total)
 }
 
+/// The numbers of `args[0]` at the positions where every `(range, criterion)` pair of `args[1..]` matches.
+/// Shared by `AVERAGEIFS`, `MAXIFS` and `MINIFS`; the value range must be a range of the criteria ranges' shape.
+fn matching_numbers(ctx: &EvalContext<'_>, args: &[Arg]) -> Res<Vec<f64>> {
+    if args.len() < 3 || args.len().is_multiple_of(2) {
+        return Err(ErrorKind::Value);
+    }
+    let value_grid = range_grid(ctx, &args[0])?;
+    let first = range_grid(ctx, &args[1])?;
+    if value_grid.rows() != first.rows() || value_grid.cols() != first.cols() {
+        return Err(ErrorKind::Value);
+    }
+    let pairs = criteria_pairs(ctx, &args[1..])?;
+    let mut out = Vec::new();
+    let mut failure = None;
+    for_each_match(&pairs, |r, c| match value_grid.get(r, c) {
+        Value::Number(x) => out.push(x),
+        Value::Error(e) => failure = failure.or(Some(e)),
+        _ => {}
+    });
+    match failure {
+        Some(e) => Err(e),
+        None => Ok(out),
+    }
+}
+
+pub(super) fn averageifs(ctx: &EvalContext<'_>, args: &[Arg]) -> Res<Value> {
+    let nums = matching_numbers(ctx, args)?;
+    if nums.is_empty() {
+        return Err(ErrorKind::DivZero);
+    }
+    number(nums.iter().sum::<f64>() / nums.len() as f64)
+}
+
+pub(super) fn maxifs(ctx: &EvalContext<'_>, args: &[Arg]) -> Res<Value> {
+    let nums = matching_numbers(ctx, args)?;
+    Ok(Value::Number(
+        nums.into_iter().reduce(f64::max).unwrap_or(0.0),
+    ))
+}
+
+pub(super) fn minifs(ctx: &EvalContext<'_>, args: &[Arg]) -> Res<Value> {
+    let nums = matching_numbers(ctx, args)?;
+    Ok(Value::Number(
+        nums.into_iter().reduce(f64::min).unwrap_or(0.0),
+    ))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

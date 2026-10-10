@@ -388,6 +388,8 @@ pub struct Deps {
     pub names: Vec<String>,
     /// The formula calls a volatile function such as `NOW`.
     pub volatile: bool,
+    /// The formula calls `SUBTOTAL` or `AGGREGATE`, so other subtotals skip its cell.
+    pub subtotal: bool,
 }
 
 /// Collects the references, defined names and volatility of a formula. `resolve` expands
@@ -434,6 +436,9 @@ fn walk(ast: &Ast, sheet: &str, resolve: &dyn Fn(&str) -> Option<Ast>, out: &mut
         Ast::Func { name, args, .. } => {
             if is_volatile(name) {
                 out.volatile = true;
+            }
+            if name.eq_ignore_ascii_case("SUBTOTAL") || name.eq_ignore_ascii_case("AGGREGATE") {
+                out.subtotal = true;
             }
             for a in args {
                 walk(a, sheet, resolve, out, depth);

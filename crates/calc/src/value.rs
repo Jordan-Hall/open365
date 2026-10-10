@@ -444,7 +444,7 @@ pub fn number_to_text(n: f64) -> String {
 }
 
 /// `x` rounded to 15 significant digits.
-fn round15(x: f64) -> f64 {
+pub(crate) fn round15(x: f64) -> f64 {
     format!("{x:.14e}").parse().unwrap_or(x)
 }
 
