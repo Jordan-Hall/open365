@@ -1,0 +1,49 @@
+# cargo-fuzz targets. Nightly only; deliberately NOT a member of the main workspace
+# (see `exclude` in the root Cargo.toml), so stable CI never builds it.
+[package]
+name = "open365-fuzz"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+open365-opc = { path = "../crates/opc" }
+open365-docx = { path = "../crates/docx" }
+open365-xlsx = { path = "../crates/xlsx" }
+open365-calc = { path = "../crates/calc" }
+open365-commands = { path = "../crates/commands" }
+
+# Separate workspace root, so this directory is not pulled into the main workspace.
+[workspace]
+
+[[bin]]
+name = "opc"
+path = "fuzz_targets/opc.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "docx"
+path = "fuzz_targets/docx.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "xlsx"
+path = "fuzz_targets/xlsx.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "calc_formula"
+path = "fuzz_targets/calc_formula.rs"
+test = false
+doc = false
+bench = false

@@ -1,12 +1,17 @@
-//! `open365` CLI: `inspect` and `roundtrip --check`.
+//! `open365` CLI: `docx|xlsx inspect`, `apply`, `roundtrip --check` and `inspect`.
+
+mod apply_cmd;
+mod inspect_cmd;
 
 use std::fmt;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
-use clap::{Parser, Subcommand};
+use clap::{Args, Parser, Subcommand};
 use open365_opc::OpcError;
 use open365_testkit::{inspect, roundtrip};
+
+use inspect_cmd::Kind;
 
 #[derive(Debug, Parser)]
 #[command(name = "open365", version)]
@@ -15,10 +20,59 @@ struct Cli {
     command: Command,
 }
 
+#[derive(Debug, Args)]
+struct InspectArgs {
+    /// Also list what a user may not see (hidden text, comments, tracked changes, hidden
+    /// sheets/rows/columns, defined names, external links, macros, custom XML, thumbnails,
+    /// unreachable parts, author metadata).
+    #[arg(long)]
+    hidden: bool,
+    /// Machine-readable output.
+    #[arg(long)]
+    json: bool,
+    file: PathBuf,
+}
+
+#[derive(Debug, Subcommand)]
+enum FormatCommand {
+    /// Print parts, relationships and content types.
+    Inspect(InspectArgs),
+}
+
 #[derive(Debug, Subcommand)]
 enum Command {
-    /// Print the parts, content types and integrity issues of a package.
+    /// Print the parts, content types and integrity issues of any OPC package.
     Inspect { file: PathBuf },
+    /// DOCX commands.
+    Docx {
+        #[command(subcommand)]
+        command: FormatCommand,
+    },
+    /// XLSX commands.
+    Xlsx {
+        #[command(subcommand)]
+        command: FormatCommand,
+    },
+    /// Apply a JSON command file through the command layer and save the result.
+    ///
+    /// Each command's effect class is printed to stdout and one JSON audit line per command
+    /// goes to stderr. Destructive and egress commands are refused (and nothing runs) unless
+    /// --allow-destructive is given.
+    Apply {
+        /// JSON array of commands (the serialised command log).
+        commands: PathBuf,
+        /// Input .docx or .xlsx file.
+        input: PathBuf,
+        /// Output file.
+        #[arg(short, long, required_unless_present = "dry_run")]
+        output: Option<PathBuf>,
+        /// Run every command in memory, report, and write nothing.
+        #[arg(long)]
+        dry_run: bool,
+        /// Permit destructive and egress commands.
+        #[arg(long)]
+        allow_destructive: bool,
+    },
     /// Verify that files survive read -> write -> read unchanged.
     Roundtrip {
         /// Required: run the check without writing anything.
@@ -30,9 +84,10 @@ enum Command {
 }
 
 #[derive(Debug)]
-enum CliError {
+pub(crate) enum CliError {
     Io(PathBuf, std::io::Error),
     Opc(PathBuf, OpcError),
+    Other(String),
 }
 
 impl fmt::Display for CliError {
@@ -40,13 +95,14 @@ impl fmt::Display for CliError {
         match self {
             Self::Io(p, e) => write!(f, "{}: {e}", p.display()),
             Self::Opc(p, e) => write!(f, "{}: {e}", p.display()),
+            Self::Other(m) => f.write_str(m),
         }
     }
 }
 
 impl std::error::Error for CliError {}
 
-fn read(path: &Path) -> Result<Vec<u8>, CliError> {
+pub(crate) fn read(path: &Path) -> Result<Vec<u8>, CliError> {
     std::fs::read(path).map_err(|e| CliError::Io(path.to_owned(), e))
 }
 
@@ -101,19 +157,55 @@ fn check_file(file: &Path) -> bool {
     }
 }
 
+fn finish(result: Result<(), CliError>) -> ExitCode {
+    match result {
+        Ok(()) => ExitCode::SUCCESS,
+        Err(e) => {
+            eprintln!("error: {e}");
+            ExitCode::FAILURE
+        }
+    }
+}
+
+fn format_inspect(kind: Kind, command: &FormatCommand) -> ExitCode {
+    let FormatCommand::Inspect(a) = command;
+    finish(inspect_cmd::run(kind, &a.file, a.hidden, a.json))
+}
+
 fn main() -> ExitCode {
     match Cli::parse().command {
-        Command::Inspect { file } => match run_inspect(&file) {
-            Ok(()) => ExitCode::SUCCESS,
-            Err(e) => {
-                eprintln!("error: {e}");
-                ExitCode::FAILURE
+        Command::Inspect { file } => finish(run_inspect(&file)),
+        Command::Docx { command } => format_inspect(Kind::Docx, &command),
+        Command::Xlsx { command } => format_inspect(Kind::Xlsx, &command),
+        Command::Apply {
+            commands,
+            input,
+            output,
+            dry_run,
+            allow_destructive,
+        } => {
+            let opts = apply_cmd::Options {
+                commands,
+                input,
+                output,
+                dry_run,
+                allow_destructive,
+            };
+            match apply_cmd::run(&opts) {
+                Ok(apply_cmd::Outcome::Done) => ExitCode::SUCCESS,
+                Ok(apply_cmd::Outcome::Refused) => {
+                    eprintln!("error: refused; nothing was applied or written");
+                    ExitCode::from(3)
+                }
+                Err(e) => {
+                    eprintln!("error: {e}");
+                    ExitCode::FAILURE
+                }
             }
-        },
+        }
         Command::Roundtrip { files, .. } => {
             let results: Vec<bool> = files.iter().map(|f| check_file(f)).collect();
-            let all_ok = results.iter().all(|&ok| ok);
-            if all_ok {
+            if results.iter().all(|&ok| ok) {
                 ExitCode::SUCCESS
             } else {
                 ExitCode::FAILURE

@@ -1,6 +1,6 @@
 //! Read -> write -> read invariant checker.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use open365_opc::{IntegrityIssue, Limits, OpcError, Package};
 
@@ -73,9 +73,10 @@ pub fn roundtrip(bytes: &[u8]) -> Result<RoundtripReport, OpcError> {
             Some(_) => {}
         }
     }
+    let before_set: HashSet<&String> = before_names.iter().collect();
     let added_parts: Vec<String> = after_names
         .iter()
-        .filter(|n| !before_names.contains(n))
+        .filter(|n| !before_set.contains(n))
         .cloned()
         .collect();
 

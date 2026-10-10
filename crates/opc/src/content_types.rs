@@ -55,6 +55,28 @@ impl ContentTypes {
         Ok(types)
     }
 
+    /// Extension defaults as sorted `(extension, content type)` pairs.
+    pub fn defaults(&self) -> Vec<(&str, &str)> {
+        let mut v: Vec<_> = self
+            .defaults
+            .iter()
+            .map(|(k, v)| (k.as_str(), v.as_str()))
+            .collect();
+        v.sort_unstable();
+        v
+    }
+
+    /// Part overrides as sorted `(lower-cased part name, content type)` pairs.
+    pub fn overrides(&self) -> Vec<(&str, &str)> {
+        let mut v: Vec<_> = self
+            .overrides
+            .iter()
+            .map(|(k, v)| (k.as_str(), v.as_str()))
+            .collect();
+        v.sort_unstable();
+        v
+    }
+
     /// The content type of `part`: an override wins over the extension default.
     pub fn content_type_of(&self, part: &PartName) -> Option<&str> {
         if let Some(ct) = self.overrides.get(&part.key()) {
