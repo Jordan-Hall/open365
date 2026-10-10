@@ -4,15 +4,22 @@
 //! `tools/office/word-layout-oracle.ps1` from the real Word. Each reference line must be
 //! reproduced with the same page, the same first-character offset (so identical line breaks),
 //! the same vertical position (baseline from the PDF when the oracle has it, else the screen
-//! line top) within 0.5 pt, and the same x of the first character within 0.5 pt.
+//! line top) within 0.5 pt, and the same x of the first drawn glyph within 0.5 pt (from the PDF
+//! when available: the screen `left`/`lastX` values are unreliable for aligned text).
 //!
 //! The expected number of matching lines per fixture lives in
 //! `fixtures/reference/layout/parity-floor.toml`. The floor only goes up: a lower result fails
 //! the test; a higher one prints a note, and `UPDATE_PARITY_FLOOR=1` rewrites the file.
 //! `PARITY_DETAIL=<fixture>` prints every reference line with the engine's answer.
 //!
-//! Only the bundled fonts are used (Calibri -> Carlito, Cambria -> Caladea), so results do not
-//! depend on the machine.
+//! Two font modes. The default uses only the bundled fonts (Calibri -> Carlito, Cambria ->
+//! Caladea), so results do not depend on the machine; a fixture that asks for a family the
+//! bundle cannot stand in for (Calibri Light, Arial, Aptos ...) is reported as skipped, never as
+//! passed. Caladea is not metric-compatible with the Cambria Word used (its glyphs are up to
+//! 10 % narrower), so Cambria text only approximates. With `OPEN365_PARITY_SYSTEM_FONTS=1` the
+//! test loads the real faces from the machine (Windows font folders and Office's cloud font
+//! cache for Aptos) and scores against the `[system.*]` floors; a fixture whose families the
+//! machine lacks is skipped. The references were produced on a machine with those fonts.
 
 use std::collections::BTreeMap;
 use std::fmt::Write as _;
@@ -22,10 +29,12 @@ use std::path::{Path, PathBuf};
 use open365_docx::Document;
 use open365_layout::{LayoutOptions, layout_document};
 use open365_opc::Limits;
-use open365_text::FontLibrary;
+use open365_text::{FontLibrary, FontMatch};
 use serde_json::Value;
 
 const TOLERANCE: f64 = 0.5;
+/// Word's PDF places glyph origins 0.024 pt (1/3000 in) right of the layout position.
+const PDF_X_OFFSET: f64 = 0.024;
 
 fn root() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("../..")
@@ -37,6 +46,8 @@ struct RefLine {
     end: u64,
     top: f64,
     left: f64,
+    /// Origin x of the first glyph drawn on the line, from Word's 600 dpi PDF.
+    ink_left: Option<f64>,
     last_x: Option<f64>,
     baseline: Option<f64>,
     text: String,
@@ -55,6 +66,7 @@ fn load_reference(path: &Path) -> Vec<RefLine> {
             end: l["end"].as_u64().expect("end"),
             top: l["top"].as_f64().expect("top"),
             left: l["left"].as_f64().expect("left"),
+            ink_left: l["inkLeft"].as_f64(),
             last_x: l["lastX"].as_f64(),
             baseline: l["baseline"].as_f64(),
             text: l["text"].as_str().unwrap_or_default().to_owned(),
@@ -82,13 +94,25 @@ fn show(s: &str) -> String {
     t.chars().take(40).collect()
 }
 
-fn score(name: &str, detail: bool) -> Score {
+/// `Err` carries the families that keep the fixture from being scored in this mode.
+fn score(name: &str, detail: bool, mode: Mode, fonts: &FontLibrary) -> Result<Score, String> {
     let root = root();
     let reference = load_reference(&root.join(format!("fixtures/reference/layout/{name}.json")));
     let bytes = fs::read(root.join(format!("fixtures/docx/{name}.docx"))).expect("read docx");
     let doc = Document::open(&bytes, &Limits::default()).expect("open docx");
-    let fonts = FontLibrary::bundled();
-    let layout = layout_document(&doc, &fonts, LayoutOptions::default());
+    let layout = layout_document(&doc, fonts, LayoutOptions::default());
+    let unusable: Vec<String> = layout
+        .fonts
+        .iter()
+        .filter(|f| match mode {
+            Mode::Bundled => f.matched == FontMatch::Fallback,
+            Mode::System => f.matched != FontMatch::Exact,
+        })
+        .map(|f| f.requested.clone())
+        .collect();
+    if !unusable.is_empty() {
+        return Err(unusable.join(", "));
+    }
 
     let engine: BTreeMap<usize, (usize, &open365_layout::Line)> =
         layout.lines().map(|(p, l)| (l.start, (p, l))).collect();
@@ -109,7 +133,11 @@ fn score(name: &str, detail: bool) -> Score {
                 l.top
             };
             let y_ok = (ey - ry).abs() <= TOLERANCE;
-            let x_ok = (l.left - r.left).abs() <= TOLERANCE;
+            let (ex, rx) = match r.ink_left {
+                Some(ink) => (l.first_glyph_x(), ink - PDF_X_OFFSET),
+                None => (l.left, r.left),
+            };
+            let x_ok = (ex - rx).abs() <= TOLERANCE;
             let end_ok = l.end as u64 == r.end;
             let lx_ok = r.last_x.is_none_or(|lx| (l.last_x - lx).abs() <= TOLERANCE);
             s.breaks += 1;
@@ -130,8 +158,8 @@ fn score(name: &str, detail: bool) -> Score {
                     ey,
                     ry,
                     ey - ry,
-                    l.left,
-                    r.left,
+                    ex,
+                    rx,
                     l.end,
                     r.end,
                     l.last_x,
@@ -157,25 +185,102 @@ fn score(name: &str, detail: bool) -> Score {
             println!("note: {note}");
         }
     }
-    s
+    Ok(s)
 }
 
 fn floor_path() -> PathBuf {
     root().join("fixtures/reference/layout/parity-floor.toml")
 }
 
-fn read_floor() -> BTreeMap<String, (usize, usize)> {
-    let text = fs::read_to_string(floor_path()).expect("parity-floor.toml");
-    let table: toml::Table = text.parse().expect("parse parity-floor.toml");
-    let mut out = BTreeMap::new();
-    if let Some(toml::Value::Table(fixtures)) = table.get("fixtures") {
-        for (name, v) in fixtures {
-            let m = v["matched"].as_integer().expect("matched") as usize;
-            let t = v["total"].as_integer().expect("total") as usize;
-            out.insert(name.clone(), (m, t));
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Mode {
+    Bundled,
+    System,
+}
+
+impl Mode {
+    fn from_env() -> Self {
+        if std::env::var("OPEN365_PARITY_SYSTEM_FONTS").is_ok_and(|v| v != "0" && !v.is_empty()) {
+            Self::System
+        } else {
+            Self::Bundled
         }
     }
-    out
+}
+
+type Floors = BTreeMap<String, (usize, usize)>;
+
+fn read_floors() -> (Floors, Floors) {
+    let text = fs::read_to_string(floor_path()).expect("parity-floor.toml");
+    let table: toml::Table = text.parse().expect("parse parity-floor.toml");
+    let section = |name: &str| {
+        let mut out = Floors::new();
+        if let Some(toml::Value::Table(fixtures)) = table.get(name) {
+            for (fixture, v) in fixtures {
+                let m = v["matched"].as_integer().expect("matched") as usize;
+                let t = v["total"].as_integer().expect("total") as usize;
+                out.insert(fixture.clone(), (m, t));
+            }
+        }
+        out
+    };
+    (section("fixtures"), section("system"))
+}
+
+fn write_floors(bundled: &Floors, system: &Floors) {
+    let mut out = String::from(concat!(
+        "# Ratchet for crates/layout/tests/word_parity.rs: lines that must match Word.
+",
+        "# [fixtures.*] is the default bundled-font mode, [system.*] the
+",
+        "# OPEN365_PARITY_SYSTEM_FONTS=1 mode. Raise `matched` when the engine improves
+",
+        "# (UPDATE_PARITY_FLOOR=1 cargo test -p open365-layout --test word_parity); never
+",
+        "# lower it. `total` is the number of reference lines.
+",
+    ));
+    for (section, floors) in [("fixtures", bundled), ("system", system)] {
+        for (name, (matched, total)) in floors {
+            let _ = write!(
+                out,
+                "
+[{section}.{name}]
+matched = {matched}
+total = {total}
+"
+            );
+        }
+    }
+    fs::write(floor_path(), out).expect("write floor");
+}
+
+/// Families the system mode loads from the machine.
+const SYSTEM_FAMILIES: [&str; 9] = [
+    "Calibri",
+    "Calibri Light",
+    "Cambria",
+    "Aptos",
+    "Aptos Display",
+    "Aptos Narrow",
+    "Arial",
+    "Times New Roman",
+    "Segoe UI",
+];
+
+fn library(mode: Mode) -> FontLibrary {
+    let mut lib = FontLibrary::bundled();
+    if mode == Mode::System {
+        let mut dirs = Vec::new();
+        if let Some(local) = std::env::var_os("LOCALAPPDATA") {
+            let cloud = PathBuf::from(local).join("Microsoft/FontCache/4/CloudFonts");
+            if cloud.is_dir() {
+                dirs.push(cloud);
+            }
+        }
+        lib.add_system_families(&SYSTEM_FAMILIES, &dirs);
+    }
+    lib
 }
 
 fn reference_names() -> Vec<String> {
@@ -195,25 +300,39 @@ fn reference_names() -> Vec<String> {
 fn layout_matches_word_at_least_as_well_as_the_floor() {
     let detail = std::env::var("PARITY_DETAIL").ok();
     let update = std::env::var_os("UPDATE_PARITY_FLOOR").is_some();
-    let floor = read_floor();
+    let mode = Mode::from_env();
+    let (mut bundled_floor, mut system_floor) = read_floors();
+    let floor = match mode {
+        Mode::Bundled => &mut bundled_floor,
+        Mode::System => &mut system_floor,
+    };
+    let fonts = library(mode);
     let mut failures = Vec::new();
-    let mut summary = String::from(
-        "\nWord layout parity (matched / total lines; stage columns count lines whose break is found)\n",
+    let mut skipped = Vec::new();
+    let mut summary = format!(
+        "
+Word layout parity, {} fonts (matched / total lines; stage columns count lines whose break is found)
+",
+        match mode {
+            Mode::Bundled => "bundled",
+            Mode::System => "system",
+        }
     );
     let _ = writeln!(
         summary,
         "{:<24} {:>9}  {:>6} {:>5} {:>5} {:>5} {:>5} {:>6}",
         "fixture", "matched", "breaks", "page", "y", "x", "end", "lastX"
     );
-    let mut new_floor = String::from(
-        "# Ratchet for crates/layout/tests/word_parity.rs: lines that must match Word.\n\
-         # Raise `matched` when the engine improves (UPDATE_PARITY_FLOOR=1 cargo test -p open365-layout\n\
-         # --test word_parity); never lower it. `total` is the number of reference lines.\n",
-    );
     let (mut all_matched, mut all_total) = (0, 0);
     for name in reference_names() {
         let want = detail.as_deref().is_some_and(|d| d == name || d == "all");
-        let s = score(&name, want);
+        let s = match score(&name, want, mode, &fonts) {
+            Ok(s) => s,
+            Err(missing) => {
+                skipped.push(format!("{name} (needs {missing})"));
+                continue;
+            }
+        };
         all_matched += s.matched;
         all_total += s.total;
         let _ = writeln!(
@@ -221,12 +340,16 @@ fn layout_matches_word_at_least_as_well_as_the_floor() {
             "{:<24} {:>4}/{:<4}  {:>6} {:>5} {:>5} {:>5} {:>5} {:>6}",
             name, s.matched, s.total, s.breaks, s.page, s.y, s.x, s.end, s.last_x
         );
-        match floor.get(&name) {
-            None => failures.push(format!(
-                "{name}: no entry in parity-floor.toml (matched {}/{})",
-                s.matched, s.total
-            )),
-            Some(&(fm, ft)) => {
+        match floor.get(&name).copied() {
+            None => {
+                if !update {
+                    failures.push(format!(
+                        "{name}: no entry in parity-floor.toml (matched {}/{})",
+                        s.matched, s.total
+                    ));
+                }
+            }
+            Some((fm, ft)) => {
                 if ft != s.total {
                     failures.push(format!(
                         "{name}: reference has {} lines, floor file says {ft}",
@@ -247,25 +370,30 @@ fn layout_matches_word_at_least_as_well_as_the_floor() {
                 }
             }
         }
-        let keep = if update {
-            s.matched
-        } else {
-            floor.get(&name).map_or(0, |f| f.0)
-        };
-        let _ = write!(
-            new_floor,
-            "\n[fixtures.{name}]\nmatched = {keep}\ntotal = {}\n",
-            s.total
-        );
+        if update {
+            let keep = floor.get(&name).map_or(0, |f| f.0).max(s.matched);
+            floor.insert(name, (keep, s.total));
+        }
     }
-    let _ = writeln!(summary, "{:<24} {:>4}/{:<4}", "all", all_matched, all_total);
+    let _ = writeln!(
+        summary,
+        "{:<24} {:>4}/{:<4}",
+        "all scored", all_matched, all_total
+    );
+    for item in &skipped {
+        let _ = writeln!(summary, "skipped: {item}");
+    }
     println!("{summary}");
     if update {
-        fs::write(floor_path(), new_floor).expect("write floor");
+        write_floors(&bundled_floor, &system_floor);
     }
     assert!(
-        update || failures.is_empty(),
-        "parity regressions:\n{}",
-        failures.join("\n")
+        failures.is_empty(),
+        "parity regressions:
+{}",
+        failures.join(
+            "
+"
+        )
     );
 }

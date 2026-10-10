@@ -1,3 +1,4 @@
+use std::path::PathBuf;
 use std::sync::Arc;
 
 use crate::{FontError, FontFace};
@@ -28,6 +29,17 @@ pub struct FontStyle {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FontChain {
     pub faces: Vec<FaceId>,
+}
+
+/// How a requested family is satisfied.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FontMatch {
+    /// A face of that very family is loaded.
+    Exact,
+    /// A metric-compatible substitute stands in (Calibri -> Carlito).
+    Alias,
+    /// Nothing related is loaded; the default family is used.
+    Fallback,
 }
 
 /// A set of faces plus the family substitution table.
@@ -80,6 +92,51 @@ const BUNDLED: [(&str, bool, bool, &[u8]); 8] = [
     ),
 ];
 
+/// The system face of `family` with the given style that is closest to regular or bold weight.
+fn best_system_face(
+    db: &fontdb::Database,
+    family: &str,
+    bold: bool,
+    italic: bool,
+) -> Option<fontdb::ID> {
+    let want = family.to_lowercase();
+    let want_compact = want.replace(' ', "");
+    let target = if bold { 700 } else { 400 };
+    db.faces()
+        .filter(|f| (f.style != fontdb::Style::Normal) == italic)
+        .filter_map(|f| {
+            let by_name = f.families.iter().any(|(n, _)| n.to_lowercase() == want);
+            // Face base name of the PostScript name: "Calibri-Light" -> "calibri".
+            let base = f
+                .post_script_name
+                .split('-')
+                .next()
+                .unwrap_or_default()
+                .to_lowercase();
+            let by_ps = f
+                .post_script_name
+                .replace('-', "")
+                .to_lowercase()
+                .starts_with(&want_compact)
+                && base != want_compact
+                && want_compact.len() > base.len();
+            // A bold slot takes only bold faces, a regular slot only regular ones.
+            if !(by_name || by_ps) || bold != (f.weight.0 >= 600) {
+                return None;
+            }
+            let mut score = u32::from(f.weight.0.abs_diff(target)) * 10;
+            if base != want_compact {
+                score += 1;
+            }
+            if f.stretch != fontdb::Stretch::Normal {
+                score += 100_000;
+            }
+            Some((score, f.id))
+        })
+        .min_by_key(|(score, _)| *score)
+        .map(|(_, id)| id)
+}
+
 impl FontLibrary {
     /// A library without faces.
     pub fn empty(default_family: &str) -> Self {
@@ -123,30 +180,55 @@ impl FontLibrary {
             .push((requested.to_lowercase(), installed.to_owned()));
     }
 
-    /// Adds every system face of `family` (case-insensitive) using fontdb. Returns how many
+    /// Adds the system faces of `family` (case-insensitive) using fontdb. Returns how many
     /// faces were added. Use only outside deterministic tests.
     pub fn add_system_family(&mut self, family: &str) -> usize {
+        self.add_system_families(&[family], &[])
+    }
+
+    /// Loads the system fonts plus the font directories `extra_dirs` once and adds, for each
+    /// of `families`, the regular, bold, italic and bold italic face that matches best. The
+    /// faces are registered under the requested family name, so a typographic subfamily such
+    /// as "Calibri Light" or "Aptos Display" can be requested by its own name. Returns how
+    /// many faces were added. Use only outside deterministic tests.
+    pub fn add_system_families(&mut self, families: &[&str], extra_dirs: &[PathBuf]) -> usize {
         let mut db = fontdb::Database::new();
         db.load_system_fonts();
-        let wanted = family.to_lowercase();
-        let ids: Vec<_> = db
-            .faces()
-            .filter(|f| f.families.iter().any(|(n, _)| n.to_lowercase() == wanted))
-            .filter(|f| f.stretch == fontdb::Stretch::Normal)
-            .map(|f| (f.id, f.style, f.weight))
-            .collect();
+        for dir in extra_dirs {
+            db.load_fonts_dir(dir);
+        }
         let mut added = 0;
-        for (id, style, weight) in ids {
-            let bold = weight.0 >= 600;
-            let italic = style != fontdb::Style::Normal;
-            let loaded = db.with_face_data(id, |data, index| (Arc::<[u8]>::from(data), index));
-            if let Some((data, index)) = loaded
-                && self.add_bytes(data, index, family, bold, italic).is_ok()
-            {
-                added += 1;
+        for family in families {
+            for (bold, italic) in [(false, false), (true, false), (false, true), (true, true)] {
+                let Some(id) = best_system_face(&db, family, bold, italic) else {
+                    continue;
+                };
+                let loaded = db.with_face_data(id, |data, index| (Arc::<[u8]>::from(data), index));
+                if let Some((data, index)) = loaded
+                    && self.add_bytes(data, index, family, bold, italic).is_ok()
+                {
+                    added += 1;
+                }
             }
         }
         added
+    }
+
+    /// How `family` would be satisfied by this library.
+    pub fn match_kind(&self, family: &str) -> FontMatch {
+        if self.best_in_family(family, FontStyle::default()).is_some() {
+            return FontMatch::Exact;
+        }
+        let lower = family.to_lowercase();
+        if self.aliases.iter().any(|(r, installed)| {
+            *r == lower
+                && self
+                    .best_in_family(installed, FontStyle::default())
+                    .is_some()
+        }) {
+            return FontMatch::Alias;
+        }
+        FontMatch::Fallback
     }
 
     pub fn face(&self, id: FaceId) -> &FontFace {

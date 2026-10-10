@@ -1,0 +1,5 @@
+feature = "layout-justify"
+made_with = "Microsoft Word 16.0.20430 (Windows)"
+author = "project member"
+expect_dropped = []
+notes = "justified text in Calibri 11 and Cambria 12 with right indents from 0 to 29.75 pt in 0.25 pt steps; a final group ends with a manual line break"

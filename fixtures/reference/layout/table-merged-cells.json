@@ -1,0 +1,14 @@
+{
+  "source": "fixtures/docx/table-merged-cells.docx",
+  "oracle": "Microsoft Word 16.0 (16.0.20430), Print Layout, tools/office/word-layout-oracle.ps1",
+  "units": "points; page and top/left/baseline measured from the page top-left corner; start/end are UTF-16 offsets in the main story",
+  "precision": "top/left/lastX are screen-quantised (+-0.3 pt); baseline/inkLeft come from the 600 dpi PDF and are exact",
+  "pageCount": 1,
+  "lines": [
+    {"page": 1, "start": 0, "end": 25, "top": 72.6, "left": 77.4, "lastX": 524.4, "baseline": null, "inkLeft": null, "text": "r1 c1\u000dr1 c2\u000d\u0007r1 c3\u000d\u0007r1 c4\u000d\u0007\u000d\u0007"},
+    {"page": 1, "start": 25, "end": 56, "top": 118.2, "left": 77.4, "lastX": 524.4, "baseline": null, "inkLeft": null, "text": "r2 c1\u000d\u0007r2 c2\u000d\u0007r2 c3\u000dr3 c3\u000d\u0007r2 c4\u000d\u0007\u000d\u0007"},
+    {"page": 1, "start": 56, "end": 76, "top": 141.0, "left": 77.4, "lastX": 524.4, "baseline": null, "inkLeft": null, "text": "r3 c1\u000d\u0007r3 c2\u000d\u0007\u000d\u0007r3 c4\u000d\u0007\u000d\u0007"},
+    {"page": 1, "start": 76, "end": 101, "top": 163.8, "left": 77.4, "lastX": 524.4, "baseline": null, "inkLeft": null, "text": "r4 c1\u000d\u0007r4 c2\u000d\u0007r4 c3\u000d\u0007r4 c4\u000d\u0007\u000d\u0007"},
+    {"page": 1, "start": 101, "end": 102, "top": 187.2, "left": 72.0, "lastX": 72.0, "baseline": null, "inkLeft": null, "text": "\u000d"}
+  ]
+}

@@ -135,6 +135,15 @@ fn can_start(
     true
 }
 
+/// Word positions baselines on a 1/300 inch grid (0.24 pt), rounding up: measured from the
+/// 600 dpi PDF export (`tools/office/word-layout-oracle.ps1`) over every font size from 8 to
+/// 72 pt, the line pitch averages the unrounded font height but each baseline lies on this grid.
+const BASELINE_GRID: f64 = 0.24;
+
+fn snap_baseline(y: f64) -> f64 {
+    ((y - 1e-6) / BASELINE_GRID).ceil() * BASELINE_GRID
+}
+
 fn build_line(
     ctx: &Context<'_>,
     para: &ParaLayout,
@@ -183,7 +192,7 @@ fn build_line(
         start: lb.start,
         end: lb.end,
         top,
-        baseline: top + lb.baseline_off,
+        baseline: snap_baseline(top + lb.baseline_off),
         height: lb.height,
         left: left_origin + lb.left,
         last_x: left_origin + lb.last_x,
@@ -223,7 +232,10 @@ pub(crate) fn paginate(
     for (p, (para, section)) in paras.iter().enumerate() {
         let wants_break = force_break || para.extra.page_break_before;
         if *section != page.section_index || (wants_break && page.has_content()) {
-            new_page!(true, *section);
+            // Space before is dropped at the top of every page after the first, whether the page
+            // began naturally, after a break character or at `pageBreakBefore`; a new section
+            // keeps it (layout-pagination).
+            new_page!(*section != page.section_index, *section);
         }
         force_break = false;
 
@@ -257,7 +269,8 @@ pub(crate) fn paginate(
                         before = 0.0;
                     }
                 }
-                after + before
+                // Word does not add space after and space before; the larger one separates.
+                after.max(before)
             };
             let y0 = page.y + gap(&page);
             let at_top = !page.has_content();

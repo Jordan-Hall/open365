@@ -1,22 +1,64 @@
 # Ratchet for crates/layout/tests/word_parity.rs: lines that must match Word.
-# Raise `matched` when the engine improves (UPDATE_PARITY_FLOOR=1 cargo test -p open365-layout
-# --test word_parity); never lower it. `total` is the number of reference lines.
+# [fixtures.*] is the default bundled-font mode, [system.*] the
+# OPEN365_PARITY_SYSTEM_FONTS=1 mode. Raise `matched` when the engine improves
+# (UPDATE_PARITY_FLOOR=1 cargo test -p open365-layout --test word_parity); never
+# lower it. `total` is the number of reference lines.
+
+[fixtures.comments]
+matched = 3
+total = 3
+
+[fixtures.custom-xml-part]
+matched = 2
+total = 2
+
+[fixtures.footnotes-endnotes]
+matched = 5
+total = 7
+
+[fixtures.header-footer]
+matched = 1
+total = 8
+
+[fixtures.hidden-text]
+matched = 1
+total = 1
+
+[fixtures.hyperlink-external]
+matched = 1
+total = 1
+
+[fixtures.inline-image]
+matched = 1
+total = 2
 
 [fixtures.layout-align]
-matched = 4
+matched = 5
 total = 22
 
 [fixtures.layout-indents-spacing]
-matched = 11
+matched = 88
 total = 98
+
+[fixtures.layout-justify]
+matched = 1207
+total = 1471
+
+[fixtures.layout-marks]
+matched = 17
+total = 17
 
 [fixtures.layout-mixed-sizes]
 matched = 1
 total = 12
 
 [fixtures.layout-pagination]
-matched = 261
+matched = 381
 total = 383
+
+[fixtures.layout-sizes]
+matched = 160
+total = 221
 
 [fixtures.layout-tabs]
 matched = 9
@@ -25,3 +67,115 @@ total = 18
 [fixtures.layout-wrap]
 matched = 9
 total = 34
+
+[fixtures.numbering]
+matched = 0
+total = 9
+
+[fixtures.plain-paragraphs]
+matched = 4
+total = 4
+
+[fixtures.sections-landscape]
+matched = 3
+total = 3
+
+[fixtures.table-merged-cells]
+matched = 0
+total = 5
+
+[fixtures.tracked-changes]
+matched = 1
+total = 2
+
+[system.comments]
+matched = 3
+total = 3
+
+[system.custom-xml-part]
+matched = 2
+total = 2
+
+[system.fields]
+matched = 4
+total = 10
+
+[system.footnotes-endnotes]
+matched = 5
+total = 7
+
+[system.header-footer]
+matched = 1
+total = 8
+
+[system.hidden-text]
+matched = 1
+total = 1
+
+[system.hyperlink-external]
+matched = 1
+total = 1
+
+[system.inline-image]
+matched = 1
+total = 2
+
+[system.layout-align]
+matched = 22
+total = 22
+
+[system.layout-indents-spacing]
+matched = 98
+total = 98
+
+[system.layout-justify]
+matched = 1351
+total = 1471
+
+[system.layout-marks]
+matched = 17
+total = 17
+
+[system.layout-mixed-sizes]
+matched = 12
+total = 12
+
+[system.layout-pagination]
+matched = 383
+total = 383
+
+[system.layout-sizes]
+matched = 221
+total = 221
+
+[system.layout-tabs]
+matched = 17
+total = 18
+
+[system.layout-wrap]
+matched = 34
+total = 34
+
+[system.numbering]
+matched = 0
+total = 9
+
+[system.plain-paragraphs]
+matched = 4
+total = 4
+
+[system.sections-landscape]
+matched = 3
+total = 3
+
+[system.styles-headings]
+matched = 2
+total = 4
+
+[system.table-merged-cells]
+matched = 0
+total = 5
+
+[system.tracked-changes]
+matched = 1
+total = 2

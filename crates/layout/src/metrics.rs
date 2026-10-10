@@ -36,8 +36,10 @@ pub(crate) fn line_height(
     let single = asc + desc;
     match rule {
         LineSpacing::Multiple(m) => {
+            // Extra leading goes below the baseline (measured: a 1.079 multiple leaves the
+            // first baseline where single spacing puts it).
             let h = single * f64::from(m);
-            (h, asc + (h - single))
+            (h, asc)
         }
         LineSpacing::AtLeast(x) => {
             let h = single.max(f64::from(x));

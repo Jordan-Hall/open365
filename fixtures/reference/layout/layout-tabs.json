@@ -20,7 +20,7 @@
     {"page": 1, "start": 331, "end": 425, "top": 300.6, "left": 72.0, "lastX": 523.2, "baseline": 311.14, "inkLeft": 72.024, "text": "1.\u0009Typesetting depends on small decisions repeated thousands of times: where a line ends, how "},
     {"page": 1, "start": 425, "end": 515, "top": 313.8, "left": 72.0, "lastX": 483.6, "baseline": 324.58, "inkLeft": 108.05, "text": "much space follows a paragraph, and which words travel together across a page boundary. A "},
     {"page": 1, "start": 515, "end": 612, "top": 327.6, "left": 72.0, "lastX": 538.8, "baseline": 338.02, "inkLeft": 108.05, "text": "faithful reproduction must make exactly the same decisions, because one different break early in "},
-    {"page": 1, "start": 612, "end": 679, "top": 340.8, "left": 72.0, "lastX": 365.4, "baseline": 351.46, "inkLeft": 108.05, "text": "a document moves every line that follows it onto a different page.\u000d"},
+    {"page": 1, "start": 612, "end": 679, "top": 340.8, "left": 72.0, "lastX": 401.4, "baseline": 351.46, "inkLeft": 108.05, "text": "a document moves every line that follows it onto a different page.\u000d"},
     {"page": 1, "start": 679, "end": 703, "top": 360.0, "left": 72.0, "lastX": 198.6, "baseline": 370.92, "inkLeft": 72.024, "text": "a)\u0009Short hanging entry.\u000d"},
     {"page": 1, "start": 703, "end": 704, "top": 379.8, "left": 72.0, "lastX": 72.0, "baseline": 390.12, "inkLeft": 72.024, "text": "\u000d"}
   ]

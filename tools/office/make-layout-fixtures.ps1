@@ -10,6 +10,7 @@ All fixtures use only Calibri and Cambria (bundled metric-compatible fallbacks: 
 Letter paper, 1 inch margins, so page geometry is the same on every machine and locale.
 All text is original.
 #>
+param([string[]]$Only = @())   # fixture names to (re)create; default: all layout fixtures
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 $docxDir = Join-Path $root 'fixtures\docx'
@@ -64,6 +65,7 @@ try {
   }
   function L-Fixture($name, $feature, $notes, [scriptblock]$build) {
     $doc = $null; $path = Join-Path $docxDir "$name.docx"
+    if ($script:Only.Count -gt 0 -and $name -notin $script:Only) { return }
     try {
       if (Test-Path $path) { Remove-Item $path -Force }
       $doc = $script:word.Documents.Add()
@@ -223,6 +225,67 @@ try {
     $hang = { param($f) $f.TabStops.ClearAll(); $f.LeftIndent = 36; $f.FirstLineIndent = -36 }
     L-Para ("1.`t" + $B) $hang
     L-Para ("a)`tShort hanging entry.") $hang
+  }
+
+  # Probe: line pitch / baseline for many font sizes (one paragraph per size, 10 lines each, no spacing).
+  L-Fixture 'layout-sizes' 'layout-sizes' 'line pitch and baseline offsets for Calibri and Cambria at sizes 8 to 72, 10 lines each, single spacing, no space after' {
+    Init-Doc 0
+    $ten = (1..10 | ForEach-Object { "Line $_ of ten" }) -join $VT
+    foreach ($sz in 8, 9, 10, 10.5, 11, 12, 13, 14, 16, 18, 20, 24, 28, 36, 48, 72) {
+      $szv = [single]$sz
+      L-Para $ten $null { param($f) $f.Size = $szv }
+    }
+    foreach ($sz in 9, 11, 12, 14, 24, 40) {
+      $szv = [single]$sz
+      L-Para $ten $null { param($f) $f.Name = 'Cambria'; $f.Size = $szv }
+    }
+  }
+
+  # Probe: does the paragraph mark's own font size change the height of its line?
+  L-Fixture 'layout-marks' 'layout-marks' 'paragraph mark font size versus text size on the last line, and empty paragraphs with several mark sizes' {
+    Init-Doc 0
+    function Mark($text, $textSize, $markSize) {
+      $ts = [single]$textSize; $ms = [single]$markSize
+      L-Para $text $null { param($f) $f.Size = $ts }
+      $p = $script:doc.Paragraphs.Item($script:doc.Paragraphs.Count - 1)
+      $p.Range.Characters.Last.Font.Size = $ms
+    }
+    Mark ("Alpha one" + $VT + "Alpha two" + $VT + "Alpha three") 10 28
+    Mark ("Beta one" + $VT + "Beta two" + $VT + "Beta three") 20 6
+    Mark ("Gamma one" + $VT + "Gamma two") 12 12
+    Mark ("Delta one" + $VT + "Delta two") 11 36
+    Mark 'Epsilon single line, small text, big mark' 9 24
+    foreach ($ms in 8, 11, 20, 36) {
+      $mv = [single]$ms
+      $s = $script:word.Selection; [void]$s.EndKey(6)
+      $s.Font.Size = $mv
+      $s.TypeParagraph()
+      $s.Font.Reset()
+    }
+    L-Para 'Closing paragraph.'
+  }
+
+  # Probe: justified lines. Each paragraph narrows the text by a different right indent, so many lines end
+  # within a few points of the margin (does Word shrink spaces to fit one more word? by how much?).
+  L-Fixture 'layout-justify' 'layout-justify' 'justified text in Calibri 11 and Cambria 12 with right indents from 0 to 29.75 pt in 0.25 pt steps; a final group ends with a manual line break' {
+    Init-Doc 0
+    $C = 'Evening settles over the harbour while the lamps along the breakwater flicker on one by one, and the last ferry of the day slides quietly towards the slipway with its windows glowing amber against the darkening water.'
+    foreach ($i in 0..119) {
+      $ri = [single]($i * 0.25)
+      L-Para $A { param($f) $f.Alignment = 3; $f.RightIndent = $ri }
+    }
+    foreach ($i in 0..119) {
+      $ri = [single]($i * 0.25)
+      L-Para ($B + ' ' + $C) { param($f) $f.Alignment = 3; $f.RightIndent = $ri }
+    }
+    foreach ($i in 0..39) {
+      $ri = [single]($i * 0.75)
+      L-Para $C { param($f) $f.Alignment = 3; $f.RightIndent = $ri } { param($f) $f.Name = 'Cambria'; $f.Size = 12 }
+    }
+    foreach ($i in 0..9) {
+      $ri = [single]($i * 1.5)
+      L-Para ('Justified text that finishes with a manual line break, followed by a short tail. ' + $B.Substring(0, 120) + $VT + 'Tail.') { param($f) $f.Alignment = 3; $f.RightIndent = $ri }
+    }
   }
 } finally {
   if ($word) {

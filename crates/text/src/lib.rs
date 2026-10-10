@@ -16,6 +16,6 @@ mod shape;
 
 pub use error::FontError;
 pub use face::{FaceMetrics, FontFace};
-pub use library::{FaceId, FontChain, FontLibrary, FontStyle};
+pub use library::{FaceId, FontChain, FontLibrary, FontMatch, FontStyle};
 pub use linebreak::{BreakKind, BreakOpportunity, break_opportunities};
 pub use shape::{ShapeFeatures, ShapedGlyph, ShapedRun, shape_run};

@@ -20,7 +20,7 @@ mod para;
 mod props;
 
 use open365_docx::{Block, Document, Paragraph, RawXml, Styles};
-use open365_text::{FaceId, FontLibrary};
+use open365_text::{FaceId, FontLibrary, FontMatch};
 
 pub use metrics::LineMetricModel;
 pub use props::{SectionProps, TabKind, TabLeader, TabStop};
@@ -85,6 +85,16 @@ pub struct Line {
     pub runs: Vec<GlyphRun>,
 }
 
+impl Line {
+    /// X of the first drawn glyph's origin, or of the line start when nothing is drawn.
+    pub fn first_glyph_x(&self) -> f64 {
+        self.runs
+            .iter()
+            .find_map(|r| r.glyphs.first())
+            .map_or(self.left, |g| g.x)
+    }
+}
+
 /// One page of the main story.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Page {
@@ -94,10 +104,19 @@ pub struct Page {
     pub lines: Vec<Line>,
 }
 
+/// A font family the document asked for and how the library satisfied it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FontUse {
+    pub requested: String,
+    pub matched: FontMatch,
+}
+
 /// The laid-out document.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct Layout {
     pub pages: Vec<Page>,
+    /// Every family the main story's text and paragraph marks use, sorted by name.
+    pub fonts: Vec<FontUse>,
     /// Features present in the document that layout does not model yet.
     pub notes: Vec<String>,
 }
@@ -213,6 +232,20 @@ pub fn layout_document(doc: &Document, fonts: &FontLibrary, options: LayoutOptio
         story = pl.story_end + item.extra_chars;
         laid.push((pl, item.section));
     }
+
+    let mut requested: Vec<&str> = laid
+        .iter()
+        .flat_map(|(pl, _)| pl.styles.iter().map(|s| s.requested.as_str()))
+        .collect();
+    requested.sort_unstable();
+    requested.dedup();
+    layout.fonts = requested
+        .into_iter()
+        .map(|r| FontUse {
+            requested: r.to_owned(),
+            matched: fonts.match_kind(r),
+        })
+        .collect();
 
     layout.pages = flow::paginate(&ctx, &laid, &sections);
     layout

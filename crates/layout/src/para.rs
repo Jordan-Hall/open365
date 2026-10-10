@@ -16,9 +16,16 @@ use crate::props::{DocExtras, ParaExtra, TabKind, TabStop};
 
 const EPS: f64 = 1e-6;
 
+/// A justified line may squeeze its spaces by up to this fraction of their width to take one
+/// more word (Word 2013+ layout). Fitted to layout-align and layout-justify: 0.2 gives the best
+/// match, but Word also weighs the alternative break, which is not modelled yet.
+const SPACE_SHRINK: f64 = 0.2;
+
 /// Resolved formatting of a run of text.
 #[derive(Debug, Clone)]
 pub(crate) struct RunStyle {
+    /// Family name the document asked for.
+    pub requested: String,
     pub chain: FontChain,
     pub face: FaceId,
     pub size: f64,
@@ -134,6 +141,7 @@ fn style_from(ctx: &Context<'_>, er: &EffectiveRun) -> RunStyle {
         .copied()
         .unwrap_or_else(|| FaceId::from_index(0));
     RunStyle {
+        requested: er.font.clone(),
         chain,
         face,
         size: f64::from(er.size_half_points) / 2.0,
@@ -494,6 +502,8 @@ impl LineBuilder<'_> {
         let mut end = n;
         let mut forced = false;
         let mut page_break_after = false;
+        let justify = self.props.alignment == Alignment::Justify;
+        let mut space_sum = 0.0;
         while i < n {
             let a = &self.atoms[i];
             let adv = match a.class {
@@ -501,7 +511,16 @@ impl LineBuilder<'_> {
                 AtomClass::LineBreak | AtomClass::PageBreak | AtomClass::Mark => 0.0,
                 _ => a.adv,
             };
-            if a.class == AtomClass::Text && i > a0 && x + adv > right_limit + EPS {
+            // A justified line may squeeze its spaces to take one more word.
+            let squeeze = if justify {
+                space_sum * SPACE_SHRINK
+            } else {
+                0.0
+            };
+            if a.class == AtomClass::Space {
+                space_sum += a.adv;
+            }
+            if a.class == AtomClass::Text && i > a0 && x + adv > right_limit + squeeze + EPS {
                 end = cand.unwrap_or(i);
                 break;
             }
@@ -591,7 +610,7 @@ impl LineBuilder<'_> {
                     let spaces: Vec<usize> = (0..last_vis)
                         .filter(|k| self.atoms[a0 + k].class == AtomClass::Space)
                         .collect();
-                    if !spaces.is_empty() && avail > vis_w {
+                    if !spaces.is_empty() && (avail - vis_w).abs() > EPS {
                         let per = (avail - vis_w) / spaces.len() as f64;
                         let mut added = 0.0;
                         for k in 0..xs.len() {
@@ -610,7 +629,15 @@ impl LineBuilder<'_> {
         let mut asc: f64 = 0.0;
         let mut desc: f64 = 0.0;
         let mut seen: Vec<usize> = Vec::new();
+        // The paragraph mark sizes its line only when nothing else is on it (measured with the
+        // layout-marks probe: a 28 pt mark after 10 pt text leaves the line at 10 pt).
+        let only_mark = self.atoms[a0..end]
+            .iter()
+            .all(|a| a.class == AtomClass::Mark);
         for a in &self.atoms[a0..end] {
+            if a.class == AtomClass::Mark && !only_mark {
+                continue;
+            }
             if seen.contains(&a.style) {
                 continue;
             }

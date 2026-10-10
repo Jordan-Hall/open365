@@ -29,5 +29,9 @@ pwsh -NoProfile -File tools/office/word-layout-oracle.ps1 -Path fixtures/docx/la
 ```
 `word-layout-oracle.ps1` writes `fixtures/reference/layout/<name>.json`: per main-story line the page, first
 character offset, top, left, lastX (screen-quantised +-0.3 pt) and exact baseline/inkLeft read from Word's PDF.
-Method and speed are documented in the script header. Only `layout-*` references are committed; the older
-fixtures use theme fonts (Aptos) that the bundled metric-compatible fonts cannot reproduce.
+Method and speed are documented in the script header. References exist for every docx fixture. The
+fixtures use Calibri (theme minor font), Calibri Light, Cambria and Arial, not Aptos. Use `make-layout-fixtures.ps1 -Only <name>`
+to create a single probe fixture. The parity test scores `x` from the PDF `inkLeft` (the screen `left`/`lastX`
+are unreliable for aligned text). `OPEN365_PARITY_SYSTEM_FONTS=1` runs it with the machine's real fonts
+(`[system.*]` floors); the default bundled mode skips fixtures whose fonts Carlito/Caladea cannot stand in for
+and only approximates Cambria (Caladea is narrower than Cambria).

@@ -1,0 +1,5 @@
+feature = "layout-sizes"
+made_with = "Microsoft Word 16.0.20430 (Windows)"
+author = "project member"
+expect_dropped = []
+notes = "line pitch and baseline offsets for Calibri and Cambria at sizes 8 to 72, 10 lines each, single spacing, no space after"
