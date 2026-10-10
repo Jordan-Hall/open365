@@ -1,0 +1,5 @@
+feature = "grid-styles"
+made_with = "Microsoft Excel 20430 (Windows)"
+author = "project member"
+expect_dropped = []
+notes = "theme colours with tints, indexed and RGB colours, fill patterns, every border style, alignments, wrapping, overflow, narrow numeric columns, fonts"

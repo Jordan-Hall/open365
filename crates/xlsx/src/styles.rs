@@ -3,6 +3,7 @@
 use std::collections::HashMap;
 
 use crate::XlsxError;
+use crate::format::{CellFormat, Color, FormatTables, Rgb, Theme};
 use crate::xml::{self, XmlElement};
 
 /// Built-in number format codes for ids 0 to 49 (ECMA-376 Part 1, 18.8.30). Ids the
@@ -56,6 +57,8 @@ pub struct Styles {
     num_fmts: HashMap<u32, String>,
     /// `numFmtId` of each `cellXfs/xf`, by style index.
     xf_num_fmt: Vec<u32>,
+    tables: FormatTables,
+    theme: Theme,
 }
 
 impl Styles {
@@ -94,10 +97,13 @@ impl Styles {
                     .collect()
             })
             .unwrap_or_default();
+        let tables = FormatTables::parse(&parsed.root);
         Ok(Self {
             parsed: Some((parsed.prolog, parsed.root, parsed.epilogue)),
             num_fmts,
             xf_num_fmt,
+            tables,
+            theme: Theme::default(),
         })
     }
 
@@ -143,6 +149,27 @@ impl Styles {
         };
         let size = attr("sz")?.trim().parse::<f64>().ok()?;
         Some((attr("name")?.to_owned(), size))
+    }
+
+    pub(crate) fn set_theme(&mut self, theme: Theme) {
+        self.theme = theme;
+    }
+
+    /// The workbook theme (the Office default when the package has none).
+    pub fn theme(&self) -> &Theme {
+        &self.theme
+    }
+
+    /// Font, fill, border and alignment of cell format `xf`, resolved through
+    /// `cellStyleXfs`. An unknown index gives the default format (the first font, no fill,
+    /// no borders, general alignment).
+    pub fn cell_format(&self, xf: u32) -> &CellFormat {
+        self.tables.format(xf)
+    }
+
+    /// A colour with theme, palette and tint applied. Automatic colours are black.
+    pub fn resolve_color(&self, color: &Color) -> Rgb {
+        crate::format::resolve(color, &self.theme, &self.tables.palette)
     }
 
     /// Custom number formats declared in the style sheet, by id.

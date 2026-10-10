@@ -15,31 +15,42 @@
 //! through the formula bar and the command layer: text starting with `=` becomes
 //! `XlsxSetCellFormula`, anything else `XlsxSetCellValue`.
 
+use std::cell::RefCell;
+use std::rc::Rc;
 use std::sync::Arc;
 use std::time::Instant;
 
 use egui::text::CCursor;
+use egui::text::{LayoutJob, TextFormat};
 use egui::text_edit::TextEditState;
 use egui::{
-    Align2, Color32, Context, Event, EventFilter, FontId, Id, Key, Painter, PointerButton, Pos2,
+    Align, Color32, Context, Event, EventFilter, FontId, Id, Key, Painter, PointerButton, Pos2,
     Rect, Sense, Stroke, TextEdit, Ui, UiBuilder, Vec2, accesskit, vec2,
 };
 use open365_calc::Value;
 use open365_calc::numfmt::{builtin_format_code, format_value};
 use open365_commands::{CellEntry, Command, Target};
 use open365_xlsx::{
-    Cell, CellValue, FrozenPanes, GridMetrics, MAX_COL, MAX_ROW, SheetGeometry, SheetKind,
-    SheetState, Workbook, Worksheet, col_letters, format_number,
+    Border, BorderEdge, BorderStyle, Cell, CellFormat, CellValue, Color, ColorSource, Fill,
+    FillPattern, FrozenPanes, GridMetrics, HorizontalAlignment, MAX_COL, MAX_ROW, SheetGeometry,
+    SheetKind, SheetState, Styles, Underline, VerticalAlignment, Workbook, Worksheet, col_letters,
+    format_number,
 };
 
 use crate::a11y;
+use crate::fonts::FontBook;
+use crate::grid_text::{
+    NumberText, TEXT_INSET_PX, color32, effective_horizontal, fill_text, fit_number, is_numeric,
+    overflow_room,
+};
 
 const ROW_HEADER_W: f32 = 54.0;
 const COL_HEADER_H: f32 = 24.0;
 const MIN_ROWS: u32 = 200;
 const MIN_COLS: u32 = 26;
-/// Display DPI the grid lays out for: egui points are 1/96 inch at 100% scaling.
-const GRID_DPI: u32 = 96;
+/// DPI of a display with no scaling: one egui point is one pixel. The grid lays out at
+/// `96 * pixels_per_point` so Excel's pixel rules hold on the real pixel grid.
+const BASE_DPI: f32 = 96.0;
 /// Largest number of cells Delete clears in one go.
 const MAX_CLEAR_CELLS: usize = 10_000;
 
@@ -59,17 +70,28 @@ struct SheetLayout {
     /// Tallest merge in rows; bounds the backwards scan in [`Self::merge_at`].
     max_span: u32,
     frozen: FrozenPanes,
+    /// Device pixels per egui point; geometry is in device pixels.
+    ppp: f32,
+    /// `(min, max, style)` of columns with a default cell format.
+    col_styles: Vec<(u32, u32, u32)>,
+}
+
+/// Layout DPI for a scale factor.
+fn layout_dpi(ppp: f32) -> u32 {
+    (BASE_DPI * ppp).round().max(1.0) as u32
 }
 
 impl SheetLayout {
-    fn new(wb: &Workbook, sheet: usize) -> Self {
-        let metrics = GridMetrics::for_styles(wb.styles(), GRID_DPI);
+    fn new(wb: &Workbook, sheet: usize, ppp: f32) -> Self {
+        let metrics = GridMetrics::for_styles(wb.styles(), layout_dpi(ppp));
         let Some(ws) = wb.sheet(sheet) else {
             return Self {
                 geo: SheetGeometry::uniform(metrics),
                 merges: Vec::new(),
                 max_span: 1,
                 frozen: FrozenPanes::default(),
+                ppp,
+                col_styles: Vec::new(),
             };
         };
         let mut merges = ws.merged_cells();
@@ -80,7 +102,39 @@ impl SheetLayout {
             merges,
             max_span,
             frozen: ws.frozen_panes().unwrap_or_default(),
+            ppp,
+            col_styles: ws.column_styles(),
         }
+    }
+
+    /// Left edge of column `col` in points from the sheet origin.
+    fn x(&self, col: u32) -> f32 {
+        self.geo.col_x(col) as f32 / self.ppp
+    }
+
+    /// Top edge of row `row` in points from the sheet origin.
+    fn y(&self, row: u32) -> f32 {
+        self.geo.row_y(row) as f32 / self.ppp
+    }
+
+    /// Width of column `col` in points.
+    fn w(&self, col: u32) -> f32 {
+        self.geo.col_px(col) as f32 / self.ppp
+    }
+
+    /// Height of row `row` in points.
+    fn h(&self, row: u32) -> f32 {
+        self.geo.row_px(row) as f32 / self.ppp
+    }
+
+    /// Column at a point offset from the sheet origin.
+    fn col_at(&self, x: f32, limit: u32) -> u32 {
+        self.geo.col_at((x.max(0.0) * self.ppp) as u64, limit)
+    }
+
+    /// Row at a point offset from the sheet origin.
+    fn row_at(&self, y: f32, limit: u32) -> u32 {
+        self.geo.row_at((y.max(0.0) * self.ppp) as u64, limit)
     }
 
     /// Smallest `(rows, cols)` that holds every merge and frozen line.
@@ -193,11 +247,9 @@ struct View<'a> {
 impl View<'_> {
     /// Cell range on the unshifted canvas.
     fn canvas_rect(&self, span: Span) -> Rect {
-        let geo = &self.layout.geo;
-        let x0 = geo.col_x(span.1) as f32;
-        let x1 = geo.col_x(span.3 + 1) as f32;
-        let y0 = geo.row_y(span.0) as f32;
-        let y1 = geo.row_y(span.2 + 1) as f32;
+        let l = self.layout;
+        let (x0, x1) = (l.x(span.1), l.x(span.3 + 1));
+        let (y0, y1) = (l.y(span.0), l.y(span.2 + 1));
         Rect::from_min_max(
             self.origin + vec2(ROW_HEADER_W + x0, COL_HEADER_H + y0),
             self.origin + vec2(ROW_HEADER_W + x1, COL_HEADER_H + y1),
@@ -222,10 +274,7 @@ impl View<'_> {
     /// Width and height of the frozen block in pixels.
     fn frozen_size(&self) -> Vec2 {
         let f = self.layout.frozen;
-        vec2(
-            self.layout.geo.col_x(f.cols + 1) as f32,
-            self.layout.geo.row_y(f.rows + 1) as f32,
-        )
+        vec2(self.layout.x(f.cols + 1), self.layout.y(f.rows + 1))
     }
 
     /// The cell under a screen position; `clamp` keeps a position outside the cell area
@@ -247,8 +296,8 @@ impl View<'_> {
         } else {
             local.y + self.scroll.y
         };
-        let col = self.layout.geo.col_at(sheet_x as u64, limits.1);
-        let row = self.layout.geo.row_at(sheet_y as u64, limits.0);
+        let col = self.layout.col_at(sheet_x, limits.1);
+        let row = self.layout.row_at(sheet_y, limits.0);
         Some((row, col))
     }
 }
@@ -306,8 +355,12 @@ pub struct GridView {
     /// Set when this frame's key events were already used by the formula bar.
     keys_consumed: bool,
     /// Geometry of the current sheet, built once per sheet.
-    layout: Option<(usize, Arc<SheetLayout>)>,
+    layout: Option<(usize, u32, Arc<SheetLayout>)>,
     visible: Visible,
+    fonts: Rc<RefCell<FontBook>>,
+    /// The application syncs a shared font book; a grid with its own syncs it itself.
+    owns_fonts: bool,
+    painted: RefCell<Vec<PaintedCell>>,
     /// Message for the status bar, taken by the application each frame.
     pub status: Option<String>,
     /// Milliseconds spent drawing the grid in the last frame.
@@ -380,9 +433,26 @@ impl GridView {
             keys_consumed: false,
             layout: None,
             visible: Visible::default(),
+            fonts: Rc::new(RefCell::new(FontBook::new())),
+            owns_fonts: true,
+            painted: RefCell::new(Vec::new()),
             status: None,
             last_frame_ms: 0.0,
         }
+    }
+
+    /// A grid that draws with the application's shared font book (which the application syncs).
+    pub(crate) fn with_fonts(fonts: Rc<RefCell<FontBook>>) -> Self {
+        Self {
+            fonts,
+            owns_fonts: false,
+            ..Self::new()
+        }
+    }
+
+    /// The cells drawn in the last frame, with the text as shown.
+    pub fn painted(&self) -> Vec<PaintedCell> {
+        self.painted.borrow().clone()
     }
 
     pub fn id(&self) -> Id {
@@ -403,7 +473,7 @@ impl GridView {
         let raw = (a.0.min(e.0), a.1.min(e.1), a.0.max(e.0), a.1.max(e.1));
         self.layout
             .as_ref()
-            .map_or(raw, |(_, layout)| layout.expand(raw))
+            .map_or(raw, |(_, _, layout)| layout.expand(raw))
     }
 
     pub fn is_editing(&self) -> bool {
@@ -528,7 +598,7 @@ impl GridView {
 
     /// `pos` moved by `steps` cells (sign gives direction) along one axis.
     fn walk(&self, mut pos: (u32, u32), d_row: i32, d_col: i32) -> (u32, u32) {
-        let layout = self.layout.as_ref().map(|(_, l)| l);
+        let layout = self.layout.as_ref().map(|(_, _, l)| l);
         for _ in 0..d_row.unsigned_abs().max(d_col.unsigned_abs()) {
             pos = match layout {
                 Some(l) => l.step(pos, d_row.signum(), d_col.signum()),
@@ -547,7 +617,7 @@ impl GridView {
     fn anchor_of(&self, pos: (u32, u32)) -> (u32, u32) {
         self.layout
             .as_ref()
-            .and_then(|(_, l)| l.merge_at(pos.0, pos.1))
+            .and_then(|(_, _, l)| l.merge_at(pos.0, pos.1))
             .map_or(pos, |m| (m.0, m.1))
     }
 
@@ -579,14 +649,16 @@ impl GridView {
         )
     }
 
-    fn layout_for(&mut self, wb: &Workbook) -> Arc<SheetLayout> {
-        if let Some((sheet, layout)) = &self.layout
+    fn layout_for(&mut self, wb: &Workbook, ppp: f32) -> Arc<SheetLayout> {
+        let dpi = layout_dpi(ppp);
+        if let Some((sheet, cached_dpi, layout)) = &self.layout
             && *sheet == self.sheet
+            && *cached_dpi == dpi
         {
             return Arc::clone(layout);
         }
-        let layout = Arc::new(SheetLayout::new(wb, self.sheet));
-        self.layout = Some((self.sheet, Arc::clone(&layout)));
+        let layout = Arc::new(SheetLayout::new(wb, self.sheet, ppp));
+        self.layout = Some((self.sheet, dpi, Arc::clone(&layout)));
         layout
     }
 
@@ -608,7 +680,10 @@ impl GridView {
         {
             self.sheet = first;
         }
-        self.layout_for(wb);
+        if self.owns_fonts {
+            self.fonts.borrow_mut().sync(ui.ctx());
+        }
+        self.layout_for(wb, ui.ctx().pixels_per_point());
         if let Some((row, col)) = self.pending_focus.take() {
             self.set_active(row, col);
         }
@@ -697,13 +772,13 @@ impl GridView {
         let ctx = ui.ctx().clone();
         let sheet = self.sheet;
         let Some(wb) = target.xlsx() else { return };
-        let layout = self.layout_for(wb);
+        let layout = self.layout_for(wb, ctx.pixels_per_point());
         let (rows_n, cols_n) = Self::sheet_extent(wb, sheet, &layout);
         // Selecting any cell of a merge selects the merge, anchored at its top-left cell.
         self.active = self.anchor_of(self.active);
         let content = vec2(
-            ROW_HEADER_W + layout.geo.col_x(cols_n + 1) as f32,
-            COL_HEADER_H + layout.geo.row_y(rows_n + 1) as f32,
+            ROW_HEADER_W + layout.x(cols_n + 1),
+            COL_HEADER_H + layout.y(rows_n + 1),
         );
 
         let active_id = self.focus_id;
@@ -776,22 +851,14 @@ impl GridView {
                 let view_min = origin + scroll;
 
                 // Visible rows and columns of the scrolling part.
-                let x0 = (scroll.x + fz.x).max(0.0) as u64;
-                let x1 = (scroll.x + viewport.width() - ROW_HEADER_W).max(0.0) as u64;
-                let y0 = (scroll.y + fz.y).max(0.0) as u64;
-                let y1 = (scroll.y + viewport.height() - COL_HEADER_H).max(0.0) as u64;
-                let first_col = layout
-                    .geo
-                    .col_at(x0, cols_n)
-                    .max(frozen.cols + 1)
-                    .min(cols_n);
-                let last_col = layout.geo.col_at(x1.max(x0), cols_n).max(first_col);
-                let first_row = layout
-                    .geo
-                    .row_at(y0, rows_n)
-                    .max(frozen.rows + 1)
-                    .min(rows_n);
-                let last_row = layout.geo.row_at(y1.max(y0), rows_n).max(first_row);
+                let x0 = (scroll.x + fz.x).max(0.0);
+                let x1 = (scroll.x + viewport.width() - ROW_HEADER_W).max(0.0);
+                let y0 = (scroll.y + fz.y).max(0.0);
+                let y1 = (scroll.y + viewport.height() - COL_HEADER_H).max(0.0);
+                let first_col = layout.col_at(x0, cols_n).max(frozen.cols + 1).min(cols_n);
+                let last_col = layout.col_at(x1.max(x0), cols_n).max(first_col);
+                let first_row = layout.row_at(y0, rows_n).max(frozen.rows + 1).min(rows_n);
+                let last_row = layout.row_at(y1.max(y0), rows_n).max(first_row);
                 visible = Visible {
                     frozen_rows: frozen.rows.min(rows_n),
                     frozen_cols: frozen.cols.min(cols_n),
@@ -903,10 +970,18 @@ impl GridView {
                         clip: frozen_x.intersect(frozen_y),
                     });
                 }
+                self.painted.borrow_mut().clear();
+                let paint = Paint {
+                    wb,
+                    ws,
+                    view: &view,
+                    pal: &pal,
+                    fonts: &self.fonts,
+                    log: &self.painted,
+                    ppp: ctx.pixels_per_point(),
+                };
                 for region in &regions {
-                    paint_region(
-                        &painter, wb, ws, &view, region, &pal, selection, active, &font,
-                    );
+                    paint_region(&painter, &paint, region, selection, active);
                 }
                 paint_headers(&painter, &view, clip_all, &visible, &pal, selection, &font);
 
@@ -1244,19 +1319,115 @@ impl GridView {
     }
 }
 
-/// Draws one region: background, grid lines, merged cells, text and the selection.
-#[allow(clippy::too_many_arguments)]
+/// What the grid drew for one cell: the text after fitting (`####`, shrunk General numbers,
+/// fill repeats), the space it was clipped to and the box it occupies. Kept for the last
+/// frame so tests and diagnostics can check text behaviour without reading pixels.
+#[derive(Debug, Clone)]
+pub struct PaintedCell {
+    pub row: u32,
+    pub col: u32,
+    /// The text as drawn; a wrapped cell holds all its lines joined with `\n`.
+    pub text: String,
+    /// The text did not fit and `#` characters are shown.
+    pub hashes: bool,
+    /// Where the text may be drawn: the cell, widened over empty neighbours when it overflows.
+    pub clip: Rect,
+    /// The cell's own rectangle.
+    pub cell: Rect,
+    /// The rectangle the text occupies (before clipping).
+    pub bounds: Rect,
+    /// The alignment after resolving General.
+    pub horizontal: HorizontalAlignment,
+    pub lines: usize,
+}
+
+/// Everything a painting pass needs besides the painter.
+struct Paint<'a> {
+    wb: &'a Workbook,
+    ws: Option<&'a Worksheet>,
+    view: &'a View<'a>,
+    pal: &'a Palette,
+    fonts: &'a RefCell<FontBook>,
+    log: &'a RefCell<Vec<PaintedCell>>,
+    ppp: f32,
+}
+
+/// A cell to draw: its rectangle (the whole merge for a merged cell) and format.
+struct Item<'a> {
+    row: u32,
+    col: u32,
+    /// Last column and row of the merge, or the cell itself.
+    end: (u32, u32),
+    rect: Rect,
+    cell: &'a Cell,
+    fmt: &'a CellFormat,
+    merged: bool,
+}
+
+/// Mixes the pattern colour into the background for a patterned fill.
+fn pattern_density(p: FillPattern) -> f32 {
+    match p {
+        FillPattern::Solid => 1.0,
+        FillPattern::DarkGray => 0.75,
+        FillPattern::MediumGray => 0.5,
+        FillPattern::LightGray => 0.25,
+        FillPattern::Gray125 => 0.125,
+        FillPattern::Gray0625 => 0.0625,
+        FillPattern::DarkHorizontal
+        | FillPattern::DarkVertical
+        | FillPattern::DarkDown
+        | FillPattern::DarkUp
+        | FillPattern::DarkGrid
+        | FillPattern::DarkTrellis => 0.5,
+        FillPattern::LightHorizontal
+        | FillPattern::LightVertical
+        | FillPattern::LightDown
+        | FillPattern::LightUp
+        | FillPattern::LightGrid
+        | FillPattern::LightTrellis => 0.25,
+        FillPattern::None => 0.0,
+    }
+}
+
+fn fill_color(styles: &Styles, fill: &Fill) -> Option<Color32> {
+    if fill.pattern == FillPattern::None {
+        return None;
+    }
+    let fg = color32(styles.resolve_color(&fill.fg));
+    if fill.pattern == FillPattern::Solid {
+        return Some(fg);
+    }
+    let bg = color32(styles.resolve_color(&fill.bg));
+    Some(Color32::from_rgb(
+        mix(bg.r(), fg.r(), pattern_density(fill.pattern)),
+        mix(bg.g(), fg.g(), pattern_density(fill.pattern)),
+        mix(bg.b(), fg.b(), pattern_density(fill.pattern)),
+    ))
+}
+
+fn mix(a: u8, b: u8, t: f32) -> u8 {
+    (f32::from(a) + (f32::from(b) - f32::from(a)) * t).round() as u8
+}
+
+/// The colour of text: automatic and theme "dark 1" follow the application's text colour so the
+/// grid stays readable in a dark theme; every other colour is drawn as the file says.
+fn text_color(styles: &Styles, c: &Color, pal: &Palette) -> Color32 {
+    match c.source {
+        ColorSource::Auto => pal.text,
+        ColorSource::Theme(1) if c.tint == 0.0 => pal.text,
+        _ => color32(styles.resolve_color(c)),
+    }
+}
+
+/// Draws one region: background, grid lines, fills, text, borders and the selection.
 fn paint_region(
     painter: &Painter,
-    wb: &Workbook,
-    ws: Option<&Worksheet>,
-    view: &View<'_>,
+    paint: &Paint<'_>,
     region: &Region,
-    pal: &Palette,
     selection: Span,
     active: (u32, u32),
-    font: &FontId,
 ) {
+    let (wb, ws, view, pal) = (paint.wb, paint.ws, paint.view, paint.pal);
     if region.rows.0 > region.rows.1 || region.cols.0 > region.cols.1 || !region.clip.is_positive()
     {
         return;
@@ -1264,29 +1435,23 @@ fn paint_region(
     let p = painter.with_clip_rect(region.clip.intersect(painter.clip_rect()));
     let layout = view.layout;
     let geo = &layout.geo;
+    let styles = wb.styles();
     let block = (region.rows.0, region.cols.0, region.rows.1, region.cols.1);
     let area = view.canvas_rect(block).translate(region.shift);
     p.rect_filled(area, 0.0, pal.cell_bg);
-    let line = Stroke::new(1.0, pal.grid_line);
+    let line = Stroke::new(1.0 / paint.ppp, pal.grid_line);
     for r in region.rows.0..=region.rows.1 + 1 {
-        let y = view.origin.y + COL_HEADER_H + geo.row_y(r) as f32 + region.shift.y;
+        let y = view.origin.y + COL_HEADER_H + layout.y(r) + region.shift.y - 0.5 / paint.ppp;
         p.hline(area.x_range(), y, line);
     }
     for c in region.cols.0..=region.cols.1 + 1 {
-        let x = view.origin.x + ROW_HEADER_W + geo.col_x(c) as f32 + region.shift.x;
+        let x = view.origin.x + ROW_HEADER_W + layout.x(c) + region.shift.x - 0.5 / paint.ppp;
         p.vline(x, area.y_range(), line);
     }
 
-    // A merged cell is one cell: cover the grid lines inside it.
+    // The cells to draw: stored cells in the block, merges as one cell.
     let merges = layout.merges_overlapping(region.rows, region.cols);
-    for m in &merges {
-        let r = view.canvas_rect(*m).translate(region.shift);
-        if r.is_positive() {
-            p.rect_filled(r, 0.0, pal.cell_bg);
-            p.rect_stroke(r, 0.0, line, egui::StrokeKind::Inside);
-        }
-    }
-
+    let mut items: Vec<Item<'_>> = Vec::new();
     if let Some(ws) = ws {
         let rows = ws.rows();
         let start = rows.partition_point(|r| r.r < region.rows.0);
@@ -1302,17 +1467,60 @@ fn paint_region(
                 if geo.col_hidden(cell.col) || layout.merge_at(row.r, cell.col).is_some() {
                     continue;
                 }
-                let r = view
-                    .canvas_rect((row.r, cell.col, row.r, cell.col))
-                    .translate(region.shift);
-                paint_cell_text(&p, wb, cell, r, pal, font);
+                items.push(Item {
+                    row: row.r,
+                    col: cell.col,
+                    end: (row.r, cell.col),
+                    rect: view
+                        .canvas_rect((row.r, cell.col, row.r, cell.col))
+                        .translate(region.shift),
+                    cell,
+                    fmt: styles.cell_format(cell.style.unwrap_or(0)),
+                    merged: false,
+                });
             }
         }
         for m in &merges {
             if let Some(cell) = ws.cell(m.0, m.1) {
-                let r = view.canvas_rect(*m).translate(region.shift);
-                paint_cell_text(&p, wb, cell, r, pal, font);
+                items.push(Item {
+                    row: m.0,
+                    col: m.1,
+                    end: (m.2, m.3),
+                    rect: view.canvas_rect(*m).translate(region.shift),
+                    cell,
+                    fmt: styles.cell_format(cell.style.unwrap_or(0)),
+                    merged: true,
+                });
             }
+        }
+    }
+    // A merged cell is one cell: it covers the grid lines inside it.
+    for m in &merges {
+        let r = view.canvas_rect(*m).translate(region.shift);
+        if r.is_positive() {
+            p.rect_filled(r, 0.0, pal.cell_bg);
+        }
+    }
+    for item in &items {
+        if let Some(color) = fill_color(styles, &item.fmt.fill) {
+            p.rect_filled(item.rect, 0.0, color);
+        }
+    }
+    for m in &merges {
+        let r = view.canvas_rect(*m).translate(region.shift);
+        let has_fill = ws.and_then(|ws| ws.cell(m.0, m.1)).is_some_and(|c| {
+            fill_color(styles, &styles.cell_format(c.style.unwrap_or(0)).fill).is_some()
+        });
+        if r.is_positive() && !has_fill {
+            p.rect_stroke(r, 0.0, line, egui::StrokeKind::Inside);
+        }
+    }
+    for item in &items {
+        paint_cell_text(&p, paint, item, region);
+    }
+    if let Some(ws) = ws {
+        for item in &items {
+            paint_cell_borders(&p, paint, ws, item);
         }
     }
 
@@ -1352,41 +1560,418 @@ fn paint_region(
     }
 }
 
-fn paint_cell_text(
+/// Width of `text` in device pixels with `font`: the sum of the glyph advances, each rounded to
+/// whole pixels as GDI text does at screen sizes.
+fn text_px(painter: &Painter, text: &str, font: &FontId, ppp: f32) -> f32 {
+    let galley = painter.layout_no_wrap(text.to_owned(), font.clone(), Color32::WHITE);
+    galley.rows.first().map_or(0.0, |row| {
+        row.glyphs
+            .iter()
+            .map(|g| (g.advance_width * ppp).round())
+            .sum()
+    })
+}
+
+/// The text of a cell as shown, and whether it is a row of `#`.
+fn shown_text(
     painter: &Painter,
-    wb: &Workbook,
-    cell: &Cell,
-    r: Rect,
-    pal: &Palette,
+    paint: &Paint<'_>,
+    item: &Item<'_>,
     font: &FontId,
-) {
-    if !r.is_positive() {
+    avail_px: f32,
+) -> (String, bool) {
+    let wb = paint.wb;
+    let full = display_text(wb, item.cell);
+    match &item.cell.value {
+        CellValue::Number(n) => {
+            let code = format_code(wb, item.cell.style.unwrap_or(0));
+            let general = code == "General" || code.is_empty();
+            let mut measure = |s: &str| text_px(painter, s, font, paint.ppp);
+            match fit_number(*n, full, general, avail_px, &mut measure) {
+                NumberText::Text(t) => (t, false),
+                NumberText::Hashes(t) => (t, true),
+            }
+        }
+        CellValue::Error(_) => {
+            if text_px(painter, &full, font, paint.ppp) <= avail_px {
+                (full, false)
+            } else {
+                let one = text_px(painter, "#", font, paint.ppp).max(1.0);
+                ("#".repeat(((avail_px / one).floor() as usize).max(1)), true)
+            }
+        }
+        _ => (full, false),
+    }
+}
+
+fn paint_cell_text(painter: &Painter, paint: &Paint<'_>, item: &Item<'_>, region: &Region) {
+    let r = item.rect;
+    if !r.is_positive() || matches!(item.cell.value, CellValue::Empty) {
         return;
     }
-    let text = display_text(wb, cell);
+    let (wb, view, pal, ppp) = (paint.wb, paint.view, paint.pal, paint.ppp);
+    let layout = view.layout;
+    let styles = wb.styles();
+    let fmt = item.fmt;
+    let font = &fmt.font;
+    let face = paint
+        .fonts
+        .borrow_mut()
+        .resolve(&font.name, font.bold, font.italic);
+    // Excel sizes are points at 72 per inch; egui points are 1/96 inch at ppp 1.
+    let base_size = (font.size * 96.0 / 72.0) as f32;
+    let mut font_id = FontId::new(base_size, face.family.clone());
+    let color = text_color(styles, &font.color, pal);
+    let px = |v: f32| v / ppp;
+
+    let avail_px = (r.width() * ppp).round() - TEXT_INSET_PX;
+    let (text, hashes) = shown_text(painter, paint, item, &font_id, avail_px);
     if text.is_empty() {
         return;
     }
-    let clipped = painter.with_clip_rect(r.shrink2(vec2(1.0, 0.0)).intersect(painter.clip_rect()));
-    let (anchor, pos, color) = match &cell.value {
-        CellValue::Number(_) => (
-            Align2::RIGHT_CENTER,
-            Pos2::new(r.right() - 4.0, r.center().y),
-            pal.text,
-        ),
-        CellValue::Bool(_) => (Align2::CENTER_CENTER, r.center(), pal.text),
-        CellValue::Error(_) => (
-            Align2::CENTER_CENTER,
-            r.center(),
-            Color32::from_rgb(200, 60, 60),
-        ),
-        _ => (
-            Align2::LEFT_CENTER,
-            Pos2::new(r.left() + 4.0, r.center().y),
-            pal.text,
-        ),
+    let is_text = !is_numeric(&item.cell.value) && !matches!(item.cell.value, CellValue::Error(_));
+    let align = &fmt.alignment;
+    let h = effective_horizontal(align.horizontal, &item.cell.value);
+    let wrap = align.wrap_text && is_text && !hashes;
+    let rotation = if wrap {
+        Some(0)
+    } else {
+        align.rotation_degrees()
     };
-    clipped.text(pos, anchor, text, font.clone(), color);
+
+    // Indent: three space widths per step, on the aligned side.
+    let space = text_px(painter, " ", &font_id, ppp) / ppp;
+    let indent = align.indent as f32 * 3.0 * space;
+    let mut inner = Rect::from_min_max(
+        Pos2::new(r.left() + px(2.0), r.top()),
+        Pos2::new(r.right() - px(2.0) - px(1.0), r.bottom()),
+    );
+    match h {
+        HorizontalAlignment::Left | HorizontalAlignment::Distributed => inner.min.x += indent,
+        HorizontalAlignment::Right => inner.max.x -= indent,
+        _ => {}
+    }
+    let mut text = text;
+    if h == HorizontalAlignment::Fill && is_text {
+        let mut measure = |s: &str| text_px(painter, s, &font_id, ppp);
+        text = fill_text(&text, inner.width() * ppp, &mut measure);
+    }
+
+    let format = TextFormat {
+        font_id: font_id.clone(),
+        color,
+        underline: if font.underline == Underline::None {
+            Stroke::NONE
+        } else {
+            Stroke::new(1.0 / ppp, color)
+        },
+        strikethrough: if font.strike {
+            Stroke::new(1.0 / ppp, color)
+        } else {
+            Stroke::NONE
+        },
+        ..TextFormat::default()
+    };
+    let mut job = LayoutJob::default();
+    job.wrap.max_width = if wrap {
+        inner.width().max(1.0)
+    } else {
+        f32::INFINITY
+    };
+    if rotation.is_none() {
+        // Stacked vertical text: one character per line.
+        text = text
+            .chars()
+            .map(String::from)
+            .collect::<Vec<_>>()
+            .join("\n");
+    }
+    job.halign = match h {
+        HorizontalAlignment::Right => Align::Max,
+        HorizontalAlignment::Center | HorizontalAlignment::CenterContinuous => Align::Center,
+        _ => Align::Min,
+    };
+    job.justify = wrap
+        && matches!(
+            h,
+            HorizontalAlignment::Justify | HorizontalAlignment::Distributed
+        );
+    job.append(&text, 0.0, format.clone());
+    let mut galley = painter.layout_job(job.clone());
+
+    // Shrink to fit: scale the font down until one line fits.
+    if align.shrink_to_fit && !wrap && galley.size().x > inner.width() && galley.size().x > 0.0 {
+        let scale = (inner.width() / galley.size().x).clamp(0.1, 1.0);
+        font_id = FontId::new(base_size * scale, face.family.clone());
+        let mut shrunk = TextFormat {
+            font_id: font_id.clone(),
+            ..format.clone()
+        };
+        shrunk.color = color;
+        let mut j = LayoutJob::default();
+        j.wrap.max_width = f32::INFINITY;
+        j.halign = job.halign;
+        j.append(&text, 0.0, shrunk);
+        galley = painter.layout_job(j);
+    }
+
+    let size = galley.size();
+    let cell_rect = r;
+    // Where the text may spread: over empty neighbours when it overflows its cell.
+    let mut clip = cell_rect;
+    let mut area = inner;
+    let overflows = size.x > inner.width() + 0.01;
+    let can_overflow =
+        is_text && !wrap && !align.shrink_to_fit && !item.merged && rotation == Some(0);
+    if h == HorizontalAlignment::CenterContinuous {
+        // Centre across the following empty cells that are also centred across selection.
+        if let Some(ws) = paint.ws {
+            let mut last = item.end.1;
+            while last < MAX_COL {
+                let next = last + 1;
+                let blank = ws
+                    .cell(item.row, next)
+                    .is_none_or(|c| matches!(c.value, CellValue::Empty) && c.formula.is_none());
+                let st = ws.resolved_style(item.row, next, &layout.col_styles);
+                if blank
+                    && styles.cell_format(st).alignment.horizontal
+                        == HorizontalAlignment::CenterContinuous
+                {
+                    last = next;
+                } else {
+                    break;
+                }
+            }
+            if last > item.end.1 {
+                let extra = layout.x(last + 1) - layout.x(item.end.1 + 1);
+                clip.max.x += extra;
+                area.max.x += extra;
+            }
+        }
+    } else if can_overflow
+        && overflows
+        && let Some(ws) = paint.ws
+    {
+        let is_empty = |c: u32| {
+            ws.cell(item.row, c)
+                .is_none_or(|x| matches!(x.value, CellValue::Empty) && x.formula.is_none())
+                && layout.merge_at(item.row, c).is_none()
+        };
+        let width = |c: u32| layout.w(c);
+        let need = size.x - inner.width() + px(TEXT_INSET_PX);
+        match h {
+            HorizontalAlignment::Right => {
+                let room = overflow_room(item.col, -1, MAX_COL, need, &is_empty, &width);
+                clip.min.x -= room.min(need);
+                area.min.x -= room.min(need);
+            }
+            HorizontalAlignment::Center => {
+                let each = need / 2.0;
+                let l = overflow_room(item.col, -1, MAX_COL, each, &is_empty, &width).min(each);
+                let rr = overflow_room(item.end.1, 1, MAX_COL, each, &is_empty, &width).min(each);
+                clip.min.x -= l;
+                clip.max.x += rr;
+                area.min.x -= l;
+                area.max.x += rr;
+            }
+            _ => {
+                let room = overflow_room(item.end.1, 1, MAX_COL, need, &is_empty, &width);
+                clip.max.x += room.min(need);
+                area.max.x += room.min(need);
+            }
+        }
+    }
+
+    // Position.
+    let pad_y = px(1.0);
+    let y = match align.vertical {
+        VerticalAlignment::Top | VerticalAlignment::Justify => r.top() + pad_y,
+        VerticalAlignment::Center | VerticalAlignment::Distributed => r.center().y - size.y / 2.0,
+        VerticalAlignment::Bottom => r.bottom() - size.y - pad_y,
+    };
+    let x = match h {
+        HorizontalAlignment::Right => area.right() - size.x,
+        HorizontalAlignment::Center | HorizontalAlignment::CenterContinuous => {
+            if overflows && !can_overflow && h == HorizontalAlignment::Center {
+                inner.left()
+            } else {
+                area.center().x - size.x / 2.0
+            }
+        }
+        _ => area.left(),
+    };
+    let wrap_x = if wrap { area.left() } else { x };
+    let pos = Pos2::new(wrap_x, y);
+    let clipped = painter.with_clip_rect(clip.intersect(painter.clip_rect()));
+    let bounds = Rect::from_min_size(pos, size);
+    match rotation {
+        Some(0) => {
+            clipped.galley(pos, galley.clone(), color);
+            if font.bold && !face.real_bold {
+                clipped.galley(pos + vec2(px(1.0), 0.0), galley.clone(), color);
+            }
+        }
+        deg => {
+            // Rotated (or stacked) text is centred in the cell.
+            let top_left = r.center() - size / 2.0;
+            let angle = -(deg.unwrap_or(0) as f32).to_radians();
+            let shape = egui::epaint::TextShape::new(top_left, galley.clone(), color)
+                .with_angle_and_anchor(angle, egui::Align2::CENTER_CENTER);
+            painter
+                .with_clip_rect(cell_rect.intersect(painter.clip_rect()))
+                .add(shape);
+        }
+    }
+    paint.log.borrow_mut().push(PaintedCell {
+        row: item.row,
+        col: item.col,
+        text: galley.text().to_owned(),
+        hashes,
+        clip,
+        cell: cell_rect,
+        bounds,
+        horizontal: h,
+        lines: galley.rows.len().max(1),
+    });
+    let _ = region;
+}
+
+/// Pixel dash pattern `(on, off)` lengths for a border style, empty for a solid line.
+fn dash_pattern(style: BorderStyle) -> &'static [f32] {
+    match style {
+        BorderStyle::Dashed => &[3.0, 1.0],
+        BorderStyle::MediumDashed => &[3.0, 1.0],
+        BorderStyle::Dotted | BorderStyle::Hair => &[1.0, 1.0],
+        BorderStyle::DashDot | BorderStyle::MediumDashDot | BorderStyle::SlantDashDot => {
+            &[3.0, 1.0, 1.0, 1.0]
+        }
+        BorderStyle::DashDotDot | BorderStyle::MediumDashDotDot => &[3.0, 1.0, 1.0, 1.0, 1.0, 1.0],
+        _ => &[],
+    }
+}
+
+/// Draws one border edge along the boundary between two cells. `horizontal` edges run along x
+/// from `from` to `to` at the boundary `at`; vertical ones run along y. Positions are points.
+#[allow(clippy::too_many_arguments)]
+fn draw_edge(
+    painter: &Painter,
+    horizontal: bool,
+    at: f32,
+    from: f32,
+    to: f32,
+    edge: &BorderEdge,
+    color: Color32,
+    ppp: f32,
+) {
+    let width = edge.style.width_px();
+    if width == 0 || to <= from {
+        return;
+    }
+    // A line of `width` px covers the pixels [at - ceil(w/2), at + floor(w/2)), so a 1 px line
+    // sits on the grid line pixel just before the boundary.
+    let lines: &[(f32, f32)] = if edge.style == BorderStyle::Double {
+        &[(2.0, 1.0), (0.0, 1.0)]
+    } else {
+        &[(width.div_ceil(2) as f32, width as f32)]
+    };
+    let pattern = dash_pattern(edge.style);
+    for &(back, thickness) in lines {
+        let center = at - (back - thickness / 2.0) / ppp;
+        let stroke = Stroke::new(thickness / ppp, color);
+        let seg = |a: f32, b: f32| {
+            if horizontal {
+                [Pos2::new(a, center), Pos2::new(b, center)]
+            } else {
+                [Pos2::new(center, a), Pos2::new(center, b)]
+            }
+        };
+        if pattern.is_empty() {
+            painter.line_segment(seg(from, to), stroke);
+        } else {
+            let mut pos = from;
+            let mut i = 0;
+            let mut guard = 0;
+            while pos < to && guard < 4096 {
+                let len = pattern[i % pattern.len()] / ppp;
+                if i % 2 == 0 {
+                    painter.line_segment(seg(pos, (pos + len).min(to)), stroke);
+                }
+                pos += len;
+                i += 1;
+                guard += 1;
+            }
+        }
+    }
+}
+
+fn paint_cell_borders(painter: &Painter, paint: &Paint<'_>, ws: &Worksheet, item: &Item<'_>) {
+    let styles = paint.wb.styles();
+    let col_styles = &paint.view.layout.col_styles;
+    let b = if item.merged {
+        let tl = ws.resolved_border(styles, item.row, item.col, col_styles);
+        let tr = ws.resolved_border(styles, item.row, item.end.1, col_styles);
+        let bl = ws.resolved_border(styles, item.end.0, item.col, col_styles);
+        Border {
+            left: tl.left,
+            top: tl.top,
+            right: tr.right,
+            bottom: bl.bottom,
+            ..tl
+        }
+    } else {
+        ws.resolved_border(styles, item.row, item.col, col_styles)
+    };
+    let r = item.rect;
+    let ppp = paint.ppp;
+    let colour = |e: &BorderEdge| color32(styles.resolve_color(&e.color));
+    if b.top.style != BorderStyle::None {
+        draw_edge(
+            painter,
+            true,
+            r.top(),
+            r.left(),
+            r.right(),
+            &b.top,
+            colour(&b.top),
+            ppp,
+        );
+    }
+    if b.bottom.style != BorderStyle::None {
+        draw_edge(
+            painter,
+            true,
+            r.bottom(),
+            r.left(),
+            r.right(),
+            &b.bottom,
+            colour(&b.bottom),
+            ppp,
+        );
+    }
+    if b.left.style != BorderStyle::None {
+        draw_edge(
+            painter,
+            false,
+            r.left(),
+            r.top(),
+            r.bottom(),
+            &b.left,
+            colour(&b.left),
+            ppp,
+        );
+    }
+    if b.right.style != BorderStyle::None {
+        draw_edge(
+            painter,
+            false,
+            r.right(),
+            r.top(),
+            r.bottom(),
+            &b.right,
+            colour(&b.right),
+            ppp,
+        );
+    }
 }
 
 /// Sticky column and row headers; frozen ones stay put, the rest scroll under them.
@@ -1399,7 +1984,7 @@ fn paint_headers(
     selection: Span,
     font: &FontId,
 ) {
-    let geo = &view.layout.geo;
+    let layout = view.layout;
     let view_min = view.origin + view.scroll;
     let fz = view.frozen_size();
     let stroke = Stroke::new(1.0, pal.grid_line);
@@ -1441,11 +2026,11 @@ fn paint_headers(
             .intersect(clip_all),
         );
         for c in cols.0..=cols.1 {
-            let w = geo.col_px(c) as f32;
+            let w = layout.w(c);
             if w <= 0.0 {
                 continue;
             }
-            let x = view.origin.x + ROW_HEADER_W + geo.col_x(c) as f32 + shift;
+            let x = view.origin.x + ROW_HEADER_W + layout.x(c) + shift;
             let r = Rect::from_min_size(Pos2::new(x, view_min.y), vec2(w, COL_HEADER_H));
             let selected = (selection.1..=selection.3).contains(&c);
             if selected {
@@ -1454,7 +2039,7 @@ fn paint_headers(
             p.vline(r.left(), r.y_range(), stroke);
             p.with_clip_rect(r.intersect(p.clip_rect())).text(
                 r.center(),
-                Align2::CENTER_CENTER,
+                egui::Align2::CENTER_CENTER,
                 col_letters(c),
                 font.clone(),
                 if selected { pal.accent } else { pal.text },
@@ -1487,11 +2072,11 @@ fn paint_headers(
             .intersect(clip_all),
         );
         for r in rows.0..=rows.1 {
-            let h = geo.row_px(r) as f32;
+            let h = layout.h(r);
             if h <= 0.0 {
                 continue;
             }
-            let y = view.origin.y + COL_HEADER_H + geo.row_y(r) as f32 + shift;
+            let y = view.origin.y + COL_HEADER_H + layout.y(r) + shift;
             let rr = Rect::from_min_size(Pos2::new(view_min.x, y), vec2(ROW_HEADER_W, h));
             let selected = (selection.0..=selection.2).contains(&r);
             if selected {
@@ -1500,7 +2085,7 @@ fn paint_headers(
             p.hline(rr.x_range(), rr.top(), stroke);
             p.with_clip_rect(rr.intersect(p.clip_rect())).text(
                 rr.center(),
-                Align2::CENTER_CENTER,
+                egui::Align2::CENTER_CENTER,
                 r.to_string(),
                 font.clone(),
                 if selected { pal.accent } else { pal.text },

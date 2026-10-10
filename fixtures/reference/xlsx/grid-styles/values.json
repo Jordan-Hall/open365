@@ -1,0 +1,2532 @@
+{
+  "source": "fixtures/xlsx/grid-styles.xlsx",
+  "sheets": [
+    {
+      "name": "Colours",
+      "visible": -1,
+      "usedRange": "A1:L60",
+      "truncatedAt2000": false,
+      "cells": {
+        "B2": {
+          "value2": "x",
+          "text": "x",
+          "formula": null
+        },
+        "C2": {
+          "value2": "x",
+          "text": "x",
+          "formula": null
+        },
+        "D2": {
+          "value2": "x",
+          "text": "x",
+          "formula": null
+        },
+        "E2": {
+          "value2": "x",
+          "text": "x",
+          "formula": null
+        },
+        "F2": {
+          "value2": "x",
+          "text": "x",
+          "formula": null
+        },
+        "G2": {
+          "value2": "x",
+          "text": "x",
+          "formula": null
+        },
+        "H2": {
+          "value2": "x",
+          "text": "x",
+          "formula": null
+        },
+        "I2": {
+          "value2": "x",
+          "text": "x",
+          "formula": null
+        },
+        "J2": {
+          "value2": "x",
+          "text": "x",
+          "formula": null
+        },
+        "B3": {
+          "value2": "x",
+          "text": "x",
+          "formula": null
+        },
+        "C3": {
+          "value2": "x",
+          "text": "x",
+          "formula": null
+        },
+        "D3": {
+          "value2": "x",
+          "text": "x",
+          "formula": null
+        },
+        "E3": {
+          "value2": "x",
+          "text": "x",
+          "formula": null
+        },
+        "F3": {
+          "value2": "x",
+          "text": "x",
+          "formula": null
+        },
+        "G3": {
+          "value2": "x",
+          "text": "x",
+          "formula": null
+        },
+        "H3": {
+          "value2": "x",
+          "text": "x",
+          "formula": null
+        },
+        "I3": {
+          "value2": "x",
+          "text": "x",
+          "formula": null
+        },
+        "J3": {
+          "value2": "x",
+          "text": "x",
+          "formula": null
+        },
+        "B4": {
+          "value2": "x",
+          "text": "x",
+          "formula": null
+        },
+        "C4": {
+          "value2": "x",
+          "text": "x",
+          "formula": null
+        },
+        "D4": {
+          "value2": "x",
+          "text": "x",
+          "formula": null
+        },
+        "E4": {
+          "value2": "x",
+          "text": "x",
+          "formula": null
+        },
+        "F4": {
+          "value2": "x",
+          "text": "x",
+          "formula": null
+        },
+        "G4": {
+          "value2": "x",
+          "text": "x",
+          "formula": null
+        },
+        "H4": {
+          "value2": "x",
+          "text": "x",
+          "formula": null
+        },
+        "I4": {
+          "value2": "x",
+          "text": "x",
+          "formula": null
+        },
+        "J4": {
+          "value2": "x",
+          "text": "x",
+          "formula": null
+        },
+        "B5": {
+          "value2": "x",
+          "text": "x",
+          "formula": null
+        },
+        "C5": {
+          "value2": "x",
+          "text": "x",
+          "formula": null
+        },
+        "D5": {
+          "value2": "x",
+          "text": "x",
+          "formula": null
+        },
+        "E5": {
+          "value2": "x",
+          "text": "x",
+          "formula": null
+        },
+        "F5": {
+          "value2": "x",
+          "text": "x",
+          "formula": null
+        },
+        "G5": {
+          "value2": "x",
+          "text": "x",
+          "formula": null
+        },
+        "H5": {
+          "value2": "x",
+          "text": "x",
+          "formula": null
+        },
+        "I5": {
+          "value2": "x",
+          "text": "x",
+          "formula": null
+        },
+        "J5": {
+          "value2": "x",
+          "text": "x",
+          "formula": null
+        },
+        "B6": {
+          "value2": "x",
+          "text": "x",
+          "formula": null
+        },
+        "C6": {
+          "value2": "x",
+          "text": "x",
+          "formula": null
+        },
+        "D6": {
+          "value2": "x",
+          "text": "x",
+          "formula": null
+        },
+        "E6": {
+          "value2": "x",
+          "text": "x",
+          "formula": null
+        },
+        "F6": {
+          "value2": "x",
+          "text": "x",
+          "formula": null
+        },
+        "G6": {
+          "value2": "x",
+          "text": "x",
+          "formula": null
+        },
+        "H6": {
+          "value2": "x",
+          "text": "x",
+          "formula": null
+        },
+        "I6": {
+          "value2": "x",
+          "text": "x",
+          "formula": null
+        },
+        "J6": {
+          "value2": "x",
+          "text": "x",
+          "formula": null
+        },
+        "B7": {
+          "value2": "x",
+          "text": "x",
+          "formula": null
+        },
+        "C7": {
+          "value2": "x",
+          "text": "x",
+          "formula": null
+        },
+        "D7": {
+          "value2": "x",
+          "text": "x",
+          "formula": null
+        },
+        "E7": {
+          "value2": "x",
+          "text": "x",
+          "formula": null
+        },
+        "F7": {
+          "value2": "x",
+          "text": "x",
+          "formula": null
+        },
+        "G7": {
+          "value2": "x",
+          "text": "x",
+          "formula": null
+        },
+        "H7": {
+          "value2": "x",
+          "text": "x",
+          "formula": null
+        },
+        "I7": {
+          "value2": "x",
+          "text": "x",
+          "formula": null
+        },
+        "J7": {
+          "value2": "x",
+          "text": "x",
+          "formula": null
+        },
+        "B8": {
+          "value2": "x",
+          "text": "x",
+          "formula": null
+        },
+        "C8": {
+          "value2": "x",
+          "text": "x",
+          "formula": null
+        },
+        "D8": {
+          "value2": "x",
+          "text": "x",
+          "formula": null
+        },
+        "E8": {
+          "value2": "x",
+          "text": "x",
+          "formula": null
+        },
+        "F8": {
+          "value2": "x",
+          "text": "x",
+          "formula": null
+        },
+        "G8": {
+          "value2": "x",
+          "text": "x",
+          "formula": null
+        },
+        "H8": {
+          "value2": "x",
+          "text": "x",
+          "formula": null
+        },
+        "I8": {
+          "value2": "x",
+          "text": "x",
+          "formula": null
+        },
+        "J8": {
+          "value2": "x",
+          "text": "x",
+          "formula": null
+        },
+        "B9": {
+          "value2": "x",
+          "text": "x",
+          "formula": null
+        },
+        "C9": {
+          "value2": "x",
+          "text": "x",
+          "formula": null
+        },
+        "D9": {
+          "value2": "x",
+          "text": "x",
+          "formula": null
+        },
+        "E9": {
+          "value2": "x",
+          "text": "x",
+          "formula": null
+        },
+        "F9": {
+          "value2": "x",
+          "text": "x",
+          "formula": null
+        },
+        "G9": {
+          "value2": "x",
+          "text": "x",
+          "formula": null
+        },
+        "H9": {
+          "value2": "x",
+          "text": "x",
+          "formula": null
+        },
+        "I9": {
+          "value2": "x",
+          "text": "x",
+          "formula": null
+        },
+        "J9": {
+          "value2": "x",
+          "text": "x",
+          "formula": null
+        },
+        "B10": {
+          "value2": "x",
+          "text": "x",
+          "formula": null
+        },
+        "C10": {
+          "value2": "x",
+          "text": "x",
+          "formula": null
+        },
+        "D10": {
+          "value2": "x",
+          "text": "x",
+          "formula": null
+        },
+        "E10": {
+          "value2": "x",
+          "text": "x",
+          "formula": null
+        },
+        "F10": {
+          "value2": "x",
+          "text": "x",
+          "formula": null
+        },
+        "G10": {
+          "value2": "x",
+          "text": "x",
+          "formula": null
+        },
+        "H10": {
+          "value2": "x",
+          "text": "x",
+          "formula": null
+        },
+        "I10": {
+          "value2": "x",
+          "text": "x",
+          "formula": null
+        },
+        "J10": {
+          "value2": "x",
+          "text": "x",
+          "formula": null
+        },
+        "B11": {
+          "value2": "x",
+          "text": "x",
+          "formula": null
+        },
+        "C11": {
+          "value2": "x",
+          "text": "x",
+          "formula": null
+        },
+        "D11": {
+          "value2": "x",
+          "text": "x",
+          "formula": null
+        },
+        "E11": {
+          "value2": "x",
+          "text": "x",
+          "formula": null
+        },
+        "F11": {
+          "value2": "x",
+          "text": "x",
+          "formula": null
+        },
+        "G11": {
+          "value2": "x",
+          "text": "x",
+          "formula": null
+        },
+        "H11": {
+          "value2": "x",
+          "text": "x",
+          "formula": null
+        },
+        "I11": {
+          "value2": "x",
+          "text": "x",
+          "formula": null
+        },
+        "J11": {
+          "value2": "x",
+          "text": "x",
+          "formula": null
+        },
+        "B12": {
+          "value2": "x",
+          "text": "x",
+          "formula": null
+        },
+        "C12": {
+          "value2": "x",
+          "text": "x",
+          "formula": null
+        },
+        "D12": {
+          "value2": "x",
+          "text": "x",
+          "formula": null
+        },
+        "E12": {
+          "value2": "x",
+          "text": "x",
+          "formula": null
+        },
+        "F12": {
+          "value2": "x",
+          "text": "x",
+          "formula": null
+        },
+        "G12": {
+          "value2": "x",
+          "text": "x",
+          "formula": null
+        },
+        "H12": {
+          "value2": "x",
+          "text": "x",
+          "formula": null
+        },
+        "I12": {
+          "value2": "x",
+          "text": "x",
+          "formula": null
+        },
+        "J12": {
+          "value2": "x",
+          "text": "x",
+          "formula": null
+        },
+        "B13": {
+          "value2": "x",
+          "text": "x",
+          "formula": null
+        },
+        "C13": {
+          "value2": "x",
+          "text": "x",
+          "formula": null
+        },
+        "D13": {
+          "value2": "x",
+          "text": "x",
+          "formula": null
+        },
+        "E13": {
+          "value2": "x",
+          "text": "x",
+          "formula": null
+        },
+        "F13": {
+          "value2": "x",
+          "text": "x",
+          "formula": null
+        },
+        "G13": {
+          "value2": "x",
+          "text": "x",
+          "formula": null
+        },
+        "H13": {
+          "value2": "x",
+          "text": "x",
+          "formula": null
+        },
+        "I13": {
+          "value2": "x",
+          "text": "x",
+          "formula": null
+        },
+        "J13": {
+          "value2": "x",
+          "text": "x",
+          "formula": null
+        },
+        "B16": {
+          "value2": 12.0,
+          "text": "12",
+          "formula": null
+        },
+        "C16": {
+          "value2": 12.0,
+          "text": "12",
+          "formula": null
+        },
+        "D16": {
+          "value2": 12.0,
+          "text": "12",
+          "formula": null
+        },
+        "E16": {
+          "value2": 12.0,
+          "text": "12",
+          "formula": null
+        },
+        "F16": {
+          "value2": 12.0,
+          "text": "12",
+          "formula": null
+        },
+        "G16": {
+          "value2": 12.0,
+          "text": "12",
+          "formula": null
+        },
+        "H16": {
+          "value2": 12.0,
+          "text": "12",
+          "formula": null
+        },
+        "I16": {
+          "value2": 12.0,
+          "text": "12",
+          "formula": null
+        },
+        "J16": {
+          "value2": 12.0,
+          "text": "12",
+          "formula": null
+        },
+        "B17": {
+          "value2": 12.0,
+          "text": "12",
+          "formula": null
+        },
+        "C17": {
+          "value2": 12.0,
+          "text": "12",
+          "formula": null
+        },
+        "D17": {
+          "value2": 12.0,
+          "text": "12",
+          "formula": null
+        },
+        "E17": {
+          "value2": 12.0,
+          "text": "12",
+          "formula": null
+        },
+        "F17": {
+          "value2": 12.0,
+          "text": "12",
+          "formula": null
+        },
+        "G17": {
+          "value2": 12.0,
+          "text": "12",
+          "formula": null
+        },
+        "H17": {
+          "value2": 12.0,
+          "text": "12",
+          "formula": null
+        },
+        "I17": {
+          "value2": 12.0,
+          "text": "12",
+          "formula": null
+        },
+        "J17": {
+          "value2": 12.0,
+          "text": "12",
+          "formula": null
+        },
+        "B18": {
+          "value2": 12.0,
+          "text": "12",
+          "formula": null
+        },
+        "C18": {
+          "value2": 12.0,
+          "text": "12",
+          "formula": null
+        },
+        "D18": {
+          "value2": 12.0,
+          "text": "12",
+          "formula": null
+        },
+        "E18": {
+          "value2": 12.0,
+          "text": "12",
+          "formula": null
+        },
+        "F18": {
+          "value2": 12.0,
+          "text": "12",
+          "formula": null
+        },
+        "G18": {
+          "value2": 12.0,
+          "text": "12",
+          "formula": null
+        },
+        "H18": {
+          "value2": 12.0,
+          "text": "12",
+          "formula": null
+        },
+        "I18": {
+          "value2": 12.0,
+          "text": "12",
+          "formula": null
+        },
+        "J18": {
+          "value2": 12.0,
+          "text": "12",
+          "formula": null
+        },
+        "B19": {
+          "value2": 12.0,
+          "text": "12",
+          "formula": null
+        },
+        "C19": {
+          "value2": 12.0,
+          "text": "12",
+          "formula": null
+        },
+        "D19": {
+          "value2": 12.0,
+          "text": "12",
+          "formula": null
+        },
+        "E19": {
+          "value2": 12.0,
+          "text": "12",
+          "formula": null
+        },
+        "F19": {
+          "value2": 12.0,
+          "text": "12",
+          "formula": null
+        },
+        "G19": {
+          "value2": 12.0,
+          "text": "12",
+          "formula": null
+        },
+        "H19": {
+          "value2": 12.0,
+          "text": "12",
+          "formula": null
+        },
+        "I19": {
+          "value2": 12.0,
+          "text": "12",
+          "formula": null
+        },
+        "J19": {
+          "value2": 12.0,
+          "text": "12",
+          "formula": null
+        },
+        "B20": {
+          "value2": 12.0,
+          "text": "12",
+          "formula": null
+        },
+        "C20": {
+          "value2": 12.0,
+          "text": "12",
+          "formula": null
+        },
+        "D20": {
+          "value2": 12.0,
+          "text": "12",
+          "formula": null
+        },
+        "E20": {
+          "value2": 12.0,
+          "text": "12",
+          "formula": null
+        },
+        "F20": {
+          "value2": 12.0,
+          "text": "12",
+          "formula": null
+        },
+        "G20": {
+          "value2": 12.0,
+          "text": "12",
+          "formula": null
+        },
+        "H20": {
+          "value2": 12.0,
+          "text": "12",
+          "formula": null
+        },
+        "I20": {
+          "value2": 12.0,
+          "text": "12",
+          "formula": null
+        },
+        "J20": {
+          "value2": 12.0,
+          "text": "12",
+          "formula": null
+        },
+        "B21": {
+          "value2": 12.0,
+          "text": "12",
+          "formula": null
+        },
+        "C21": {
+          "value2": 12.0,
+          "text": "12",
+          "formula": null
+        },
+        "D21": {
+          "value2": 12.0,
+          "text": "12",
+          "formula": null
+        },
+        "E21": {
+          "value2": 12.0,
+          "text": "12",
+          "formula": null
+        },
+        "F21": {
+          "value2": 12.0,
+          "text": "12",
+          "formula": null
+        },
+        "G21": {
+          "value2": 12.0,
+          "text": "12",
+          "formula": null
+        },
+        "H21": {
+          "value2": 12.0,
+          "text": "12",
+          "formula": null
+        },
+        "I21": {
+          "value2": 12.0,
+          "text": "12",
+          "formula": null
+        },
+        "J21": {
+          "value2": 12.0,
+          "text": "12",
+          "formula": null
+        },
+        "B22": {
+          "value2": 12.0,
+          "text": "12",
+          "formula": null
+        },
+        "C22": {
+          "value2": 12.0,
+          "text": "12",
+          "formula": null
+        },
+        "D22": {
+          "value2": 12.0,
+          "text": "12",
+          "formula": null
+        },
+        "E22": {
+          "value2": 12.0,
+          "text": "12",
+          "formula": null
+        },
+        "F22": {
+          "value2": 12.0,
+          "text": "12",
+          "formula": null
+        },
+        "G22": {
+          "value2": 12.0,
+          "text": "12",
+          "formula": null
+        },
+        "H22": {
+          "value2": 12.0,
+          "text": "12",
+          "formula": null
+        },
+        "I22": {
+          "value2": 12.0,
+          "text": "12",
+          "formula": null
+        },
+        "J22": {
+          "value2": 12.0,
+          "text": "12",
+          "formula": null
+        },
+        "B23": {
+          "value2": 12.0,
+          "text": "12",
+          "formula": null
+        },
+        "C23": {
+          "value2": 12.0,
+          "text": "12",
+          "formula": null
+        },
+        "D23": {
+          "value2": 12.0,
+          "text": "12",
+          "formula": null
+        },
+        "E23": {
+          "value2": 12.0,
+          "text": "12",
+          "formula": null
+        },
+        "F23": {
+          "value2": 12.0,
+          "text": "12",
+          "formula": null
+        },
+        "G23": {
+          "value2": 12.0,
+          "text": "12",
+          "formula": null
+        },
+        "H23": {
+          "value2": 12.0,
+          "text": "12",
+          "formula": null
+        },
+        "I23": {
+          "value2": 12.0,
+          "text": "12",
+          "formula": null
+        },
+        "J23": {
+          "value2": 12.0,
+          "text": "12",
+          "formula": null
+        },
+        "B24": {
+          "value2": 12.0,
+          "text": "12",
+          "formula": null
+        },
+        "C24": {
+          "value2": 12.0,
+          "text": "12",
+          "formula": null
+        },
+        "D24": {
+          "value2": 12.0,
+          "text": "12",
+          "formula": null
+        },
+        "E24": {
+          "value2": 12.0,
+          "text": "12",
+          "formula": null
+        },
+        "F24": {
+          "value2": 12.0,
+          "text": "12",
+          "formula": null
+        },
+        "G24": {
+          "value2": 12.0,
+          "text": "12",
+          "formula": null
+        },
+        "H24": {
+          "value2": 12.0,
+          "text": "12",
+          "formula": null
+        },
+        "I24": {
+          "value2": 12.0,
+          "text": "12",
+          "formula": null
+        },
+        "J24": {
+          "value2": 12.0,
+          "text": "12",
+          "formula": null
+        },
+        "B25": {
+          "value2": 12.0,
+          "text": "12",
+          "formula": null
+        },
+        "C25": {
+          "value2": 12.0,
+          "text": "12",
+          "formula": null
+        },
+        "D25": {
+          "value2": 12.0,
+          "text": "12",
+          "formula": null
+        },
+        "E25": {
+          "value2": 12.0,
+          "text": "12",
+          "formula": null
+        },
+        "F25": {
+          "value2": 12.0,
+          "text": "12",
+          "formula": null
+        },
+        "G25": {
+          "value2": 12.0,
+          "text": "12",
+          "formula": null
+        },
+        "H25": {
+          "value2": 12.0,
+          "text": "12",
+          "formula": null
+        },
+        "I25": {
+          "value2": 12.0,
+          "text": "12",
+          "formula": null
+        },
+        "J25": {
+          "value2": 12.0,
+          "text": "12",
+          "formula": null
+        },
+        "B26": {
+          "value2": 12.0,
+          "text": "12",
+          "formula": null
+        },
+        "C26": {
+          "value2": 12.0,
+          "text": "12",
+          "formula": null
+        },
+        "D26": {
+          "value2": 12.0,
+          "text": "12",
+          "formula": null
+        },
+        "E26": {
+          "value2": 12.0,
+          "text": "12",
+          "formula": null
+        },
+        "F26": {
+          "value2": 12.0,
+          "text": "12",
+          "formula": null
+        },
+        "G26": {
+          "value2": 12.0,
+          "text": "12",
+          "formula": null
+        },
+        "H26": {
+          "value2": 12.0,
+          "text": "12",
+          "formula": null
+        },
+        "I26": {
+          "value2": 12.0,
+          "text": "12",
+          "formula": null
+        },
+        "J26": {
+          "value2": 12.0,
+          "text": "12",
+          "formula": null
+        },
+        "B27": {
+          "value2": 12.0,
+          "text": "12",
+          "formula": null
+        },
+        "C27": {
+          "value2": 12.0,
+          "text": "12",
+          "formula": null
+        },
+        "D27": {
+          "value2": 12.0,
+          "text": "12",
+          "formula": null
+        },
+        "E27": {
+          "value2": 12.0,
+          "text": "12",
+          "formula": null
+        },
+        "F27": {
+          "value2": 12.0,
+          "text": "12",
+          "formula": null
+        },
+        "G27": {
+          "value2": 12.0,
+          "text": "12",
+          "formula": null
+        },
+        "H27": {
+          "value2": 12.0,
+          "text": "12",
+          "formula": null
+        },
+        "I27": {
+          "value2": 12.0,
+          "text": "12",
+          "formula": null
+        },
+        "J27": {
+          "value2": 12.0,
+          "text": "12",
+          "formula": null
+        },
+        "B30": {
+          "value2": "i",
+          "text": "i",
+          "formula": null
+        },
+        "C30": {
+          "value2": "i",
+          "text": "i",
+          "formula": null
+        },
+        "D30": {
+          "value2": "i",
+          "text": "i",
+          "formula": null
+        },
+        "E30": {
+          "value2": "i",
+          "text": "i",
+          "formula": null
+        },
+        "F30": {
+          "value2": "i",
+          "text": "i",
+          "formula": null
+        },
+        "G30": {
+          "value2": "i",
+          "text": "i",
+          "formula": null
+        },
+        "H30": {
+          "value2": "i",
+          "text": "i",
+          "formula": null
+        },
+        "I30": {
+          "value2": "i",
+          "text": "i",
+          "formula": null
+        },
+        "B31": {
+          "value2": "i",
+          "text": "i",
+          "formula": null
+        },
+        "C31": {
+          "value2": "i",
+          "text": "i",
+          "formula": null
+        },
+        "D31": {
+          "value2": "i",
+          "text": "i",
+          "formula": null
+        },
+        "E31": {
+          "value2": "i",
+          "text": "i",
+          "formula": null
+        },
+        "F31": {
+          "value2": "i",
+          "text": "i",
+          "formula": null
+        },
+        "G31": {
+          "value2": "i",
+          "text": "i",
+          "formula": null
+        },
+        "H31": {
+          "value2": "i",
+          "text": "i",
+          "formula": null
+        },
+        "I31": {
+          "value2": "i",
+          "text": "i",
+          "formula": null
+        },
+        "B32": {
+          "value2": "i",
+          "text": "i",
+          "formula": null
+        },
+        "C32": {
+          "value2": "i",
+          "text": "i",
+          "formula": null
+        },
+        "D32": {
+          "value2": "i",
+          "text": "i",
+          "formula": null
+        },
+        "E32": {
+          "value2": "i",
+          "text": "i",
+          "formula": null
+        },
+        "F32": {
+          "value2": "i",
+          "text": "i",
+          "formula": null
+        },
+        "G32": {
+          "value2": "i",
+          "text": "i",
+          "formula": null
+        },
+        "H32": {
+          "value2": "i",
+          "text": "i",
+          "formula": null
+        },
+        "I32": {
+          "value2": "i",
+          "text": "i",
+          "formula": null
+        },
+        "B33": {
+          "value2": "i",
+          "text": "i",
+          "formula": null
+        },
+        "C33": {
+          "value2": "i",
+          "text": "i",
+          "formula": null
+        },
+        "D33": {
+          "value2": "i",
+          "text": "i",
+          "formula": null
+        },
+        "E33": {
+          "value2": "i",
+          "text": "i",
+          "formula": null
+        },
+        "F33": {
+          "value2": "i",
+          "text": "i",
+          "formula": null
+        },
+        "G33": {
+          "value2": "i",
+          "text": "i",
+          "formula": null
+        },
+        "H33": {
+          "value2": "i",
+          "text": "i",
+          "formula": null
+        },
+        "I33": {
+          "value2": "i",
+          "text": "i",
+          "formula": null
+        },
+        "B34": {
+          "value2": "i",
+          "text": "i",
+          "formula": null
+        },
+        "C34": {
+          "value2": "i",
+          "text": "i",
+          "formula": null
+        },
+        "D34": {
+          "value2": "i",
+          "text": "i",
+          "formula": null
+        },
+        "E34": {
+          "value2": "i",
+          "text": "i",
+          "formula": null
+        },
+        "F34": {
+          "value2": "i",
+          "text": "i",
+          "formula": null
+        },
+        "G34": {
+          "value2": "i",
+          "text": "i",
+          "formula": null
+        },
+        "H34": {
+          "value2": "i",
+          "text": "i",
+          "formula": null
+        },
+        "I34": {
+          "value2": "i",
+          "text": "i",
+          "formula": null
+        },
+        "B35": {
+          "value2": "i",
+          "text": "i",
+          "formula": null
+        },
+        "C35": {
+          "value2": "i",
+          "text": "i",
+          "formula": null
+        },
+        "D35": {
+          "value2": "i",
+          "text": "i",
+          "formula": null
+        },
+        "E35": {
+          "value2": "i",
+          "text": "i",
+          "formula": null
+        },
+        "F35": {
+          "value2": "i",
+          "text": "i",
+          "formula": null
+        },
+        "G35": {
+          "value2": "i",
+          "text": "i",
+          "formula": null
+        },
+        "H35": {
+          "value2": "i",
+          "text": "i",
+          "formula": null
+        },
+        "I35": {
+          "value2": "i",
+          "text": "i",
+          "formula": null
+        },
+        "B36": {
+          "value2": "i",
+          "text": "i",
+          "formula": null
+        },
+        "C36": {
+          "value2": "i",
+          "text": "i",
+          "formula": null
+        },
+        "D36": {
+          "value2": "i",
+          "text": "i",
+          "formula": null
+        },
+        "E36": {
+          "value2": "i",
+          "text": "i",
+          "formula": null
+        },
+        "F36": {
+          "value2": "i",
+          "text": "i",
+          "formula": null
+        },
+        "G36": {
+          "value2": "i",
+          "text": "i",
+          "formula": null
+        },
+        "H36": {
+          "value2": "i",
+          "text": "i",
+          "formula": null
+        },
+        "I36": {
+          "value2": "i",
+          "text": "i",
+          "formula": null
+        },
+        "B39": {
+          "value2": "rgb",
+          "text": "rgb",
+          "formula": null
+        },
+        "C39": {
+          "value2": "rgb",
+          "text": "rgb",
+          "formula": null
+        },
+        "D39": {
+          "value2": "rgb",
+          "text": "rgb",
+          "formula": null
+        },
+        "E39": {
+          "value2": "rgb",
+          "text": "rgb",
+          "formula": null
+        },
+        "F39": {
+          "value2": "rgb",
+          "text": "rgb",
+          "formula": null
+        },
+        "G39": {
+          "value2": "rgb",
+          "text": "rgb",
+          "formula": null
+        },
+        "H39": {
+          "value2": "rgb",
+          "text": "rgb",
+          "formula": null
+        },
+        "I39": {
+          "value2": "rgb",
+          "text": "rgb",
+          "formula": null
+        },
+        "B42": {
+          "value2": "p",
+          "text": "p",
+          "formula": null
+        },
+        "C42": {
+          "value2": "p",
+          "text": "p",
+          "formula": null
+        },
+        "D42": {
+          "value2": "p",
+          "text": "p",
+          "formula": null
+        },
+        "E42": {
+          "value2": "p",
+          "text": "p",
+          "formula": null
+        },
+        "F42": {
+          "value2": "p",
+          "text": "p",
+          "formula": null
+        },
+        "G42": {
+          "value2": "p",
+          "text": "p",
+          "formula": null
+        },
+        "H42": {
+          "value2": "p",
+          "text": "p",
+          "formula": null
+        },
+        "I42": {
+          "value2": "p",
+          "text": "p",
+          "formula": null
+        },
+        "J42": {
+          "value2": "p",
+          "text": "p",
+          "formula": null
+        },
+        "B43": {
+          "value2": "p",
+          "text": "p",
+          "formula": null
+        },
+        "C43": {
+          "value2": "p",
+          "text": "p",
+          "formula": null
+        },
+        "D43": {
+          "value2": "p",
+          "text": "p",
+          "formula": null
+        },
+        "E43": {
+          "value2": "p",
+          "text": "p",
+          "formula": null
+        },
+        "F43": {
+          "value2": "p",
+          "text": "p",
+          "formula": null
+        },
+        "G43": {
+          "value2": "p",
+          "text": "p",
+          "formula": null
+        },
+        "H43": {
+          "value2": "p",
+          "text": "p",
+          "formula": null
+        },
+        "I43": {
+          "value2": "p",
+          "text": "p",
+          "formula": null
+        },
+        "J43": {
+          "value2": "p",
+          "text": "p",
+          "formula": null
+        },
+        "B44": {
+          "value2": "p",
+          "text": "p",
+          "formula": null
+        },
+        "C44": {
+          "value2": "p",
+          "text": "p",
+          "formula": null
+        },
+        "D44": {
+          "value2": "p",
+          "text": "p",
+          "formula": null
+        },
+        "E44": {
+          "value2": "p",
+          "text": "p",
+          "formula": null
+        },
+        "F44": {
+          "value2": "p",
+          "text": "p",
+          "formula": null
+        },
+        "G44": {
+          "value2": "p",
+          "text": "p",
+          "formula": null
+        },
+        "H44": {
+          "value2": "p",
+          "text": "p",
+          "formula": null
+        }
+      }
+    },
+    {
+      "name": "Borders",
+      "visible": -1,
+      "usedRange": "A1:Z60",
+      "truncatedAt2000": false,
+      "cells": {
+        "B2": {
+          "value2": 0.0,
+          "text": "0",
+          "formula": null
+        },
+        "D2": {
+          "value2": "c",
+          "text": "c",
+          "formula": null
+        },
+        "B4": {
+          "value2": 1.0,
+          "text": "1",
+          "formula": null
+        },
+        "D4": {
+          "value2": "c",
+          "text": "c",
+          "formula": null
+        },
+        "B6": {
+          "value2": 2.0,
+          "text": "2",
+          "formula": null
+        },
+        "D6": {
+          "value2": "c",
+          "text": "c",
+          "formula": null
+        },
+        "B8": {
+          "value2": 3.0,
+          "text": "3",
+          "formula": null
+        },
+        "D8": {
+          "value2": "c",
+          "text": "c",
+          "formula": null
+        },
+        "B10": {
+          "value2": 4.0,
+          "text": "4",
+          "formula": null
+        },
+        "D10": {
+          "value2": "c",
+          "text": "c",
+          "formula": null
+        },
+        "B12": {
+          "value2": 5.0,
+          "text": "5",
+          "formula": null
+        },
+        "D12": {
+          "value2": "c",
+          "text": "c",
+          "formula": null
+        },
+        "B14": {
+          "value2": 6.0,
+          "text": "6",
+          "formula": null
+        },
+        "D14": {
+          "value2": "c",
+          "text": "c",
+          "formula": null
+        },
+        "B16": {
+          "value2": 7.0,
+          "text": "7",
+          "formula": null
+        },
+        "D16": {
+          "value2": "c",
+          "text": "c",
+          "formula": null
+        },
+        "B18": {
+          "value2": 8.0,
+          "text": "8",
+          "formula": null
+        },
+        "D18": {
+          "value2": "c",
+          "text": "c",
+          "formula": null
+        },
+        "B20": {
+          "value2": 9.0,
+          "text": "9",
+          "formula": null
+        },
+        "D20": {
+          "value2": "c",
+          "text": "c",
+          "formula": null
+        },
+        "B22": {
+          "value2": 10.0,
+          "text": "10",
+          "formula": null
+        },
+        "D22": {
+          "value2": "c",
+          "text": "c",
+          "formula": null
+        },
+        "B24": {
+          "value2": 11.0,
+          "text": "11",
+          "formula": null
+        },
+        "D24": {
+          "value2": "c",
+          "text": "c",
+          "formula": null
+        },
+        "B26": {
+          "value2": 12.0,
+          "text": "12",
+          "formula": null
+        },
+        "D26": {
+          "value2": "c",
+          "text": "c",
+          "formula": null
+        },
+        "B30": {
+          "value2": "L",
+          "text": "L",
+          "formula": null
+        },
+        "C30": {
+          "value2": "R",
+          "text": "R",
+          "formula": null
+        },
+        "B32": {
+          "value2": "T",
+          "text": "T",
+          "formula": null
+        },
+        "E32": {
+          "value2": 1.0,
+          "text": "1",
+          "formula": null
+        },
+        "F32": {
+          "value2": 1.0,
+          "text": "1",
+          "formula": null
+        },
+        "G32": {
+          "value2": 1.0,
+          "text": "1",
+          "formula": null
+        },
+        "B33": {
+          "value2": "B",
+          "text": "B",
+          "formula": null
+        },
+        "E33": {
+          "value2": 1.0,
+          "text": "1",
+          "formula": null
+        },
+        "F33": {
+          "value2": 1.0,
+          "text": "1",
+          "formula": null
+        },
+        "G33": {
+          "value2": 1.0,
+          "text": "1",
+          "formula": null
+        },
+        "E34": {
+          "value2": 1.0,
+          "text": "1",
+          "formula": null
+        },
+        "F34": {
+          "value2": 1.0,
+          "text": "1",
+          "formula": null
+        },
+        "G34": {
+          "value2": 1.0,
+          "text": "1",
+          "formula": null
+        }
+      }
+    },
+    {
+      "name": "Text",
+      "visible": -1,
+      "usedRange": "A1:Z80",
+      "truncatedAt2000": false,
+      "cells": {
+        "A1": {
+          "value2": "Overflowing text that is long",
+          "text": "Overflowing text that is long",
+          "formula": null
+        },
+        "A2": {
+          "value2": "Overflowing text that is long",
+          "text": "Overflowing text that is long",
+          "formula": null
+        },
+        "B2": {
+          "value2": "x",
+          "text": "x",
+          "formula": null
+        },
+        "D3": {
+          "value2": "Overflowing text that is long",
+          "text": "Overflowing text that is long",
+          "formula": null
+        },
+        "D4": {
+          "value2": "Overflowing text that is long",
+          "text": "Overflowing text that is long",
+          "formula": null
+        },
+        "C5": {
+          "value2": "blocker",
+          "text": "blocker",
+          "formula": null
+        },
+        "D5": {
+          "value2": "Overflowing text that is long",
+          "text": "Overflowing text that is long",
+          "formula": null
+        },
+        "F6": {
+          "value2": "Overflowing text that is long",
+          "text": "Overflowing text that is long",
+          "formula": null
+        },
+        "G6": {
+          "value2": "r",
+          "text": "r",
+          "formula": null
+        },
+        "C7": {
+          "value2": "l",
+          "text": "l",
+          "formula": null
+        },
+        "D7": {
+          "value2": "Overflowing text that is long",
+          "text": "Overflowing text that is long",
+          "formula": null
+        },
+        "A8": {
+          "value2": "Left with indent",
+          "text": "Left with indent",
+          "formula": null
+        },
+        "D8": {
+          "value2": "Right indent text",
+          "text": "Right indent text",
+          "formula": null
+        },
+        "G9": {
+          "value2": "text",
+          "text": "text",
+          "formula": null
+        },
+        "H9": {
+          "value2": "formula text",
+          "text": "formula text",
+          "formula": "=\"formula text\""
+        },
+        "G10": {
+          "value2": 42.5,
+          "text": "42.5",
+          "formula": null
+        },
+        "H10": {
+          "value2": 2.0,
+          "text": "2",
+          "formula": "=1+1"
+        },
+        "G11": {
+          "value2": true,
+          "text": "TRUE",
+          "formula": "=TRUE"
+        },
+        "G12": {
+          "value2": -2146826281,
+          "text": "#DIV/0!",
+          "formula": "=1/0"
+        },
+        "G13": {
+          "value2": -2146826246,
+          "text": "#N/A",
+          "formula": "=NA()"
+        },
+        "A16": {
+          "value2": "ab",
+          "text": "ab",
+          "formula": null
+        },
+        "B16": {
+          "value2": "ab",
+          "text": "ab",
+          "formula": null
+        },
+        "C16": {
+          "value2": "ab",
+          "text": "ab",
+          "formula": null
+        },
+        "D16": {
+          "value2": "ab",
+          "text": "ab",
+          "formula": null
+        },
+        "E16": {
+          "value2": "ab",
+          "text": "ab",
+          "formula": null
+        },
+        "F16": {
+          "value2": "ab",
+          "text": "ab",
+          "formula": null
+        },
+        "G16": {
+          "value2": "ab",
+          "text": "ab",
+          "formula": null
+        },
+        "H16": {
+          "value2": "ab",
+          "text": "ab",
+          "formula": null
+        },
+        "A17": {
+          "value2": 5.0,
+          "text": "5",
+          "formula": null
+        },
+        "B17": {
+          "value2": 5.0,
+          "text": "5",
+          "formula": null
+        },
+        "C17": {
+          "value2": 5.0,
+          "text": "5",
+          "formula": null
+        },
+        "D17": {
+          "value2": 5.0,
+          "text": "5",
+          "formula": null
+        },
+        "E17": {
+          "value2": 5.0,
+          "text": "5",
+          "formula": null
+        },
+        "F17": {
+          "value2": 5.0,
+          "text": "5",
+          "formula": null
+        },
+        "G17": {
+          "value2": 5.0,
+          "text": "5",
+          "formula": null
+        },
+        "H17": {
+          "value2": 5.0,
+          "text": "5",
+          "formula": null
+        },
+        "A18": {
+          "value2": "across",
+          "text": "across",
+          "formula": null
+        },
+        "F18": {
+          "value2": "across",
+          "text": "across",
+          "formula": null
+        },
+        "G18": {
+          "value2": "stop",
+          "text": "stop",
+          "formula": null
+        },
+        "A20": {
+          "value2": "v",
+          "text": "v",
+          "formula": null
+        },
+        "B20": {
+          "value2": "v",
+          "text": "v",
+          "formula": null
+        },
+        "C20": {
+          "value2": "v",
+          "text": "v",
+          "formula": null
+        },
+        "D20": {
+          "value2": "v",
+          "text": "v",
+          "formula": null
+        },
+        "E20": {
+          "value2": "v",
+          "text": "v",
+          "formula": null
+        },
+        "A22": {
+          "value2": "one two three four five six",
+          "text": "one two three four five six",
+          "formula": null
+        },
+        "D22": {
+          "value2": "wrapped and centred text",
+          "text": "wrapped and centred text",
+          "formula": null
+        },
+        "G22": {
+          "value2": "wrapped text that needs several lines in a narrow cell",
+          "text": "wrapped text that needs several lines in a narrow cell",
+          "formula": null
+        },
+        "A24": {
+          "value2": "Hello\nWorld",
+          "text": "Hello\nWorld",
+          "formula": null
+        },
+        "F24": {
+          "value2": "justified wrapped text spans lines",
+          "text": "justified wrapped text spans lines",
+          "formula": null
+        },
+        "H24": {
+          "value2": "shrink this text to fit",
+          "text": "shrink this text to fit",
+          "formula": null
+        },
+        "A27": {
+          "value2": "rot",
+          "text": "rot",
+          "formula": null
+        },
+        "B27": {
+          "value2": "rot",
+          "text": "rot",
+          "formula": null
+        },
+        "C27": {
+          "value2": "rot",
+          "text": "rot",
+          "formula": null
+        },
+        "D27": {
+          "value2": "rot",
+          "text": "rot",
+          "formula": null
+        },
+        "E27": {
+          "value2": "rot",
+          "text": "rot",
+          "formula": null
+        },
+        "A30": {
+          "value2": "General",
+          "text": "General",
+          "formula": null
+        },
+        "B30": {
+          "value2": 1234567.0,
+          "text": "####",
+          "formula": null
+        },
+        "C30": {
+          "value2": 1234567.0,
+          "text": "1E+06",
+          "formula": null
+        },
+        "E30": {
+          "value2": 1234567.0,
+          "text": "###",
+          "formula": null
+        },
+        "F30": {
+          "value2": 1234567.0,
+          "text": "1234567",
+          "formula": null
+        },
+        "A31": {
+          "value2": "General",
+          "text": "General",
+          "formula": null
+        },
+        "B31": {
+          "value2": 0.123456789,
+          "text": "0.12",
+          "formula": null
+        },
+        "C31": {
+          "value2": 0.123456789,
+          "text": "0.1235",
+          "formula": null
+        },
+        "E31": {
+          "value2": 0.123456789,
+          "text": "0.1",
+          "formula": null
+        },
+        "F31": {
+          "value2": 0.123456789,
+          "text": "0.123456789",
+          "formula": null
+        },
+        "A32": {
+          "value2": "General",
+          "text": "General",
+          "formula": null
+        },
+        "B32": {
+          "value2": 3.14159265358979,
+          "text": "3.14",
+          "formula": null
+        },
+        "C32": {
+          "value2": 3.14159265358979,
+          "text": "3.1416",
+          "formula": null
+        },
+        "E32": {
+          "value2": 3.14159265358979,
+          "text": "3.1",
+          "formula": null
+        },
+        "F32": {
+          "value2": 3.14159265358979,
+          "text": "3.141592654",
+          "formula": null
+        },
+        "A33": {
+          "value2": "General",
+          "text": "General",
+          "formula": null
+        },
+        "B33": {
+          "value2": 1E+25,
+          "text": "####",
+          "formula": null
+        },
+        "C33": {
+          "value2": 1E+25,
+          "text": "######",
+          "formula": null
+        },
+        "E33": {
+          "value2": 1E+25,
+          "text": "###",
+          "formula": null
+        },
+        "F33": {
+          "value2": 1E+25,
+          "text": "1.00E+25",
+          "formula": null
+        },
+        "A34": {
+          "value2": "General",
+          "text": "General",
+          "formula": null
+        },
+        "B34": {
+          "value2": -12345.6789,
+          "text": "####",
+          "formula": null
+        },
+        "C34": {
+          "value2": -12345.6789,
+          "text": "-12346",
+          "formula": null
+        },
+        "E34": {
+          "value2": -12345.6789,
+          "text": "###",
+          "formula": null
+        },
+        "F34": {
+          "value2": -12345.6789,
+          "text": "-12345.6789",
+          "formula": null
+        },
+        "A35": {
+          "value2": "General",
+          "text": "General",
+          "formula": null
+        },
+        "B35": {
+          "value2": 100.0,
+          "text": "100",
+          "formula": null
+        },
+        "C35": {
+          "value2": 100.0,
+          "text": "100",
+          "formula": null
+        },
+        "E35": {
+          "value2": 100.0,
+          "text": "100",
+          "formula": null
+        },
+        "F35": {
+          "value2": 100.0,
+          "text": "100",
+          "formula": null
+        },
+        "A36": {
+          "value2": "General",
+          "text": "General",
+          "formula": null
+        },
+        "B36": {
+          "value2": 12.5,
+          "text": "12.5",
+          "formula": null
+        },
+        "C36": {
+          "value2": 12.5,
+          "text": "12.5",
+          "formula": null
+        },
+        "E36": {
+          "value2": 12.5,
+          "text": "13",
+          "formula": null
+        },
+        "F36": {
+          "value2": 12.5,
+          "text": "12.5",
+          "formula": null
+        },
+        "A37": {
+          "value2": "General",
+          "text": "General",
+          "formula": null
+        },
+        "B37": {
+          "value2": 1.234E-05,
+          "text": "####",
+          "formula": null
+        },
+        "C37": {
+          "value2": 1.234E-05,
+          "text": "######",
+          "formula": null
+        },
+        "E37": {
+          "value2": 1.234E-05,
+          "text": "###",
+          "formula": null
+        },
+        "F37": {
+          "value2": 1.234E-05,
+          "text": "1.23E-05",
+          "formula": null
+        },
+        "A38": {
+          "value2": "General",
+          "text": "General",
+          "formula": null
+        },
+        "B38": {
+          "value2": 123456789012.0,
+          "text": "####",
+          "formula": null
+        },
+        "C38": {
+          "value2": 123456789012.0,
+          "text": "1E+11",
+          "formula": null
+        },
+        "E38": {
+          "value2": 123456789012.0,
+          "text": "###",
+          "formula": null
+        },
+        "F38": {
+          "value2": 123456789012.0,
+          "text": "1.23457E+11",
+          "formula": null
+        },
+        "A39": {
+          "value2": "General",
+          "text": "General",
+          "formula": null
+        },
+        "B39": {
+          "value2": 99999.5,
+          "text": "####",
+          "formula": null
+        },
+        "C39": {
+          "value2": 99999.5,
+          "text": "100000",
+          "formula": null
+        },
+        "E39": {
+          "value2": 99999.5,
+          "text": "###",
+          "formula": null
+        },
+        "F39": {
+          "value2": 99999.5,
+          "text": "99999.5",
+          "formula": null
+        },
+        "A40": {
+          "value2": "General",
+          "text": "General",
+          "formula": null
+        },
+        "B40": {
+          "value2": -0.5,
+          "text": "-0.5",
+          "formula": null
+        },
+        "C40": {
+          "value2": -0.5,
+          "text": "-0.5",
+          "formula": null
+        },
+        "E40": {
+          "value2": -0.5,
+          "text": "-1",
+          "formula": null
+        },
+        "F40": {
+          "value2": -0.5,
+          "text": "-0.5",
+          "formula": null
+        },
+        "A41": {
+          "value2": "General",
+          "text": "General",
+          "formula": null
+        },
+        "B41": {
+          "value2": 1234.5678,
+          "text": "1235",
+          "formula": null
+        },
+        "C41": {
+          "value2": 1234.5678,
+          "text": "1234.6",
+          "formula": null
+        },
+        "E41": {
+          "value2": 1234.5678,
+          "text": "###",
+          "formula": null
+        },
+        "F41": {
+          "value2": 1234.5678,
+          "text": "1234.5678",
+          "formula": null
+        },
+        "A42": {
+          "value2": "General",
+          "text": "General",
+          "formula": null
+        },
+        "B42": {
+          "value2": 0.000123,
+          "text": "0",
+          "formula": null
+        },
+        "C42": {
+          "value2": 0.000123,
+          "text": "0.0001",
+          "formula": null
+        },
+        "E42": {
+          "value2": 0.000123,
+          "text": "0",
+          "formula": null
+        },
+        "F42": {
+          "value2": 0.000123,
+          "text": "0.000123",
+          "formula": null
+        },
+        "A43": {
+          "value2": "General",
+          "text": "General",
+          "formula": null
+        },
+        "B43": {
+          "value2": 1E-10,
+          "text": "####",
+          "formula": null
+        },
+        "C43": {
+          "value2": 1E-10,
+          "text": "######",
+          "formula": null
+        },
+        "E43": {
+          "value2": 1E-10,
+          "text": "###",
+          "formula": null
+        },
+        "F43": {
+          "value2": 1E-10,
+          "text": "1.00E-10",
+          "formula": null
+        },
+        "C46": {
+          "value2": 1234.5678,
+          "text": "######",
+          "formula": null
+        },
+        "F46": {
+          "value2": 1234.5678,
+          "text": "1234.57",
+          "formula": null
+        },
+        "C47": {
+          "value2": 1234.5678,
+          "text": "1,235",
+          "formula": null
+        },
+        "F47": {
+          "value2": 1234.5678,
+          "text": "1,235",
+          "formula": null
+        },
+        "C48": {
+          "value2": 1234.5678,
+          "text": "######",
+          "formula": null
+        },
+        "F48": {
+          "value2": 1234.5678,
+          "text": "123456.8%",
+          "formula": null
+        },
+        "C49": {
+          "value2": 1234.5678,
+          "text": "######",
+          "formula": null
+        },
+        "F49": {
+          "value2": 1234.5678,
+          "text": "1.23E+03",
+          "formula": null
+        },
+        "C50": {
+          "value2": 45306.0,
+          "text": "######",
+          "formula": null
+        },
+        "F50": {
+          "value2": 45306.0,
+          "text": "15/01/2024",
+          "formula": null
+        },
+        "C51": {
+          "value2": 1234.5678,
+          "text": "######",
+          "formula": null
+        },
+        "F51": {
+          "value2": 1234.5678,
+          "text": "$1,234.57",
+          "formula": null
+        },
+        "C52": {
+          "value2": "12345678",
+          "text": "12345678",
+          "formula": null
+        },
+        "F52": {
+          "value2": "12345678",
+          "text": "12345678",
+          "formula": null
+        },
+        "C54": {
+          "value2": 12345.0,
+          "text": "12345",
+          "formula": null
+        },
+        "F54": {
+          "value2": 123456.0,
+          "text": "123456",
+          "formula": null
+        },
+        "C55": {
+          "value2": 12345.0,
+          "text": "12345",
+          "formula": null
+        },
+        "F55": {
+          "value2": 123456.0,
+          "text": "123456",
+          "formula": null
+        }
+      }
+    },
+    {
+      "name": "Fonts",
+      "visible": -1,
+      "usedRange": "A1:L30",
+      "truncatedAt2000": false,
+      "cells": {
+        "A1": {
+          "value2": "Plain",
+          "text": "Plain",
+          "formula": null
+        },
+        "A2": {
+          "value2": "Bold",
+          "text": "Bold",
+          "formula": null
+        },
+        "A3": {
+          "value2": "Italic",
+          "text": "Italic",
+          "formula": null
+        },
+        "A4": {
+          "value2": "Bold italic",
+          "text": "Bold italic",
+          "formula": null
+        },
+        "A5": {
+          "value2": "Single underline",
+          "text": "Single underline",
+          "formula": null
+        },
+        "A6": {
+          "value2": "Double underline",
+          "text": "Double underline",
+          "formula": null
+        },
+        "A7": {
+          "value2": "Accounting underline",
+          "text": "Accounting underline",
+          "formula": null
+        },
+        "A8": {
+          "value2": "Double accounting",
+          "text": "Double accounting",
+          "formula": null
+        },
+        "A9": {
+          "value2": "Strike",
+          "text": "Strike",
+          "formula": null
+        },
+        "A10": {
+          "value2": "Cambria 14",
+          "text": "Cambria 14",
+          "formula": null
+        },
+        "A11": {
+          "value2": "Calibri 20 red",
+          "text": "Calibri 20 red",
+          "formula": null
+        },
+        "A12": {
+          "value2": "Everything",
+          "text": "Everything",
+          "formula": null
+        }
+      }
+    }
+  ]
+}

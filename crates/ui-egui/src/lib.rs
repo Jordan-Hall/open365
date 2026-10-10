@@ -9,13 +9,14 @@ mod app;
 mod doc_view;
 mod docmodel;
 mod fonts;
+mod grid_text;
 mod grid_view;
 
 use std::path::PathBuf;
 
 pub use app::App;
 pub use doc_view::{DocPos, DocView, Toggle};
-pub use grid_view::GridView;
+pub use grid_view::{GridView, PaintedCell};
 
 /// Opens the main window and runs until it closes. `initial` is a file to open at start-up.
 pub fn run(initial: Option<PathBuf>) -> eframe::Result {

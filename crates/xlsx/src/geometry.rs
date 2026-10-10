@@ -43,6 +43,8 @@ pub struct ColumnSpec {
     pub width: Option<f64>,
     pub custom_width: bool,
     pub hidden: bool,
+    /// Default cell format (`style`) of the columns; `None` when absent.
+    pub style: Option<u32>,
 }
 
 /// The `<sheetFormatPr>` defaults. `default_row_height` is in points.
@@ -111,6 +113,15 @@ impl Row {
         flag(self.attr("hidden"))
     }
 
+    /// The row's default cell format (`s`), only when `customFormat` is set.
+    pub fn default_style(&self) -> Option<u32> {
+        if flag(self.attr("customFormat")) {
+            uint(self.attr("s"))
+        } else {
+            None
+        }
+    }
+
     fn attr(&self, name: &str) -> Option<&str> {
         self.attrs()
             .iter()
@@ -149,9 +160,72 @@ impl Worksheet {
                     width: float(e.head.attr("width")),
                     custom_width: flag(e.head.attr("customWidth")),
                     hidden: flag(e.head.attr("hidden")),
+                    style: uint(e.head.attr("style")),
                 })
             })
             .collect()
+    }
+
+    /// `(min, max, style)` of every `<col>` with a default cell format, sorted by `min`.
+    pub fn column_styles(&self) -> Vec<(u32, u32, u32)> {
+        let mut out: Vec<_> = self
+            .columns()
+            .into_iter()
+            .filter_map(|c| Some((c.min, c.max, c.style?)))
+            .collect();
+        out.sort_unstable();
+        out
+    }
+
+    /// The cell format index that applies at `(row, col)`: the cell's own `s`, else the
+    /// row's `s` when `customFormat` is set, else the column's `style` (from
+    /// [`Self::column_styles`]), else 0.
+    pub fn resolved_style(&self, row: u32, col: u32, column_styles: &[(u32, u32, u32)]) -> u32 {
+        if let Some(s) = self.cell(row, col).and_then(|c| c.style) {
+            return s;
+        }
+        let rows = self.rows();
+        if let Ok(i) = rows.binary_search_by_key(&row, |r| r.r)
+            && let Some(s) = rows[i].default_style()
+        {
+            return s;
+        }
+        let i = column_styles.partition_point(|c| c.1 < col);
+        match column_styles.get(i) {
+            Some(&(min, _, style)) if min <= col => style,
+            _ => 0,
+        }
+    }
+
+    /// The borders of the cell at `(row, col)` as Excel reports them: each edge is shared with
+    /// the neighbouring cell's matching edge (see [`crate::format::shared_edge`]).
+    pub fn resolved_border(
+        &self,
+        styles: &Styles,
+        row: u32,
+        col: u32,
+        column_styles: &[(u32, u32, u32)],
+    ) -> crate::format::Border {
+        use crate::format::shared_edge;
+        let own = |r: u32, c: u32| {
+            styles
+                .cell_format(self.resolved_style(r, c, column_styles))
+                .border
+        };
+        let mut b = own(row, col);
+        if col > 1 {
+            b.left = shared_edge(own(row, col - 1).right, b.left);
+        }
+        if col < crate::MAX_COL {
+            b.right = shared_edge(b.right, own(row, col + 1).left);
+        }
+        if row > 1 {
+            b.top = shared_edge(own(row - 1, col).bottom, b.top);
+        }
+        if row < crate::MAX_ROW {
+            b.bottom = shared_edge(b.bottom, own(row + 1, col).top);
+        }
+        b
     }
 
     /// The `<sheetFormatPr>` defaults, or the spec defaults when the element is absent.

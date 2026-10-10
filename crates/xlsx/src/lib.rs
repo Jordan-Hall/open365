@@ -17,6 +17,7 @@
 
 mod error;
 mod fast;
+mod format;
 mod geometry;
 mod parts;
 mod refs;
@@ -27,6 +28,10 @@ mod workbook;
 mod xml;
 
 pub use error::XlsxError;
+pub use format::{
+    Alignment, Border, BorderEdge, BorderStyle, CellFormat, Color, ColorSource, Fill, FillPattern,
+    Font, HorizontalAlignment, Rgb, Theme, Underline, VerticalAlignment, apply_tint, shared_edge,
+};
 pub use geometry::{
     Axis, BASE_DPI, ColumnSpec, FrozenPanes, GridMetrics, Pane, PaneState, SheetFormat,
     SheetGeometry, default_font,

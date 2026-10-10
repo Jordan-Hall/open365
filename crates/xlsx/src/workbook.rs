@@ -169,13 +169,18 @@ impl Workbook {
             }
             None => None,
         };
-        let styles = match internal_part("/styles")? {
+        let mut styles = match internal_part("/styles")? {
             Some(name) => {
                 let data = package.part(name.as_str()).map(|p| p.data());
                 Styles::parse(data.unwrap_or_default())?
             }
             None => Styles::default(),
         };
+        if let Some(name) = internal_part("/theme")?
+            && let Some(part) = package.part(name.as_str())
+        {
+            styles.set_theme(crate::format::Theme::parse(part.data()));
+        }
         let empty: [Arc<str>; 0] = [];
         let sst_texts: &[Arc<str>] = sst.as_ref().map_or(&empty[..], |(_, s)| s.texts());
 
