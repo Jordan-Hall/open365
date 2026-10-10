@@ -286,14 +286,17 @@ pub(super) fn npv(ctx: &EvalContext<'_>, args: &[Arg]) -> Res<Value> {
     let r = num_arg(ctx, &args[0])?;
     let values = collect(ctx, &args[1..])?;
     let u = 1.0 + r;
+    // Excel sums v_i / u^i (u^i is a running product) and divides the total by u once.
     let mut sum = 0.0;
-    for (i, v) in values.iter().enumerate() {
+    let mut p = 1.0;
+    for v in &values {
         if u == 0.0 {
             return Err(ErrorKind::DivZero);
         }
-        sum += v / u.powf((i + 1) as f64);
+        sum += v / p;
+        p *= u;
     }
-    number(sum)
+    number(sum / u)
 }
 
 /// The numbers of one array or range argument; text, booleans and blanks inside a reference are skipped.
@@ -472,7 +475,11 @@ pub(super) fn syd(ctx: &EvalContext<'_>, args: &[Arg]) -> Res<Value> {
     if salvage < 0.0 || life <= 0.0 || per <= 0.0 || per > life {
         return Err(ErrorKind::Num);
     }
-    number((cost - salvage) * (life - per + 1.0) * 2.0 / (life * (life + 1.0)))
+    let denominator = life * (life + 1.0);
+    if denominator.is_infinite() {
+        return Err(ErrorKind::DivZero);
+    }
+    number((cost - salvage) * (life - per + 1.0) * 2.0 / denominator)
 }
 
 pub(super) fn db(ctx: &EvalContext<'_>, args: &[Arg]) -> Res<Value> {
@@ -486,40 +493,49 @@ pub(super) fn db(ctx: &EvalContext<'_>, args: &[Arg]) -> Res<Value> {
     {
         return Err(ErrorKind::Num);
     }
+    let extra = life < 1.0 && period >= 1.0;
+    let period = period.floor().max(1.0);
     if period > life + if month < 12.0 { 1.0 } else { 0.0 } {
         return Err(ErrorKind::Num);
     }
     if cost == 0.0 {
         return number(0.0);
     }
-    let rate = ((1.0 - xpow(salvage / cost, 1.0 / life)?) * 1000.0).round() / 1000.0;
-    let mut total = 0.0;
+    let rate = ((1.0 - xpow(salvage / cost, 1.0 / life)?) * 1000.0 + 0.5).floor() / 1000.0;
+    // A life below one year adds one more iteration for periods of 1 or more; periods past the life take the partial-year form.
+    let last = period + if extra { 1.0 } else { 0.0 };
+    let mut book = cost;
     let mut value = 0.0;
-    let last = period.ceil();
     let mut p = 1.0;
     while p <= last {
         value = if p == 1.0 {
-            cost * rate * month / 12.0
-        } else if p == life + 1.0 {
-            (cost - total) * rate * (12.0 - month) / 12.0
+            cost * rate * (month / 12.0)
+        } else if p > life {
+            book * rate / 12.0 * (12.0 - month)
         } else {
-            (cost - total) * rate
+            book * rate
         };
-        total += value;
+        book -= value;
         p += 1.0;
     }
     number(value)
 }
 
+/// One period of double-declining-balance depreciation. A period below 1 counts as the first period. The
+/// declining balance before the period is `cost * (1 - rate)^(period - 1)` (binary power, see `xpow`), the
+/// depreciation is that balance times `rate` and is cut so the book value never drops below `salvage`.
 fn ddb_calc(cost: f64, salvage: f64, life: f64, period: f64, factor: f64) -> Res<f64> {
-    let t = factor / life;
-    let before = cost * xpow(1.0 - t, period - 1.0)?;
-    let value = before * t;
-    Ok(if before - value < salvage {
-        (before - salvage).max(0.0)
+    let period = period.max(1.0);
+    let rate = factor / life;
+    let value = if rate >= 1.0 {
+        let old = if period == 1.0 { cost } else { 0.0 };
+        if salvage > 0.0 { old - salvage } else { old }
     } else {
-        value
-    })
+        let old = cost * xpow(1.0 - rate, period - 1.0)?;
+        let d = old * rate;
+        if old - d < salvage { old - salvage } else { d }
+    };
+    Ok(value.max(0.0))
 }
 
 pub(super) fn ddb(ctx: &EvalContext<'_>, args: &[Arg]) -> Res<Value> {

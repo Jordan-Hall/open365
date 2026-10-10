@@ -236,3 +236,31 @@ reason = "SUM(IFERROR(INDIRECT({\"G1\",\"A1\"}),\"e\")) is #VALUE! in Excel: IFE
 [[difference]]
 id = "refarr.s_indbool_48"
 reason = "SUM(IFERROR(INDIRECT({\"H4\",\"A1\"}),\"e\")) is 1 in Excel (the TRUE cell counts, the number does not); the rule behind it is unknown."
+
+[[difference]]
+id = "db.t107"
+reason = "DB last (partial-year) period: Excel differs by 1-2 ulp in the evaluation order of book * rate * (12 - month) / 12; the exact order is unknown (13 orderings tried)."
+
+[[difference]]
+id = "db.t297"
+reason = "DB last (partial-year) period: Excel differs by 1-2 ulp in the evaluation order of book * rate * (12 - month) / 12; the exact order is unknown (13 orderings tried)."
+
+[[difference]]
+id = "db.t458"
+reason = "DB last (partial-year) period: Excel differs by 1-2 ulp in the evaluation order of book * rate * (12 - month) / 12; the exact order is unknown (13 orderings tried)."
+
+[[difference]]
+id = "db.t459"
+reason = "DB last (partial-year) period: Excel differs by 1-2 ulp in the evaluation order of book * rate * (12 - month) / 12; the exact order is unknown (13 orderings tried)."
+
+[[difference]]
+id = "db.t460"
+reason = "DB last (partial-year) period: Excel differs by 1-2 ulp in the evaluation order of book * rate * (12 - month) / 12; the exact order is unknown (13 orderings tried)."
+
+[[difference]]
+id = "db.t499"
+reason = "DB last (partial-year) period: Excel differs by 1-2 ulp in the evaluation order of book * rate * (12 - month) / 12; the exact order is unknown (13 orderings tried)."
+
+[[difference]]
+id = "db.life_frac_per7"
+reason = "DB last (partial-year) period: Excel differs by 1-2 ulp in the evaluation order of book * rate * (12 - month) / 12; the exact order is unknown (13 orderings tried)."

@@ -219,9 +219,16 @@ Financial batch, verified (groups `pv`, `fv`, `sln`, `effect`, `nominal`, `dolla
 * `EFFECT`/`NOMINAL`/`DOLLARDE`/`DOLLARFR` are Analysis ToolPak style (boolean and multi-cell range arguments are `#VALUE!`); `n` and the
   fraction are truncated. `SYD` rejects a negative salvage, not a negative cost.
 
-Implemented but NOT verified (no corpus cases; generators `gen_fin1.py`..`gen_fin3.py` kept outside the repository): `PMT`, `NPER`, `RATE`,
-`IPMT`, `PPMT`, `CUMIPMT`, `CUMPRINC`, `NPV`, `XNPV`, `IRR`, `XIRR`, `MIRR`, `SYD`, `DB`, `DDB`, `VDB`. Measured so far:
+Verified in the second financial batch (groups `npv`, `syd`, `ddb`, `db`; bit-exact except 7 `db` last-period cases in known-differences.toml):
 
+* `NPV` is `(sum of v_i / u^i, i from 0) / u` with `u = 1+rate` and `u^i` a running product (`p *= u`); one final division, not one per term.
+* `DDB`: a period below 1 counts as 1, period > life is `#NUM!`, balance `old = cost*xpow(1-f/life, period-1)`, depreciation `old*rate`, cut to `old-salvage`; `rate >= 1` gives `cost` in period 1 and 0 afterwards. `SYD` gives `#DIV/0!` when `life*(life+1)` overflows.
+* `DB`: `rate = floor(1000*(1-(salvage/cost)^(1/life)) + 0.5)/1000`; period is truncated (below 1 counts as 1); the book value is tracked by subtraction, first period `cost*rate*(month/12)`, any period past the life `book*rate/12*(12-month)`; a life below 1 with period >= 1 runs one extra iteration.
+
+Implemented but NOT verified (no corpus cases; generators `gen_fin1.py`..`gen_fin3.py` kept outside the repository): `PMT`, `NPER`, `RATE`,
+`IPMT`, `PPMT`, `CUMIPMT`, `CUMPRINC`, `XNPV`, `IRR`, `XIRR`, `MIRR`, `VDB`. Measured so far:
+
+* `PMT` structure is `-r*((pv+fv)*(q/e) - fv)` with `e = q-1` accurate for small rates (probes at r = 1 fit all 126 cases), but the bits of `q`/`e` for r != 1 are not reproduced (about 55% exact). Excel's `ln` is correctly rounded (`LN(1.05)` = 0.04879016416943205) whereas the Windows CRT/Rust `ln` is one ulp lower; with a correctly rounded `ln`, `NPER` is 376/397 exact, so a high-accuracy `ln` is the next step. `VDB` has 284 mismatches (fractional start/end and no_switch cases) and was not analysed.
 * `PMT` matches the closed form `-r*(pv + (pv+fv)/expm1(n*log1p(r)))/(1+r*type)` only in about half of the cases; Excel's fv-only results
   carry an error that grows with `(1+r)^n` (80 ulp at q = 140), so its algorithm is not a plain double evaluation. `NPER` is
   `ln(num/den)/ln(1+r)` (93% exact); the rest differ because Excel's `ln(1.05)` is one ulp above the C library's.
