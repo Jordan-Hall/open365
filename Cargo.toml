@@ -4,6 +4,7 @@ members = [
     "crates/opc",
     "crates/docx",
     "crates/xlsx",
+    "crates/calc",
     "crates/commands",
     "crates/testkit",
     "apps/cli",
@@ -21,6 +22,7 @@ publish = false
 open365-opc = { path = "crates/opc" }
 open365-docx = { path = "crates/docx" }
 open365-xlsx = { path = "crates/xlsx" }
+open365-calc = { path = "crates/calc" }
 open365-commands = { path = "crates/commands" }
 open365-testkit = { path = "crates/testkit" }
 

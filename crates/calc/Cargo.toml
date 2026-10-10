@@ -1,0 +1,13 @@
+[package]
+name = "open365-calc"
+description = "Open365's own spreadsheet formula engine: parser, dependency graph, functions."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+
+[lints]
+workspace = true
