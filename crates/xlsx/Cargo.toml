@@ -9,6 +9,11 @@ publish.workspace = true
 
 [dependencies]
 open365-opc.workspace = true
+quick-xml = "0.42.0"
+thiserror = "2.0.21"
+
+[dev-dependencies]
+serde_json = "1.0.152"
 
 [lints]
 workspace = true
