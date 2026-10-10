@@ -2,6 +2,24 @@
 
 Status: proposed, 2026-10-10. Each milestone is a vertical slice with an acceptance command. Durations are estimates for a small team, not commitments.
 
+## Product scope (owner requirement, 2026-10-10)
+The target is the **full Microsoft 365 suite at 1:1 parity, including Teams**, built entirely by us (ADR-009). Everything below is in scope. The phases set order, not whether something gets built.
+
+| Open365 app | M365 equivalent | Phase starts |
+|---|---|---|
+| Documents | Word | P0 |
+| Sheets | Excel | P0 |
+| Drive (files, sync, sharing, versions) | OneDrive / SharePoint files | P1 |
+| Teams (chat, channels, meetings, calls, screen share, files in channels) | Teams | P2 core chat → P3 meetings/calls |
+| Slides | PowerPoint | P2 |
+| Mail and Calendar | Outlook / Exchange | P3 |
+| Admin, identity, tenancy, audit, retention | Entra ID / admin centre / Purview basics | P1 → P3 |
+| Open CoWorker | Copilot | P2 |
+| Notes, Forms, Planner/tasks, Sites | OneNote, Forms, Planner, SharePoint sites | P4+ |
+| Federation between deployments | (no M365 equivalent) | P4 |
+
+Teams moves forward from "P3 integration" to an owned product line. Its server foundation (identity, realtime transport, storage) is shared with Drive and co-editing, so it is designed in P1 and ships its chat core in P2.
+
 ## Recommended first slice
 **M1: headless lossless round-trip.** It tests the highest-risk assumption that most decides the product: can we open, edit, save and reopen real DOCX/XLSX without silent loss? It does this without being blocked on the UI toolkit decision. The UI spike (M2) runs in parallel on the same core.
 
@@ -35,7 +53,7 @@ Printing, rich clipboard, out-of-process parser sandbox, signed installers and u
 P2 co-editing (own sync service; CRDT primitives spike Loro vs Yrs) + CoWorker MVP (provider trait, Ollama/OpenAI-compatible + one BYOK API, read/suggest-only tools). P3 OIDC org identity, own chat and meetings (WebRTC), admin and audit. P4 federation (allowlist, OCM-style sharing, Matrix federation).
 
 ## Non-goals for M0–M4
-Server of any kind, co-editing, chat/meetings, CoWorker UI, .doc/.xls/ODF, PowerPoint, macros execution, pivot refresh, chart editing, mobile/web clients, claims of "full Office compatibility".
+Shipping (not designing) the server, co-editing, Teams, Slides or CoWorker UI; .doc/.xls/ODF; macro execution, pivot refresh, chart editing, mobile/web clients, claims of "full Office compatibility".
 
 ## Risk register
 | Risk | Likelihood | Impact | Mitigation / signal |
