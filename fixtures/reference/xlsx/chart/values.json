@@ -1,0 +1,73 @@
+{
+  "source": "fixtures/xlsx/chart.xlsx",
+  "sheets": [
+    {
+      "name": "Sheet1",
+      "visible": -1,
+      "usedRange": "A1:B6",
+      "truncatedAt2000": false,
+      "cells": {
+        "A1": {
+          "value2": "Item",
+          "text": "Item",
+          "formula": null
+        },
+        "B1": {
+          "value2": "Qty",
+          "text": "Qty",
+          "formula": null
+        },
+        "A2": {
+          "value2": "P1",
+          "text": "P1",
+          "formula": null
+        },
+        "B2": {
+          "value2": 3.0,
+          "text": "3",
+          "formula": null
+        },
+        "A3": {
+          "value2": "P2",
+          "text": "P2",
+          "formula": null
+        },
+        "B3": {
+          "value2": 6.0,
+          "text": "6",
+          "formula": null
+        },
+        "A4": {
+          "value2": "P3",
+          "text": "P3",
+          "formula": null
+        },
+        "B4": {
+          "value2": 9.0,
+          "text": "9",
+          "formula": null
+        },
+        "A5": {
+          "value2": "P4",
+          "text": "P4",
+          "formula": null
+        },
+        "B5": {
+          "value2": 12.0,
+          "text": "12",
+          "formula": null
+        },
+        "A6": {
+          "value2": "P5",
+          "text": "P5",
+          "formula": null
+        },
+        "B6": {
+          "value2": 15.0,
+          "text": "15",
+          "formula": null
+        }
+      }
+    }
+  ]
+}

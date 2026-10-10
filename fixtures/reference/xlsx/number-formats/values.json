@@ -1,0 +1,48 @@
+{
+  "source": "fixtures/xlsx/number-formats.xlsx",
+  "sheets": [
+    {
+      "name": "Sheet1",
+      "visible": -1,
+      "usedRange": "A1:A7",
+      "truncatedAt2000": false,
+      "cells": {
+        "A1": {
+          "value2": 1234.5,
+          "text": "$1,234.50",
+          "formula": null
+        },
+        "A2": {
+          "value2": 0.256,
+          "text": "25.6%",
+          "formula": null
+        },
+        "A3": {
+          "value2": -12.345,
+          "text": "-12.35",
+          "formula": null
+        },
+        "A4": {
+          "value2": 12.345,
+          "text": "12.35",
+          "formula": null
+        },
+        "A5": {
+          "value2": 45306.0,
+          "text": "15/01/2024",
+          "formula": null
+        },
+        "A6": {
+          "value2": 45306.0,
+          "text": "Monday, January 15, 2024",
+          "formula": null
+        },
+        "A7": {
+          "value2": 0.5,
+          "text": "12:00 PM",
+          "formula": null
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,18 @@
+{
+  "source": "fixtures/xlsx/external-link-formula.xlsx",
+  "sheets": [
+    {
+      "name": "Sheet1",
+      "visible": -1,
+      "usedRange": "A1",
+      "truncatedAt2000": false,
+      "cells": {
+        "A1": {
+          "value2": 42.0,
+          "text": "42",
+          "formula": "='C:\\open365-fixture-ext\\[source.xlsx]Sheet1'!A1"
+        }
+      }
+    }
+  ]
+}

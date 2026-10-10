@@ -1,0 +1,14 @@
+{
+  "source": "fixtures/docx/sections-landscape.docx",
+  "pageCount": 2,
+  "pages": [
+    {
+      "page": 1,
+      "firstLine": "Portrait section."
+    },
+    {
+      "page": 2,
+      "firstLine": "Landscape section."
+    }
+  ]
+}

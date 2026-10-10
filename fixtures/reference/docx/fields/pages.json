@@ -1,0 +1,10 @@
+{
+  "source": "fixtures/docx/fields.docx",
+  "pageCount": 1,
+  "pages": [
+    {
+      "page": 1,
+      "firstLine": "Chapter A"
+    }
+  ]
+}

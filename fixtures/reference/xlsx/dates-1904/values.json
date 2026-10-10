@@ -1,0 +1,38 @@
+{
+  "source": "fixtures/xlsx/dates-1904.xlsx",
+  "sheets": [
+    {
+      "name": "Sheet1",
+      "visible": -1,
+      "usedRange": "A1:B4",
+      "truncatedAt2000": false,
+      "cells": {
+        "A1": {
+          "value2": 0.0,
+          "text": "1904-01-01",
+          "formula": null
+        },
+        "B1": {
+          "value2": 43844.0,
+          "text": "2024-01-15",
+          "formula": "=DATE(2024,1,15)"
+        },
+        "A2": {
+          "value2": 1.0,
+          "text": "1904-01-02",
+          "formula": null
+        },
+        "A3": {
+          "value2": 1462.0,
+          "text": "1908-01-02",
+          "formula": null
+        },
+        "A4": {
+          "value2": 40000.0,
+          "text": "2013-07-07",
+          "formula": null
+        }
+      }
+    }
+  ]
+}

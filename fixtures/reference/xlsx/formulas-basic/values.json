@@ -1,0 +1,93 @@
+{
+  "source": "fixtures/xlsx/formulas-basic.xlsx",
+  "sheets": [
+    {
+      "name": "Sheet1",
+      "visible": -1,
+      "usedRange": "A1:D6",
+      "truncatedAt2000": false,
+      "cells": {
+        "A1": {
+          "value2": 1.0,
+          "text": "1",
+          "formula": null
+        },
+        "B1": {
+          "value2": "item1",
+          "text": "item1",
+          "formula": null
+        },
+        "D1": {
+          "value2": 15.0,
+          "text": "15",
+          "formula": "=SUM(A1:A5)"
+        },
+        "A2": {
+          "value2": 2.0,
+          "text": "2",
+          "formula": null
+        },
+        "B2": {
+          "value2": "item2",
+          "text": "item2",
+          "formula": null
+        },
+        "D2": {
+          "value2": "big",
+          "text": "big",
+          "formula": "=IF(D1>10,\"big\",\"small\")"
+        },
+        "A3": {
+          "value2": 3.0,
+          "text": "3",
+          "formula": null
+        },
+        "B3": {
+          "value2": "item3",
+          "text": "item3",
+          "formula": null
+        },
+        "D3": {
+          "value2": 3.0,
+          "text": "3",
+          "formula": "=AVERAGE(A1:A5)"
+        },
+        "A4": {
+          "value2": 4.0,
+          "text": "4",
+          "formula": null
+        },
+        "B4": {
+          "value2": "item4",
+          "text": "item4",
+          "formula": null
+        },
+        "D4": {
+          "value2": 0.43,
+          "text": "0.43",
+          "formula": "=ROUND(D3/7,2)"
+        },
+        "A5": {
+          "value2": 5.0,
+          "text": "5",
+          "formula": null
+        },
+        "B5": {
+          "value2": "item5",
+          "text": "item5",
+          "formula": null
+        },
+        "D5": {
+          "value2": "item1-item2",
+          "text": "item1-item2",
+          "formula": "=CONCAT(B1,\"-\",B2)"
+        },
+        "D6": {
+          "value2": "item3",
+          "text": "item3",
+          "formula": "=VLOOKUP(3,A1:B5,2,FALSE)"
+        }
+      }
+    }
+  ]
+}

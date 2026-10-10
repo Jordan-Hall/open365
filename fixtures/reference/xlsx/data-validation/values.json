@@ -1,0 +1,18 @@
+{
+  "source": "fixtures/xlsx/data-validation.xlsx",
+  "sheets": [
+    {
+      "name": "Sheet1",
+      "visible": -1,
+      "usedRange": "A1",
+      "truncatedAt2000": false,
+      "cells": {
+        "A1": {
+          "value2": "Red",
+          "text": "Red",
+          "formula": null
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "source": "fixtures/docx/header-footer.docx",
+  "pageCount": 2,
+  "pages": [
+    {
+      "page": 1,
+      "firstLine": "Page one body."
+    },
+    {
+      "page": 2,
+      "firstLine": "Page two body."
+    }
+  ]
+}

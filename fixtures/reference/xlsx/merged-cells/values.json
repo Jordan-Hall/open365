@@ -1,0 +1,23 @@
+{
+  "source": "fixtures/xlsx/merged-cells.xlsx",
+  "sheets": [
+    {
+      "name": "Sheet1",
+      "visible": -1,
+      "usedRange": "A1:C5",
+      "truncatedAt2000": false,
+      "cells": {
+        "A1": {
+          "value2": "wide",
+          "text": "wide",
+          "formula": null
+        },
+        "A3": {
+          "value2": "tall",
+          "text": "tall",
+          "formula": null
+        }
+      }
+    }
+  ]
+}

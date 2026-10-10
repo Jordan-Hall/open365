@@ -1,0 +1,10 @@
+{
+  "source": "fixtures/docx/custom-xml-part.docx",
+  "pageCount": 1,
+  "pages": [
+    {
+      "page": 1,
+      "firstLine": "Document carrying a custom XML part."
+    }
+  ]
+}

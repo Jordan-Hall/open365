@@ -1,0 +1,10 @@
+{
+  "source": "fixtures/docx/hidden-text.docx",
+  "pageCount": 1,
+  "pages": [
+    {
+      "page": 1,
+      "firstLine": "Visible start.  Visible end."
+    }
+  ]
+}

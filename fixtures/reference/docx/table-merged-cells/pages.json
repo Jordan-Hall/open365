@@ -1,0 +1,10 @@
+{
+  "source": "fixtures/docx/table-merged-cells.docx",
+  "pageCount": 1,
+  "pages": [
+    {
+      "page": 1,
+      "firstLine": "r1 c1"
+    }
+  ]
+}

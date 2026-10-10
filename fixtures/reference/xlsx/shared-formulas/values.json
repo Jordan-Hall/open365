@@ -1,0 +1,1013 @@
+{
+  "source": "fixtures/xlsx/shared-formulas.xlsx",
+  "sheets": [
+    {
+      "name": "Sheet1",
+      "visible": -1,
+      "usedRange": "A1:B100",
+      "truncatedAt2000": false,
+      "cells": {
+        "A1": {
+          "value2": 1.0,
+          "text": "1",
+          "formula": null
+        },
+        "B1": {
+          "value2": 3.0,
+          "text": "3",
+          "formula": "=A1*2+1"
+        },
+        "A2": {
+          "value2": 2.0,
+          "text": "2",
+          "formula": null
+        },
+        "B2": {
+          "value2": 5.0,
+          "text": "5",
+          "formula": "=A2*2+1"
+        },
+        "A3": {
+          "value2": 3.0,
+          "text": "3",
+          "formula": null
+        },
+        "B3": {
+          "value2": 7.0,
+          "text": "7",
+          "formula": "=A3*2+1"
+        },
+        "A4": {
+          "value2": 4.0,
+          "text": "4",
+          "formula": null
+        },
+        "B4": {
+          "value2": 9.0,
+          "text": "9",
+          "formula": "=A4*2+1"
+        },
+        "A5": {
+          "value2": 5.0,
+          "text": "5",
+          "formula": null
+        },
+        "B5": {
+          "value2": 11.0,
+          "text": "11",
+          "formula": "=A5*2+1"
+        },
+        "A6": {
+          "value2": 6.0,
+          "text": "6",
+          "formula": null
+        },
+        "B6": {
+          "value2": 13.0,
+          "text": "13",
+          "formula": "=A6*2+1"
+        },
+        "A7": {
+          "value2": 7.0,
+          "text": "7",
+          "formula": null
+        },
+        "B7": {
+          "value2": 15.0,
+          "text": "15",
+          "formula": "=A7*2+1"
+        },
+        "A8": {
+          "value2": 8.0,
+          "text": "8",
+          "formula": null
+        },
+        "B8": {
+          "value2": 17.0,
+          "text": "17",
+          "formula": "=A8*2+1"
+        },
+        "A9": {
+          "value2": 9.0,
+          "text": "9",
+          "formula": null
+        },
+        "B9": {
+          "value2": 19.0,
+          "text": "19",
+          "formula": "=A9*2+1"
+        },
+        "A10": {
+          "value2": 10.0,
+          "text": "10",
+          "formula": null
+        },
+        "B10": {
+          "value2": 21.0,
+          "text": "21",
+          "formula": "=A10*2+1"
+        },
+        "A11": {
+          "value2": 11.0,
+          "text": "11",
+          "formula": null
+        },
+        "B11": {
+          "value2": 23.0,
+          "text": "23",
+          "formula": "=A11*2+1"
+        },
+        "A12": {
+          "value2": 12.0,
+          "text": "12",
+          "formula": null
+        },
+        "B12": {
+          "value2": 25.0,
+          "text": "25",
+          "formula": "=A12*2+1"
+        },
+        "A13": {
+          "value2": 13.0,
+          "text": "13",
+          "formula": null
+        },
+        "B13": {
+          "value2": 27.0,
+          "text": "27",
+          "formula": "=A13*2+1"
+        },
+        "A14": {
+          "value2": 14.0,
+          "text": "14",
+          "formula": null
+        },
+        "B14": {
+          "value2": 29.0,
+          "text": "29",
+          "formula": "=A14*2+1"
+        },
+        "A15": {
+          "value2": 15.0,
+          "text": "15",
+          "formula": null
+        },
+        "B15": {
+          "value2": 31.0,
+          "text": "31",
+          "formula": "=A15*2+1"
+        },
+        "A16": {
+          "value2": 16.0,
+          "text": "16",
+          "formula": null
+        },
+        "B16": {
+          "value2": 33.0,
+          "text": "33",
+          "formula": "=A16*2+1"
+        },
+        "A17": {
+          "value2": 17.0,
+          "text": "17",
+          "formula": null
+        },
+        "B17": {
+          "value2": 35.0,
+          "text": "35",
+          "formula": "=A17*2+1"
+        },
+        "A18": {
+          "value2": 18.0,
+          "text": "18",
+          "formula": null
+        },
+        "B18": {
+          "value2": 37.0,
+          "text": "37",
+          "formula": "=A18*2+1"
+        },
+        "A19": {
+          "value2": 19.0,
+          "text": "19",
+          "formula": null
+        },
+        "B19": {
+          "value2": 39.0,
+          "text": "39",
+          "formula": "=A19*2+1"
+        },
+        "A20": {
+          "value2": 20.0,
+          "text": "20",
+          "formula": null
+        },
+        "B20": {
+          "value2": 41.0,
+          "text": "41",
+          "formula": "=A20*2+1"
+        },
+        "A21": {
+          "value2": 21.0,
+          "text": "21",
+          "formula": null
+        },
+        "B21": {
+          "value2": 43.0,
+          "text": "43",
+          "formula": "=A21*2+1"
+        },
+        "A22": {
+          "value2": 22.0,
+          "text": "22",
+          "formula": null
+        },
+        "B22": {
+          "value2": 45.0,
+          "text": "45",
+          "formula": "=A22*2+1"
+        },
+        "A23": {
+          "value2": 23.0,
+          "text": "23",
+          "formula": null
+        },
+        "B23": {
+          "value2": 47.0,
+          "text": "47",
+          "formula": "=A23*2+1"
+        },
+        "A24": {
+          "value2": 24.0,
+          "text": "24",
+          "formula": null
+        },
+        "B24": {
+          "value2": 49.0,
+          "text": "49",
+          "formula": "=A24*2+1"
+        },
+        "A25": {
+          "value2": 25.0,
+          "text": "25",
+          "formula": null
+        },
+        "B25": {
+          "value2": 51.0,
+          "text": "51",
+          "formula": "=A25*2+1"
+        },
+        "A26": {
+          "value2": 26.0,
+          "text": "26",
+          "formula": null
+        },
+        "B26": {
+          "value2": 53.0,
+          "text": "53",
+          "formula": "=A26*2+1"
+        },
+        "A27": {
+          "value2": 27.0,
+          "text": "27",
+          "formula": null
+        },
+        "B27": {
+          "value2": 55.0,
+          "text": "55",
+          "formula": "=A27*2+1"
+        },
+        "A28": {
+          "value2": 28.0,
+          "text": "28",
+          "formula": null
+        },
+        "B28": {
+          "value2": 57.0,
+          "text": "57",
+          "formula": "=A28*2+1"
+        },
+        "A29": {
+          "value2": 29.0,
+          "text": "29",
+          "formula": null
+        },
+        "B29": {
+          "value2": 59.0,
+          "text": "59",
+          "formula": "=A29*2+1"
+        },
+        "A30": {
+          "value2": 30.0,
+          "text": "30",
+          "formula": null
+        },
+        "B30": {
+          "value2": 61.0,
+          "text": "61",
+          "formula": "=A30*2+1"
+        },
+        "A31": {
+          "value2": 31.0,
+          "text": "31",
+          "formula": null
+        },
+        "B31": {
+          "value2": 63.0,
+          "text": "63",
+          "formula": "=A31*2+1"
+        },
+        "A32": {
+          "value2": 32.0,
+          "text": "32",
+          "formula": null
+        },
+        "B32": {
+          "value2": 65.0,
+          "text": "65",
+          "formula": "=A32*2+1"
+        },
+        "A33": {
+          "value2": 33.0,
+          "text": "33",
+          "formula": null
+        },
+        "B33": {
+          "value2": 67.0,
+          "text": "67",
+          "formula": "=A33*2+1"
+        },
+        "A34": {
+          "value2": 34.0,
+          "text": "34",
+          "formula": null
+        },
+        "B34": {
+          "value2": 69.0,
+          "text": "69",
+          "formula": "=A34*2+1"
+        },
+        "A35": {
+          "value2": 35.0,
+          "text": "35",
+          "formula": null
+        },
+        "B35": {
+          "value2": 71.0,
+          "text": "71",
+          "formula": "=A35*2+1"
+        },
+        "A36": {
+          "value2": 36.0,
+          "text": "36",
+          "formula": null
+        },
+        "B36": {
+          "value2": 73.0,
+          "text": "73",
+          "formula": "=A36*2+1"
+        },
+        "A37": {
+          "value2": 37.0,
+          "text": "37",
+          "formula": null
+        },
+        "B37": {
+          "value2": 75.0,
+          "text": "75",
+          "formula": "=A37*2+1"
+        },
+        "A38": {
+          "value2": 38.0,
+          "text": "38",
+          "formula": null
+        },
+        "B38": {
+          "value2": 77.0,
+          "text": "77",
+          "formula": "=A38*2+1"
+        },
+        "A39": {
+          "value2": 39.0,
+          "text": "39",
+          "formula": null
+        },
+        "B39": {
+          "value2": 79.0,
+          "text": "79",
+          "formula": "=A39*2+1"
+        },
+        "A40": {
+          "value2": 40.0,
+          "text": "40",
+          "formula": null
+        },
+        "B40": {
+          "value2": 81.0,
+          "text": "81",
+          "formula": "=A40*2+1"
+        },
+        "A41": {
+          "value2": 41.0,
+          "text": "41",
+          "formula": null
+        },
+        "B41": {
+          "value2": 83.0,
+          "text": "83",
+          "formula": "=A41*2+1"
+        },
+        "A42": {
+          "value2": 42.0,
+          "text": "42",
+          "formula": null
+        },
+        "B42": {
+          "value2": 85.0,
+          "text": "85",
+          "formula": "=A42*2+1"
+        },
+        "A43": {
+          "value2": 43.0,
+          "text": "43",
+          "formula": null
+        },
+        "B43": {
+          "value2": 87.0,
+          "text": "87",
+          "formula": "=A43*2+1"
+        },
+        "A44": {
+          "value2": 44.0,
+          "text": "44",
+          "formula": null
+        },
+        "B44": {
+          "value2": 89.0,
+          "text": "89",
+          "formula": "=A44*2+1"
+        },
+        "A45": {
+          "value2": 45.0,
+          "text": "45",
+          "formula": null
+        },
+        "B45": {
+          "value2": 91.0,
+          "text": "91",
+          "formula": "=A45*2+1"
+        },
+        "A46": {
+          "value2": 46.0,
+          "text": "46",
+          "formula": null
+        },
+        "B46": {
+          "value2": 93.0,
+          "text": "93",
+          "formula": "=A46*2+1"
+        },
+        "A47": {
+          "value2": 47.0,
+          "text": "47",
+          "formula": null
+        },
+        "B47": {
+          "value2": 95.0,
+          "text": "95",
+          "formula": "=A47*2+1"
+        },
+        "A48": {
+          "value2": 48.0,
+          "text": "48",
+          "formula": null
+        },
+        "B48": {
+          "value2": 97.0,
+          "text": "97",
+          "formula": "=A48*2+1"
+        },
+        "A49": {
+          "value2": 49.0,
+          "text": "49",
+          "formula": null
+        },
+        "B49": {
+          "value2": 99.0,
+          "text": "99",
+          "formula": "=A49*2+1"
+        },
+        "A50": {
+          "value2": 50.0,
+          "text": "50",
+          "formula": null
+        },
+        "B50": {
+          "value2": 101.0,
+          "text": "101",
+          "formula": "=A50*2+1"
+        },
+        "A51": {
+          "value2": 51.0,
+          "text": "51",
+          "formula": null
+        },
+        "B51": {
+          "value2": 103.0,
+          "text": "103",
+          "formula": "=A51*2+1"
+        },
+        "A52": {
+          "value2": 52.0,
+          "text": "52",
+          "formula": null
+        },
+        "B52": {
+          "value2": 105.0,
+          "text": "105",
+          "formula": "=A52*2+1"
+        },
+        "A53": {
+          "value2": 53.0,
+          "text": "53",
+          "formula": null
+        },
+        "B53": {
+          "value2": 107.0,
+          "text": "107",
+          "formula": "=A53*2+1"
+        },
+        "A54": {
+          "value2": 54.0,
+          "text": "54",
+          "formula": null
+        },
+        "B54": {
+          "value2": 109.0,
+          "text": "109",
+          "formula": "=A54*2+1"
+        },
+        "A55": {
+          "value2": 55.0,
+          "text": "55",
+          "formula": null
+        },
+        "B55": {
+          "value2": 111.0,
+          "text": "111",
+          "formula": "=A55*2+1"
+        },
+        "A56": {
+          "value2": 56.0,
+          "text": "56",
+          "formula": null
+        },
+        "B56": {
+          "value2": 113.0,
+          "text": "113",
+          "formula": "=A56*2+1"
+        },
+        "A57": {
+          "value2": 57.0,
+          "text": "57",
+          "formula": null
+        },
+        "B57": {
+          "value2": 115.0,
+          "text": "115",
+          "formula": "=A57*2+1"
+        },
+        "A58": {
+          "value2": 58.0,
+          "text": "58",
+          "formula": null
+        },
+        "B58": {
+          "value2": 117.0,
+          "text": "117",
+          "formula": "=A58*2+1"
+        },
+        "A59": {
+          "value2": 59.0,
+          "text": "59",
+          "formula": null
+        },
+        "B59": {
+          "value2": 119.0,
+          "text": "119",
+          "formula": "=A59*2+1"
+        },
+        "A60": {
+          "value2": 60.0,
+          "text": "60",
+          "formula": null
+        },
+        "B60": {
+          "value2": 121.0,
+          "text": "121",
+          "formula": "=A60*2+1"
+        },
+        "A61": {
+          "value2": 61.0,
+          "text": "61",
+          "formula": null
+        },
+        "B61": {
+          "value2": 123.0,
+          "text": "123",
+          "formula": "=A61*2+1"
+        },
+        "A62": {
+          "value2": 62.0,
+          "text": "62",
+          "formula": null
+        },
+        "B62": {
+          "value2": 125.0,
+          "text": "125",
+          "formula": "=A62*2+1"
+        },
+        "A63": {
+          "value2": 63.0,
+          "text": "63",
+          "formula": null
+        },
+        "B63": {
+          "value2": 127.0,
+          "text": "127",
+          "formula": "=A63*2+1"
+        },
+        "A64": {
+          "value2": 64.0,
+          "text": "64",
+          "formula": null
+        },
+        "B64": {
+          "value2": 129.0,
+          "text": "129",
+          "formula": "=A64*2+1"
+        },
+        "A65": {
+          "value2": 65.0,
+          "text": "65",
+          "formula": null
+        },
+        "B65": {
+          "value2": 131.0,
+          "text": "131",
+          "formula": "=A65*2+1"
+        },
+        "A66": {
+          "value2": 66.0,
+          "text": "66",
+          "formula": null
+        },
+        "B66": {
+          "value2": 133.0,
+          "text": "133",
+          "formula": "=A66*2+1"
+        },
+        "A67": {
+          "value2": 67.0,
+          "text": "67",
+          "formula": null
+        },
+        "B67": {
+          "value2": 135.0,
+          "text": "135",
+          "formula": "=A67*2+1"
+        },
+        "A68": {
+          "value2": 68.0,
+          "text": "68",
+          "formula": null
+        },
+        "B68": {
+          "value2": 137.0,
+          "text": "137",
+          "formula": "=A68*2+1"
+        },
+        "A69": {
+          "value2": 69.0,
+          "text": "69",
+          "formula": null
+        },
+        "B69": {
+          "value2": 139.0,
+          "text": "139",
+          "formula": "=A69*2+1"
+        },
+        "A70": {
+          "value2": 70.0,
+          "text": "70",
+          "formula": null
+        },
+        "B70": {
+          "value2": 141.0,
+          "text": "141",
+          "formula": "=A70*2+1"
+        },
+        "A71": {
+          "value2": 71.0,
+          "text": "71",
+          "formula": null
+        },
+        "B71": {
+          "value2": 143.0,
+          "text": "143",
+          "formula": "=A71*2+1"
+        },
+        "A72": {
+          "value2": 72.0,
+          "text": "72",
+          "formula": null
+        },
+        "B72": {
+          "value2": 145.0,
+          "text": "145",
+          "formula": "=A72*2+1"
+        },
+        "A73": {
+          "value2": 73.0,
+          "text": "73",
+          "formula": null
+        },
+        "B73": {
+          "value2": 147.0,
+          "text": "147",
+          "formula": "=A73*2+1"
+        },
+        "A74": {
+          "value2": 74.0,
+          "text": "74",
+          "formula": null
+        },
+        "B74": {
+          "value2": 149.0,
+          "text": "149",
+          "formula": "=A74*2+1"
+        },
+        "A75": {
+          "value2": 75.0,
+          "text": "75",
+          "formula": null
+        },
+        "B75": {
+          "value2": 151.0,
+          "text": "151",
+          "formula": "=A75*2+1"
+        },
+        "A76": {
+          "value2": 76.0,
+          "text": "76",
+          "formula": null
+        },
+        "B76": {
+          "value2": 153.0,
+          "text": "153",
+          "formula": "=A76*2+1"
+        },
+        "A77": {
+          "value2": 77.0,
+          "text": "77",
+          "formula": null
+        },
+        "B77": {
+          "value2": 155.0,
+          "text": "155",
+          "formula": "=A77*2+1"
+        },
+        "A78": {
+          "value2": 78.0,
+          "text": "78",
+          "formula": null
+        },
+        "B78": {
+          "value2": 157.0,
+          "text": "157",
+          "formula": "=A78*2+1"
+        },
+        "A79": {
+          "value2": 79.0,
+          "text": "79",
+          "formula": null
+        },
+        "B79": {
+          "value2": 159.0,
+          "text": "159",
+          "formula": "=A79*2+1"
+        },
+        "A80": {
+          "value2": 80.0,
+          "text": "80",
+          "formula": null
+        },
+        "B80": {
+          "value2": 161.0,
+          "text": "161",
+          "formula": "=A80*2+1"
+        },
+        "A81": {
+          "value2": 81.0,
+          "text": "81",
+          "formula": null
+        },
+        "B81": {
+          "value2": 163.0,
+          "text": "163",
+          "formula": "=A81*2+1"
+        },
+        "A82": {
+          "value2": 82.0,
+          "text": "82",
+          "formula": null
+        },
+        "B82": {
+          "value2": 165.0,
+          "text": "165",
+          "formula": "=A82*2+1"
+        },
+        "A83": {
+          "value2": 83.0,
+          "text": "83",
+          "formula": null
+        },
+        "B83": {
+          "value2": 167.0,
+          "text": "167",
+          "formula": "=A83*2+1"
+        },
+        "A84": {
+          "value2": 84.0,
+          "text": "84",
+          "formula": null
+        },
+        "B84": {
+          "value2": 169.0,
+          "text": "169",
+          "formula": "=A84*2+1"
+        },
+        "A85": {
+          "value2": 85.0,
+          "text": "85",
+          "formula": null
+        },
+        "B85": {
+          "value2": 171.0,
+          "text": "171",
+          "formula": "=A85*2+1"
+        },
+        "A86": {
+          "value2": 86.0,
+          "text": "86",
+          "formula": null
+        },
+        "B86": {
+          "value2": 173.0,
+          "text": "173",
+          "formula": "=A86*2+1"
+        },
+        "A87": {
+          "value2": 87.0,
+          "text": "87",
+          "formula": null
+        },
+        "B87": {
+          "value2": 175.0,
+          "text": "175",
+          "formula": "=A87*2+1"
+        },
+        "A88": {
+          "value2": 88.0,
+          "text": "88",
+          "formula": null
+        },
+        "B88": {
+          "value2": 177.0,
+          "text": "177",
+          "formula": "=A88*2+1"
+        },
+        "A89": {
+          "value2": 89.0,
+          "text": "89",
+          "formula": null
+        },
+        "B89": {
+          "value2": 179.0,
+          "text": "179",
+          "formula": "=A89*2+1"
+        },
+        "A90": {
+          "value2": 90.0,
+          "text": "90",
+          "formula": null
+        },
+        "B90": {
+          "value2": 181.0,
+          "text": "181",
+          "formula": "=A90*2+1"
+        },
+        "A91": {
+          "value2": 91.0,
+          "text": "91",
+          "formula": null
+        },
+        "B91": {
+          "value2": 183.0,
+          "text": "183",
+          "formula": "=A91*2+1"
+        },
+        "A92": {
+          "value2": 92.0,
+          "text": "92",
+          "formula": null
+        },
+        "B92": {
+          "value2": 185.0,
+          "text": "185",
+          "formula": "=A92*2+1"
+        },
+        "A93": {
+          "value2": 93.0,
+          "text": "93",
+          "formula": null
+        },
+        "B93": {
+          "value2": 187.0,
+          "text": "187",
+          "formula": "=A93*2+1"
+        },
+        "A94": {
+          "value2": 94.0,
+          "text": "94",
+          "formula": null
+        },
+        "B94": {
+          "value2": 189.0,
+          "text": "189",
+          "formula": "=A94*2+1"
+        },
+        "A95": {
+          "value2": 95.0,
+          "text": "95",
+          "formula": null
+        },
+        "B95": {
+          "value2": 191.0,
+          "text": "191",
+          "formula": "=A95*2+1"
+        },
+        "A96": {
+          "value2": 96.0,
+          "text": "96",
+          "formula": null
+        },
+        "B96": {
+          "value2": 193.0,
+          "text": "193",
+          "formula": "=A96*2+1"
+        },
+        "A97": {
+          "value2": 97.0,
+          "text": "97",
+          "formula": null
+        },
+        "B97": {
+          "value2": 195.0,
+          "text": "195",
+          "formula": "=A97*2+1"
+        },
+        "A98": {
+          "value2": 98.0,
+          "text": "98",
+          "formula": null
+        },
+        "B98": {
+          "value2": 197.0,
+          "text": "197",
+          "formula": "=A98*2+1"
+        },
+        "A99": {
+          "value2": 99.0,
+          "text": "99",
+          "formula": null
+        },
+        "B99": {
+          "value2": 199.0,
+          "text": "199",
+          "formula": "=A99*2+1"
+        },
+        "A100": {
+          "value2": 100.0,
+          "text": "100",
+          "formula": null
+        },
+        "B100": {
+          "value2": 201.0,
+          "text": "201",
+          "formula": "=A100*2+1"
+        }
+      }
+    }
+  ]
+}

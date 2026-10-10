@@ -1,0 +1,38 @@
+{
+  "source": "fixtures/xlsx/values-types.xlsx",
+  "sheets": [
+    {
+      "name": "Sheet1",
+      "visible": -1,
+      "usedRange": "A1:A5",
+      "truncatedAt2000": false,
+      "cells": {
+        "A1": {
+          "value2": 3.14159,
+          "text": "3.14159",
+          "formula": null
+        },
+        "A2": {
+          "value2": "text value",
+          "text": "text value",
+          "formula": null
+        },
+        "A3": {
+          "value2": true,
+          "text": "TRUE",
+          "formula": null
+        },
+        "A4": {
+          "value2": -2146826246,
+          "text": "#N/A",
+          "formula": "=NA()"
+        },
+        "A5": {
+          "value2": 45306.0,
+          "text": "2024-01-15",
+          "formula": null
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,48 @@
+{
+  "source": "fixtures/xlsx/dates-1900.xlsx",
+  "sheets": [
+    {
+      "name": "Sheet1",
+      "visible": -1,
+      "usedRange": "A1:B5",
+      "truncatedAt2000": false,
+      "cells": {
+        "A1": {
+          "value2": 59.0,
+          "text": "1900-02-28",
+          "formula": null
+        },
+        "B1": {
+          "value2": 2.0,
+          "text": "2",
+          "formula": "=A3-A1"
+        },
+        "A2": {
+          "value2": 60.0,
+          "text": "1900-02-29",
+          "formula": null
+        },
+        "B2": {
+          "value2": 61.0,
+          "text": "########",
+          "formula": "=DATE(1900,3,1)"
+        },
+        "A3": {
+          "value2": 61.0,
+          "text": "1900-03-01",
+          "formula": null
+        },
+        "A4": {
+          "value2": 62.0,
+          "text": "1900-03-02",
+          "formula": null
+        },
+        "A5": {
+          "value2": 45352.0,
+          "text": "2024-03-01",
+          "formula": null
+        }
+      }
+    }
+  ]
+}

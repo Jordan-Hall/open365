@@ -1,0 +1,44 @@
+{
+  "source": "fixtures/xlsx/hidden-sheet.xlsx",
+  "sheets": [
+    {
+      "name": "Visible",
+      "visible": -1,
+      "usedRange": "A1",
+      "truncatedAt2000": false,
+      "cells": {
+        "A1": {
+          "value2": "visible",
+          "text": "visible",
+          "formula": null
+        }
+      }
+    },
+    {
+      "name": "HiddenSheet",
+      "visible": 0,
+      "usedRange": "A1",
+      "truncatedAt2000": false,
+      "cells": {
+        "A1": {
+          "value2": "hidden-data",
+          "text": "hidden-data",
+          "formula": null
+        }
+      }
+    },
+    {
+      "name": "VeryHiddenSheet",
+      "visible": 2,
+      "usedRange": "A1",
+      "truncatedAt2000": false,
+      "cells": {
+        "A1": {
+          "value2": "veryhidden-data",
+          "text": "veryhidden-data",
+          "formula": null
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,28 @@
+{
+  "source": "fixtures/xlsx/defined-names.xlsx",
+  "sheets": [
+    {
+      "name": "Data",
+      "visible": -1,
+      "usedRange": "A1:C1",
+      "truncatedAt2000": false,
+      "cells": {
+        "A1": {
+          "value2": 5.0,
+          "text": "5",
+          "formula": null
+        },
+        "B1": {
+          "value2": 7.0,
+          "text": "7",
+          "formula": null
+        },
+        "C1": {
+          "value2": 12.0,
+          "text": "12",
+          "formula": "=GlobalRate+LocalVal"
+        }
+      }
+    }
+  ]
+}
