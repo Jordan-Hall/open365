@@ -276,6 +276,8 @@ name = "open365-docx"
 version = "0.1.0"
 dependencies = [
  "open365-opc",
+ "quick-xml",
+ "thiserror",
 ]
 
 [[package]]
