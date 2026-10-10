@@ -1,6 +1,6 @@
 use std::path::{Path, PathBuf};
 
-use open365_docx::Document;
+use open365_docx::{DocPos, Document, Snapshot};
 use open365_opc::Limits;
 use open365_xlsx::Workbook;
 
@@ -23,8 +23,11 @@ enum Content {
 
 #[derive(Debug)]
 enum Inverse {
-    /// Undo by reopening the base bytes and replaying the commands before this one.
+    /// Undo by reopening the base bytes and replaying the commands before this one. Only used
+    /// when the affected paragraphs could not be captured.
     DocxReplay,
+    /// Undo by putting the captured paragraphs back (newest capture last).
+    DocxRestore(Vec<Snapshot>),
     /// Undo by writing the previous cell back; `before` is `None` when it cannot be
     /// restored.
     Cell {
@@ -56,6 +59,8 @@ pub struct Target {
     next_state: u64,
     saved_state: u64,
     revision: u64,
+    /// Edit-log entries the last edit added, taken by `apply`.
+    notes: Vec<String>,
 }
 
 impl Target {
@@ -70,6 +75,7 @@ impl Target {
             next_state: 1,
             saved_state: 0,
             revision: 0,
+            notes: Vec::new(),
         }
     }
 
@@ -163,6 +169,7 @@ impl Target {
         let outcome = if let Command::Save { path } = &command {
             self.save_to(path, effect)?
         } else {
+            self.notes.clear();
             let (inverse, changed_cells) = self.run_edit(&command)?;
             let state_before = self.state;
             self.state = self.next_state;
@@ -180,6 +187,7 @@ impl Target {
                 changed_cells,
                 saved_to: None,
                 bytes_written: 0,
+                notes: std::mem::take(&mut self.notes),
             }
         };
         self.audit.0.push(command);
@@ -204,6 +212,15 @@ impl Target {
                     replay_docx(&mut doc, c)?;
                 }
                 state.doc = doc;
+                Vec::new()
+            }
+            Inverse::DocxRestore(snapshots) => {
+                let Content::Docx(state) = &mut self.content else {
+                    return Err(CommandError::NotUndoable);
+                };
+                for snapshot in snapshots.iter().rev() {
+                    state.doc.restore(snapshot)?;
+                }
                 Vec::new()
             }
             Inverse::Cell {
@@ -247,9 +264,18 @@ impl Target {
     /// Runs an edit command against the content and captures how to reverse it.
     fn run_edit(&mut self, command: &Command) -> Result<(Inverse, Vec<CellRef>), CommandError> {
         match (&mut self.content, command) {
-            (Content::Docx(s), Command::DocxInsertText { .. } | Command::DocxSetBold { .. }) => {
+            (Content::Docx(s), command) if is_docx_edit(command) => {
+                let inverse = match capture_docx(&s.doc, command) {
+                    Ok(snapshots) => Inverse::DocxRestore(snapshots),
+                    Err(_) => Inverse::DocxReplay,
+                };
+                let log_len = s.doc.edit_log().len();
                 replay_docx(&mut s.doc, command)?;
-                Ok((Inverse::DocxReplay, Vec::new()))
+                self.notes = s.doc.edit_log()[log_len..]
+                    .iter()
+                    .map(|e| e.description.clone())
+                    .collect();
+                Ok((inverse, Vec::new()))
             }
             (
                 Content::Xlsx(x),
@@ -316,6 +342,7 @@ impl Target {
             changed_cells: Vec::new(),
             saved_to: Some(path.to_path_buf()),
             bytes_written: bytes.len(),
+            notes: Vec::new(),
         })
     }
 }
@@ -326,12 +353,55 @@ fn edit_outcome(changed_cells: Vec<CellRef>) -> Outcome {
         changed_cells,
         saved_to: None,
         bytes_written: 0,
+        notes: Vec::new(),
     }
 }
 
 /// Applies one command to a target. The single mutation entry point (ADR-002).
 pub fn apply(target: &mut Target, command: Command) -> Result<Outcome, CommandError> {
     target.apply(command)
+}
+
+fn is_docx_edit(command: &Command) -> bool {
+    matches!(
+        command,
+        Command::DocxInsertText { .. }
+            | Command::DocxSetBold { .. }
+            | Command::DocxDeleteRange { .. }
+            | Command::DocxSplitParagraph { .. }
+            | Command::DocxSetRunProps { .. }
+            | Command::DocxSetParagraphStyle { .. }
+            | Command::DocxSetAlignment { .. }
+            | Command::DocxReplaceRange { .. }
+    )
+}
+
+fn ordered(a: DocPos, b: DocPos) -> (DocPos, DocPos) {
+    if a <= b { (a, b) } else { (b, a) }
+}
+
+/// Saves the paragraphs `command` is going to change, for a cheap undo. Commands that keep
+/// the paragraph count (formatting) save each paragraph on its own so a selection may span
+/// table cells; commands that merge or split paragraphs save one contiguous range.
+fn capture_docx(doc: &Document, command: &Command) -> Result<Vec<Snapshot>, CommandError> {
+    let one = |para: usize| doc.capture(para, para);
+    let snapshots = match command {
+        Command::DocxInsertText { para, .. }
+        | Command::DocxSetBold { para, .. }
+        | Command::DocxSetParagraphStyle { para, .. }
+        | Command::DocxSetAlignment { para, .. } => vec![one(*para)?],
+        Command::DocxSplitParagraph { pos } => vec![one(pos.para)?],
+        Command::DocxDeleteRange { start, end } | Command::DocxReplaceRange { start, end, .. } => {
+            let (s, e) = ordered(*start, *end);
+            vec![doc.capture(s.para, e.para)?]
+        }
+        Command::DocxSetRunProps { start, end, .. } => {
+            let (s, e) = ordered(*start, *end);
+            (s.para..=e.para).map(one).collect::<Result<Vec<_>, _>>()?
+        }
+        _ => return Err(CommandError::NotUndoable),
+    };
+    Ok(snapshots)
 }
 
 fn replay_docx(doc: &mut Document, command: &Command) -> Result<(), CommandError> {
@@ -343,6 +413,16 @@ fn replay_docx(doc: &mut Document, command: &Command) -> Result<(), CommandError
             end,
             bold,
         } => doc.set_bold(*para, *start..*end, *bold)?,
+        Command::DocxDeleteRange { start, end } => doc.delete_range(*start, *end)?,
+        Command::DocxSplitParagraph { pos } => doc.split_paragraph(*pos)?,
+        Command::DocxSetRunProps { start, end, patch } => doc.set_run_props(*start, *end, patch)?,
+        Command::DocxSetParagraphStyle { para, style_id } => {
+            doc.set_paragraph_style(*para, style_id)?;
+        }
+        Command::DocxSetAlignment { para, alignment } => doc.set_alignment(*para, *alignment)?,
+        Command::DocxReplaceRange { start, end, text } => {
+            doc.replace_range(*start, *end, text)?;
+        }
         _ => {}
     }
     Ok(())

@@ -1,21 +1,53 @@
-//! View model of a DOCX body: one entry per paragraph with text, run styling and page setup.
+//! View model of a DOCX body: one entry per paragraph with text, resolved run formatting and
+//! paragraph formatting, plus page setup.
 //!
-//! Built from the typed model in `open365_docx` and rebuilt per paragraph after an edit.
-//! Character offsets are Unicode scalar values, the same unit the commands use.
+//! Built from the typed model in `open365_docx` (styles resolved by `Styles`) and rebuilt per
+//! paragraph after an edit. Character offsets are Unicode scalar values, the same unit the
+//! commands use.
 
-use open365_docx::{Block, BreakKind, Document, Inline, Paragraph, RawXml, RunContent};
+use std::sync::Arc;
 
-/// Character formatting of a span.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+use open365_docx::{
+    Alignment, Block, BreakKind, Document, EffectiveParagraph, Inline, Paragraph, RawXml,
+    RunContent, Styles,
+};
+
+/// Font used when a document has no styles part and the run names no font.
+const BARE_FONT: &str = "Calibri";
+const BARE_SIZE_HALF_POINTS: u32 = 22;
+
+/// Resolved character formatting of a span.
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SpanStyle {
+    pub font: Arc<str>,
+    /// Font size in half-points.
+    pub size_half_points: u32,
     pub bold: bool,
     pub italic: bool,
     pub underline: bool,
     pub strike: bool,
-    /// Font size in half-points, as written.
-    pub size_half_points: Option<u32>,
-    /// `RRGGBB`.
+    /// `RRGGBB`; `None` is automatic (black).
     pub color: Option<[u8; 3]>,
+}
+
+impl Default for SpanStyle {
+    fn default() -> Self {
+        Self {
+            font: Arc::from(BARE_FONT),
+            size_half_points: BARE_SIZE_HALF_POINTS,
+            bold: false,
+            italic: false,
+            underline: false,
+            strike: false,
+            color: None,
+        }
+    }
+}
+
+impl SpanStyle {
+    pub fn size_pt(&self) -> f32 {
+        self.size_half_points as f32 / 2.0
+    }
 }
 
 /// A styled stretch of a paragraph, `start..end` in characters.
@@ -26,39 +58,59 @@ pub struct Span {
     pub style: SpanStyle,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub enum ParaKind {
-    #[default]
-    Normal,
-    Title,
-    Heading(u8),
-}
-
 /// One paragraph as the view needs it.
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, PartialEq, Default)]
 pub struct ParaModel {
     /// Text as laid out: tabs become an em space so one character stays one character.
     pub text: String,
     pub char_len: usize,
     pub spans: Vec<Span>,
-    pub kind: ParaKind,
+    /// Style id from `w:pStyle`, `None` for the default style.
+    pub style_id: Option<String>,
+    pub para: EffectiveParagraph,
+    /// Formatting an empty paragraph (or a caret at its end) takes.
+    pub mark: SpanStyle,
     /// A page break inside the paragraph: the next paragraph starts a new page.
     pub page_break: bool,
 }
 
 impl ParaModel {
-    pub fn from_paragraph(p: &Paragraph) -> Self {
+    pub fn from_paragraph(p: &Paragraph, styles: Option<&Styles>) -> Self {
         let mut model = Self {
-            kind: kind_of(p),
+            style_id: p.style_id().map(str::to_owned),
+            para: styles.map_or_else(
+                || EffectiveParagraph {
+                    alignment: p.direct_alignment().unwrap_or(Alignment::Left),
+                    space_after_pt: 8.0,
+                    ..EffectiveParagraph::default()
+                },
+                |s| s.effective_para_props(p),
+            ),
             ..Self::default()
         };
-        collect(&p.content, &mut model);
+        collect(&p.content, p, styles, &mut model);
         model.char_len = model.text.chars().count();
+        model.mark = model
+            .spans
+            .last()
+            .map(|s| s.style.clone())
+            .unwrap_or_else(|| mark_style(p, styles));
         model
     }
 
-    /// Whether every character in `start..end` is bold (an empty range is not bold).
-    pub fn is_bold(&self, start: usize, end: usize) -> bool {
+    /// The style of the character at `offset` (the one before it at the end of a paragraph).
+    pub fn style_at(&self, offset: usize) -> &SpanStyle {
+        let at = offset
+            .saturating_sub(1)
+            .min(self.char_len.saturating_sub(1));
+        self.spans
+            .iter()
+            .find(|s| s.start <= at && at < s.end)
+            .map_or(&self.mark, |s| &s.style)
+    }
+
+    /// Whether `test` holds for every character in `start..end` (false for an empty range).
+    pub fn all(&self, start: usize, end: usize, test: impl Fn(&SpanStyle) -> bool) -> bool {
         if start >= end {
             return false;
         }
@@ -67,7 +119,7 @@ impl ParaModel {
             if span.end <= covered {
                 continue;
             }
-            if span.start > covered || !span.style.bold {
+            if span.start > covered || !test(&span.style) {
                 return false;
             }
             covered = span.end;
@@ -79,41 +131,49 @@ impl ParaModel {
     }
 }
 
-fn kind_of(p: &Paragraph) -> ParaKind {
-    let style = p.props.as_ref().and_then(|props| {
-        props.children.iter().find_map(|c| match c {
-            RawXml::Element(e) if e.head.is_w("pStyle") => e.head.attr_w("val"),
-            _ => None,
-        })
-    });
-    let Some(style) = style else {
-        return ParaKind::Normal;
-    };
-    let lower = style.to_ascii_lowercase();
-    if lower == "title" {
-        return ParaKind::Title;
+fn span_style(p: &Paragraph, run: &open365_docx::Run, styles: Option<&Styles>) -> SpanStyle {
+    if let Some(styles) = styles {
+        let e = styles.effective_run_props(p, run);
+        return SpanStyle {
+            font: Arc::from(e.font.as_str()),
+            size_half_points: e.size_half_points,
+            bold: e.bold,
+            italic: e.italic,
+            underline: e.underline,
+            strike: e.strike,
+            color: e.color,
+        };
     }
-    if let Some(level) = lower.strip_prefix("heading")
-        && let Ok(level) = level.trim().parse::<u8>()
-    {
-        return ParaKind::Heading(level.clamp(1, 6));
+    let props = &run.props;
+    SpanStyle {
+        font: props
+            .fonts()
+            .and_then(|f| f.head.attr_w("ascii"))
+            .map_or_else(|| Arc::from(BARE_FONT), Arc::from),
+        size_half_points: props.size_half_points().unwrap_or(BARE_SIZE_HALF_POINTS),
+        bold: props.bold().unwrap_or(false),
+        italic: props.italic().unwrap_or(false),
+        underline: props.underline().is_some_and(|u| u != "none"),
+        strike: props.strike().unwrap_or(false),
+        color: props.color().and_then(parse_color),
     }
-    ParaKind::Normal
 }
 
-fn collect(content: &[Inline], model: &mut ParaModel) {
+/// Formatting for an empty paragraph: the paragraph-mark properties on top of the style.
+fn mark_style(p: &Paragraph, styles: Option<&Styles>) -> SpanStyle {
+    let probe = open365_docx::Run {
+        head: p.head.sibling("r"),
+        props: p.mark_run_props(),
+        content: Vec::new(),
+    };
+    span_style(p, &probe, styles)
+}
+
+fn collect(content: &[Inline], p: &Paragraph, styles: Option<&Styles>, model: &mut ParaModel) {
     for inline in content {
         match inline {
             Inline::Run(run) => {
-                let props = &run.props;
-                let style = SpanStyle {
-                    bold: props.bold().unwrap_or(false),
-                    italic: props.italic().unwrap_or(false),
-                    underline: props.underline().is_some_and(|u| u != "none"),
-                    strike: props.strike().unwrap_or(false),
-                    size_half_points: props.size_half_points(),
-                    color: props.color().and_then(parse_color),
-                };
+                let style = span_style(p, run, styles);
                 let start = model.text.chars().count();
                 for item in &run.content {
                     match item {
@@ -136,7 +196,7 @@ fn collect(content: &[Inline], model: &mut ParaModel) {
                     }
                 }
             }
-            Inline::Group(g) => collect(&g.content, model),
+            Inline::Group(g) => collect(&g.content, p, styles, model),
             Inline::Raw(_) => {}
         }
     }
@@ -219,10 +279,11 @@ impl PageSetup {
 
 /// Builds the model of every paragraph (tables flattened, as the command layer indexes them).
 pub fn build_models(doc: &Document) -> Vec<ParaModel> {
+    let styles = doc.styles();
     doc.body()
         .paragraphs()
         .into_iter()
-        .map(ParaModel::from_paragraph)
+        .map(|p| ParaModel::from_paragraph(p, styles))
         .collect()
 }
 
@@ -255,19 +316,24 @@ mod tests {
     }
 
     #[test]
-    fn headings_and_page_setup() {
+    fn headings_resolve_to_larger_bold_text_and_page_setup_reads() {
         let doc = Document::open(&fixture("docx/styles-headings.docx"), &Limits::default())
             .expect("open");
         let models = build_models(&doc);
-        assert!(
-            models
-                .iter()
-                .any(|m| matches!(m.kind, ParaKind::Heading(_)))
-        );
+        let heading = models
+            .iter()
+            .find(|m| m.style_id.as_deref() == Some("Heading1"))
+            .expect("a heading");
+        let body = models
+            .iter()
+            .find(|m| m.style_id.is_none() && m.char_len > 0)
+            .expect("body text");
+        assert!(heading.spans[0].style.size_half_points > body.spans[0].style.size_half_points);
+        assert!(heading.para.space_before_pt > 0.0 || heading.para.keep_next);
         let landscape =
             Document::open(&fixture("docx/sections-landscape.docx"), &Limits::default())
                 .expect("open");
         let setup = PageSetup::from_document(&landscape);
-        assert!(setup.width > 0.0 && setup.height > 0.0);
+        assert!(setup.width > setup.height, "landscape: {setup:?}");
     }
 }

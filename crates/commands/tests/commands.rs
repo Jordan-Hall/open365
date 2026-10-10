@@ -465,3 +465,235 @@ fn command_log_round_trips_through_json_and_replays() {
     assert_eq!(number(&fresh, 1, 4), number(&t, 1, 4));
     assert_eq!(t.applied_log(), CommandLog(commands[..3].to_vec()));
 }
+
+// ---- DOCX editing commands -------------------------------------------------------------
+
+mod docx_edits {
+    use super::*;
+    use open365_commands::{Alignment, DocPos, RunPropsPatch};
+
+    fn main_xml(t: &Target) -> String {
+        String::from_utf8(t.docx().expect("docx").serialize_main()).expect("utf8")
+    }
+
+    fn pos(para: usize, offset: usize) -> DocPos {
+        DocPos::new(para, offset)
+    }
+
+    fn paragraph(t: &Target, i: usize) -> String {
+        t.docx()
+            .and_then(|d| d.paragraph_text(i))
+            .unwrap_or_default()
+    }
+
+    #[test]
+    fn effect_classes() {
+        let del = Command::DocxDeleteRange {
+            start: pos(0, 0),
+            end: pos(0, 3),
+        };
+        assert_eq!(del.effect(None), EffectClass::Destructive);
+        let empty = Command::DocxDeleteRange {
+            start: pos(0, 2),
+            end: pos(0, 2),
+        };
+        assert_eq!(empty.effect(None), EffectClass::Edit);
+        let replace = Command::DocxReplaceRange {
+            start: pos(0, 0),
+            end: pos(1, 1),
+            text: "x".into(),
+        };
+        assert_eq!(replace.effect(None), EffectClass::Destructive);
+        for edit in [
+            Command::DocxSplitParagraph { pos: pos(0, 1) },
+            Command::DocxSetRunProps {
+                start: pos(0, 0),
+                end: pos(0, 1),
+                patch: RunPropsPatch::bold(true),
+            },
+            Command::DocxSetParagraphStyle {
+                para: 0,
+                style_id: "Heading1".into(),
+            },
+            Command::DocxSetAlignment {
+                para: 0,
+                alignment: Alignment::Center,
+            },
+        ] {
+            assert_eq!(edit.effect(None), EffectClass::Edit, "{}", edit.name());
+        }
+    }
+
+    #[test]
+    fn new_commands_round_trip_through_json() {
+        let log = CommandLog(vec![
+            Command::DocxDeleteRange {
+                start: pos(0, 1),
+                end: pos(2, 0),
+            },
+            Command::DocxSetRunProps {
+                start: pos(0, 0),
+                end: pos(0, 4),
+                patch: RunPropsPatch {
+                    italic: Some(true),
+                    color: Some("00FF00".into()),
+                    ..RunPropsPatch::default()
+                },
+            },
+            Command::DocxSetAlignment {
+                para: 1,
+                alignment: Alignment::Justify,
+            },
+            Command::DocxReplaceRange {
+                start: pos(0, 0),
+                end: pos(0, 2),
+                text: "a\nb".into(),
+            },
+        ]);
+        let json = log.to_json().expect("json");
+        assert!(json.contains("docx_delete_range") && json.contains("\"para\""));
+        assert_eq!(CommandLog::from_json(&json).expect("parse"), log);
+    }
+
+    #[test]
+    fn delete_split_replace_and_format_work_and_undo_in_reverse() {
+        let mut t = plain();
+        let original = main_xml(&t);
+        let count = t.docx().expect("docx").paragraph_count();
+        let mut states = vec![original.clone()];
+        let commands = [
+            Command::DocxDeleteRange {
+                start: pos(0, 5),
+                end: pos(1, 3),
+            },
+            Command::DocxSplitParagraph { pos: pos(0, 2) },
+            Command::DocxSetRunProps {
+                start: pos(0, 0),
+                end: pos(2, 2),
+                patch: RunPropsPatch {
+                    italic: Some(true),
+                    underline: Some(true),
+                    ..RunPropsPatch::default()
+                },
+            },
+            Command::DocxSetParagraphStyle {
+                para: 1,
+                style_id: "Heading1".into(),
+            },
+            Command::DocxSetAlignment {
+                para: 1,
+                alignment: Alignment::Right,
+            },
+            Command::DocxReplaceRange {
+                start: pos(0, 1),
+                end: pos(1, 1),
+                text: "Z\nQ".into(),
+            },
+            Command::DocxInsertText {
+                para: 0,
+                offset: 0,
+                text: "!".into(),
+            },
+        ];
+        for command in commands {
+            apply(&mut t, command).expect("apply");
+            states.push(main_xml(&t));
+        }
+        // Undo one by one: every intermediate state comes back exactly.
+        for expected in states.iter().rev().skip(1) {
+            t.undo().expect("undo");
+            assert_eq!(&main_xml(&t), expected);
+        }
+        assert!(!t.can_undo());
+        assert!(!t.is_dirty());
+        assert_eq!(t.docx().expect("docx").paragraph_count(), count);
+        // Redo everything, then undo it all again.
+        for expected in states.iter().skip(1) {
+            t.redo().expect("redo");
+            assert_eq!(&main_xml(&t), expected);
+        }
+        while t.can_undo() {
+            t.undo().expect("undo");
+        }
+        assert_eq!(main_xml(&t), original);
+    }
+
+    #[test]
+    fn deleting_across_paragraphs_merges_them() {
+        let mut t = plain();
+        let first = paragraph(&t, 0);
+        let second = paragraph(&t, 1);
+        let out = apply(
+            &mut t,
+            Command::DocxDeleteRange {
+                start: pos(0, 5),
+                end: pos(1, 6),
+            },
+        )
+        .expect("delete");
+        assert_eq!(out.effect, EffectClass::Destructive);
+        let expected: String = first
+            .chars()
+            .take(5)
+            .chain(second.chars().skip(6))
+            .collect();
+        assert_eq!(paragraph(&t, 0), expected);
+        assert_eq!(t.applied_log().commands().len(), 1);
+    }
+
+    #[test]
+    fn a_refused_edit_changes_nothing_and_is_not_logged() {
+        let mut t = plain();
+        let err = apply(
+            &mut t,
+            Command::DocxDeleteRange {
+                start: pos(0, 0),
+                end: pos(99, 0),
+            },
+        )
+        .expect_err("out of range");
+        assert!(matches!(err, CommandError::Docx(_)));
+        let err = apply(
+            &mut t,
+            Command::DocxSetParagraphStyle {
+                para: 0,
+                style_id: "NoSuchStyle".into(),
+            },
+        )
+        .expect_err("unknown style");
+        assert!(matches!(err, CommandError::Docx(_)));
+        assert!(!t.can_undo() && !t.is_dirty());
+        assert!(t.audit_log().commands().is_empty());
+    }
+
+    #[test]
+    fn removed_drawings_are_reported_in_the_outcome_and_come_back_on_undo() {
+        let mut t = Target::open_path(&fixture("docx/inline-image.docx")).expect("open");
+        let original = main_xml(&t);
+        assert!(original.contains("<w:drawing"));
+        let count = t.docx().expect("docx").paragraph_count();
+        let last = count - 1;
+        let len = t
+            .docx()
+            .and_then(|d| d.paragraph(last))
+            .expect("p")
+            .char_len();
+        // Deleting the whole document removes the drawing.
+        let out = apply(
+            &mut t,
+            Command::DocxDeleteRange {
+                start: pos(0, 0),
+                end: pos(last, len),
+            },
+        )
+        .expect("delete");
+        assert!(!main_xml(&t).contains("<w:drawing"));
+        assert!(
+            out.notes.iter().any(|n| n.contains("drawing")),
+            "{:?}",
+            out.notes
+        );
+        t.undo().expect("undo");
+        assert_eq!(main_xml(&t), original);
+    }
+}

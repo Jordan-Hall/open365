@@ -12,7 +12,10 @@ mod document;
 mod edit;
 mod error;
 mod model;
+mod ppr;
 mod props;
+mod ranges;
+mod styles;
 mod xml;
 
 pub use document::{Document, DroppedItem, HygieneAction};
@@ -21,7 +24,12 @@ pub use model::{
     Block, Body, Break, BreakKind, Cell, DocChild, DocumentRoot, Group, Inline, Paragraph, Row,
     RowChild, Run, RunContent, Table, TableChild,
 };
-pub use props::{RunPropItem, RunPropKind, RunProps};
+pub use ppr::Alignment;
+pub use props::{RunPropItem, RunPropKind, RunProps, RunPropsPatch};
+pub use ranges::{DocPos, EditLogEntry, Snapshot};
+pub use styles::{
+    EffectiveParagraph, EffectiveRun, LineSpacing, StyleInfo, StyleKind, Styles, ThemeFonts,
+};
 pub use xml::{
     Attr, ElementHead, MAX_XML_DEPTH, ParsedXml, RawXml, W_NS, W_NS_STRICT, XmlElement,
     parse as parse_xml,

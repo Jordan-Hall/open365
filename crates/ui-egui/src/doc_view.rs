@@ -8,7 +8,9 @@
 //! All edits go through [`Target::apply`]; the view keeps only the caret, the selection and
 //! the layout caches.
 
+use std::cell::RefCell;
 use std::collections::HashMap;
+use std::rc::Rc;
 use std::sync::Arc;
 use std::time::Instant;
 
@@ -19,23 +21,62 @@ use egui::{
     Align, Color32, Context, Event, EventFilter, FontId, Galley, IMEPurpose, Id, Key, Modifiers,
     Pos2, Rect, Sense, Stroke, Ui, UiBuilder, Vec2, accesskit, vec2,
 };
-use open365_commands::{Command, Target};
+use open365_commands::{Command, Outcome, Target};
+use open365_docx::{Alignment, LineSpacing, RunPropsPatch};
 
 use crate::a11y::{self, RunEntry};
-use crate::docmodel::{PageSetup, ParaKind, ParaModel, SpanStyle, build_models};
+use crate::docmodel::{PageSetup, ParaModel, SpanStyle, build_models};
+use crate::fonts::FontBook;
+
+pub use open365_docx::DocPos;
 
 const PAGE_GAP: f32 = 16.0;
 const SIDE_PAD: f32 = 16.0;
 /// Screen points per document point at 100% zoom (96 dpi).
 const POINT_SCALE: f32 = 96.0 / 72.0;
 const MEASURE_BUDGET_MS: f64 = 4.0;
-const DEFAULT_SIZE_PT: f32 = 11.0;
 
-/// A caret position: paragraph index and character offset within it.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Default)]
-pub struct DocPos {
-    pub para: usize,
-    pub offset: usize,
+/// Which character toggle a button or shortcut flips.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Toggle {
+    Bold,
+    Italic,
+    Underline,
+}
+
+impl Toggle {
+    fn test(self, style: &SpanStyle) -> bool {
+        match self {
+            Self::Bold => style.bold,
+            Self::Italic => style.italic,
+            Self::Underline => style.underline,
+        }
+    }
+
+    fn patch(self, on: bool) -> RunPropsPatch {
+        match self {
+            Self::Bold => RunPropsPatch::bold(on),
+            Self::Italic => RunPropsPatch {
+                italic: Some(on),
+                ..RunPropsPatch::default()
+            },
+            Self::Underline => RunPropsPatch {
+                underline: Some(on),
+                ..RunPropsPatch::default()
+            },
+        }
+    }
+}
+
+/// Where a paragraph's text sits, in screen pixels relative to the text area.
+#[derive(Debug, Clone, Copy)]
+struct ParaGeom {
+    /// Left edge of the wrapping area.
+    x0: f32,
+    /// Width of the wrapping area.
+    wrap: f32,
+    /// Extra space before the first line (first-line indent).
+    leading: f32,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -46,8 +87,8 @@ struct PageSlice {
 
 struct Cached {
     galley: Arc<Galley>,
-    /// Same layout with only the bold spans visible, drawn offset to fake a bold weight (the
-    /// bundled fonts have no bold face).
+    /// Same layout with only the faked-bold spans visible, drawn offset to fake a bold weight
+    /// for fonts that have no bold face.
     bold_overlay: Option<Arc<Galley>>,
     preedit: Option<String>,
     last_used: u64,
@@ -88,6 +129,10 @@ pub struct DocView {
     dragging: bool,
     want_focus: bool,
     doc_id: Id,
+    fonts: Rc<RefCell<FontBook>>,
+    fonts_gen: u64,
+    /// Character formatting to apply to the next typed text (a toggle with no selection).
+    pending: RunPropsPatch,
     /// Message for the status bar, taken by the application each frame.
     pub status: Option<String>,
     /// Milliseconds spent laying out and painting the last frame.
@@ -126,9 +171,17 @@ impl DocView {
             dragging: false,
             want_focus: true,
             doc_id: Id::new("open365-doc-view"),
+            fonts: Rc::new(RefCell::new(FontBook::new())),
+            fonts_gen: 0,
+            pending: RunPropsPatch::default(),
             status: None,
             last_frame_ms: 0.0,
         }
+    }
+
+    /// Gives the document keyboard focus on the next frame (after a toolbar action).
+    pub fn focus(&mut self) {
+        self.want_focus = true;
     }
 
     pub fn id(&self) -> Id {
@@ -174,6 +227,7 @@ impl DocView {
         self.anchor = pos;
         self.goal_x = None;
         self.scroll_to_caret = true;
+        self.pending = RunPropsPatch::default();
     }
 
     /// Selects the half-open range between two positions.
@@ -182,6 +236,7 @@ impl DocView {
         self.caret = self.clamp(focus);
         self.goal_x = None;
         self.scroll_to_caret = true;
+        self.pending = RunPropsPatch::default();
     }
 
     fn clamp(&self, pos: DocPos) -> DocPos {
@@ -201,6 +256,19 @@ impl DocView {
         self.cache.clear();
     }
 
+    /// A view that shares an application-wide font book.
+    pub(crate) fn with_fonts(fonts: Rc<RefCell<FontBook>>) -> Self {
+        Self {
+            fonts,
+            ..Self::new()
+        }
+    }
+
+    /// Fonts the document uses that are not installed, with the bundled font drawn instead.
+    pub fn font_substitutions(&self) -> Vec<(String, String)> {
+        self.fonts.borrow().substitutions()
+    }
+
     fn rebuild_all(&mut self, target: &Target) {
         let Some(doc) = target.docx() else {
             self.models.clear();
@@ -208,6 +276,7 @@ impl DocView {
         };
         self.models = build_models(doc);
         self.page = PageSetup::from_document(doc);
+        self.register_fonts(0..self.models.len());
         self.cache.clear();
         self.heights = (0..self.models.len()).map(|i| self.estimate(i)).collect();
         self.measured = vec![false; self.models.len()];
@@ -218,13 +287,28 @@ impl DocView {
         self.model_revision = Some(target.revision());
     }
 
-    fn refresh_para(&mut self, target: &Target, para: usize) {
-        let Some(p) = target.docx().and_then(|d| d.paragraph(para)) else {
-            return;
-        };
-        if let Some(slot) = self.models.get_mut(para) {
-            *slot = ParaModel::from_paragraph(p);
+    /// Asks the font book for every face the paragraphs use, so they are registered together.
+    fn register_fonts(&self, range: std::ops::Range<usize>) {
+        let mut fonts = self.fonts.borrow_mut();
+        for model in self.models.get(range).unwrap_or_default() {
+            for style in model
+                .spans
+                .iter()
+                .map(|s| &s.style)
+                .chain(std::iter::once(&model.mark))
+            {
+                fonts.resolve(&style.font, style.bold, style.italic);
+            }
         }
+    }
+
+    fn refresh_para(&mut self, target: &Target, para: usize) {
+        let Some(doc) = target.docx() else { return };
+        let Some(p) = doc.paragraph(para) else { return };
+        if let Some(slot) = self.models.get_mut(para) {
+            *slot = ParaModel::from_paragraph(p, doc.styles());
+        }
+        self.register_fonts(para..para + 1);
         self.cache.remove(&para);
         if let Some(m) = self.measured.get_mut(para) {
             *m = false;
@@ -238,58 +322,141 @@ impl DocView {
         self.model_revision = Some(target.revision());
     }
 
-    fn font_size_pt(model: &ParaModel, style: &SpanStyle) -> f32 {
-        if let Some(half) = style.size_half_points {
-            return half as f32 / 2.0;
+    /// After an edit replaced `old` paragraphs starting at `first` by `new` ones, rebuilds just
+    /// those models. Falls back to a full rebuild when the counts do not add up.
+    fn resync(&mut self, target: &Target, first: usize, old: usize, new: usize) {
+        let Some(doc) = target.docx() else { return };
+        let expected = (self.models.len() + new).checked_sub(old);
+        if expected != Some(doc.paragraph_count()) || first + old > self.models.len() {
+            self.rebuild_all(target);
+            return;
         }
-        match model.kind {
-            ParaKind::Title => 26.0,
-            ParaKind::Heading(1) => 16.0,
-            ParaKind::Heading(2) => 13.0,
-            ParaKind::Heading(_) => 12.0,
-            ParaKind::Normal => DEFAULT_SIZE_PT,
+        let styles = doc.styles();
+        let fresh: Vec<ParaModel> = (first..first + new)
+            .filter_map(|i| doc.paragraph(i))
+            .map(|p| ParaModel::from_paragraph(p, styles))
+            .collect();
+        if fresh.len() != new {
+            self.rebuild_all(target);
+            return;
+        }
+        self.models.splice(first..first + old, fresh);
+        self.register_fonts(first..first + new);
+        let estimates: Vec<f32> = (first..first + new).map(|i| self.estimate(i)).collect();
+        self.heights.splice(first..first + old, estimates);
+        self.measured
+            .splice(first..first + old, std::iter::repeat_n(false, new));
+        self.cache.clear();
+        self.measure_cursor = self.measure_cursor.min(first);
+        self.paginate_dirty = true;
+        self.model_revision = Some(target.revision());
+    }
+
+    /// The largest font size in a paragraph, in points.
+    fn max_size_pt(model: &ParaModel) -> f32 {
+        model
+            .spans
+            .iter()
+            .map(|s| s.style.size_pt())
+            .fold(model.mark.size_pt(), f32::max)
+            .max(1.0)
+    }
+
+    fn before_px(&self, model: &ParaModel) -> f32 {
+        model.para.space_before_pt * self.scale
+    }
+
+    fn after_px(&self, model: &ParaModel) -> f32 {
+        model.para.space_after_pt * self.scale
+    }
+
+    fn geom(&self, model: &ParaModel) -> ParaGeom {
+        let body = self.page.body_width() * self.scale;
+        let left = model.para.indent_left_pt * self.scale;
+        let right = model.para.indent_right_pt * self.scale;
+        let first = model.para.first_line_pt * self.scale;
+        // A hanging indent starts the whole paragraph at the hanging position: egui cannot
+        // indent only the continuation lines.
+        let (x0, leading) = if first >= 0.0 {
+            (left.max(0.0), first)
+        } else {
+            ((left + first).max(0.0), 0.0)
+        };
+        ParaGeom {
+            x0,
+            wrap: (body - x0 - right).max(50.0),
+            leading,
         }
     }
 
-    fn space_after(&self, model: &ParaModel) -> f32 {
-        let pt = match model.kind {
-            ParaKind::Normal => 6.0,
-            _ => 8.0,
-        };
-        pt * self.scale
+    /// X of the galley anchor relative to the text area: the left edge, centre or right edge
+    /// of the wrapping area depending on alignment.
+    fn anchor_x(&self, model: &ParaModel) -> f32 {
+        let g = self.geom(model);
+        match model.para.alignment {
+            Alignment::Center => g.x0 + g.wrap / 2.0,
+            Alignment::Right => g.x0 + g.wrap,
+            Alignment::Left | Alignment::Justify => g.x0,
+        }
     }
 
     fn estimate(&self, idx: usize) -> f32 {
         let Some(model) = self.models.get(idx) else {
             return 0.0;
         };
-        let size = Self::font_size_pt(model, &SpanStyle::default()) * self.scale;
-        let wrap = (self.page.body_width() * self.scale).max(50.0);
+        let size_pt = Self::max_size_pt(model);
+        let size = size_pt * self.scale;
+        let wrap = self.geom(model).wrap;
         let chars_per_line = (wrap / (size * 0.5)).max(1.0);
         let lines = ((model.char_len as f32 / chars_per_line).ceil() as usize).max(1)
             + model.text.matches('\n').count();
-        lines as f32 * size * 1.3 + self.space_after(model)
+        let line = match model.para.line {
+            LineSpacing::Multiple(m) => size * 1.22 * m,
+            LineSpacing::AtLeast(pt) => (size * 1.22).max(pt * self.scale),
+            LineSpacing::Exactly(pt) => pt * self.scale,
+        };
+        self.before_px(model) + lines as f32 * line + self.after_px(model)
     }
 
-    fn build_jobs(&self, idx: usize, preedit: Option<&str>) -> (LayoutJob, Option<LayoutJob>) {
+    /// Layout job of a paragraph (and, when some text needs faked bold, a second job with only
+    /// those spans visible).
+    fn build_jobs(
+        &self,
+        ctx: &Context,
+        idx: usize,
+        preedit: Option<&str>,
+    ) -> (LayoutJob, Option<LayoutJob>) {
         let model = &self.models[idx];
-        let wrap = (self.page.body_width() * self.scale).max(50.0);
+        let geom = self.geom(model);
         let mut job = LayoutJob::default();
-        job.wrap.max_width = wrap;
+        job.wrap.max_width = geom.wrap;
+        job.halign = match model.para.alignment {
+            Alignment::Center => Align::Center,
+            Alignment::Right => Align::RIGHT,
+            Alignment::Left | Alignment::Justify => Align::LEFT,
+        };
+        job.justify = model.para.alignment == Alignment::Justify;
         let mut overlay = LayoutJob::default();
-        overlay.wrap.max_width = wrap;
-        let mut any_bold = false;
+        overlay.wrap.max_width = geom.wrap;
+        overlay.halign = job.halign;
+        overlay.justify = job.justify;
+        let mut any_fake_bold = false;
+        let mut first_section = true;
 
         // Walk the text in runs of equal style, inserting the IME preedit at the caret.
         let preedit_at = preedit.map(|_| self.caret.offset.min(model.char_len));
-        let heading_bold = !matches!(model.kind, ParaKind::Normal);
-        let mut push = |text: &str, style: SpanStyle, is_preedit: bool| {
+        let mut push = |text: &str, style: &SpanStyle, is_preedit: bool| {
             if text.is_empty() {
                 return;
             }
-            let bold = style.bold || heading_bold;
-            any_bold |= bold;
-            let size = Self::font_size_pt(model, &style) * self.scale;
+            let face = self
+                .fonts
+                .borrow_mut()
+                .resolve(&style.font, style.bold, style.italic);
+            let fake_bold = style.bold && !face.real_bold;
+            any_fake_bold |= fake_bold;
+            let size = style.size_pt() * self.scale;
+            let font_id = FontId::new(size, face.family);
             let color = style
                 .color
                 .map_or(Color32::BLACK, |[r, g, b]| Color32::from_rgb(r, g, b));
@@ -303,59 +470,78 @@ impl DocView {
             } else {
                 Stroke::NONE
             };
+            let natural = ctx.fonts_mut(|f| f.row_height(&font_id));
+            let line_height = match model.para.line {
+                LineSpacing::Multiple(m) if (m - 1.0).abs() < 0.001 => None,
+                LineSpacing::Multiple(m) => Some(natural * m),
+                LineSpacing::AtLeast(pt) => Some(natural.max(pt * self.scale)),
+                LineSpacing::Exactly(pt) => Some(pt * self.scale),
+            };
             let format = |color: Color32| TextFormat {
-                font_id: FontId::proportional(size),
+                font_id: font_id.clone(),
                 color,
-                italics: style.italic,
+                italics: style.italic && !face.real_italic,
                 underline,
                 strikethrough: strike,
+                line_height,
                 ..TextFormat::default()
             };
-            job.append(text, 0.0, format(color));
+            let leading = if std::mem::take(&mut first_section) {
+                geom.leading
+            } else {
+                0.0
+            };
+            job.append(text, leading, format(color));
             overlay.append(
                 text,
-                0.0,
-                format(if bold { color } else { Color32::TRANSPARENT }),
+                leading,
+                format(if fake_bold {
+                    color
+                } else {
+                    Color32::TRANSPARENT
+                }),
             );
         };
 
         let mut buf = String::new();
-        let mut buf_style = SpanStyle::default();
+        let mut buf_style = model.mark.clone();
         let mut span_i = 0usize;
         for (i, ch) in model.text.chars().enumerate() {
             if preedit_at == Some(i) {
-                push(&buf, buf_style, false);
+                push(&buf, &buf_style, false);
                 buf.clear();
-                push(preedit.unwrap_or_default(), buf_style, true);
+                push(preedit.unwrap_or_default(), &buf_style, true);
             }
             while span_i < model.spans.len() && model.spans[span_i].end <= i {
                 span_i += 1;
             }
             let style = match model.spans.get(span_i) {
-                Some(s) if s.start <= i => s.style,
-                _ => SpanStyle::default(),
+                Some(s) if s.start <= i => s.style.clone(),
+                _ => model.mark.clone(),
             };
             if style != buf_style {
-                push(&buf, buf_style, false);
+                push(&buf, &buf_style, false);
                 buf.clear();
                 buf_style = style;
             }
             buf.push(ch);
         }
-        push(&buf, buf_style, false);
+        push(&buf, &buf_style, false);
         if preedit_at == Some(model.char_len) {
-            push(preedit.unwrap_or_default(), buf_style, true);
+            let style = model.spans.last().map_or(&model.mark, |s| &s.style);
+            push(preedit.unwrap_or_default(), style, true);
         }
         if job.is_empty() {
             // An empty paragraph still needs a row of the right height.
-            let size = Self::font_size_pt(model, &SpanStyle::default()) * self.scale;
-            job.append(
-                "",
-                0.0,
-                TextFormat::simple(FontId::proportional(size), Color32::BLACK),
-            );
+            let style = &model.mark;
+            let face = self
+                .fonts
+                .borrow_mut()
+                .resolve(&style.font, style.bold, style.italic);
+            let font_id = FontId::new(style.size_pt() * self.scale, face.family);
+            job.append("", 0.0, TextFormat::simple(font_id, Color32::BLACK));
         }
-        (job, any_bold.then_some(overlay))
+        (job, any_fake_bold.then_some(overlay))
     }
 
     /// The cached galley of a paragraph, laying it out when needed.
@@ -369,11 +555,13 @@ impl DocView {
             c.last_used = self.frame;
             return Arc::clone(&c.galley);
         }
-        let (job, overlay) = self.build_jobs(idx, preedit.as_deref());
+        let (job, overlay) = self.build_jobs(ctx, idx, preedit.as_deref());
         let galley = ctx.fonts_mut(|f| f.layout_job(job));
         let bold_overlay = overlay.map(|j| ctx.fonts_mut(|f| f.layout_job(j)));
-        let height =
-            galley.size().y.max(self.min_row_height(idx)) + self.space_after(&self.models[idx]);
+        let model = &self.models[idx];
+        let height = self.before_px(model)
+            + galley.size().y.max(self.min_row_height(idx))
+            + self.after_px(model);
         if let (Some(h), Some(m)) = (self.heights.get_mut(idx), self.measured.get_mut(idx)) {
             if (*h - height).abs() > 0.01 {
                 self.paginate_dirty = true;
@@ -394,9 +582,9 @@ impl DocView {
     }
 
     fn min_row_height(&self, idx: usize) -> f32 {
-        self.models.get(idx).map_or(0.0, |m| {
-            Self::font_size_pt(m, &SpanStyle::default()) * self.scale * 1.2
-        })
+        self.models
+            .get(idx)
+            .map_or(0.0, |m| Self::max_size_pt(m) * self.scale * 1.15)
     }
 
     /// Measures a few unmeasured paragraphs per frame so page breaks settle without a stall.
@@ -405,10 +593,12 @@ impl DocView {
         while self.measure_cursor < self.models.len() {
             let i = self.measure_cursor;
             if !self.measured[i] {
-                let (job, _) = self.build_jobs(i, None);
+                let (job, _) = self.build_jobs(ctx, i, None);
                 let galley = ctx.fonts_mut(|f| f.layout_job(job));
-                let height =
-                    galley.size().y.max(self.min_row_height(i)) + self.space_after(&self.models[i]);
+                let model = &self.models[i];
+                let height = self.before_px(model)
+                    + galley.size().y.max(self.min_row_height(i))
+                    + self.after_px(model);
                 if (self.heights[i] - height).abs() > 0.01 {
                     self.paginate_dirty = true;
                 }
@@ -474,11 +664,15 @@ impl DocView {
         let page = self.page_of(para);
         let size = self.page_size_px();
         let x0 = canvas.min.x + ((canvas.width() - size.x) / 2.0).max(SIDE_PAD);
+        let model = self.models.get(para);
+        let anchor = model.map_or(0.0, |m| self.anchor_x(m));
+        let before = model.map_or(0.0, |m| self.before_px(m));
         Pos2::new(
-            x0 + self.page.margin_left * self.scale,
+            x0 + self.page.margin_left * self.scale + anchor,
             self.page_top(canvas.min.y, page)
                 + self.page.margin_top * self.scale
-                + self.para_y.get(para).copied().unwrap_or(0.0),
+                + self.para_y.get(para).copied().unwrap_or(0.0)
+                + before,
         )
     }
 
@@ -531,86 +725,354 @@ impl DocView {
 
     // ----- edits (all through the command layer) -----
 
-    fn run(&mut self, target: &mut Target, command: Command) -> bool {
+    /// Applies a command; on failure shows the reason and returns `None`.
+    fn run(&mut self, target: &mut Target, command: Command) -> Option<Outcome> {
         match target.apply(command) {
-            Ok(_) => true,
+            Ok(outcome) => {
+                if !outcome.notes.is_empty() {
+                    self.status = Some(format!("Removed {}", outcome.notes.join("; ")));
+                }
+                Some(outcome)
+            }
             Err(e) => {
                 self.status = Some(e.to_string());
-                false
+                None
             }
         }
     }
 
-    /// Inserts typed, pasted or committed text at the caret. The command layer has no delete
-    /// yet, so typing over a selection collapses it to its end and inserts there.
+    /// The selection clamped to the document, as (start, end).
+    fn range(&self) -> (DocPos, DocPos) {
+        let (a, b) = self.selection();
+        (self.clamp(a), self.clamp(b))
+    }
+
+    /// Replaces the selection (or inserts at the caret) with `text`. `\n` in `text` starts a
+    /// new paragraph; the caller has removed other control characters.
+    fn replace_selection(&mut self, target: &mut Target, text: &str) {
+        if self.models.is_empty() {
+            return;
+        }
+        let (s, e) = self.range();
+        let lines = text.matches('\n').count();
+        let (end_para, end_offset) = match text.rsplit_once('\n') {
+            Some((_, last)) => (s.para + lines, last.chars().count()),
+            None => (s.para, s.offset + text.chars().count()),
+        };
+        let after = DocPos::new(end_para, end_offset);
+        let ok = if s == e && lines == 0 {
+            self.run(
+                target,
+                Command::DocxInsertText {
+                    para: s.para,
+                    offset: s.offset,
+                    text: text.to_owned(),
+                },
+            )
+            .is_some()
+        } else {
+            self.run(
+                target,
+                Command::DocxReplaceRange {
+                    start: s,
+                    end: e,
+                    text: text.to_owned(),
+                },
+            )
+            .is_some()
+        };
+        if !ok {
+            return;
+        }
+        if s.para == e.para && lines == 0 {
+            self.refresh_para(target, s.para);
+        } else {
+            self.resync(target, s.para, e.para - s.para + 1, 1 + lines);
+        }
+        self.apply_pending(target, s, after);
+        self.set_caret(after);
+        self.preedit = None;
+    }
+
+    /// Gives text just typed the formatting toggled with no selection.
+    fn apply_pending(&mut self, target: &mut Target, start: DocPos, end: DocPos) {
+        let patch = std::mem::take(&mut self.pending);
+        if patch.is_empty() || start == end {
+            return;
+        }
+        if self
+            .run(target, Command::DocxSetRunProps { start, end, patch })
+            .is_some()
+        {
+            for p in start.para..=end.para {
+                self.refresh_para(target, p);
+            }
+        }
+    }
+
+    /// Inserts typed or committed text at the caret (or over the selection). Line breaks
+    /// become spaces; use [`DocView::paste_text`] for multi-line text.
     pub fn insert_text(&mut self, target: &mut Target, text: &str) {
         let clean: String = text
             .chars()
             .map(|c| if matches!(c, '\n' | '\r') { ' ' } else { c })
             .filter(|c| !c.is_control() || *c == '\t')
             .collect();
-        if clean.is_empty() || self.models.is_empty() {
-            return;
-        }
-        let at = if self.has_selection() {
-            self.selection().1
-        } else {
-            self.caret
-        };
-        let at = self.clamp(at);
-        let added = clean.chars().count();
-        let ok = self.run(
-            target,
-            Command::DocxInsertText {
-                para: at.para,
-                offset: at.offset,
-                text: clean,
-            },
-        );
-        if ok {
-            self.refresh_para(target, at.para);
-            let pos = DocPos {
-                para: at.para,
-                offset: at.offset + added,
-            };
-            self.set_caret(pos);
+        if !clean.is_empty() {
+            self.replace_selection(target, &clean);
         }
     }
 
-    /// Toggles bold over the selection: bold unless all of it is already bold.
-    pub fn toggle_bold(&mut self, target: &mut Target) {
+    /// Pastes plain text: line breaks start new paragraphs.
+    pub fn paste_text(&mut self, target: &mut Target, text: &str) {
+        let normalised = text.replace("\r\n", "\n").replace('\r', "\n");
+        let clean: String = normalised
+            .chars()
+            .filter(|c| !c.is_control() || matches!(c, '\t' | '\n'))
+            .collect();
+        if !clean.is_empty() {
+            self.replace_selection(target, &clean);
+        }
+    }
+
+    /// Deletes the selection; true when something was deleted.
+    pub fn delete_selection(&mut self, target: &mut Target) -> bool {
         if !self.has_selection() {
-            self.status = Some("Select text to make it bold".to_owned());
+            return false;
+        }
+        let (s, e) = self.range();
+        if self
+            .run(target, Command::DocxDeleteRange { start: s, end: e })
+            .is_none()
+        {
+            return false;
+        }
+        if s.para == e.para {
+            self.refresh_para(target, s.para);
+        } else {
+            self.resync(target, s.para, e.para - s.para + 1, 1);
+        }
+        self.set_caret(s);
+        true
+    }
+
+    /// Backspace (`word`: Ctrl+Backspace). Joins with the previous paragraph at its start.
+    pub fn backspace(&mut self, target: &mut Target, word: bool, ctx: &Context) {
+        let _ = ctx;
+        if self.delete_selection(target) || self.models.is_empty() {
             return;
         }
-        let (a, b) = self.selection();
-        let range_of = |p: usize, models: &[ParaModel]| {
-            let len = models[p].char_len;
+        let caret = self.caret;
+        let start = if caret.offset > 0 {
+            DocPos::new(
+                caret.para,
+                if word {
+                    self.word_left(caret).offset
+                } else {
+                    caret.offset - 1
+                },
+            )
+        } else if caret.para > 0 {
+            DocPos::new(caret.para - 1, self.models[caret.para - 1].char_len)
+        } else {
+            return;
+        };
+        self.delete_between(target, start, caret);
+    }
+
+    /// Delete key (`word`: Ctrl+Delete). Joins with the next paragraph at the end.
+    pub fn delete_forward(&mut self, target: &mut Target, word: bool) {
+        if self.delete_selection(target) || self.models.is_empty() {
+            return;
+        }
+        let caret = self.caret;
+        let len = self.models[caret.para].char_len;
+        let end = if caret.offset < len {
+            DocPos::new(
+                caret.para,
+                if word {
+                    self.word_right(caret).offset.max(caret.offset + 1)
+                } else {
+                    caret.offset + 1
+                },
+            )
+        } else if caret.para + 1 < self.models.len() {
+            DocPos::new(caret.para + 1, 0)
+        } else {
+            return;
+        };
+        self.delete_between(target, caret, end);
+    }
+
+    fn delete_between(&mut self, target: &mut Target, start: DocPos, end: DocPos) {
+        if self
+            .run(target, Command::DocxDeleteRange { start, end })
+            .is_none()
+        {
+            return;
+        }
+        if start.para == end.para {
+            self.refresh_para(target, start.para);
+        } else {
+            self.resync(target, start.para, end.para - start.para + 1, 1);
+        }
+        self.set_caret(start);
+    }
+
+    /// Enter: splits the paragraph at the caret (replacing the selection). With `soft`
+    /// (Shift+Enter) inserts a line break instead.
+    pub fn enter(&mut self, target: &mut Target, soft: bool) {
+        if self.models.is_empty() {
+            return;
+        }
+        if soft {
+            self.delete_selection(target);
+            let at = self.caret;
+            if self
+                .run(
+                    target,
+                    Command::DocxInsertText {
+                        para: at.para,
+                        offset: at.offset,
+                        text: "\n".to_owned(),
+                    },
+                )
+                .is_some()
+            {
+                self.refresh_para(target, at.para);
+                self.set_caret(DocPos::new(at.para, at.offset + 1));
+            }
+            return;
+        }
+        if self.has_selection() {
+            self.replace_selection(target, "\n");
+            return;
+        }
+        let at = self.clamp(self.caret);
+        if self
+            .run(target, Command::DocxSplitParagraph { pos: at })
+            .is_some()
+        {
+            self.resync(target, at.para, 1, 2);
+            self.set_caret(DocPos::new(at.para + 1, 0));
+            self.pending = RunPropsPatch::default();
+        }
+    }
+
+    /// Cuts the selection to the clipboard.
+    pub fn cut(&mut self, target: &mut Target, ctx: &Context) {
+        if self.has_selection() {
+            ctx.copy_text(self.selected_text());
+            self.delete_selection(target);
+        }
+    }
+
+    /// Flips bold, italic or underline: over the selection when there is one (on unless the
+    /// whole selection already has it), otherwise for the text typed next.
+    pub fn toggle(&mut self, target: &mut Target, which: Toggle) {
+        if self.models.is_empty() {
+            return;
+        }
+        if !self.has_selection() {
+            let current = self.models[self.caret.para].style_at(self.caret.offset);
+            let on = match which {
+                Toggle::Bold => self.pending.bold.unwrap_or(current.bold),
+                Toggle::Italic => self.pending.italic.unwrap_or(current.italic),
+                Toggle::Underline => self.pending.underline.unwrap_or(current.underline),
+            };
+            let flipped = which.patch(!on);
+            match which {
+                Toggle::Bold => self.pending.bold = flipped.bold,
+                Toggle::Italic => self.pending.italic = flipped.italic,
+                Toggle::Underline => self.pending.underline = flipped.underline,
+            }
+            return;
+        }
+        let (a, b) = self.range();
+        let all = (a.para..=b.para).all(|p| {
+            let len = self.models[p].char_len;
             let start = if p == a.para { a.offset } else { 0 };
             let end = if p == b.para { b.offset } else { len };
-            (start, end.max(start))
-        };
-        let all_bold = (a.para..=b.para).all(|p| {
-            let (s, e) = range_of(p, &self.models);
-            s == e || self.models[p].is_bold(s, e)
+            start >= end || self.models[p].all(start, end, |s| which.test(s))
         });
-        let bold = !all_bold;
-        for p in a.para..=b.para {
-            let (start, end) = range_of(p, &self.models);
-            if start == end {
-                continue;
-            }
-            if self.run(
-                target,
-                Command::DocxSetBold {
-                    para: p,
-                    start,
-                    end,
-                    bold,
-                },
-            ) {
+        let command = Command::DocxSetRunProps {
+            start: a,
+            end: b,
+            patch: which.patch(!all),
+        };
+        if self.run(target, command).is_some() {
+            for p in a.para..=b.para {
                 self.refresh_para(target, p);
             }
+        }
+    }
+
+    pub fn toggle_bold(&mut self, target: &mut Target) {
+        self.toggle(target, Toggle::Bold);
+    }
+
+    /// Style id of the paragraph holding the caret (`None` is the default style).
+    pub fn caret_style_id(&self) -> Option<&str> {
+        self.models
+            .get(self.caret.para)
+            .and_then(|m| m.style_id.as_deref())
+    }
+
+    /// Alignment of the paragraph holding the caret.
+    pub fn caret_alignment(&self) -> Alignment {
+        self.models
+            .get(self.caret.para)
+            .map_or(Alignment::Left, |m| m.para.alignment)
+    }
+
+    /// Character formatting at the caret, including a toggle waiting to be typed.
+    pub fn caret_format(&self) -> SpanStyle {
+        let mut style = self
+            .models
+            .get(self.caret.para)
+            .map_or_else(SpanStyle::default, |m| {
+                m.style_at(self.caret.offset).clone()
+            });
+        if let Some(v) = self.pending.bold {
+            style.bold = v;
+        }
+        if let Some(v) = self.pending.italic {
+            style.italic = v;
+        }
+        if let Some(v) = self.pending.underline {
+            style.underline = v;
+        }
+        style
+    }
+
+    /// Paragraphs touched by the selection (or just the caret's).
+    fn selected_paragraphs(&self) -> std::ops::RangeInclusive<usize> {
+        let (a, b) = self.range();
+        a.para..=b.para
+    }
+
+    /// Applies a paragraph style to the selected paragraphs.
+    pub fn set_style(&mut self, target: &mut Target, style_id: &str) {
+        for p in self.selected_paragraphs() {
+            let command = Command::DocxSetParagraphStyle {
+                para: p,
+                style_id: style_id.to_owned(),
+            };
+            if self.run(target, command).is_none() {
+                return;
+            }
+            self.refresh_para(target, p);
+        }
+    }
+
+    /// Aligns the selected paragraphs.
+    pub fn set_alignment(&mut self, target: &mut Target, alignment: Alignment) {
+        for p in self.selected_paragraphs() {
+            let command = Command::DocxSetAlignment { para: p, alignment };
+            if self.run(target, command).is_none() {
+                return;
+            }
+            self.refresh_para(target, p);
         }
     }
 
@@ -711,6 +1173,7 @@ impl DocView {
         }
         self.goal_x = if keep_goal { goal } else { None };
         self.scroll_to_caret = true;
+        self.pending = RunPropsPatch::default();
     }
 
     fn word_left(&self, mut pos: DocPos) -> DocPos {
@@ -829,8 +1292,19 @@ impl DocView {
         let started = Instant::now();
         self.frame += 1;
         let ctx = ui.ctx().clone();
+        self.fonts.borrow_mut().sync(&ctx);
         if self.model_revision != Some(target.revision()) {
             self.rebuild_all(target);
+        }
+        let fonts_gen = self.fonts.borrow().generation();
+        if fonts_gen != self.fonts_gen {
+            // New families became usable: every layout made so far used stand-in fonts.
+            self.fonts_gen = fonts_gen;
+            self.cache.clear();
+            self.heights = (0..self.models.len()).map(|i| self.estimate(i)).collect();
+            self.measured = vec![false; self.models.len()];
+            self.measure_cursor = 0;
+            self.paginate_dirty = true;
         }
         let avail = ui.available_size_before_wrap();
         let fit = ((avail.x - 2.0 * SIDE_PAD) / self.page.width).clamp(0.3, POINT_SCALE);
@@ -852,7 +1326,7 @@ impl DocView {
 
         let page_px = self.page_size_px();
         let total_h = PAGE_GAP + self.pages.len() as f32 * (page_px.y + PAGE_GAP);
-        let mut want_more = more;
+        let mut want_more = more || !self.fonts.borrow().is_ready();
 
         egui::ScrollArea::vertical()
             .auto_shrink([false, false])
@@ -884,6 +1358,10 @@ impl DocView {
                         self.handle_keys(&ctx, target);
                     }
                     self.handle_access_requests(&ctx, target);
+                }
+                // Edits above may have changed the paragraph list within this frame.
+                if self.paginate_dirty {
+                    self.paginate();
                 }
 
                 // Visible pages.
@@ -1051,16 +1529,12 @@ impl DocView {
                 Event::Text(t) => typed.push_str(&t),
                 Event::Paste(t) => {
                     self.flush_typed(target, &mut typed);
-                    self.insert_text(target, &t);
+                    self.paste_text(target, &t);
                 }
-                Event::Copy | Event::Cut => {
-                    if self.has_selection() {
-                        let text = self.selected_text();
-                        ctx.copy_text(text);
-                    }
-                    if matches!(event, Event::Cut) {
-                        self.status = Some("Cut is not available yet (no delete command)".into());
-                    }
+                Event::Copy if self.has_selection() => ctx.copy_text(self.selected_text()),
+                Event::Cut => {
+                    self.flush_typed(target, &mut typed);
+                    self.cut(target, ctx);
                 }
                 Event::Ime(ime) => match ime {
                     egui::ImeEvent::Preedit { text, .. } => {
@@ -1100,12 +1574,13 @@ impl DocView {
                                 self.select(DocPos::default(), end);
                             }
                         }
-                        Key::Backspace | Key::Delete | Key::Enter if self.preedit.is_none() => {
-                            self.status = Some(
-                                "Deleting and splitting paragraphs need a docx delete API (not yet available)"
-                                    .into(),
-                            );
+                        Key::Backspace if self.preedit.is_none() => {
+                            self.backspace(target, modifiers.command, ctx);
                         }
+                        Key::Delete if self.preedit.is_none() => {
+                            self.delete_forward(target, modifiers.command);
+                        }
+                        Key::Enter if self.preedit.is_none() => self.enter(target, modifiers.shift),
                         _ => {}
                     }
                 }
@@ -1176,7 +1651,8 @@ impl DocView {
         let doc_id = self.doc_id;
         // Always expose the paragraphs holding the caret and selection ends so the text
         // selection resolves to published runs even when they are off screen.
-        let mut paras: Vec<usize> = self.placed.clone();
+        let count = self.models.len();
+        let mut paras: Vec<usize> = self.placed.iter().copied().filter(|p| *p < count).collect();
         for p in [self.caret.para, self.anchor.para] {
             if !paras.contains(&p) && p < self.models.len() {
                 paras.push(p);

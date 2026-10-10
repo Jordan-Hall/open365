@@ -1,5 +1,6 @@
 use std::path::{Path, PathBuf};
 
+use open365_docx::{Alignment, DocPos, RunPropsPatch};
 use serde::{Deserialize, Serialize};
 
 use crate::CommandError;
@@ -13,7 +14,8 @@ pub enum EffectClass {
     Read,
     /// Changes the open document in memory, or overwrites the file it was opened from.
     Edit,
-    /// Removes content or files that cannot be recovered from undo.
+    /// Removes existing content. Undo restores it within the session, but a permission layer
+    /// should still treat it as the riskiest in-document class.
     Destructive,
     /// Sends data off this machine.
     Egress,
@@ -69,6 +71,37 @@ pub enum Command {
         end: usize,
         bold: bool,
     },
+    /// Deletes the characters between two positions, merging paragraphs across the range.
+    DocxDeleteRange {
+        start: DocPos,
+        end: DocPos,
+    },
+    /// Enter: splits the paragraph at `pos`.
+    DocxSplitParagraph {
+        pos: DocPos,
+    },
+    /// Applies run-property changes over a character range (may span paragraphs).
+    DocxSetRunProps {
+        start: DocPos,
+        end: DocPos,
+        patch: RunPropsPatch,
+    },
+    /// `style_id` is a `w:styleId`; the default style removes `w:pStyle`.
+    DocxSetParagraphStyle {
+        para: usize,
+        style_id: String,
+    },
+    DocxSetAlignment {
+        para: usize,
+        alignment: Alignment,
+    },
+    /// Typing over a selection or pasting: deletes the range, then inserts `text` there.
+    /// `\n` in `text` starts a new paragraph.
+    DocxReplaceRange {
+        start: DocPos,
+        end: DocPos,
+        text: String,
+    },
     XlsxSetCellValue {
         sheet: usize,
         row: u32,
@@ -113,19 +146,31 @@ impl Command {
         match self {
             Self::DocxInsertText { .. } => "docx_insert_text",
             Self::DocxSetBold { .. } => "docx_set_bold",
+            Self::DocxDeleteRange { .. } => "docx_delete_range",
+            Self::DocxSplitParagraph { .. } => "docx_split_paragraph",
+            Self::DocxSetRunProps { .. } => "docx_set_run_props",
+            Self::DocxSetParagraphStyle { .. } => "docx_set_paragraph_style",
+            Self::DocxSetAlignment { .. } => "docx_set_alignment",
+            Self::DocxReplaceRange { .. } => "docx_replace_range",
             Self::XlsxSetCellValue { .. } => "xlsx_set_cell_value",
             Self::XlsxSetCellFormula { .. } => "xlsx_set_cell_formula",
             Self::Save { .. } => "save",
         }
     }
 
-    /// The effect class. Edits are `Edit`. `Save` is `Export` when it writes a path other
+    /// The effect class. Formatting and insertion are `Edit`; deleting or replacing a
+    /// non-empty range is `Destructive`. `Save` is `Export` when it writes a path other
     /// than `current_path` (the file the document was opened from or last saved to, or
     /// none for an unsaved document), and `Edit` when it overwrites that file.
     pub fn effect(&self, current_path: Option<&Path>) -> EffectClass {
         match self {
             Self::Save { path } if current_path == Some(path.as_path()) => EffectClass::Edit,
             Self::Save { .. } => EffectClass::Export,
+            Self::DocxDeleteRange { start, end } | Self::DocxReplaceRange { start, end, .. }
+                if start != end =>
+            {
+                EffectClass::Destructive
+            }
             _ => EffectClass::Edit,
         }
     }
@@ -148,6 +193,9 @@ pub struct Outcome {
     /// Set by `Save`: where the file was written.
     pub saved_to: Option<PathBuf>,
     pub bytes_written: usize,
+    /// Content the edit removed besides plain text (drawings, fields, section breaks).
+    #[serde(default)]
+    pub notes: Vec<String>,
 }
 
 /// The audit log of applied commands, in order. Replaying it on a fresh target reproduces

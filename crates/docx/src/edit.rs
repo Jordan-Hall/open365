@@ -5,6 +5,7 @@ use std::ops::Range;
 
 use crate::DocxError;
 use crate::model::{Break, BreakKind, Inline, Paragraph, Run, RunContent};
+use crate::props::{RunProps, RunPropsPatch};
 
 /// What a string to insert turns into.
 enum Piece {
@@ -161,7 +162,7 @@ impl Run {
 
     /// Splits this run at character offset `local` (0 < `local` < `char_len`) and returns
     /// the right half, which has the same element name, attributes and properties.
-    fn split_at(&mut self, local: usize) -> Run {
+    pub(crate) fn split_at(&mut self, local: usize) -> Run {
         let mut acc = 0;
         let mut after_last = 0;
         let mut split_index = self.content.len();
@@ -206,7 +207,7 @@ impl Run {
 
 /// Finds the run covering `offset`; pushes the index path to it. Returns the offset
 /// within that run.
-fn locate(
+pub(crate) fn locate(
     content: &[Inline],
     offset: usize,
     acc: &mut usize,
@@ -270,7 +271,12 @@ fn split_runs_at(content: &mut Vec<Inline>, offset: usize, acc: &mut usize) -> b
     false
 }
 
-fn apply_bold(content: &mut [Inline], range: &Range<usize>, value: bool, acc: &mut usize) {
+fn apply_patch(
+    content: &mut [Inline],
+    range: &Range<usize>,
+    patch: &RunPropsPatch,
+    acc: &mut usize,
+) {
     for inline in content {
         match inline {
             Inline::Run(run) => {
@@ -282,11 +288,12 @@ fn apply_bold(content: &mut [Inline], range: &Range<usize>, value: bool, acc: &m
                     start > range.start && start < range.end
                 };
                 if inside {
-                    run.set_bold(Some(value));
+                    let owner = run.head.clone();
+                    run.props.apply(patch, &owner);
                 }
                 *acc = end;
             }
-            Inline::Group(group) => apply_bold(&mut group.content, range, value, acc),
+            Inline::Group(group) => apply_patch(&mut group.content, range, patch, acc),
             Inline::Raw(_) => {}
         }
     }
@@ -311,6 +318,7 @@ impl Paragraph {
         }
         if len == 0 {
             let mut run = self.new_run();
+            run.props = self.mark_run_props();
             run.content = run.items_for(pieces);
             self.content.push(Inline::Run(run));
             return Ok(());
@@ -333,8 +341,12 @@ impl Paragraph {
         Ok(())
     }
 
-    /// Sets bold on the characters in `range`, splitting runs at the boundaries.
-    pub(crate) fn set_bold(&mut self, range: Range<usize>, value: bool) -> Result<(), DocxError> {
+    /// Applies `patch` to the characters in `range`, splitting runs at the boundaries.
+    pub(crate) fn apply_run_props(
+        &mut self,
+        range: Range<usize>,
+        patch: &RunPropsPatch,
+    ) -> Result<(), DocxError> {
         let len = self.char_len();
         if range.start > range.end || range.end > len {
             return Err(DocxError::RangeOutOfBounds {
@@ -351,7 +363,55 @@ impl Paragraph {
             split_runs_at(&mut self.content, boundary, &mut acc);
         }
         let mut acc = 0;
-        apply_bold(&mut self.content, &range, value, &mut acc);
+        apply_patch(&mut self.content, &range, patch, &mut acc);
         Ok(())
+    }
+
+    /// Run properties in effect at the caret `offset`: those of the run holding the
+    /// character before it (the first character at offset 0). Empty paragraphs give the
+    /// paragraph-mark properties.
+    pub(crate) fn run_props_at(&self, offset: usize) -> RunProps {
+        if self.char_len() == 0 {
+            return self.mark_run_props();
+        }
+        let mut path = Vec::new();
+        let mut acc = 0;
+        if locate(&self.content, offset, &mut acc, &mut path).is_some() {
+            let mut content = &self.content;
+            for (n, i) in path.iter().enumerate() {
+                match content.get(*i) {
+                    Some(Inline::Run(run)) if n + 1 == path.len() => {
+                        return run.props.without_tracking();
+                    }
+                    Some(Inline::Group(g)) => content = &g.content,
+                    _ => break,
+                }
+            }
+        }
+        RunProps::default()
+    }
+
+    /// Paragraph-mark run properties (`w:pPr/w:rPr`), which new text in an empty paragraph
+    /// takes.
+    pub fn mark_run_props(&self) -> RunProps {
+        self.props
+            .as_ref()
+            .and_then(|p| crate::ppr::child(p, "rPr"))
+            .map(|e| RunProps::from_element(e.clone()).without_tracking())
+            .unwrap_or_default()
+    }
+
+    /// Stores `props` as the paragraph-mark properties (removes them when absent/empty).
+    pub(crate) fn set_mark_run_props(&mut self, props: &RunProps) {
+        match props.to_element() {
+            Some(element) if !element.children.is_empty() => {
+                crate::ppr::upsert_child(self.props_mut(), "rPr", |e| *e = element);
+            }
+            _ => {
+                if let Some(p) = &mut self.props {
+                    crate::ppr::remove_child(p, "rPr");
+                }
+            }
+        }
     }
 }

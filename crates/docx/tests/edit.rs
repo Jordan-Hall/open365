@@ -324,7 +324,12 @@ fn run_props_expose_typed_values_and_extras() {
     assert_eq!(p.underline(), Some("double"));
     assert_eq!(p.vert_align(), Some("superscript"));
     assert!(p.fonts().is_some());
-    assert_eq!(p.extras().count(), 1, "only rStyle is untyped");
+    assert_eq!(p.style_id(), Some("Emph"));
+    assert_eq!(
+        p.extras().count(),
+        0,
+        "every child here has a typed accessor"
+    );
 }
 
 #[test]

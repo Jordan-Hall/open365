@@ -7,6 +7,10 @@ use open365_opc::{
 
 use crate::DocxError;
 use crate::model::{Body, DocumentRoot, Paragraph};
+use crate::ppr::Alignment;
+use crate::props::RunPropsPatch;
+use crate::ranges::{DocPos, EditLogEntry};
+use crate::styles::Styles;
 use crate::xml::{self, RawXml};
 
 const OFFICE_DOCUMENT_TYPES: [&str; 2] = [
@@ -55,6 +59,8 @@ pub struct Document {
     hygiene_done: bool,
     dropped: Vec<DroppedItem>,
     hygiene: Vec<HygieneAction>,
+    styles: Option<Styles>,
+    pub(crate) edit_log: Vec<EditLogEntry>,
 }
 
 impl Document {
@@ -80,6 +86,7 @@ impl Document {
         let main_part = part.name().clone();
         let parsed = xml::parse(part.data())?;
         let root = DocumentRoot::from_xml(parsed.root).map_err(DocxError::NotWordprocessing)?;
+        let styles = load_styles(&package, &main_part);
         Ok(Self {
             package,
             main_part,
@@ -90,7 +97,14 @@ impl Document {
             hygiene_done: false,
             dropped: Vec::new(),
             hygiene: Vec::new(),
+            styles,
+            edit_log: Vec::new(),
         })
+    }
+
+    /// The document's styles, when it has a (valid) styles part.
+    pub fn styles(&self) -> Option<&Styles> {
+        self.styles.as_ref()
     }
 
     /// Name of the main document part.
@@ -111,7 +125,7 @@ impl Document {
         }
     }
 
-    fn body_mut(&mut self) -> &mut Body {
+    pub(crate) fn body_mut(&mut self) -> &mut Body {
         match self.root.body_mut() {
             Some(body) => body,
             None => unreachable!("DocumentRoot::from_xml requires a w:body"),
@@ -180,11 +194,61 @@ impl Document {
     ) -> Result<(), DocxError> {
         self.check_paragraph(para_idx)?;
         let empty = char_range.start == char_range.end;
-        self.paragraph_mut(para_idx)?.set_bold(char_range, bold)?;
+        self.paragraph_mut(para_idx)?
+            .apply_run_props(char_range, &RunPropsPatch::bold(bold))?;
         if !empty {
             self.edited();
         }
         Ok(())
+    }
+
+    /// Sets the paragraph style. The default style (usually `Normal`) removes `w:pStyle`.
+    /// `Heading1`-`Heading3` and `Title` are added to the styles part when missing; any
+    /// other id must already be defined.
+    pub fn set_paragraph_style(&mut self, para: usize, style_id: &str) -> Result<(), DocxError> {
+        self.check_paragraph(para)?;
+        let mut new_id = Some(style_id);
+        if let Some(styles) = &mut self.styles {
+            if !styles.ensure_builtin(style_id) {
+                return Err(DocxError::UnknownStyle(style_id.to_owned()));
+            }
+            if styles.default_paragraph_style() == Some(style_id) {
+                new_id = None;
+            }
+        } else if style_id.is_empty() {
+            new_id = None;
+        }
+        let paragraph = self.paragraph_mut(para)?;
+        if paragraph.style_id() == new_id {
+            return Ok(());
+        }
+        paragraph.set_style_id(new_id);
+        self.edited();
+        Ok(())
+    }
+
+    /// Sets the paragraph alignment (`w:jc`).
+    pub fn set_alignment(&mut self, para: usize, alignment: Alignment) -> Result<(), DocxError> {
+        self.check_paragraph(para)?;
+        let paragraph = self.paragraph_mut(para)?;
+        if paragraph.direct_alignment() == Some(alignment) {
+            return Ok(());
+        }
+        paragraph.set_alignment(alignment);
+        self.edited();
+        Ok(())
+    }
+
+    /// Run formatting in effect at the caret `pos`, with styles resolved.
+    pub fn char_format_at(&self, pos: DocPos) -> Option<crate::styles::EffectiveRun> {
+        let paragraph = self.paragraph(pos.para)?;
+        let styles = self.styles.as_ref()?;
+        let probe = crate::model::Run {
+            head: paragraph.new_run().head,
+            props: paragraph.run_props_at(pos.offset),
+            content: Vec::new(),
+        };
+        Some(styles.effective_run_props(paragraph, &probe))
     }
 
     fn check_paragraph(&self, index: usize) -> Result<(), DocxError> {
@@ -196,7 +260,7 @@ impl Document {
         }
     }
 
-    fn paragraph_mut(&mut self, index: usize) -> Result<&mut Paragraph, DocxError> {
+    pub(crate) fn paragraph_mut(&mut self, index: usize) -> Result<&mut Paragraph, DocxError> {
         let count = self.paragraph_count();
         self.body_mut()
             .paragraph_mut(index)
@@ -204,7 +268,7 @@ impl Document {
     }
 
     /// Records a content change; the first one also drops stale parts.
-    fn edited(&mut self) {
+    pub(crate) fn edited(&mut self) {
         self.dirty = true;
         if !self.hygiene_done {
             self.hygiene_done = true;
@@ -232,6 +296,13 @@ impl Document {
             let bytes = self.serialize_main();
             self.package.set_part(self.main_part.clone(), bytes);
             self.dirty = false;
+        }
+        if let Some(styles) = &mut self.styles
+            && styles.is_dirty()
+        {
+            self.package
+                .set_part(styles.part_name().clone(), styles.serialize());
+            styles.mark_clean();
         }
         Ok(self.package.write()?)
     }
@@ -311,4 +382,28 @@ fn invalidate_stale_parts(package: &mut Package, log: &mut Vec<HygieneAction>) {
         _ => true,
     });
     package.set_part(rels_name, parsed.to_bytes());
+}
+
+const STYLES_TYPES: [&str; 1] =
+    ["http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles"];
+const THEME_TYPES: [&str; 1] =
+    ["http://schemas.openxmlformats.org/officeDocument/2006/relationships/theme"];
+
+/// Finds and parses the styles and theme parts through the main part's relationships.
+/// A missing or unreadable styles part gives `None`: editing still works without styles.
+fn load_styles(package: &Package, main: &PartName) -> Option<Styles> {
+    let rels =
+        Relationships::parse(package.part(rels_part_name(Some(main)).as_str())?.data()).ok()?;
+    let find = |types: &[&str]| -> Option<PartName> {
+        let rel = rels.iter().find(|r| {
+            r.target_mode == TargetMode::Internal && types.contains(&r.rel_type.as_str())
+        })?;
+        resolve_target(Some(main), &rel.target).ok()
+    };
+    let styles_name = find(&STYLES_TYPES)?;
+    let styles_part = package.part(styles_name.as_str())?;
+    let theme = find(&THEME_TYPES)
+        .and_then(|n| package.part(n.as_str()))
+        .map(open365_opc::Part::data);
+    Styles::parse(styles_name, styles_part.data(), theme).ok()
 }

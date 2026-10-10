@@ -29,6 +29,12 @@ pub enum DocxError {
     },
     #[error("text contains {0:?}, which XML 1.0 cannot represent")]
     InvalidText(char),
+    #[error("cannot edit this range: {0}")]
+    UnsupportedRange(String),
+    #[error("the deletion would cut a field in two; select the whole field or only its result")]
+    FieldCut,
+    #[error("style {0:?} is not defined in the document")]
+    UnknownStyle(String),
     #[error("{0} item(s) in the dropped-content log; refusing to save silently")]
     DroppedContent(usize),
 }

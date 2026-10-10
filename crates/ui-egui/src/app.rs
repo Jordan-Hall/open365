@@ -3,12 +3,15 @@
 //! The application owns the open [`Target`]. Views read it and send edits as commands; nothing
 //! here mutates a document directly.
 
+use std::cell::RefCell;
 use std::path::{Path, PathBuf};
+use std::rc::Rc;
 
-use egui::{Context, Key, KeyboardShortcut, Modifiers, Ui, ViewportCommand};
-use open365_commands::{Command, Target};
+use egui::{Context, Key, KeyboardShortcut, Modifiers, RichText, Ui, ViewportCommand};
+use open365_commands::{Alignment, Command, Target};
 
-use crate::doc_view::DocView;
+use crate::doc_view::{DocView, Toggle};
+use crate::fonts::FontBook;
 use crate::grid_view::GridView;
 
 const OPEN: KeyboardShortcut = KeyboardShortcut::new(Modifiers::COMMAND, Key::O);
@@ -20,6 +23,30 @@ const REDO: KeyboardShortcut = KeyboardShortcut::new(Modifiers::COMMAND, Key::Y)
 const REDO_ALT: KeyboardShortcut =
     KeyboardShortcut::new(Modifiers::COMMAND.plus(Modifiers::SHIFT), Key::Z);
 const BOLD: KeyboardShortcut = KeyboardShortcut::new(Modifiers::COMMAND, Key::B);
+const ITALIC: KeyboardShortcut = KeyboardShortcut::new(Modifiers::COMMAND, Key::I);
+const UNDERLINE: KeyboardShortcut = KeyboardShortcut::new(Modifiers::COMMAND, Key::U);
+const ALIGN_LEFT: KeyboardShortcut = KeyboardShortcut::new(Modifiers::COMMAND, Key::L);
+const ALIGN_CENTER: KeyboardShortcut = KeyboardShortcut::new(Modifiers::COMMAND, Key::E);
+const ALIGN_RIGHT: KeyboardShortcut = KeyboardShortcut::new(Modifiers::COMMAND, Key::R);
+const ALIGN_JUSTIFY: KeyboardShortcut = KeyboardShortcut::new(Modifiers::COMMAND, Key::J);
+
+/// Paragraph styles offered in the toolbar: (style id, label). The empty id is the default
+/// style.
+const STYLES: [(&str, &str); 5] = [
+    ("Normal", "Normal"),
+    ("Heading1", "Heading 1"),
+    ("Heading2", "Heading 2"),
+    ("Heading3", "Heading 3"),
+    ("Title", "Title"),
+];
+
+/// A change requested from the toolbar, applied after the widgets are drawn.
+#[derive(Debug, Clone, Copy)]
+enum FormatAction {
+    Style(&'static str),
+    Toggle(Toggle),
+    Align(Alignment),
+}
 
 /// The Open365 desktop application.
 #[derive(Debug)]
@@ -29,16 +56,19 @@ pub struct App {
     pub grid: GridView,
     status: String,
     title: String,
+    fonts: Rc<RefCell<FontBook>>,
 }
 
 impl App {
     pub fn new(initial: Option<PathBuf>) -> Self {
+        let fonts = Rc::new(RefCell::new(FontBook::new()));
         let mut app = Self {
             target: None,
-            doc: DocView::new(),
+            doc: DocView::with_fonts(Rc::clone(&fonts)),
             grid: GridView::new(),
             status: "Open a .docx or .xlsx file (Ctrl+O)".to_owned(),
             title: String::new(),
+            fonts,
         };
         if let Some(path) = initial {
             app.open_path(&path);
@@ -60,7 +90,7 @@ impl App {
             Ok(target) => {
                 self.status = format!("Opened {}", path.display());
                 self.target = Some(target);
-                self.doc = DocView::new();
+                self.doc = DocView::with_fonts(Rc::clone(&self.fonts));
                 self.grid = GridView::new();
             }
             Err(e) => self.status = format!("Could not open {}: {e}", path.display()),
@@ -139,13 +169,39 @@ impl App {
     }
 
     pub fn toggle_bold(&mut self) {
+        self.toggle(Toggle::Bold);
+    }
+
+    /// Flips bold, italic or underline in a Word document.
+    pub fn toggle(&mut self, which: Toggle) {
         let Some(target) = &mut self.target else {
             return;
         };
         if target.docx().is_some() {
-            self.doc.toggle_bold(target);
+            self.doc.toggle(target, which);
+            self.doc.focus();
         } else {
-            self.status = "Bold applies to Word documents".to_owned();
+            self.status = "Character formatting applies to Word documents".to_owned();
+        }
+    }
+
+    /// Sets the alignment of the selected paragraphs of a Word document.
+    pub fn set_alignment(&mut self, alignment: Alignment) {
+        if let Some(target) = &mut self.target
+            && target.docx().is_some()
+        {
+            self.doc.set_alignment(target, alignment);
+            self.doc.focus();
+        }
+    }
+
+    /// Applies a paragraph style by id (`Normal`, `Heading1`...).
+    pub fn set_style(&mut self, style_id: &str) {
+        if let Some(target) = &mut self.target
+            && target.docx().is_some()
+        {
+            self.doc.set_style(target, style_id);
+            self.doc.focus();
         }
     }
 
@@ -181,6 +237,22 @@ impl App {
         }
         if take(&BOLD) {
             self.toggle_bold();
+        }
+        if take(&ITALIC) {
+            self.toggle(Toggle::Italic);
+        }
+        if take(&UNDERLINE) {
+            self.toggle(Toggle::Underline);
+        }
+        for (shortcut, alignment) in [
+            (&ALIGN_LEFT, Alignment::Left),
+            (&ALIGN_CENTER, Alignment::Center),
+            (&ALIGN_RIGHT, Alignment::Right),
+            (&ALIGN_JUSTIFY, Alignment::Justify),
+        ] {
+            if take(shortcut) {
+                self.set_alignment(alignment);
+            }
         }
     }
 
@@ -257,16 +329,126 @@ impl App {
                     ui.close();
                     self.toggle_bold();
                 }
+                if ui
+                    .add_enabled(
+                        is_docx,
+                        egui::Button::new("Italic")
+                            .shortcut_text(ui.ctx().format_shortcut(&ITALIC)),
+                    )
+                    .clicked()
+                {
+                    ui.close();
+                    self.toggle(Toggle::Italic);
+                }
+                if ui
+                    .add_enabled(
+                        is_docx,
+                        egui::Button::new("Underline")
+                            .shortcut_text(ui.ctx().format_shortcut(&UNDERLINE)),
+                    )
+                    .clicked()
+                {
+                    ui.close();
+                    self.toggle(Toggle::Underline);
+                }
             });
         });
+    }
+
+    /// Style, character and alignment controls for a Word document.
+    fn format_bar(&mut self, ui: &mut Ui) {
+        let style = self.doc.caret_format();
+        let align = self.doc.caret_alignment();
+        let current = self.doc.caret_style_id().unwrap_or("Normal").to_owned();
+        let label = STYLES
+            .iter()
+            .find(|(id, _)| *id == current)
+            .map_or(current.as_str(), |(_, label)| *label)
+            .to_owned();
+        let mut action = None;
+        ui.horizontal(|ui| {
+            egui::ComboBox::from_id_salt("open365-style")
+                .selected_text(label)
+                .width(110.0)
+                .show_ui(ui, |ui| {
+                    for (id, name) in STYLES {
+                        if ui.selectable_label(current == id, name).clicked() {
+                            action = Some(FormatAction::Style(id));
+                        }
+                    }
+                });
+            ui.separator();
+            let toggles = [
+                (
+                    Toggle::Bold,
+                    RichText::new("Bold").strong(),
+                    style.bold,
+                    "Bold (Ctrl+B)",
+                ),
+                (
+                    Toggle::Italic,
+                    RichText::new("Italic").italics(),
+                    style.italic,
+                    "Italic (Ctrl+I)",
+                ),
+                (
+                    Toggle::Underline,
+                    RichText::new("Underline").underline(),
+                    style.underline,
+                    "Underline (Ctrl+U)",
+                ),
+            ];
+            for (which, text, on, hint) in toggles {
+                if ui
+                    .add(egui::Button::new(text).selected(on))
+                    .on_hover_text(hint)
+                    .clicked()
+                {
+                    action = Some(FormatAction::Toggle(which));
+                }
+            }
+            ui.separator();
+            for (a, name, hint) in [
+                (Alignment::Left, "Left", "Align left (Ctrl+L)"),
+                (Alignment::Center, "Center", "Center (Ctrl+E)"),
+                (Alignment::Right, "Right", "Align right (Ctrl+R)"),
+                (Alignment::Justify, "Justify", "Justify (Ctrl+J)"),
+            ] {
+                if ui
+                    .add(egui::Button::new(name).selected(align == a))
+                    .on_hover_text(hint)
+                    .clicked()
+                {
+                    action = Some(FormatAction::Align(a));
+                }
+            }
+        });
+        match action {
+            Some(FormatAction::Style(id)) => self.set_style(id),
+            Some(FormatAction::Toggle(which)) => self.toggle(which),
+            Some(FormatAction::Align(a)) => self.set_alignment(a),
+            None => {}
+        }
     }
 
     fn status_bar(&mut self, ui: &mut Ui) {
         let right = match &self.target {
             Some(t) if t.docx().is_some() => {
                 let caret = self.doc.caret();
+                let subs = self.doc.font_substitutions();
+                let fonts = match subs.as_slice() {
+                    [] => String::new(),
+                    [(from, to), rest @ ..] => format!(
+                        "  |  Substituted font: {from} -> {to}{}",
+                        if rest.is_empty() {
+                            String::new()
+                        } else {
+                            format!(" (+{} more)", rest.len())
+                        }
+                    ),
+                };
                 format!(
-                    "Page {} of {}  |  Paragraph {}, character {}  |  {:.1} ms",
+                    "Page {} of {}  |  Paragraph {}, character {}{fonts}  |  {:.1} ms",
                     self.doc.page_of(caret.para) + 1,
                     self.doc.page_count(),
                     caret.para + 1,
@@ -320,9 +502,13 @@ impl App {
     /// Draws the whole window into `ui`.
     pub fn ui(&mut self, ui: &mut Ui) {
         let ctx = ui.ctx().clone();
+        self.fonts.borrow_mut().sync(&ctx);
         self.shortcuts(&ctx);
 
         egui::Panel::top("open365-menu").show(ui, |ui| self.menu_bar(ui));
+        if self.target.as_ref().is_some_and(|t| t.docx().is_some()) {
+            egui::Panel::top("open365-format").show(ui, |ui| self.format_bar(ui));
+        }
         egui::Panel::bottom("open365-status").show(ui, |ui| self.status_bar(ui));
 
         let mut repaint = false;

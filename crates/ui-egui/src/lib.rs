@@ -8,13 +8,14 @@ mod a11y;
 mod app;
 mod doc_view;
 mod docmodel;
+mod fonts;
 mod grid_view;
 mod numfmt;
 
 use std::path::PathBuf;
 
 pub use app::App;
-pub use doc_view::{DocPos, DocView};
+pub use doc_view::{DocPos, DocView, Toggle};
 pub use grid_view::GridView;
 
 /// Opens the main window and runs until it closes. `initial` is a file to open at start-up.

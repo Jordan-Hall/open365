@@ -72,7 +72,7 @@ pub fn publish_paragraph(
     label: Option<&str>,
 ) -> Vec<RunEntry> {
     let para_id = paragraph_id(doc, para);
-    let bounds = Rect::from_min_size(origin, galley.size());
+    let bounds = galley.rect.translate(origin.to_vec2());
     parent_ui.interact(bounds, para_id, Sense::hover());
     parent_ui.ctx().accesskit_node_builder(para_id, |b| {
         b.set_role(accesskit::Role::Paragraph);
