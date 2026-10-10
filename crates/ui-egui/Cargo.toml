@@ -1,0 +1,23 @@
+[package]
+name = "open365-ui-egui"
+description = "Thin egui/eframe shell: document view, grid view and accessibility tree over the command layer."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+eframe.workspace = true
+egui.workspace = true
+open365-commands.workspace = true
+open365-docx.workspace = true
+open365-opc.workspace = true
+open365-xlsx.workspace = true
+rfd.workspace = true
+
+[dev-dependencies]
+egui_kittest = { workspace = true, features = ["eframe"] }
+
+[lints]
+workspace = true

@@ -14,8 +14,22 @@ allow = [
     "ISC",
     "Unicode-3.0",
     "Zlib",
+    # BSL-1.0 (Boost, OSI approved, permissive): clipboard-win and error-code, pulled in by
+    # egui-winit -> arboard on Windows (ADR-004 UI stack).
+    "BSL-1.0",
+    # OFL-1.1 (SIL Open Font License, OSI approved): fonts bundled in epaint_default_fonts.
+    # Fonts only, no code; the reserved-name rule only matters if we modify and redistribute a font.
+    "OFL-1.1",
 ]
 confidence-threshold = 0.9
+
+# Ubuntu-font-1.0 is not OSI approved and has a share-alike rule for modified fonts. It is data
+# bundled by epaint_default_fonts (egui "default_fonts" feature) and is not linked as code, so
+# it is excepted for that one crate only. Decision pending: replace the bundled UI font with an
+# OFL/permissive one and drop this exception (see ADR-004 follow-ups).
+[[licenses.exceptions]]
+crate = "epaint_default_fonts"
+allow = ["Ubuntu-font-1.0"]
 
 [bans]
 multiple-versions = "warn"
