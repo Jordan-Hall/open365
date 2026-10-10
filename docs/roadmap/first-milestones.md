@@ -17,6 +17,8 @@ The target is the **full Microsoft 365 suite at 1:1 parity, including Teams**, b
 | Open CoWorker | Copilot | P2 |
 | Notes, Forms, Planner/tasks, Sites | OneNote, Forms, Planner, SharePoint sites | P4+ |
 | Federation between deployments | (no M365 equivalent) | P4 |
+| Web app (native DOM UI in Rust/WASM) | Office for the web | spike after M3, ships P2 |
+| iOS/iPadOS and Android apps (native UIKit / Android views driven from Rust) | Office mobile apps | spike after M3, ships P3 |
 
 Teams moves forward from "P3 integration" to an owned product line. Its server foundation (identity, realtime transport, storage) is shared with Drive and co-editing, so it is designed in P1 and ships its chat core in P2.
 
@@ -48,6 +50,11 @@ Crates: `opc`, `docx`, `xlsx`, `calc` (own engine: parser, dependency graph, cor
 
 ## M4: Beta hardening
 Printing, rich clipboard, out-of-process parser sandbox, signed installers and updates, performance targets measured on stated hardware, and an "open in real Office" check on a Windows runner.
+
+## M5: Web and mobile native UI spike (ADR-010)
+- The Rust core builds for `wasm32-unknown-unknown`, `aarch64-apple-ios` and `aarch64-linux-android` in CI from M3 on.
+- Spike each platform's native UI (web: Rust-driven DOM; iOS: UIKit from Rust; Android: Android Views from Rust), each with open → edit → save → reopen.
+- **Accept:** the per-platform pass/fail sheet is complete (IME, screen reader, selection/clipboard, scroll p95, size, cold start), and ADR-010's stack is chosen per platform.
 
 ## Later phases (planned boundaries, not scheduled)
 P2 co-editing (own sync service; CRDT primitives spike Loro vs Yrs) + CoWorker MVP (provider trait, Ollama/OpenAI-compatible + one BYOK API, read/suggest-only tools). P3 OIDC org identity, own chat and meetings (WebRTC), admin and audit. P4 federation (allowlist, OCM-style sharing, Matrix federation).

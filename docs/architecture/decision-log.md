@@ -62,3 +62,14 @@ Format: context, alternatives, decision, consequences, confidence, and what evid
 - **Context:** Consumer CLI logins and subscriptions are not licensed as embedded production inference (details in `../research/agent-reports/coworker-providers.md`).
 - **Decision:** Open CoWorker ships provider adapters for APIs (BYOK) and local runtimes (Ollama/OpenAI-compatible). Claude Code, Codex CLI and Grok CLI connect *to* Open365 as user-launched MCP clients under the user's own permissions. Open365 never shells out to them for inference.
 - **Confidence:** High.
+
+## ADR-010 Web and mobile get their own native UIs, written in Rust — Accepted direction (owner, 2026-10-10); stack chosen by spike
+- **Context:** The owner wants Open365 on web and mobile, each with "its own UI" and "a full on native solution", ideally with Rust writing it. Not a canvas renderer shipped everywhere, and not a WebView wrapper.
+- **Decision:** One shared Rust core: the OPC/docx/xlsx models, calc, layout, the command layer and later sync. It sits under three UI families, each built from that platform's native building blocks:
+  - **Web:** Rust compiled to WebAssembly that builds and updates the real DOM, so browser text selection, IME, accessibility, find, spellcheck and printing work natively. Candidates: Leptos (MIT), Dioxus web (MIT/Apache) and direct `web-sys`. Document pages are DOM elements positioned by our layout engine, not a single canvas.
+  - **iOS/iPadOS:** native UIKit views driven from Rust. Candidates: `objc2` + `objc2-ui-kit` bindings (MIT/Apache, Rust calls UIKit directly), or a thin Swift shell over a Rust core via a permissively licensed binding generator. The document view uses UITextInput for IME and UIAccessibility, plus the native print path.
+  - **Android:** native Android Views driven from Rust over JNI (`jni` crate, MIT/Apache). The alternative is a thin Kotlin/Compose shell over the Rust core. The document view uses InputConnection for IME and AccessibilityNodeInfo.
+- **Rules:** the UI layer stays thin and replaceable on every platform (as with ADR-004). All mutations go through the command layer (ADR-002). Platform shells share no UI code with each other, only the core. Dependency licences stay permissive (ADR-008). UniFFI is MPL-2.0 and needs review before use.
+- **Spike (scheduled after M3, before P2):** for each platform, open, edit, save and reopen a tier-A DOCX and XLSX. Pass/fail rows cover IME, the screen reader (VoiceOver, TalkBack, browser plus NVDA), selection and clipboard, scroll p95 on large-sheet, app size and cold start. Pick the per-platform stack with that evidence.
+- **Consequences:** The core must stay free of desktop-only assumptions: no egui types, no threads the browser can't run, and no blocking I/O in the core. File access sits behind a storage trait. CI gains a wasm32 build of the core crates now, so the core stays portable.
+- **Confidence:** High on direction. The stack is open until the spike.
