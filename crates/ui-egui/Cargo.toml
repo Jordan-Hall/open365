@@ -11,14 +11,17 @@ publish.workspace = true
 eframe.workspace = true
 egui.workspace = true
 fontdb.workspace = true
+open365-calc.workspace = true
 open365-commands.workspace = true
 open365-docx.workspace = true
 open365-opc.workspace = true
 open365-xlsx.workspace = true
 rfd.workspace = true
+skrifa.workspace = true
 
 [dev-dependencies]
 egui_kittest = { workspace = true, features = ["eframe"] }
+serde_json.workspace = true
 
 [lints]
 workspace = true

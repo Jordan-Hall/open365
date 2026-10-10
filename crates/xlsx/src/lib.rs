@@ -17,6 +17,7 @@
 
 mod error;
 mod fast;
+mod geometry;
 mod parts;
 mod refs;
 mod sheet;
@@ -26,6 +27,10 @@ mod workbook;
 mod xml;
 
 pub use error::XlsxError;
+pub use geometry::{
+    Axis, BASE_DPI, ColumnSpec, FrozenPanes, GridMetrics, Pane, PaneState, SheetFormat,
+    SheetGeometry, default_font,
+};
 pub use parts::HygieneAction;
 pub use refs::{
     MAX_COL, MAX_ROW, cell_ref_string, col_letters, col_number, parse_cell_ref, parse_range,

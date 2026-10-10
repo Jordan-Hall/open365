@@ -250,6 +250,16 @@ impl FontBook {
     }
 }
 
+/// Checks that egui can load the font: it panics on data that does not parse, so a corrupt
+/// installed font must be turned away before it reaches `set_fonts`.
+fn validate_font(bytes: &[u8], index: u32) -> Result<(), String> {
+    use skrifa::raw::TableProvider as _;
+    let font = skrifa::FontRef::from_index(bytes, index).map_err(|e| e.to_string())?;
+    font.head().map_err(|e| format!("head table: {e}"))?;
+    font.maxp().map_err(|e| format!("maxp table: {e}"))?;
+    Ok(())
+}
+
 /// Looks `name` up among the installed fonts: case-insensitive family match, then the best
 /// weight and slant. Returns the data name, the data and whether bold/italic are real.
 fn system_face(
@@ -283,6 +293,10 @@ fn system_face(
     }
     let (bytes, index) = db.with_face_data(best.id, |data, index| (data.to_vec(), index))?;
     if bytes.len() > MAX_FONT_BYTES {
+        return None;
+    }
+    if let Err(reason) = validate_font(&bytes, index) {
+        eprintln!("open365: skipping system font {name:?} ({data_name}): {reason}");
         return None;
     }
     let data = FontData {
@@ -325,6 +339,24 @@ mod tests {
             )]
         );
         assert!(book.defs.font_data.contains_key("Carlito-Bold"));
+    }
+
+    #[test]
+    fn corrupt_font_data_is_rejected_without_panicking() {
+        assert!(validate_font(b"not a font at all", 0).is_err());
+        assert!(validate_font(&[], 0).is_err());
+        let (_, good) = BUNDLED[0];
+        assert!(validate_font(good, 0).is_ok());
+        assert!(validate_font(&good[..100], 0).is_err());
+        let mut mangled = good.to_vec();
+        for b in &mut mangled[..64] {
+            *b = 0xff;
+        }
+        assert!(validate_font(&mangled, 0).is_err());
+        // Every bundled face passes the same check.
+        for (name, data) in BUNDLED {
+            assert!(validate_font(data, 0).is_ok(), "{name}");
+        }
     }
 
     #[test]

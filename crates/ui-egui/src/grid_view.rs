@@ -1,39 +1,301 @@
 //! Virtualised spreadsheet grid over an XLSX [`Target`].
 //!
-//! Only the rows and columns in the viewport are drawn, found by binary search over the sparse
-//! row list, so a 50,000-row sheet costs the same per frame as a small one. Cell edits go
+//! Column widths, row heights, hidden rows and columns, merged cells and frozen panes come
+//! from the worksheet XML through `open365_xlsx::SheetGeometry`, converted to pixels the way
+//! Excel does at 100% zoom (maximum digit width rule). Only the rows and columns in the
+//! viewport are drawn, found by binary search over the geometry and the sparse row list, so a
+//! 50,000-row sheet costs the same per frame as a small one.
+//!
+//! The canvas is one scrolling surface. Frozen rows and columns are drawn at the viewport
+//! edge, shifted by the scroll offset, in up to four regions (corner, frozen rows, frozen
+//! columns, body), each clipped to its own rectangle.
+//!
+//! Selection is a range: the active cell is the anchor and `extent` the moving corner, grown
+//! by Shift+click, Shift+arrows or a drag, and widened to whole merged cells. Cell edits go
 //! through the formula bar and the command layer: text starting with `=` becomes
 //! `XlsxSetCellFormula`, anything else `XlsxSetCellValue`.
 
+use std::sync::Arc;
 use std::time::Instant;
 
 use egui::text::CCursor;
 use egui::text_edit::TextEditState;
 use egui::{
-    Align2, Color32, Context, Event, EventFilter, FontId, Id, Key, Pos2, Rect, Sense, Stroke,
-    TextEdit, Ui, UiBuilder, accesskit, vec2,
+    Align2, Color32, Context, Event, EventFilter, FontId, Id, Key, Painter, PointerButton, Pos2,
+    Rect, Sense, Stroke, TextEdit, Ui, UiBuilder, Vec2, accesskit, vec2,
 };
-use open365_commands::{Command, Target};
-use open365_xlsx::{CellValue, MAX_COL, MAX_ROW, SheetKind, SheetState, Workbook, col_letters};
+use open365_calc::Value;
+use open365_calc::numfmt::{builtin_format_code, format_value};
+use open365_commands::{CellEntry, Command, Target};
+use open365_xlsx::{
+    Cell, CellValue, FrozenPanes, GridMetrics, MAX_COL, MAX_ROW, SheetGeometry, SheetKind,
+    SheetState, Workbook, Worksheet, col_letters, format_number,
+};
 
 use crate::a11y;
-use crate::numfmt;
 
 const ROW_HEADER_W: f32 = 54.0;
 const COL_HEADER_H: f32 = 24.0;
-const COL_W: f32 = 88.0;
-const ROW_H: f32 = 22.0;
 const MIN_ROWS: u32 = 200;
 const MIN_COLS: u32 = 26;
+/// Display DPI the grid lays out for: egui points are 1/96 inch at 100% scaling.
+const GRID_DPI: u32 = 96;
+/// Largest number of cells Delete clears in one go.
+const MAX_CLEAR_CELLS: usize = 10_000;
+
+/// Inclusive cell range `(row1, col1, row2, col2)`.
+type Span = (u32, u32, u32, u32);
+
+fn contains(span: Span, row: u32, col: u32) -> bool {
+    (span.0..=span.2).contains(&row) && (span.1..=span.3).contains(&col)
+}
+
+/// Geometry, merges and frozen panes of one sheet, built once per sheet.
+#[derive(Debug)]
+struct SheetLayout {
+    geo: SheetGeometry,
+    /// Sorted by `(row1, col1)`.
+    merges: Vec<Span>,
+    /// Tallest merge in rows; bounds the backwards scan in [`Self::merge_at`].
+    max_span: u32,
+    frozen: FrozenPanes,
+}
+
+impl SheetLayout {
+    fn new(wb: &Workbook, sheet: usize) -> Self {
+        let metrics = GridMetrics::for_styles(wb.styles(), GRID_DPI);
+        let Some(ws) = wb.sheet(sheet) else {
+            return Self {
+                geo: SheetGeometry::uniform(metrics),
+                merges: Vec::new(),
+                max_span: 1,
+                frozen: FrozenPanes::default(),
+            };
+        };
+        let mut merges = ws.merged_cells();
+        merges.sort_unstable();
+        let max_span = merges.iter().map(|m| m.2 - m.0 + 1).max().unwrap_or(1);
+        Self {
+            geo: ws.geometry(metrics),
+            merges,
+            max_span,
+            frozen: ws.frozen_panes().unwrap_or_default(),
+        }
+    }
+
+    /// Smallest `(rows, cols)` that holds every merge and frozen line.
+    fn min_extent(&self) -> (u32, u32) {
+        let rows = self.merges.iter().map(|m| m.2).max().unwrap_or(0);
+        let cols = self.merges.iter().map(|m| m.3).max().unwrap_or(0);
+        (
+            rows.max(self.frozen.rows + 1),
+            cols.max(self.frozen.cols + 1),
+        )
+    }
+
+    /// Merges whose first row lies in `a..=b`.
+    fn merges_starting_in(&self, a: u32, b: u32) -> &[Span] {
+        let lo = self.merges.partition_point(|m| m.0 < a);
+        let hi = self.merges.partition_point(|m| m.0 <= b);
+        &self.merges[lo..hi.max(lo)]
+    }
+
+    /// The merge containing the cell.
+    fn merge_at(&self, row: u32, col: u32) -> Option<Span> {
+        let first = row.saturating_sub(self.max_span - 1);
+        self.merges_starting_in(first, row)
+            .iter()
+            .copied()
+            .find(|m| contains(*m, row, col))
+    }
+
+    /// Merges that overlap the given rows and columns.
+    fn merges_overlapping(&self, rows: (u32, u32), cols: (u32, u32)) -> Vec<Span> {
+        if rows.0 > rows.1 || cols.0 > cols.1 {
+            return Vec::new();
+        }
+        self.merges_starting_in(rows.0.saturating_sub(self.max_span - 1), rows.1)
+            .iter()
+            .copied()
+            .filter(|m| m.2 >= rows.0 && m.1 <= cols.1 && m.3 >= cols.0)
+            .collect()
+    }
+
+    /// Widens `span` until no merge is cut by its edge.
+    fn expand(&self, mut span: Span) -> Span {
+        loop {
+            let before = span;
+            for m in self.merges_overlapping((span.0, span.2), (span.1, span.3)) {
+                span = (
+                    span.0.min(m.0),
+                    span.1.min(m.1),
+                    span.2.max(m.2),
+                    span.3.max(m.3),
+                );
+            }
+            if span == before {
+                return span;
+            }
+        }
+    }
+
+    /// Next visible index from `from` in direction `dir` (`1` or `-1`), or `from` at the edge.
+    fn next_visible(&self, rows: bool, from: u32, dir: i32, max: u32) -> u32 {
+        let hidden = |i: u32| {
+            if rows {
+                self.geo.row_hidden(i)
+            } else {
+                self.geo.col_hidden(i)
+            }
+        };
+        let valid = 1..=i64::from(max);
+        let mut i = i64::from(from) + i64::from(dir);
+        while valid.contains(&i) && hidden(i as u32) {
+            i += i64::from(dir);
+        }
+        if valid.contains(&i) { i as u32 } else { from }
+    }
+
+    /// One keyboard step from `pos`: leaves a merge by its far edge and skips hidden lines.
+    fn step(&self, pos: (u32, u32), d_row: i32, d_col: i32) -> (u32, u32) {
+        let (mut r, mut c) = pos;
+        if let Some(m) = self.merge_at(r, c) {
+            if d_row > 0 {
+                r = m.2;
+            } else if d_row < 0 {
+                r = m.0;
+            }
+            if d_col > 0 {
+                c = m.3;
+            } else if d_col < 0 {
+                c = m.1;
+            }
+        }
+        if d_row != 0 {
+            r = self.next_visible(true, r, d_row.signum(), MAX_ROW);
+        }
+        if d_col != 0 {
+            c = self.next_visible(false, c, d_col.signum(), MAX_COL);
+        }
+        (r, c)
+    }
+}
+
+/// Where cells sit on screen for one frame.
+struct View<'a> {
+    layout: &'a SheetLayout,
+    /// Top-left of the scroll content on screen.
+    origin: Pos2,
+    /// Scroll offset.
+    scroll: Vec2,
+}
+
+impl View<'_> {
+    /// Cell range on the unshifted canvas.
+    fn canvas_rect(&self, span: Span) -> Rect {
+        let geo = &self.layout.geo;
+        let x0 = geo.col_x(span.1) as f32;
+        let x1 = geo.col_x(span.3 + 1) as f32;
+        let y0 = geo.row_y(span.0) as f32;
+        let y1 = geo.row_y(span.2 + 1) as f32;
+        Rect::from_min_max(
+            self.origin + vec2(ROW_HEADER_W + x0, COL_HEADER_H + y0),
+            self.origin + vec2(ROW_HEADER_W + x1, COL_HEADER_H + y1),
+        )
+    }
+
+    /// Shift that pins a frozen row or column to the viewport edge.
+    fn shift_for(&self, row: u32, col: u32) -> Vec2 {
+        let f = self.layout.frozen;
+        vec2(
+            if col <= f.cols { self.scroll.x } else { 0.0 },
+            if row <= f.rows { self.scroll.y } else { 0.0 },
+        )
+    }
+
+    /// On-screen rectangle of a cell, or of a merge anchored at `(span.0, span.1)`.
+    fn screen_rect(&self, span: Span) -> Rect {
+        self.canvas_rect(span)
+            .translate(self.shift_for(span.0, span.1))
+    }
+
+    /// Width and height of the frozen block in pixels.
+    fn frozen_size(&self) -> Vec2 {
+        let f = self.layout.frozen;
+        vec2(
+            self.layout.geo.col_x(f.cols + 1) as f32,
+            self.layout.geo.row_y(f.rows + 1) as f32,
+        )
+    }
+
+    /// The cell under a screen position; `clamp` keeps a position outside the cell area
+    /// inside it (used while dragging).
+    fn cell_at(&self, pos: Pos2, clamp: bool, limits: (u32, u32)) -> Option<(u32, u32)> {
+        let view_min = self.origin + self.scroll;
+        let local = pos - view_min - vec2(ROW_HEADER_W, COL_HEADER_H);
+        if !clamp && (local.x < 0.0 || local.y < 0.0) {
+            return None;
+        }
+        let fz = self.frozen_size();
+        let sheet_x = if local.x < fz.x {
+            local.x.max(0.0)
+        } else {
+            local.x + self.scroll.x
+        };
+        let sheet_y = if local.y < fz.y {
+            local.y.max(0.0)
+        } else {
+            local.y + self.scroll.y
+        };
+        let col = self.layout.geo.col_at(sheet_x as u64, limits.1);
+        let row = self.layout.geo.row_at(sheet_y as u64, limits.0);
+        Some((row, col))
+    }
+}
+
+/// One drawn part of the grid: a block of rows and columns, its shift and its clip.
+#[derive(Clone, Copy)]
+struct Region {
+    rows: (u32, u32),
+    cols: (u32, u32),
+    shift: Vec2,
+    clip: Rect,
+}
+
+/// Rows and columns that were visible in the last frame.
+#[derive(Debug, Clone, Copy, Default)]
+struct Visible {
+    frozen_rows: u32,
+    frozen_cols: u32,
+    rows: (u32, u32),
+    cols: (u32, u32),
+    scroll: Vec2,
+    origin: Pos2,
+}
+
+struct Palette {
+    text: Color32,
+    grid_line: Color32,
+    header_bg: Color32,
+    cell_bg: Color32,
+    accent: Color32,
+}
 
 /// State of the grid view.
 #[derive(Debug)]
 pub struct GridView {
     sheet: usize,
+    /// The anchor of the selection; the cell that is edited.
     active: (u32, u32),
+    /// The moving corner of the selection.
+    extent: (u32, u32),
+    dragging: bool,
+    /// Frame in which a press or move changed the selection. Egui drops focus from the cell
+    /// widgets in that frame and the next (press, then click), so both ask again.
+    refocus_frame: Option<u64>,
     editing: bool,
     edit_text: String,
-    scroll_to_active: bool,
+    scroll_target: Option<(u32, u32)>,
     want_focus: bool,
     grid_id: Id,
     formula_id: Id,
@@ -43,6 +305,9 @@ pub struct GridView {
     focus_id: Id,
     /// Set when this frame's key events were already used by the formula bar.
     keys_consumed: bool,
+    /// Geometry of the current sheet, built once per sheet.
+    layout: Option<(usize, Arc<SheetLayout>)>,
+    visible: Visible,
     /// Message for the status bar, taken by the application each frame.
     pub status: Option<String>,
     /// Milliseconds spent drawing the grid in the last frame.
@@ -55,20 +320,66 @@ impl Default for GridView {
     }
 }
 
+/// The format code of a cell style. Built-in ids that depend on the locale (14 is a short date)
+/// use the calculation engine's table, which the engine formats; custom codes win.
+fn format_code(wb: &Workbook, style: u32) -> &str {
+    let styles = wb.styles();
+    let id = styles.num_fmt_id(style);
+    if styles.custom_formats().contains_key(&id) {
+        return styles.format_code(id);
+    }
+    builtin_format_code(id).unwrap_or_else(|| styles.format_code(id))
+}
+
+/// The text shown in a cell: its value through the cell's number format.
+fn display_text(wb: &Workbook, cell: &Cell) -> String {
+    let code = format_code(wb, cell.style.unwrap_or(0));
+    match &cell.value {
+        CellValue::Empty => String::new(),
+        CellValue::Number(n) => format_value(&Value::Number(*n), code, wb.date1904()),
+        CellValue::Bool(true) => "TRUE".to_owned(),
+        CellValue::Bool(false) => "FALSE".to_owned(),
+        CellValue::Error(e) => e.code().to_owned(),
+        other => {
+            let text = other.as_text().unwrap_or_default();
+            if code == "General" || code.is_empty() {
+                text.to_owned()
+            } else {
+                format_value(&Value::Text(text.to_owned()), code, wb.date1904())
+            }
+        }
+    }
+}
+
+/// The address of a range: `B2` or `B2:C4`.
+fn range_label(span: Span) -> String {
+    let a = format!("{}{}", col_letters(span.1), span.0);
+    if (span.0, span.1) == (span.2, span.3) {
+        a
+    } else {
+        format!("{a}:{}{}", col_letters(span.3), span.2)
+    }
+}
+
 impl GridView {
     pub fn new() -> Self {
         Self {
             sheet: 0,
             active: (1, 1),
+            extent: (1, 1),
+            dragging: false,
+            refocus_frame: None,
             editing: false,
             edit_text: String::new(),
-            scroll_to_active: false,
+            scroll_target: None,
             want_focus: true,
             grid_id: Id::new("open365-grid-view"),
             formula_id: Id::new("open365-formula-bar"),
             pending_focus: None,
             focus_id: Id::new("open365-grid-active-cell"),
             keys_consumed: false,
+            layout: None,
+            visible: Visible::default(),
             status: None,
             last_frame_ms: 0.0,
         }
@@ -86,6 +397,15 @@ impl GridView {
         self.active
     }
 
+    /// The selected range `(row1, col1, row2, col2)`, widened to whole merged cells.
+    pub fn selection(&self) -> (u32, u32, u32, u32) {
+        let (a, e) = (self.active, self.extent);
+        let raw = (a.0.min(e.0), a.1.min(e.1), a.0.max(e.0), a.1.max(e.1));
+        self.layout
+            .as_ref()
+            .map_or(raw, |(_, layout)| layout.expand(raw))
+    }
+
     pub fn is_editing(&self) -> bool {
         self.editing
     }
@@ -96,15 +416,26 @@ impl GridView {
 
     pub fn set_active(&mut self, row: u32, col: u32) {
         self.active = (row.clamp(1, MAX_ROW), col.clamp(1, MAX_COL));
-        self.scroll_to_active = true;
+        self.extent = self.active;
+        self.scroll_target = Some(self.active);
+    }
+
+    /// Selects the range from `anchor` (the active cell) to `corner`.
+    pub fn select_range(&mut self, anchor: (u32, u32), corner: (u32, u32)) {
+        self.set_active(anchor.0, anchor.1);
+        self.extent = (corner.0.clamp(1, MAX_ROW), corner.1.clamp(1, MAX_COL));
+        self.scroll_target = Some(self.extent);
     }
 
     pub fn select_sheet(&mut self, sheet: usize) {
         if sheet != self.sheet {
             self.sheet = sheet;
             self.active = (1, 1);
+            self.extent = (1, 1);
+            self.dragging = false;
             self.editing = false;
-            self.scroll_to_active = true;
+            self.layout = None;
+            self.scroll_target = Some((1, 1));
         }
     }
 
@@ -124,7 +455,14 @@ impl GridView {
         }
         match wb.cell(sheet, row, col).map(|c| &c.value) {
             None | Some(CellValue::Empty) => String::new(),
-            Some(v) => numfmt::display_value(v, "General", wb.date1904()),
+            Some(CellValue::Number(n)) => {
+                let mut out = String::new();
+                format_number(*n, &mut out);
+                out
+            }
+            Some(CellValue::Bool(b)) => if *b { "TRUE" } else { "FALSE" }.to_owned(),
+            Some(CellValue::Error(e)) => e.code().to_owned(),
+            Some(other) => other.as_text().unwrap_or_default().to_owned(),
         }
     }
 
@@ -141,11 +479,30 @@ impl GridView {
         state.store(ctx, self.formula_id);
     }
 
+    /// Focuses the active cell. Requesting focus on a widget that has it resets its key filter,
+    /// so ask only when needed and set the filter again.
+    fn focus_active(&self, ctx: &Context) {
+        let id = self.cell_id(self.active.0, self.active.1);
+        ctx.memory_mut(|m| {
+            if !m.has_focus(id) {
+                m.request_focus(id);
+            }
+            m.set_focus_lock_filter(
+                id,
+                EventFilter {
+                    tab: true,
+                    horizontal_arrows: true,
+                    vertical_arrows: true,
+                    escape: false,
+                },
+            );
+        });
+    }
+
     fn cancel_edit(&mut self, ctx: &Context) {
         self.editing = false;
         self.keys_consumed = true;
-        let id = self.cell_id(self.active.0, self.active.1);
-        ctx.memory_mut(|m| m.request_focus(id));
+        self.focus_active(ctx);
     }
 
     /// Commits the formula bar text to the active cell through the command layer.
@@ -166,25 +523,71 @@ impl GridView {
         if advance {
             self.move_active(1, 0);
         }
-        let id = self.cell_id(self.active.0, self.active.1);
-        ctx.memory_mut(|m| m.request_focus(id));
+        self.focus_active(ctx);
     }
 
-    fn move_active(&mut self, d_row: i64, d_col: i64) {
-        let row = (i64::from(self.active.0) + d_row).clamp(1, i64::from(MAX_ROW)) as u32;
-        let col = (i64::from(self.active.1) + d_col).clamp(1, i64::from(MAX_COL)) as u32;
-        self.set_active(row, col);
+    /// `pos` moved by `steps` cells (sign gives direction) along one axis.
+    fn walk(&self, mut pos: (u32, u32), d_row: i32, d_col: i32) -> (u32, u32) {
+        let layout = self.layout.as_ref().map(|(_, l)| l);
+        for _ in 0..d_row.unsigned_abs().max(d_col.unsigned_abs()) {
+            pos = match layout {
+                Some(l) => l.step(pos, d_row.signum(), d_col.signum()),
+                None => (
+                    (i64::from(pos.0) + i64::from(d_row.signum())).clamp(1, i64::from(MAX_ROW))
+                        as u32,
+                    (i64::from(pos.1) + i64::from(d_col.signum())).clamp(1, i64::from(MAX_COL))
+                        as u32,
+                ),
+            };
+        }
+        pos
     }
 
-    fn sheet_extent(wb: &Workbook, sheet: usize) -> (u32, u32) {
+    /// The anchor cell of the merge `pos` sits in, or `pos` itself.
+    fn anchor_of(&self, pos: (u32, u32)) -> (u32, u32) {
+        self.layout
+            .as_ref()
+            .and_then(|(_, l)| l.merge_at(pos.0, pos.1))
+            .map_or(pos, |m| (m.0, m.1))
+    }
+
+    fn move_active(&mut self, d_row: i32, d_col: i32) {
+        let to = self.anchor_of(self.walk(self.active, d_row, d_col));
+        self.set_active(to.0, to.1);
+    }
+
+    /// Moves the selection's moving corner, keeping the active cell.
+    fn extend(&mut self, d_row: i32, d_col: i32) {
+        self.extent = self.walk(self.extent, d_row, d_col);
+        self.scroll_target = Some(self.extent);
+    }
+
+    fn extend_to(&mut self, row: u32, col: u32) {
+        self.extent = (row.clamp(1, MAX_ROW), col.clamp(1, MAX_COL));
+        self.scroll_target = Some(self.extent);
+    }
+
+    fn sheet_extent(wb: &Workbook, sheet: usize, layout: &SheetLayout) -> (u32, u32) {
         let (r, c) = wb
             .sheet(sheet)
-            .and_then(|ws| ws.used_range())
+            .and_then(Worksheet::used_range)
             .map_or((0, 0), |(_, _, r2, c2)| (r2, c2));
+        let (min_r, min_c) = layout.min_extent();
         (
-            (r + 50).clamp(MIN_ROWS, MAX_ROW),
-            (c + 6).clamp(MIN_COLS, MAX_COL),
+            (r + 50).clamp(MIN_ROWS, MAX_ROW).max(min_r),
+            (c + 6).clamp(MIN_COLS, MAX_COL).max(min_c),
         )
+    }
+
+    fn layout_for(&mut self, wb: &Workbook) -> Arc<SheetLayout> {
+        if let Some((sheet, layout)) = &self.layout
+            && *sheet == self.sheet
+        {
+            return Arc::clone(layout);
+        }
+        let layout = Arc::new(SheetLayout::new(wb, self.sheet));
+        self.layout = Some((self.sheet, Arc::clone(&layout)));
+        layout
     }
 
     /// Shows the formula bar, the grid and the sheet tabs.
@@ -205,6 +608,7 @@ impl GridView {
         {
             self.sheet = first;
         }
+        self.layout_for(wb);
         if let Some((row, col)) = self.pending_focus.take() {
             self.set_active(row, col);
         }
@@ -227,7 +631,8 @@ impl GridView {
         {
             self.edit_text = Self::source_text(wb, self.sheet, row, col);
         }
-        let address = format!("{}{}", col_letters(col), row);
+        let address = range_label(self.selection());
+        let active_address = format!("{}{}", col_letters(col), row);
         egui::Panel::top("open365-formula-panel").show(ui, |ui| {
             ui.horizontal(|ui| {
                 ui.add_sized(
@@ -245,7 +650,7 @@ impl GridView {
                     egui::WidgetInfo::labeled(
                         egui::WidgetType::TextEdit,
                         true,
-                        format!("Formula bar for {address}"),
+                        format!("Formula bar for {active_address}"),
                     )
                 });
                 if resp.changed() || (resp.gained_focus() && !self.editing) {
@@ -292,10 +697,13 @@ impl GridView {
         let ctx = ui.ctx().clone();
         let sheet = self.sheet;
         let Some(wb) = target.xlsx() else { return };
-        let (rows_n, cols_n) = Self::sheet_extent(wb, sheet);
+        let layout = self.layout_for(wb);
+        let (rows_n, cols_n) = Self::sheet_extent(wb, sheet, &layout);
+        // Selecting any cell of a merge selects the merge, anchored at its top-left cell.
+        self.active = self.anchor_of(self.active);
         let content = vec2(
-            ROW_HEADER_W + cols_n as f32 * COL_W,
-            COL_HEADER_H + rows_n as f32 * ROW_H,
+            ROW_HEADER_W + layout.geo.col_x(cols_n + 1) as f32,
+            COL_HEADER_H + layout.geo.row_y(rows_n + 1) as f32,
         );
 
         let active_id = self.focus_id;
@@ -326,244 +734,288 @@ impl GridView {
         }
         let Some(wb) = target.xlsx() else { return };
 
-        let text_color = ui.visuals().text_color();
-        let grid_line = ui.visuals().widgets.noninteractive.bg_stroke.color;
-        let header_bg = ui.visuals().faint_bg_color;
-        let cell_bg = ui.visuals().extreme_bg_color;
-        let accent = ui.visuals().selection.stroke.color;
-        let date1904 = wb.date1904();
+        let pal = Palette {
+            text: ui.visuals().text_color(),
+            grid_line: ui.visuals().widgets.noninteractive.bg_stroke.color,
+            header_bg: ui.visuals().faint_bg_color,
+            cell_bg: ui.visuals().extreme_bg_color,
+            accent: ui.visuals().selection.stroke.color,
+        };
         let font = FontId::proportional(13.0);
         let active = self.active;
-        let scroll_to_active = std::mem::take(&mut self.scroll_to_active);
+        let selection = self.selection();
+        let scroll_target = self.scroll_target.take();
+        let grid_id = self.grid_id;
+        let ws = wb.sheet(sheet);
 
-        let mut clicked_cell: Option<(u32, u32)> = None;
-        let mut visible_rows = (1u32, 0u32);
-        let mut visible_cols = (1u32, 0u32);
-        let mut canvas = Rect::NOTHING;
+        let mut sel_state = (self.active, self.extent, self.dragging);
+        let mut pressed = false;
+        let mut double_clicked = false;
+        let mut visible = Visible::default();
 
         egui::ScrollArea::both()
             .auto_shrink([false, false])
+            .scroll_source(egui::scroll_area::ScrollSource {
+                drag: egui::scroll_area::DragScroll::Never,
+                ..egui::scroll_area::ScrollSource::ALL
+            })
             .show_viewport(ui, |ui, viewport| {
                 let (rect, _) = ui.allocate_exact_size(content, Sense::hover());
-                canvas = rect;
-                let response = ui.interact(rect, self.grid_id, Sense::click_and_drag());
+                let response = ui.interact(rect, grid_id, Sense::click_and_drag());
                 let origin = rect.min;
-                let painter = ui.painter_at(ui.clip_rect());
+                let scroll = viewport.min.to_vec2();
+                let view = View {
+                    layout: &layout,
+                    origin,
+                    scroll,
+                };
+                let frozen = layout.frozen;
+                let fz = view.frozen_size();
+                let clip_all = ui.clip_rect();
+                let painter = ui.painter_at(clip_all);
+                let view_min = origin + scroll;
 
-                let first_row = (((viewport.min.y - COL_HEADER_H) / ROW_H).floor().max(0.0) as u32
-                    + 1)
-                .min(rows_n);
-                let last_row = ((((viewport.max.y - COL_HEADER_H) / ROW_H).ceil().max(0.0)) as u32
-                    + 1)
-                .min(rows_n);
-                let first_col = (((viewport.min.x - ROW_HEADER_W) / COL_W).floor().max(0.0) as u32
-                    + 1)
-                .min(cols_n);
-                let last_col = ((((viewport.max.x - ROW_HEADER_W) / COL_W).ceil().max(0.0)) as u32
-                    + 1)
-                .min(cols_n);
-                visible_rows = (first_row, last_row);
-                visible_cols = (first_col, last_col);
-
-                let cell_rect = |r: u32, c: u32| {
-                    Rect::from_min_size(
-                        Pos2::new(
-                            origin.x + ROW_HEADER_W + (c - 1) as f32 * COL_W,
-                            origin.y + COL_HEADER_H + (r - 1) as f32 * ROW_H,
-                        ),
-                        vec2(COL_W, ROW_H),
-                    )
+                // Visible rows and columns of the scrolling part.
+                let x0 = (scroll.x + fz.x).max(0.0) as u64;
+                let x1 = (scroll.x + viewport.width() - ROW_HEADER_W).max(0.0) as u64;
+                let y0 = (scroll.y + fz.y).max(0.0) as u64;
+                let y1 = (scroll.y + viewport.height() - COL_HEADER_H).max(0.0) as u64;
+                let first_col = layout
+                    .geo
+                    .col_at(x0, cols_n)
+                    .max(frozen.cols + 1)
+                    .min(cols_n);
+                let last_col = layout.geo.col_at(x1.max(x0), cols_n).max(first_col);
+                let first_row = layout
+                    .geo
+                    .row_at(y0, rows_n)
+                    .max(frozen.rows + 1)
+                    .min(rows_n);
+                let last_row = layout.geo.row_at(y1.max(y0), rows_n).max(first_row);
+                visible = Visible {
+                    frozen_rows: frozen.rows.min(rows_n),
+                    frozen_cols: frozen.cols.min(cols_n),
+                    rows: (first_row, last_row),
+                    cols: (first_col, last_col),
+                    scroll,
+                    origin,
                 };
 
-                // Cell area background and grid lines.
-                let area = Rect::from_min_max(
-                    cell_rect(first_row, first_col).min,
-                    cell_rect(last_row, last_col).max,
-                );
-                painter.rect_filled(area, 0.0, cell_bg);
-                let line = Stroke::new(1.0, grid_line);
-                for r in first_row..=last_row + 1 {
-                    let y = origin.y + COL_HEADER_H + (r - 1) as f32 * ROW_H;
-                    painter.hline(area.x_range(), y, line);
-                }
-                for c in first_col..=last_col + 1 {
-                    let x = origin.x + ROW_HEADER_W + (c - 1) as f32 * COL_W;
-                    painter.vline(x, area.y_range(), line);
-                }
-
-                // Cell text, found by binary search over the sparse rows.
-                if let Some(ws) = wb.sheet(sheet) {
-                    let rows = ws.rows();
-                    let start = rows.partition_point(|r| r.r < first_row);
-                    for row in rows[start..].iter().take_while(|r| r.r <= last_row) {
-                        let cstart = row.cells.partition_point(|c| c.col < first_col);
-                        for cell in row.cells[cstart..].iter().take_while(|c| c.col <= last_col) {
-                            let text = numfmt::display_value(
-                                &cell.value,
-                                wb.styles().number_format(cell.style.unwrap_or(0)),
-                                date1904,
-                            );
-                            if text.is_empty() {
-                                continue;
-                            }
-                            let r = cell_rect(row.r, cell.col);
-                            let clipped = painter.with_clip_rect(r.shrink2(vec2(1.0, 0.0)));
-                            let (anchor, pos, color) = match &cell.value {
-                                CellValue::Number(_) => (
-                                    Align2::RIGHT_CENTER,
-                                    Pos2::new(r.right() - 4.0, r.center().y),
-                                    text_color,
-                                ),
-                                CellValue::Bool(_) => {
-                                    (Align2::CENTER_CENTER, r.center(), text_color)
+                // Pointer: press selects (Shift extends), dragging grows the range.
+                let events = ctx.input(|i| {
+                    i.events
+                        .iter()
+                        .filter(|e| {
+                            matches!(e, Event::PointerButton { .. } | Event::PointerMoved(_))
+                        })
+                        .cloned()
+                        .collect::<Vec<_>>()
+                });
+                let limits = (rows_n, cols_n);
+                let own_layer = |pos: Pos2| {
+                    clip_all.contains(pos)
+                        && ctx
+                            .layer_id_at(pos)
+                            .is_none_or(|layer| layer == ui.layer_id())
+                };
+                for event in events {
+                    match event {
+                        Event::PointerButton {
+                            pos,
+                            button: PointerButton::Primary,
+                            pressed: true,
+                            modifiers,
+                        } if own_layer(pos) => {
+                            if let Some(cell) = view.cell_at(pos, false, limits) {
+                                pressed = true;
+                                if modifiers.shift {
+                                    sel_state.1 = cell;
+                                } else {
+                                    let anchor = layout
+                                        .merge_at(cell.0, cell.1)
+                                        .map_or(cell, |m| (m.0, m.1));
+                                    sel_state.0 = anchor;
+                                    sel_state.1 = anchor;
                                 }
-                                CellValue::Error(_) => (
-                                    Align2::CENTER_CENTER,
-                                    r.center(),
-                                    Color32::from_rgb(200, 60, 60),
-                                ),
-                                _ => (
-                                    Align2::LEFT_CENTER,
-                                    Pos2::new(r.left() + 4.0, r.center().y),
-                                    text_color,
-                                ),
-                            };
-                            clipped.text(pos, anchor, text, font.clone(), color);
-                        }
-                    }
-                }
-
-                // Active cell outline.
-                if (first_row..=last_row).contains(&active.0)
-                    && (first_col..=last_col).contains(&active.1)
-                {
-                    painter.rect_stroke(
-                        cell_rect(active.0, active.1),
-                        0.0,
-                        Stroke::new(2.0, accent),
-                        egui::StrokeKind::Inside,
-                    );
-                }
-
-                // Sticky headers, drawn over the cells at the viewport edge.
-                let view_min = origin + viewport.min.to_vec2();
-                let header_stroke = Stroke::new(1.0, grid_line);
-                let col_header = Rect::from_min_size(
-                    Pos2::new(origin.x + ROW_HEADER_W + 0.0, view_min.y),
-                    vec2(content.x - ROW_HEADER_W, COL_HEADER_H),
-                );
-                painter.rect_filled(
-                    Rect::from_min_size(view_min, vec2(viewport.width(), COL_HEADER_H)),
-                    0.0,
-                    header_bg,
-                );
-                painter.rect_filled(
-                    Rect::from_min_size(view_min, vec2(ROW_HEADER_W, viewport.height())),
-                    0.0,
-                    header_bg,
-                );
-                for c in first_col..=last_col {
-                    let r = Rect::from_min_size(
-                        Pos2::new(origin.x + ROW_HEADER_W + (c - 1) as f32 * COL_W, view_min.y),
-                        vec2(COL_W, COL_HEADER_H),
-                    );
-                    if r.intersects(col_header) {
-                        painter.vline(r.left(), r.y_range(), header_stroke);
-                        painter.text(
-                            r.center(),
-                            Align2::CENTER_CENTER,
-                            col_letters(c),
-                            font.clone(),
-                            if c == active.1 { accent } else { text_color },
-                        );
-                    }
-                }
-                for r in first_row..=last_row {
-                    let rr = Rect::from_min_size(
-                        Pos2::new(view_min.x, origin.y + COL_HEADER_H + (r - 1) as f32 * ROW_H),
-                        vec2(ROW_HEADER_W, ROW_H),
-                    );
-                    painter.hline(rr.x_range(), rr.top(), header_stroke);
-                    painter.text(
-                        rr.center(),
-                        Align2::CENTER_CENTER,
-                        r.to_string(),
-                        font.clone(),
-                        if r == active.0 { accent } else { text_color },
-                    );
-                }
-                painter.hline(
-                    view_min.x..=view_min.x + viewport.width(),
-                    view_min.y + COL_HEADER_H,
-                    header_stroke,
-                );
-                painter.vline(
-                    view_min.x + ROW_HEADER_W,
-                    view_min.y..=view_min.y + viewport.height(),
-                    header_stroke,
-                );
-
-                // Pointer: click selects a cell, double click edits it.
-                if response.clicked() || response.double_clicked() {
-                    if let Some(pos) = ctx.input(|i| i.pointer.interact_pos()) {
-                        let local = pos - origin;
-                        if local.x >= ROW_HEADER_W
-                            && local.y >= COL_HEADER_H
-                            && local.x >= viewport.min.x + ROW_HEADER_W
-                            && local.y >= viewport.min.y + COL_HEADER_H
-                        {
-                            let c = ((local.x - ROW_HEADER_W) / COL_W).floor() as u32 + 1;
-                            let r = ((local.y - COL_HEADER_H) / ROW_H).floor() as u32 + 1;
-                            if (1..=rows_n).contains(&r) && (1..=cols_n).contains(&c) {
-                                clicked_cell = Some((r, c));
+                                sel_state.2 = true;
                             }
                         }
+                        Event::PointerButton {
+                            button: PointerButton::Primary,
+                            pressed: false,
+                            ..
+                        } => sel_state.2 = false,
+                        Event::PointerMoved(pos) if sel_state.2 => {
+                            if let Some(cell) = view.cell_at(pos, true, limits) {
+                                sel_state.1 = cell;
+                            }
+                        }
+                        _ => {}
                     }
-                    response.request_focus();
                 }
-                if response.double_clicked() {
-                    // Handled after the borrow of the workbook ends.
-                    self.status = None;
-                }
+                double_clicked = response.double_clicked();
 
-                if scroll_to_active {
-                    ui.scroll_to_rect(cell_rect(active.0, active.1).expand(2.0), None);
+                // Regions: body, frozen rows, frozen columns, corner.
+                let body_min = view_min + vec2(ROW_HEADER_W + fz.x, COL_HEADER_H + fz.y);
+                let strip_x = Rect::from_min_max(
+                    Pos2::new(body_min.x, clip_all.top()),
+                    Pos2::new(clip_all.right(), clip_all.bottom()),
+                );
+                let strip_y = Rect::from_min_max(
+                    Pos2::new(clip_all.left(), body_min.y),
+                    Pos2::new(clip_all.right(), clip_all.bottom()),
+                );
+                let frozen_x = Rect::from_min_size(
+                    Pos2::new(view_min.x + ROW_HEADER_W, clip_all.top()),
+                    vec2(fz.x, clip_all.height()),
+                );
+                let frozen_y = Rect::from_min_size(
+                    Pos2::new(clip_all.left(), view_min.y + COL_HEADER_H),
+                    vec2(clip_all.width(), fz.y),
+                );
+                let mut regions = vec![Region {
+                    rows: (first_row, last_row),
+                    cols: (first_col, last_col),
+                    shift: Vec2::ZERO,
+                    clip: strip_x.intersect(strip_y),
+                }];
+                if frozen.rows > 0 {
+                    regions.push(Region {
+                        rows: (1, visible.frozen_rows),
+                        cols: (first_col, last_col),
+                        shift: vec2(0.0, scroll.y),
+                        clip: strip_x.intersect(frozen_y),
+                    });
+                }
+                if frozen.cols > 0 {
+                    regions.push(Region {
+                        rows: (first_row, last_row),
+                        cols: (1, visible.frozen_cols),
+                        shift: vec2(scroll.x, 0.0),
+                        clip: frozen_x.intersect(strip_y),
+                    });
+                }
+                if frozen.rows > 0 && frozen.cols > 0 {
+                    regions.push(Region {
+                        rows: (1, visible.frozen_rows),
+                        cols: (1, visible.frozen_cols),
+                        shift: scroll,
+                        clip: frozen_x.intersect(frozen_y),
+                    });
+                }
+                for region in &regions {
+                    paint_region(
+                        &painter, wb, ws, &view, region, &pal, selection, active, &font,
+                    );
+                }
+                paint_headers(&painter, &view, clip_all, &visible, &pal, selection, &font);
+
+                if let Some(cell) = scroll_target {
+                    let span = layout
+                        .merge_at(cell.0, cell.1)
+                        .unwrap_or((cell.0, cell.1, cell.0, cell.1));
+                    let mut r = view.canvas_rect(span);
+                    let viewport_screen = viewport.translate(origin.to_vec2());
+                    // Keep the cell out from under the headers and the frozen block.
+                    if cell.1 > frozen.cols {
+                        r.min.x -= ROW_HEADER_W + fz.x;
+                    } else {
+                        r.min.x = viewport_screen.min.x;
+                        r.max.x = viewport_screen.max.x;
+                    }
+                    if cell.0 > frozen.rows {
+                        r.min.y -= COL_HEADER_H + fz.y;
+                    } else {
+                        r.min.y = viewport_screen.min.y;
+                        r.max.y = viewport_screen.max.y;
+                    }
+                    ui.scroll_to_rect(r.expand(2.0), None);
                 }
 
                 // The active cell is always a focusable widget so focus and the screen
                 // reader's cursor have a node to sit on.
-                let ar = cell_rect(active.0, active.1);
-                ui.interact(ar, active_id, Sense::focusable_noninteractive());
+                let ar = layout
+                    .merge_at(active.0, active.1)
+                    .unwrap_or((active.0, active.1, active.0, active.1));
+                ui.interact(
+                    view.screen_rect(ar),
+                    active_id,
+                    Sense::focusable_noninteractive(),
+                );
             });
+        self.visible = visible;
 
-        let double = ctx.input(|i| {
-            i.pointer
-                .button_double_clicked(egui::PointerButton::Primary)
-        });
-        if let Some((r, c)) = clicked_cell {
-            if self.editing {
-                self.commit_edit(&ctx, target, false);
-            }
-            self.active = (r, c);
-            let id = self.cell_id(r, c);
-            ctx.memory_mut(|m| m.request_focus(id));
-            if double {
-                let text = target
-                    .xlsx()
-                    .map(|wb| Self::source_text(wb, self.sheet, r, c))
-                    .unwrap_or_default();
-                self.start_edit(&ctx, text);
-            }
+        if pressed && self.editing {
+            self.commit_edit(&ctx, target, false);
+        }
+        let moved = sel_state.0 != self.active;
+        self.active = sel_state.0;
+        self.extent = sel_state.1;
+        self.dragging = sel_state.2;
+        if pressed || moved {
+            self.refocus_frame = Some(ctx.cumulative_frame_nr());
+        }
+        if self.dragging {
+            ctx.request_repaint();
+        }
+        if double_clicked {
+            self.status = None;
+            let (r, c) = self.active;
+            let text = target
+                .xlsx()
+                .map(|wb| Self::source_text(wb, self.sheet, r, c))
+                .unwrap_or_default();
+            self.start_edit(&ctx, text);
         }
 
-        self.publish_accessibility(
-            ui,
-            target,
-            canvas,
-            visible_rows,
-            visible_cols,
-            (rows_n, cols_n),
-        );
+        self.publish_accessibility(ui, target, &layout, (rows_n, cols_n));
+        // After the cell widgets exist: a press elsewhere makes egui drop focus from them.
+        if self
+            .refocus_frame
+            .is_some_and(|f| ctx.cumulative_frame_nr() <= f + 1)
+            && !self.editing
+        {
+            self.focus_active(&ctx);
+        }
+    }
+
+    fn clear_selection(&mut self, target: &mut Target) {
+        let (r1, c1, r2, c2) = self.selection();
+        let mut cells: Vec<(u32, u32)> = target
+            .xlsx()
+            .and_then(|wb| wb.sheet(self.sheet))
+            .map(|ws| {
+                let rows = ws.rows();
+                let start = rows.partition_point(|r| r.r < r1);
+                rows[start..]
+                    .iter()
+                    .take_while(|r| r.r <= r2)
+                    .flat_map(|r| {
+                        r.cells
+                            .iter()
+                            .filter(|c| (c1..=c2).contains(&c.col))
+                            .filter(|c| !matches!(c.value, CellValue::Empty) || c.formula.is_some())
+                            .map(|c| (r.r, c.col))
+                    })
+                    .take(MAX_CLEAR_CELLS)
+                    .collect()
+            })
+            .unwrap_or_default();
+        if cells.is_empty() {
+            cells.push(self.active);
+        }
+        for (row, col) in cells {
+            let command = Command::XlsxSetCellValue {
+                sheet: self.sheet,
+                row,
+                col,
+                value: CellEntry::Empty,
+            };
+            if let Err(e) = target.apply(command) {
+                self.status = Some(e.to_string());
+                return;
+            }
+        }
     }
 
     fn handle_keys(&mut self, ctx: &Context, target: &mut Target, rows_n: u32, cols_n: u32) {
@@ -583,7 +1035,20 @@ impl GridView {
                     ..
                 } => {
                     let page = 20;
+                    let shift = modifiers.shift;
                     match key {
+                        Key::ArrowUp if modifiers.command && shift => {
+                            self.extend_to(1, self.extent.1);
+                        }
+                        Key::ArrowDown if modifiers.command && shift => {
+                            self.extend_to(rows_n, self.extent.1);
+                        }
+                        Key::ArrowLeft if modifiers.command && shift => {
+                            self.extend_to(self.extent.0, 1);
+                        }
+                        Key::ArrowRight if modifiers.command && shift => {
+                            self.extend_to(self.extent.0, cols_n);
+                        }
                         Key::ArrowUp if modifiers.command => self.set_active(1, self.active.1),
                         Key::ArrowDown if modifiers.command => {
                             self.set_active(rows_n, self.active.1)
@@ -592,12 +1057,18 @@ impl GridView {
                         Key::ArrowRight if modifiers.command => {
                             self.set_active(self.active.0, cols_n);
                         }
+                        Key::ArrowUp if shift => self.extend(-1, 0),
+                        Key::ArrowDown if shift => self.extend(1, 0),
+                        Key::ArrowLeft if shift => self.extend(0, -1),
+                        Key::ArrowRight if shift => self.extend(0, 1),
                         Key::ArrowUp => self.move_active(-1, 0),
                         Key::ArrowDown => self.move_active(1, 0),
                         Key::ArrowLeft => self.move_active(0, -1),
                         Key::ArrowRight => self.move_active(0, 1),
-                        Key::Enter => self.move_active(if modifiers.shift { -1 } else { 1 }, 0),
-                        Key::Tab => self.move_active(0, if modifiers.shift { -1 } else { 1 }),
+                        Key::Enter => self.move_active(if shift { -1 } else { 1 }, 0),
+                        Key::Tab => self.move_active(0, if shift { -1 } else { 1 }),
+                        Key::PageUp if shift => self.extend(-page, 0),
+                        Key::PageDown if shift => self.extend(page, 0),
                         Key::PageUp => self.move_active(-page, 0),
                         Key::PageDown => self.move_active(page, 0),
                         Key::Home if modifiers.command => self.set_active(1, 1),
@@ -611,18 +1082,7 @@ impl GridView {
                                 .unwrap_or_default();
                             self.start_edit(ctx, text);
                         }
-                        Key::Delete | Key::Backspace => {
-                            let (row, col) = self.active;
-                            let command = Command::XlsxSetCellValue {
-                                sheet: self.sheet,
-                                row,
-                                col,
-                                value: open365_commands::CellEntry::Empty,
-                            };
-                            if let Err(e) = target.apply(command) {
-                                self.status = Some(e.to_string());
-                            }
-                        }
+                        Key::Delete | Key::Backspace => self.clear_selection(target),
                         _ => {}
                     }
                 }
@@ -630,20 +1090,18 @@ impl GridView {
             }
         }
         // Keep focus on whichever cell is now active.
-        let id = self.cell_id(self.active.0, self.active.1);
         if !self.editing {
-            ctx.memory_mut(|m| m.request_focus(id));
+            self.focus_active(ctx);
         }
     }
 
-    /// Publishes Grid, Row and Cell nodes for the visible range plus the active cell.
+    /// Publishes Grid, Row and Cell nodes for the visible range plus the active cell. A merged
+    /// cell is one Cell node with row and column spans; the cells it covers are not published.
     fn publish_accessibility(
         &mut self,
         ui: &mut Ui,
         target: &Target,
-        canvas: Rect,
-        rows: (u32, u32),
-        cols: (u32, u32),
+        layout: &SheetLayout,
         extent: (u32, u32),
     ) {
         let ctx = ui.ctx().clone();
@@ -656,23 +1114,28 @@ impl GridView {
             .get(self.sheet)
             .map_or_else(String::new, |s| s.name.clone());
         let viewport = ui.clip_rect();
-        let origin = canvas.min;
-        let cell_rect = |r: u32, c: u32| {
-            Rect::from_min_size(
-                Pos2::new(
-                    origin.x + ROW_HEADER_W + (c - 1) as f32 * COL_W,
-                    origin.y + COL_HEADER_H + (r - 1) as f32 * ROW_H,
-                ),
-                vec2(COL_W, ROW_H),
-            )
+        let vis = self.visible;
+        let view = View {
+            layout,
+            origin: vis.origin,
+            scroll: vis.scroll,
         };
-
-        let mut row_list: Vec<u32> = (rows.0..=rows.1).collect();
-        if !row_list.contains(&self.active.0) {
-            row_list.push(self.active.0);
-            row_list.sort_unstable();
-        }
-        let date1904 = wb.date1904();
+        let selection = self.selection();
+        let axis = |frozen: u32,
+                    scrolled: (u32, u32),
+                    active: Option<u32>,
+                    hidden: &dyn Fn(u32) -> bool| {
+            let mut list: Vec<u32> = (1..=frozen).chain(scrolled.0..=scrolled.1).collect();
+            list.extend(active);
+            list.sort_unstable();
+            list.dedup();
+            list.retain(|i| !hidden(*i));
+            list
+        };
+        let row_list = axis(vis.frozen_rows, vis.rows, Some(self.active.0), &|r| {
+            layout.geo.row_hidden(r)
+        });
+        let sheet = self.sheet;
         // A screen reader moves the cursor by asking to focus a cell node.
         let focus_actions = ctx.input(|i| {
             i.events
@@ -690,7 +1153,7 @@ impl GridView {
         let mut focus_request = None;
         for r in row_list {
             let row_id = grid_id.with(("row", r));
-            let row_bounds = Rect::from_min_max(cell_rect(r, 1).min, cell_rect(r, extent.1).max);
+            let row_bounds = view.screen_rect((r, 1, r, extent.1));
             rows_ui.interact(row_bounds, row_id, Sense::hover());
             rows_ui.ctx().accesskit_node_builder(row_id, |b| {
                 b.set_role(accesskit::Role::Row);
@@ -703,14 +1166,18 @@ impl GridView {
                     .max_rect(row_bounds)
                     .accessibility_parent(row_id),
             );
-            let mut col_list: Vec<u32> = (cols.0..=cols.1).collect();
-            if r == self.active.0 && !col_list.contains(&self.active.1) {
-                col_list.push(self.active.1);
-                col_list.sort_unstable();
-            }
+            let active_col = (r == self.active.0).then_some(self.active.1);
+            let col_list = axis(vis.frozen_cols, vis.cols, active_col, &|c| {
+                layout.geo.col_hidden(c)
+            });
             for c in col_list {
+                let merge = layout.merge_at(r, c);
+                if merge.is_some_and(|m| (m.0, m.1) != (r, c)) {
+                    continue;
+                }
+                let span = merge.unwrap_or((r, c, r, c));
                 let cell_id = self.cell_id(r, c);
-                let rect = cell_rect(r, c);
+                let rect = view.screen_rect(span);
                 // Only the active cell is focusable, so egui's arrow-key focus navigation cannot
                 // jump between cell widgets.
                 let sense = if (r, c) == self.active {
@@ -727,25 +1194,27 @@ impl GridView {
                 {
                     focus_request = Some((r, c));
                 }
-                let (content, is_formula) = match wb.cell(self.sheet, r, c) {
-                    Some(cell) => (
-                        numfmt::display_value(
-                            &cell.value,
-                            wb.number_format(self.sheet, r, c),
-                            date1904,
-                        ),
-                        cell.formula.is_some(),
-                    ),
-                    None => (String::new(), false),
-                };
-                let address = format!("{}{}", col_letters(c), r);
-                let formula = is_formula
-                    .then(|| wb.formula_text(self.sheet, r, c))
+                let cell = wb.cell(sheet, r, c);
+                let content = cell.map(|cell| display_text(wb, cell)).unwrap_or_default();
+                let formula = cell
+                    .is_some_and(|cell| cell.formula.is_some())
+                    .then(|| wb.formula_text(sheet, r, c))
                     .flatten();
+                let address = format!("{}{}", col_letters(c), r);
+                let selected = contains(selection, r, c);
                 cells_ui.ctx().accesskit_node_builder(cell_id, |b| {
                     b.set_role(accesskit::Role::Cell);
                     b.set_row_index((r - 1) as usize);
                     b.set_column_index((c - 1) as usize);
+                    if span.2 > span.0 {
+                        b.set_row_span((span.2 - span.0 + 1) as usize);
+                    }
+                    if span.3 > span.1 {
+                        b.set_column_span((span.3 - span.1 + 1) as usize);
+                    }
+                    if selected {
+                        b.set_selected(true);
+                    }
                     b.set_bounds(a11y::to_ak_rect(rect));
                     b.set_label(if content.is_empty() {
                         "blank".to_owned()
@@ -772,5 +1241,297 @@ impl GridView {
             b.set_column_count(extent.1 as usize);
             b.set_bounds(a11y::to_ak_rect(viewport));
         });
+    }
+}
+
+/// Draws one region: background, grid lines, merged cells, text and the selection.
+#[allow(clippy::too_many_arguments)]
+fn paint_region(
+    painter: &Painter,
+    wb: &Workbook,
+    ws: Option<&Worksheet>,
+    view: &View<'_>,
+    region: &Region,
+    pal: &Palette,
+    selection: Span,
+    active: (u32, u32),
+    font: &FontId,
+) {
+    if region.rows.0 > region.rows.1 || region.cols.0 > region.cols.1 || !region.clip.is_positive()
+    {
+        return;
+    }
+    let p = painter.with_clip_rect(region.clip.intersect(painter.clip_rect()));
+    let layout = view.layout;
+    let geo = &layout.geo;
+    let block = (region.rows.0, region.cols.0, region.rows.1, region.cols.1);
+    let area = view.canvas_rect(block).translate(region.shift);
+    p.rect_filled(area, 0.0, pal.cell_bg);
+    let line = Stroke::new(1.0, pal.grid_line);
+    for r in region.rows.0..=region.rows.1 + 1 {
+        let y = view.origin.y + COL_HEADER_H + geo.row_y(r) as f32 + region.shift.y;
+        p.hline(area.x_range(), y, line);
+    }
+    for c in region.cols.0..=region.cols.1 + 1 {
+        let x = view.origin.x + ROW_HEADER_W + geo.col_x(c) as f32 + region.shift.x;
+        p.vline(x, area.y_range(), line);
+    }
+
+    // A merged cell is one cell: cover the grid lines inside it.
+    let merges = layout.merges_overlapping(region.rows, region.cols);
+    for m in &merges {
+        let r = view.canvas_rect(*m).translate(region.shift);
+        if r.is_positive() {
+            p.rect_filled(r, 0.0, pal.cell_bg);
+            p.rect_stroke(r, 0.0, line, egui::StrokeKind::Inside);
+        }
+    }
+
+    if let Some(ws) = ws {
+        let rows = ws.rows();
+        let start = rows.partition_point(|r| r.r < region.rows.0);
+        for row in rows[start..].iter().take_while(|r| r.r <= region.rows.1) {
+            if geo.row_hidden(row.r) {
+                continue;
+            }
+            let cstart = row.cells.partition_point(|c| c.col < region.cols.0);
+            for cell in row.cells[cstart..]
+                .iter()
+                .take_while(|c| c.col <= region.cols.1)
+            {
+                if geo.col_hidden(cell.col) || layout.merge_at(row.r, cell.col).is_some() {
+                    continue;
+                }
+                let r = view
+                    .canvas_rect((row.r, cell.col, row.r, cell.col))
+                    .translate(region.shift);
+                paint_cell_text(&p, wb, cell, r, pal, font);
+            }
+        }
+        for m in &merges {
+            if let Some(cell) = ws.cell(m.0, m.1) {
+                let r = view.canvas_rect(*m).translate(region.shift);
+                paint_cell_text(&p, wb, cell, r, pal, font);
+            }
+        }
+    }
+
+    // Selection: tinted range, outlined, with the active cell (or its merge) outlined too.
+    let overlaps = selection.0 <= region.rows.1
+        && selection.2 >= region.rows.0
+        && selection.1 <= region.cols.1
+        && selection.3 >= region.cols.0;
+    if overlaps {
+        let r = view.canvas_rect(selection).translate(region.shift);
+        let multi = (selection.0, selection.1) != (selection.2, selection.3);
+        if multi {
+            p.rect_filled(r, 0.0, pal.accent.gamma_multiply(0.15));
+            p.rect_stroke(
+                r,
+                0.0,
+                Stroke::new(2.0, pal.accent),
+                egui::StrokeKind::Inside,
+            );
+        }
+        if contains(
+            (region.rows.0, region.cols.0, region.rows.1, region.cols.1),
+            active.0,
+            active.1,
+        ) {
+            let span = layout
+                .merge_at(active.0, active.1)
+                .unwrap_or((active.0, active.1, active.0, active.1));
+            let ar = view.canvas_rect(span).translate(region.shift);
+            p.rect_stroke(
+                ar,
+                0.0,
+                Stroke::new(2.0, pal.accent),
+                egui::StrokeKind::Inside,
+            );
+        }
+    }
+}
+
+fn paint_cell_text(
+    painter: &Painter,
+    wb: &Workbook,
+    cell: &Cell,
+    r: Rect,
+    pal: &Palette,
+    font: &FontId,
+) {
+    if !r.is_positive() {
+        return;
+    }
+    let text = display_text(wb, cell);
+    if text.is_empty() {
+        return;
+    }
+    let clipped = painter.with_clip_rect(r.shrink2(vec2(1.0, 0.0)).intersect(painter.clip_rect()));
+    let (anchor, pos, color) = match &cell.value {
+        CellValue::Number(_) => (
+            Align2::RIGHT_CENTER,
+            Pos2::new(r.right() - 4.0, r.center().y),
+            pal.text,
+        ),
+        CellValue::Bool(_) => (Align2::CENTER_CENTER, r.center(), pal.text),
+        CellValue::Error(_) => (
+            Align2::CENTER_CENTER,
+            r.center(),
+            Color32::from_rgb(200, 60, 60),
+        ),
+        _ => (
+            Align2::LEFT_CENTER,
+            Pos2::new(r.left() + 4.0, r.center().y),
+            pal.text,
+        ),
+    };
+    clipped.text(pos, anchor, text, font.clone(), color);
+}
+
+/// Sticky column and row headers; frozen ones stay put, the rest scroll under them.
+fn paint_headers(
+    painter: &Painter,
+    view: &View<'_>,
+    clip_all: Rect,
+    vis: &Visible,
+    pal: &Palette,
+    selection: Span,
+    font: &FontId,
+) {
+    let geo = &view.layout.geo;
+    let view_min = view.origin + view.scroll;
+    let fz = view.frozen_size();
+    let stroke = Stroke::new(1.0, pal.grid_line);
+
+    painter.rect_filled(
+        Rect::from_min_size(view_min, vec2(clip_all.width(), COL_HEADER_H)),
+        0.0,
+        pal.header_bg,
+    );
+    painter.rect_filled(
+        Rect::from_min_size(view_min, vec2(ROW_HEADER_W, clip_all.height())),
+        0.0,
+        pal.header_bg,
+    );
+
+    let col_groups = [
+        (
+            (1, vis.frozen_cols),
+            view.scroll.x,
+            view_min.x + ROW_HEADER_W,
+            view_min.x + ROW_HEADER_W + fz.x,
+        ),
+        (
+            vis.cols,
+            0.0,
+            view_min.x + ROW_HEADER_W + fz.x,
+            clip_all.right(),
+        ),
+    ];
+    for (cols, shift, left, right) in col_groups {
+        if cols.0 > cols.1 || right <= left {
+            continue;
+        }
+        let p = painter.with_clip_rect(
+            Rect::from_min_max(
+                Pos2::new(left, view_min.y),
+                Pos2::new(right, view_min.y + COL_HEADER_H),
+            )
+            .intersect(clip_all),
+        );
+        for c in cols.0..=cols.1 {
+            let w = geo.col_px(c) as f32;
+            if w <= 0.0 {
+                continue;
+            }
+            let x = view.origin.x + ROW_HEADER_W + geo.col_x(c) as f32 + shift;
+            let r = Rect::from_min_size(Pos2::new(x, view_min.y), vec2(w, COL_HEADER_H));
+            let selected = (selection.1..=selection.3).contains(&c);
+            if selected {
+                p.rect_filled(r, 0.0, pal.accent.gamma_multiply(0.2));
+            }
+            p.vline(r.left(), r.y_range(), stroke);
+            p.with_clip_rect(r.intersect(p.clip_rect())).text(
+                r.center(),
+                Align2::CENTER_CENTER,
+                col_letters(c),
+                font.clone(),
+                if selected { pal.accent } else { pal.text },
+            );
+        }
+    }
+    let row_groups = [
+        (
+            (1, vis.frozen_rows),
+            view.scroll.y,
+            view_min.y + COL_HEADER_H,
+            view_min.y + COL_HEADER_H + fz.y,
+        ),
+        (
+            vis.rows,
+            0.0,
+            view_min.y + COL_HEADER_H + fz.y,
+            clip_all.bottom(),
+        ),
+    ];
+    for (rows, shift, top, bottom) in row_groups {
+        if rows.0 > rows.1 || bottom <= top {
+            continue;
+        }
+        let p = painter.with_clip_rect(
+            Rect::from_min_max(
+                Pos2::new(view_min.x, top),
+                Pos2::new(view_min.x + ROW_HEADER_W, bottom),
+            )
+            .intersect(clip_all),
+        );
+        for r in rows.0..=rows.1 {
+            let h = geo.row_px(r) as f32;
+            if h <= 0.0 {
+                continue;
+            }
+            let y = view.origin.y + COL_HEADER_H + geo.row_y(r) as f32 + shift;
+            let rr = Rect::from_min_size(Pos2::new(view_min.x, y), vec2(ROW_HEADER_W, h));
+            let selected = (selection.0..=selection.2).contains(&r);
+            if selected {
+                p.rect_filled(rr, 0.0, pal.accent.gamma_multiply(0.2));
+            }
+            p.hline(rr.x_range(), rr.top(), stroke);
+            p.with_clip_rect(rr.intersect(p.clip_rect())).text(
+                rr.center(),
+                Align2::CENTER_CENTER,
+                r.to_string(),
+                font.clone(),
+                if selected { pal.accent } else { pal.text },
+            );
+        }
+    }
+
+    painter.hline(
+        view_min.x..=clip_all.right(),
+        view_min.y + COL_HEADER_H,
+        stroke,
+    );
+    painter.vline(
+        view_min.x + ROW_HEADER_W,
+        view_min.y..=clip_all.bottom(),
+        stroke,
+    );
+    // Frozen panes get a heavier divider.
+    let divider = Stroke::new(2.0, pal.grid_line);
+    if vis.frozen_cols > 0 {
+        painter.vline(
+            view_min.x + ROW_HEADER_W + fz.x,
+            view_min.y..=clip_all.bottom(),
+            divider,
+        );
+    }
+    if vis.frozen_rows > 0 {
+        painter.hline(
+            view_min.x..=clip_all.right(),
+            view_min.y + COL_HEADER_H + fz.y,
+            divider,
+        );
     }
 }

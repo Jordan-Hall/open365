@@ -10,7 +10,6 @@ mod doc_view;
 mod docmodel;
 mod fonts;
 mod grid_view;
-mod numfmt;
 
 use std::path::PathBuf;
 

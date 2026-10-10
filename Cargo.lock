@@ -2251,6 +2251,8 @@ dependencies = [
  "open365-commands",
  "open365-opc",
  "open365-testkit",
+ "serde_json",
+ "zip",
 ]
 
 [[package]]
@@ -2309,7 +2311,14 @@ dependencies = [
 name = "open365-testkit"
 version = "0.1.0"
 dependencies = [
+ "open365-calc",
+ "open365-commands",
+ "open365-docx",
  "open365-opc",
+ "open365-xlsx",
+ "quick-xml 0.42.0",
+ "serde_json",
+ "zip",
 ]
 
 [[package]]
@@ -2331,11 +2340,14 @@ dependencies = [
  "egui",
  "egui_kittest",
  "fontdb",
+ "open365-calc",
  "open365-commands",
  "open365-docx",
  "open365-opc",
  "open365-xlsx",
  "rfd",
+ "serde_json",
+ "skrifa",
 ]
 
 [[package]]

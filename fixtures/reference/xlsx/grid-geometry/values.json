@@ -1,0 +1,56 @@
+{
+  "source": "fixtures/xlsx/grid-geometry.xlsx",
+  "sheets": [
+    {
+      "name": "Custom",
+      "visible": -1,
+      "usedRange": "A1:H14",
+      "truncatedAt2000": false,
+      "cells": {
+        "A1": {
+          "value2": "Item",
+          "text": "Item",
+          "formula": null
+        },
+        "B1": {
+          "value2": "Qty",
+          "text": "Qty",
+          "formula": null
+        },
+        "A2": {
+          "value2": "tall",
+          "text": "tall",
+          "formula": null
+        },
+        "B3": {
+          "value2": 12.5,
+          "text": "12.5",
+          "formula": null
+        },
+        "C4": {
+          "value2": "wrapped text that needs several lines in a narrow cell",
+          "text": "wrapped text that needs several lines in a narrow cell",
+          "formula": null
+        },
+        "A12": {
+          "value2": "merged across",
+          "text": "merged across",
+          "formula": null
+        }
+      }
+    },
+    {
+      "name": "Defaults",
+      "visible": -1,
+      "usedRange": "A1:C2",
+      "truncatedAt2000": false,
+      "cells": {
+        "A1": {
+          "value2": "default sizes",
+          "text": "default sizes",
+          "formula": null
+        }
+      }
+    }
+  ]
+}

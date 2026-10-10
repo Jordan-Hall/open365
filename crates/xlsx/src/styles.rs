@@ -129,6 +129,22 @@ impl Styles {
         self.format_code(self.num_fmt_id(xf))
     }
 
+    /// The default font (`fonts/font[0]`, the Normal style's font) as `(name, size in points)`.
+    pub fn default_font(&self) -> Option<(String, f64)> {
+        let (_, root, _) = self.parsed.as_ref()?;
+        let font = root
+            .child_main("fonts")?
+            .elements()
+            .find(|e| e.head.is_main("font"))?;
+        let attr = |local: &str| {
+            font.elements()
+                .find(|e| e.head.is_main(local))
+                .and_then(|e| e.head.attr("val"))
+        };
+        let size = attr("sz")?.trim().parse::<f64>().ok()?;
+        Some((attr("name")?.to_owned(), size))
+    }
+
     /// Custom number formats declared in the style sheet, by id.
     pub fn custom_formats(&self) -> &HashMap<u32, String> {
         &self.num_fmts
