@@ -24,6 +24,10 @@ replaced and the current case is retried.
 
 A case with "format" gets that number format on the formula cell (applied after the formula, so a text format
 cannot turn the formula into text); the recorded "text" is Range.Text, which the numfmt conformance group checks.
+A format code Excel refuses is recorded as kind "rejected" (hresult "NumberFormat"). Excel keeps every distinct custom
+format in the workbook and fails after roughly 250, so the script swaps in a fresh workbook every 100 formats.
+Both workbooks use a 60-character-wide column, so Range.Text of "####" overflow, "*x" fill and the like reflects that
+width.
 
 Output is stable: corpus order, LF line endings, ASCII only, no absolute paths and no user information.
 #>
@@ -58,6 +62,25 @@ $script:xlPid = 0
 $script:books = @{}      # 'd1900' / 'd1904' -> @{ wb; s1; s2 }
 $script:restarts = 0
 
+function New-Book($app, [string]$name) {
+  $wb = $app.Workbooks.Add()
+  if ($name -eq 'd1904') { $wb.Date1904 = $true }
+  while ($wb.Worksheets.Count -lt 2) { [void]$wb.Worksheets.Add([Type]::Missing, $wb.Worksheets.Item($wb.Worksheets.Count)) }
+  $s1 = $wb.Worksheets.Item(1); $s1.Name = 'Sheet1'
+  $s2 = $wb.Worksheets.Item(2); $s2.Name = 'Sheet2'
+  $s1.Cells.ColumnWidth = 60
+  $s2.Cells.ColumnWidth = 60
+  return @{ wb = $wb; s1 = $s1; s2 = $s2; formats = @{} }
+}
+
+# Excel keeps every distinct custom number format in the workbook and refuses new ones after roughly 250, so a
+# workbook that has seen many formats is replaced by a fresh one.
+function Reset-Book([string]$name) {
+  $old = $script:books[$name]
+  try { $old.wb.Saved = $true; $old.wb.Close($false) } catch {}
+  $script:books[$name] = New-Book $script:xl $name
+}
+
 function Start-Excel {
   $app = New-Object -ComObject Excel.Application
   $app.Visible = $false
@@ -69,16 +92,7 @@ function Start-Excel {
   $script:xl = $app
   $script:xlPid = [int]$procId
   $script:books = @{}
-  foreach ($name in 'd1900', 'd1904') {
-    $wb = $app.Workbooks.Add()
-    if ($name -eq 'd1904') { $wb.Date1904 = $true }
-    while ($wb.Worksheets.Count -lt 2) { [void]$wb.Worksheets.Add([Type]::Missing, $wb.Worksheets.Item($wb.Worksheets.Count)) }
-    $s1 = $wb.Worksheets.Item(1); $s1.Name = 'Sheet1'
-    $s2 = $wb.Worksheets.Item(2); $s2.Name = 'Sheet2'
-    $s1.Cells.ColumnWidth = 60
-    $s2.Cells.ColumnWidth = 60
-    $script:books[$name] = @{ wb = $wb; s1 = $s1; s2 = $s2 }
-  }
+  foreach ($name in 'd1900', 'd1904') { $script:books[$name] = New-Book $app $name }
   $app.Calculation = -4105   # xlCalculationAutomatic
 }
 
@@ -162,7 +176,10 @@ function Set-Cell($ws, [string]$addr, $val) {
 }
 
 function Invoke-Case($case) {
-  $book = if ($case.date1904) { $script:books['d1904'] } else { $script:books['d1900'] }
+  $bookName = if ($case.date1904) { 'd1904' } else { 'd1900' }
+  if ($case.format -and -not $script:books[$bookName].formats.ContainsKey($case.format) -and $script:books[$bookName].formats.Count -ge 100) { Reset-Book $bookName }
+  $book = $script:books[$bookName]
+  if ($case.format) { $book.formats[$case.format] = $true }
   $s1 = $book.s1; $s2 = $book.s2
   $s1.Cells.Clear() | Out-Null
   $s2.Cells.Clear() | Out-Null
@@ -178,7 +195,14 @@ function Invoke-Case($case) {
     }
     throw
   }
-  if ($case.format) { $target.NumberFormat = $case.format }
+  if ($case.format) {
+    try { $target.NumberFormat = $case.format }
+    catch {
+      # An invalid format code is refused like an invalid formula.
+      if ($_.Exception.Message -match 'NumberFormat property') { return @{ kind = 'rejected'; hresult = 'NumberFormat' } }
+      throw
+    }
+  }
   $script:xl.Calculate()
   $v = $target.Value2
   $text = [string]$target.Text
@@ -243,6 +267,9 @@ try {
     decimal = [string]$script:xl.International(3)
     thousands = [string]$script:xl.International(4)
     country = [int]$script:xl.International(1)
+    date_order = [int]$script:xl.International(32)    # 0 month-day-year, 1 day-month-year, 2 year-month-day
+    list_sep = [string]$script:xl.International(5)
+    culture = [string][Globalization.CultureInfo]::CurrentCulture.Name
   }
   $n = 0
   foreach ($case in $cases) {
@@ -290,7 +317,7 @@ $lines = New-Object System.Collections.Generic.List[string]
 $lines.Add('{')
 $lines.Add('  "format": 1,')
 $lines.Add('  "oracle": "Microsoft Excel via COM, Range.Formula (legacy implicit intersection, no spill)",')
-$lines.Add('  "excel": {"version": ' + (Json-Str $excelInfo.version) + ', "build": ' + (Json-Str $excelInfo.build) + ', "decimal_separator": ' + (Json-Str $excelInfo.decimal) + ', "thousands_separator": ' + (Json-Str $excelInfo.thousands) + ', "country_code": ' + $excelInfo.country + '},')
+$lines.Add('  "excel": {"version": ' + (Json-Str $excelInfo.version) + ', "build": ' + (Json-Str $excelInfo.build) + ', "decimal_separator": ' + (Json-Str $excelInfo.decimal) + ', "thousands_separator": ' + (Json-Str $excelInfo.thousands) + ', "country_code": ' + $excelInfo.country + ', "date_order": ' + $excelInfo.date_order + ', "list_separator": ' + (Json-Str $excelInfo.list_sep) + ', "culture": ' + (Json-Str $excelInfo.culture) + '},')
 $lines.Add('  "results": [')
 for ($i = 0; $i -lt $records.Count; $i++) { $lines.Add($records[$i] + $(if ($i + 1 -lt $records.Count) { ',' } else { '' })) }
 $lines.Add('  ]')

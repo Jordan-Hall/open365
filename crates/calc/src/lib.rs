@@ -10,6 +10,7 @@ mod collate;
 pub mod eval;
 pub mod functions;
 pub mod graph;
+pub mod numfmt;
 pub mod parser;
 pub mod value;
 

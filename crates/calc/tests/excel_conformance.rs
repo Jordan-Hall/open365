@@ -11,6 +11,7 @@ use std::fs;
 use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::path::PathBuf;
 
+use open365_calc::numfmt::{format_value, validate_format};
 use open365_calc::{Engine, ErrorKind, Value};
 use serde::Deserialize;
 
@@ -30,6 +31,8 @@ struct Case {
     at: Option<String>,
     #[serde(default)]
     date1904: bool,
+    /// Number format applied to the formula cell; the case then also checks `Range.Text`.
+    format: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -52,6 +55,10 @@ struct Expected {
     id: String,
     kind: String,
     value: Option<serde_json::Value>,
+    /// `Range.Text` of the formula cell.
+    text: Option<String>,
+    /// For rejected cases: `NumberFormat` when Excel refused the format code rather than the formula.
+    hresult: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -178,6 +185,27 @@ fn compare(expected: &Expected, outcome: &Outcome) -> Option<String> {
     }
 }
 
+/// For a case with a number format: the displayed text must equal `Range.Text`, and Excel refusing the format
+/// code must match Open365 refusing it.
+fn compare_display(case: &Case, expected: &Expected, outcome: &Outcome) -> Option<String> {
+    let format = case.format.as_deref()?;
+    if expected.kind == "rejected" {
+        if expected.hresult.as_deref() != Some("NumberFormat") {
+            return None;
+        }
+        return validate_format(format)
+            .is_ok()
+            .then(|| format!("Excel refuses the format {format:?}; Open365 accepts it"));
+    }
+    let Outcome::Value(value) = outcome else {
+        return None;
+    };
+    let shown = format_value(value, format, case.date1904);
+    let want = expected.text.as_deref().unwrap_or_default();
+    (shown != want)
+        .then(|| format!("Range.Text: Excel {want:?}  Open365 {shown:?}  (format {format:?})"))
+}
+
 fn group_of(id: &str) -> &str {
     id.split('.').next().unwrap_or(id)
 }
@@ -234,7 +262,20 @@ fn matches_excel() {
         );
         let outcome = catch_unwind(AssertUnwindSafe(|| run_case(case)));
         let mismatch = match &outcome {
-            Ok(outcome) => compare(expected, outcome),
+            Ok(outcome) => (if case.format.is_some()
+                && expected.kind == "rejected"
+                && expected.hresult.as_deref() == Some("NumberFormat")
+            {
+                None
+            } else {
+                compare(expected, outcome)
+            })
+            .or_else(|| {
+                catch_unwind(AssertUnwindSafe(|| {
+                    compare_display(case, expected, outcome)
+                }))
+                .unwrap_or_else(|_| Some("Range.Text: panic".to_owned()))
+            }),
             Err(_) => Some(format!(
                 "Excel: {}  Open365: panic",
                 show_expected(expected)

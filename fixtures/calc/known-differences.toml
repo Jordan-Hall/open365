@@ -200,3 +200,26 @@ reason = "SIN/COS/TAN after the 64-bit-pi argument reduction (|x| > pi/4) differ
 [[difference]]
 id = "trigfit.t69"
 reason = "SIN/COS/TAN after the 64-bit-pi argument reduction (|x| > pi/4) differ from Excel by one ulp; the platform sin/cos kernels differ from Excel's."
+
+# The accounting formats pad with `*` fill. The fill count comes from glyph widths measured in the oracle's font
+# (crates/calc/src/numfmt/mod.rs, `glyph_units`); the negative section `_(* (#,##0)` ends in `)` instead of a
+# padding space and Open365 fills one space too few (probed: Excel 170 characters, Open365 169).
+[[difference]]
+id = "numfmt.pad.052"
+reason = "Fill width of the negative accounting section is one space short; parenthesis glyph widths are not exact."
+
+[[difference]]
+id = "numfmt.builtin.164"
+reason = "Same as numfmt.pad.052."
+
+[[difference]]
+id = "numfmt.builtin.171"
+reason = "Same as numfmt.pad.052."
+
+[[difference]]
+id = "numfmt.builtin.178"
+reason = "Same as numfmt.pad.052."
+
+[[difference]]
+id = "numfmt.builtin.185"
+reason = "Same as numfmt.pad.052."
