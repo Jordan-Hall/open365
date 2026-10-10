@@ -76,14 +76,17 @@ pub(crate) struct Out {
     text: String,
     width: f64,
     fill: Option<(usize, char)>,
+    /// `*x` fill is ignored (the `TEXT` function).
+    no_fill: bool,
 }
 
 impl Out {
-    fn new() -> Self {
+    fn new(target: Target) -> Self {
         Out {
             text: String::new(),
             width: 0.0,
             fill: None,
+            no_fill: target == Target::Function,
         }
     }
 
@@ -115,6 +118,7 @@ impl Out {
     fn finish(self) -> String {
         match self.fill {
             None => self.text,
+            Some(_) if self.no_fill => self.text,
             Some((at, c)) => {
                 let room = COLUMN_UNITS - self.width;
                 let n = if room > 0.0 {
@@ -130,6 +134,13 @@ impl Out {
             }
         }
     }
+}
+
+/// Where the text goes. A cell has a column width (`####` on overflow, `*x` fill); the `TEXT` function has neither.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Target {
+    Cell,
+    Function,
 }
 
 fn hashes() -> String {
@@ -203,16 +214,58 @@ pub fn try_format_value(value: &Value, code: &str, date1904: bool) -> Result<Str
     Ok(format_with(&format, value, date1904))
 }
 
+/// The text of the `TEXT` function: like a cell display without the column (no `####`, no `*x` fill).
+/// `None` where a cell would show `####` (a negative date, a condition no section matches).
+pub fn text_function(
+    value: &Value,
+    code: &str,
+    date1904: bool,
+) -> Result<Option<String>, FormatError> {
+    let format = NumberFormat::parse(code)?;
+    Ok(format_target(&format, value, date1904, Target::Function))
+}
+
+/// `|x|` rounded half away from zero (on its 15 significant digits) to `decimals` places, `decimals` may be
+/// negative to round left of the point; used by `FIXED` and `DOLLAR`. Returns the digits (with thousands
+/// separators when `grouping`) and whether the rounded value is negative and not zero.
+pub fn fixed_digits(x: f64, decimals: i32, grouping: bool) -> (String, bool) {
+    let mut dec = decimal::Dec::from_f64(x);
+    dec.round_at(i64::from(decimals));
+    let int = dec.int_digits();
+    let int = if int.is_empty() { "0".to_owned() } else { int };
+    let mut out = String::new();
+    for (i, c) in int.chars().enumerate() {
+        if grouping && i > 0 && (int.len() - i).is_multiple_of(3) {
+            out.push(',');
+        }
+        out.push(c);
+    }
+    if decimals > 0 {
+        out.push('.');
+        out.push_str(&dec.frac_digits(decimals as usize));
+    }
+    (out, x < 0.0 && !dec.is_zero())
+}
+
 /// Formats with an already parsed code.
 pub fn format_with(format: &NumberFormat, value: &Value, date1904: bool) -> String {
-    match value {
-        Value::Number(n) => format_number(format, *n, date1904),
-        Value::Text(s) => format_text(format, s),
-        Value::Bool(b) => format_text(format, if *b { "TRUE" } else { "FALSE" }),
+    format_target(format, value, date1904, Target::Cell).unwrap_or_else(hashes)
+}
+
+fn format_target(
+    format: &NumberFormat,
+    value: &Value,
+    date1904: bool,
+    target: Target,
+) -> Option<String> {
+    Some(match value {
+        Value::Number(n) => return format_number(format, *n, date1904, target),
+        Value::Text(s) => format_text(format, s, target),
+        Value::Bool(b) => format_text(format, if *b { "TRUE" } else { "FALSE" }, target),
         Value::Error(e) => e.as_str().to_owned(),
         Value::Empty => String::new(),
         Value::Array(_) => crate::value::ErrorKind::Value.as_str().to_owned(),
-    }
+    })
 }
 
 /// The index of the text section, if the code has one.
@@ -225,14 +278,14 @@ fn text_section(format: &NumberFormat) -> Option<usize> {
     }
 }
 
-fn format_text(format: &NumberFormat, s: &str) -> String {
+fn format_text(format: &NumberFormat, s: &str, target: Target) -> String {
     let n = format.sections.len();
     let idx = match text_section(format) {
         Some(i) => i,
         None if n == 1 && format.sections[0].kind == Kind::Text => 0,
         None => return s.to_owned(),
     };
-    let mut out = Out::new();
+    let mut out = Out::new(target);
     for tok in &format.sections[idx].toks {
         match tok {
             parse::Tok::At => out.push(s),
@@ -283,25 +336,24 @@ fn choose_section(format: &NumberFormat, x: f64) -> Option<(usize, bool)> {
     None
 }
 
-fn format_number(format: &NumberFormat, x: f64, date1904: bool) -> String {
+fn format_number(format: &NumberFormat, x: f64, date1904: bool, target: Target) -> Option<String> {
     if !x.is_finite() {
-        return crate::value::ErrorKind::Num.as_str().to_owned();
+        return Some(crate::value::ErrorKind::Num.as_str().to_owned());
     }
     let secs = &format.sections;
     if secs.len() == 1 && secs[0].kind == Kind::Text {
-        return decimal::general_text(x);
+        return Some(decimal::general_text(x));
     }
-    let Some((idx, own_sign)) = choose_section(format, x) else {
-        return hashes();
-    };
+    let (idx, own_sign) = choose_section(format, x)?;
     let sec = &secs[idx];
-    let mut out = Out::new();
+    let mut out = Out::new(target);
     let negative = x < 0.0 && !own_sign;
     let ok = render_section(sec, x.abs(), negative, date1904, &mut out);
-    if !ok || (sec.kind != Kind::Text && out.width > COLUMN_UNITS) {
-        return hashes();
+    let overflow = target == Target::Cell && sec.kind != Kind::Text && out.width > COLUMN_UNITS;
+    if !ok || overflow {
+        return None;
     }
-    out.finish()
+    Some(out.finish())
 }
 
 fn render_section(sec: &Section, x: f64, negative: bool, date1904: bool, out: &mut Out) -> bool {

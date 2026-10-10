@@ -223,3 +223,23 @@ reason = "Same as numfmt.pad.052."
 [[difference]]
 id = "numfmt.builtin.185"
 reason = "Same as numfmt.pad.052."
+
+[[difference]]
+id = "text.fmt_bool"
+reason = "TEXT(1,TRUE): the format text is `TRUE`; Excel's TEXT refuses it (#VALUE!, an uppercase `E` is not a format letter) while Open365's format parser reads `E` as the era year."
+
+[[difference]]
+id = "text.fmt_text_only"
+reason = "TEXT(5,\"abc\") is `a43c` in Excel (`b` is the Buddhist-calendar year, `a` and `c` literals); numfmt has no `b` code and refuses the format, so Open365 returns #VALUE!."
+
+[[difference]]
+id = "text.fmt_invalid3"
+reason = "TEXT refuses four decimals on seconds (`ss.0000`, #VALUE!); numfmt accepts any number of them."
+
+[[difference]]
+id = "text.fmt_nested_bracket"
+reason = "TEXT refuses two colour codes in one section (`[Red][Blue]0`, #VALUE!); numfmt accepts and ignores the second."
+
+[[difference]]
+id = "textsplit.sumv"
+reason = "SUM(VALUE(TEXTSPLIT(..))): Excel applies the scalar VALUE to every element of a computed array in a plain formula (10); the evaluator only lifts scalar functions inside array parameters such as SUMPRODUCT's, so Open365 gives 1."

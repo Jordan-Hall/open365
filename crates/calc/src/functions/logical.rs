@@ -139,3 +139,8 @@ pub(super) fn iserror(ctx: &EvalContext<'_>, args: &[Arg]) -> Res<Value> {
 pub(super) fn isna(ctx: &EvalContext<'_>, args: &[Arg]) -> Res<Value> {
     test(ctx, args, |v| matches!(v, Value::Error(ErrorKind::NA)))
 }
+
+pub(super) fn na(_ctx: &EvalContext<'_>, args: &[Arg]) -> Res<Value> {
+    arity(args, 0, 0)?;
+    Err(ErrorKind::NA)
+}

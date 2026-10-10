@@ -47,7 +47,7 @@ fn count_arg(ctx: &EvalContext<'_>, args: &[Arg], index: usize, default: usize) 
 
 /// Excel rejects counts beyond the 32,767-character limit.
 fn limit(n: usize) -> Res<usize> {
-    if n > 1 << 30 {
+    if n > i32::MAX as usize {
         Err(ErrorKind::Value)
     } else {
         Ok(n)
@@ -73,7 +73,7 @@ pub(super) fn mid(ctx: &EvalContext<'_>, args: &[Arg]) -> Res<Value> {
     let u = units(&text_arg(ctx, &args[0])?);
     let start = int_arg(ctx, &args[1])?;
     let n = limit(count_arg(ctx, args, 2, 0)?)?;
-    if !(1..=1 << 30).contains(&start) {
+    if !(1..=i64::from(i32::MAX)).contains(&start) {
         return Err(ErrorKind::Value);
     }
     let from = (start as usize - 1).min(u.len());
@@ -83,46 +83,55 @@ pub(super) fn mid(ctx: &EvalContext<'_>, args: &[Arg]) -> Res<Value> {
 
 /// Excel maps characters one to one and only inside the Basic Multilingual Plane; a few characters whose
 /// simple case mapping crosses scripts (`µ`, `ſ`, `ẞ`) keep their form.
-fn map_case(s: &str, upper: bool) -> String {
+pub(super) fn map_case(s: &str, upper: bool) -> String {
     let chars: Vec<char> = s.chars().collect();
-    chars
-        .iter()
-        .enumerate()
-        .map(|(i, &c)| {
-            // Greek capital sigma at the end of a word becomes the final form.
-            if !upper
-                && c == 'Σ'
-                && i > 0
-                && chars[i - 1].is_alphabetic()
-                && !chars.get(i + 1).is_some_and(|n| n.is_alphabetic())
-            {
-                return 'ς';
-            }
-            if c.is_ascii() {
-                return if upper {
-                    c.to_ascii_uppercase()
-                } else {
-                    c.to_ascii_lowercase()
-                };
-            }
-            if c as u32 > 0xFFFF || matches!(c, 'µ' | 'ſ' | 'ẞ' | 'ß') {
-                return c;
-            }
-            if !upper && c == 'İ' {
-                return 'i';
-            }
-            let mut mapped = if upper {
-                c.to_uppercase().collect::<Vec<_>>()
-            } else {
-                c.to_lowercase().collect::<Vec<_>>()
-            };
-            if mapped.len() == 1 {
-                mapped.remove(0)
-            } else {
-                c
-            }
-        })
+    (0..chars.len())
+        .map(|i| map_char(&chars, i, upper))
         .collect()
+}
+
+/// The case mapping of `chars[i]`; the neighbours matter for the Greek final sigma.
+pub(super) fn map_char(chars: &[char], i: usize, upper: bool) -> char {
+    let c = chars[i];
+    if c.is_ascii() {
+        return if upper {
+            c.to_ascii_uppercase()
+        } else {
+            c.to_ascii_lowercase()
+        };
+    }
+    // Greek capital sigma becomes the final form unless a letter or digit follows (a lone sigma is final too).
+    if !upper && c == 'Σ' {
+        return if chars.get(i + 1).is_some_and(|n| n.is_alphanumeric()) {
+            'σ'
+        } else {
+            'ς'
+        };
+    }
+    if c as u32 > 0xFFFF || matches!(c, 'µ' | 'ſ' | 'ẞ' | 'ß') {
+        return c;
+    }
+    // Excel keeps the Kelvin, Ohm and Angstrom signs when lower-casing.
+    if !upper && matches!(c, '\u{212A}' | '\u{2126}' | '\u{212B}') {
+        return c;
+    }
+    if !upper && c == 'İ' {
+        return 'i';
+    }
+    // Excel maps these two to the capital with a diaeresis only (the full mapping adds a tonos).
+    if upper && matches!(c, 'ΐ' | 'ΰ') {
+        return if c == 'ΐ' { 'Ϊ' } else { 'Ϋ' };
+    }
+    let mut mapped = if upper {
+        c.to_uppercase().collect::<Vec<_>>()
+    } else {
+        c.to_lowercase().collect::<Vec<_>>()
+    };
+    if mapped.len() == 1 {
+        mapped.remove(0)
+    } else {
+        c
+    }
 }
 
 pub(super) fn upper(ctx: &EvalContext<'_>, args: &[Arg]) -> Res<Value> {

@@ -907,3 +907,26 @@ fn today_and_now_use_the_injected_clock() {
     e.set_date1904(true);
     assert_eq!(eval_in(&mut e, "TODAY()"), n(45244.0 - 1462.0));
 }
+
+#[test]
+fn dollar_uses_the_en_us_currency_style() {
+    assert_eq!(eval("=DOLLAR(1234.567)"), t("$1,234.57"));
+    assert_eq!(eval("=DOLLAR(1234.567,-2)"), t("$1,200"));
+    // Microsoft's documented example; the en-GB oracle cannot confirm negatives.
+    assert_eq!(eval("=DOLLAR(-1234.567,-2)"), t("($1,200)"));
+}
+
+#[test]
+fn text_functions_added_with_the_text_batch() {
+    assert_eq!(eval("=TEXTBEFORE(\"a-b-c\",\"-\",-1)"), t("a-b"));
+    assert_eq!(eval("=TEXTAFTER(\"aaaa\",\"aa\",-2)"), t("aa"));
+    assert_eq!(
+        eval("=TEXTJOIN(\"|\",FALSE,TEXTSPLIT(\"a,b;c\",\",\",\";\",,,\"-\"))"),
+        t("a|b|c|-")
+    );
+    assert_eq!(eval("=PROPER(\"2nd it's\")"), t("2Nd It'S"));
+    assert_eq!(eval("=NUMBERVALUE(\"3%%\")"), n(0.0003));
+    assert_eq!(eval("=UNICHAR(55296)"), err(NA));
+    assert_eq!(eval("=LENB(\"😀x\")"), n(3.0));
+    assert_eq!(eval("=FIXED(1234.5678,-2)"), t("1,200"));
+}

@@ -3,11 +3,16 @@
 mod arith;
 mod criteria;
 mod datetime;
+mod letters;
 mod logical;
 mod lookup;
 mod math;
 mod stats;
 mod text;
+mod textbyte;
+mod textchar;
+mod textfmt;
+mod textsplit;
 
 use std::collections::HashMap;
 use std::sync::OnceLock;
@@ -133,6 +138,7 @@ static TABLE: &[(&str, Func)] = &[
     ("ISTEXT", Func::Res(logical::istext)),
     ("ISERROR", Func::Res(logical::iserror)),
     ("ISNA", Func::Res(logical::isna)),
+    ("NA", Func::Res(logical::na)),
     // text
     ("LEN", Func::Res(text::len)),
     ("LEFT", Func::Res(text::left)),
@@ -149,6 +155,32 @@ static TABLE: &[(&str, Func)] = &[
     ("SUBSTITUTE", Func::Res(text::substitute)),
     ("REPT", Func::Res(text::rept)),
     ("VALUE", Func::Res(text::value)),
+    ("TEXT", Func::Res(textfmt::text)),
+    ("FIXED", Func::Res(textfmt::fixed)),
+    ("DOLLAR", Func::Res(textfmt::dollar)),
+    ("NUMBERVALUE", Func::Res(textfmt::numbervalue)),
+    ("VALUETOTEXT", Func::Res(textfmt::valuetotext)),
+    ("ARRAYTOTEXT", Func::Res(textfmt::arraytotext)),
+    ("CHAR", Func::Res(textchar::char_fn)),
+    ("CODE", Func::Res(textchar::code)),
+    ("UNICHAR", Func::Res(textchar::unichar)),
+    ("UNICODE", Func::Res(textchar::unicode)),
+    ("EXACT", Func::Res(textchar::exact)),
+    ("PROPER", Func::Res(textchar::proper)),
+    ("CLEAN", Func::Res(textchar::clean)),
+    ("T", Func::Res(textchar::t)),
+    ("N", Func::Res(textchar::n)),
+    ("REPLACE", Func::Res(textbyte::replace)),
+    ("REPLACEB", Func::Res(textbyte::replaceb)),
+    ("LENB", Func::Res(textbyte::lenb)),
+    ("LEFTB", Func::Res(text::left)),
+    ("RIGHTB", Func::Res(text::right)),
+    ("MIDB", Func::Res(textbyte::midb)),
+    ("FINDB", Func::Res(textbyte::findb)),
+    ("SEARCHB", Func::Res(textbyte::searchb)),
+    ("TEXTBEFORE", Func::Res(textsplit::textbefore)),
+    ("TEXTAFTER", Func::Res(textsplit::textafter)),
+    ("TEXTSPLIT", Func::Res(textsplit::textsplit)),
     // lookup and reference
     ("VLOOKUP", Func::Res(lookup::vlookup)),
     ("HLOOKUP", Func::Res(lookup::hlookup)),
@@ -246,6 +278,25 @@ pub(crate) fn is_elementwise(name: &str) -> bool {
         "REPT",
         "FIND",
         "SEARCH",
+        "TEXT",
+        "FIXED",
+        "DOLLAR",
+        "NUMBERVALUE",
+        "CHAR",
+        "CODE",
+        "UNICHAR",
+        "UNICODE",
+        "EXACT",
+        "PROPER",
+        "CLEAN",
+        "REPLACE",
+        "REPLACEB",
+        "LENB",
+        "LEFTB",
+        "RIGHTB",
+        "MIDB",
+        "FINDB",
+        "SEARCHB",
         "YEAR",
         "MONTH",
         "DAY",

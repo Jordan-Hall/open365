@@ -5,7 +5,7 @@ never needs Excel.
 
 | File | Role |
 |---|---|
-| `fixtures/calc/conformance.json` | The corpus: 8,306 cases. Edited by hand or by script; one case per line. |
+| `fixtures/calc/conformance.json` | The corpus: 10,004 cases. Edited by hand or by script; one case per line. |
 | `tools/office/calc-oracle.ps1` | Local-only tool. Runs every case in Excel over COM and writes the results. |
 | `fixtures/reference/calc/conformance-results.json` | Excel's answers, committed. Includes Excel version, build and decimal separator. |
 | `fixtures/calc/known-differences.toml` | Cases where Open365 intentionally or temporarily differs, each with a reason. |
@@ -66,7 +66,7 @@ forms; the corpus has no case for them.
 
 ## Current state
 
-8,306 cases, 8,251 pass (99.34%), 55 known differences (the 50 below plus 5 fill-width cases of negative accounting formats) (14 older ones plus 36 in the new math/statistics groups: large COMBIN, trigonometric last digits after argument reduction, variance accumulation order). Before the fixes driven by this corpus 3,311 of 3,700
+10,004 cases, 9,949 pass (99.45%), 60 known differences (55 earlier ones plus 5 in the text batch) (14 older ones plus 36 in the new math/statistics groups: large COMBIN, trigonometric last digits after argument reduction, variance accumulation order). Before the fixes driven by this corpus 3,311 of 3,700
 passed (89.49%). The remaining differences are listed with reasons in `known-differences.toml`: the `**`
 parse quirk, XLOOKUP array results (no spill), a few undocumented Excel quirks (`DATE` with huge day numbers,
 CONCAT over the cell limit returning an unnamed error code, a 17-digit literal) and two formulas Excel
@@ -134,3 +134,27 @@ Added with the number format engine (`crates/calc/src/numfmt`, 3,271 cases in gr
   oracle's column, not a user-resized one.
 * Excel accepts most unquoted ASCII letters as literals; it refuses `b d e g h m n s y` (format letters) in numeric
   sections, `E` without a sign, `0:0`, `0/` and `/0`, lowercase `e+`.
+
+Added with the text batch (TEXT, FIXED, DOLLAR, CHAR, CODE, UNICHAR, UNICODE, EXACT, PROPER, CLEAN, T, N, NUMBERVALUE,
+TEXTBEFORE, TEXTAFTER, TEXTSPLIT, VALUETOTEXT, ARRAYTOTEXT, REPLACE and the B variants; about 1,700 cases):
+
+* `TEXT` is the cell display without the column: no `*x` fill, no `####` (a negative date or an unmatched condition is
+  `#VALUE!`), result longer than 255 UTF-16 units is `#VALUE!`. Numeric text is converted first, blank is 0.
+  `TEXT` accepts a few format codes `Range.NumberFormat` style parsing does not (known differences `text.fmt_*`).
+* `FIXED`/`DOLLAR` round half away on the 15-digit value, decimals above 127 are `#VALUE!`, negative decimals round
+  left; `FIXED(x,,TRUE)` means 2 decimals but `DOLLAR(x,)` means 0. The oracle is en-GB: `DOLLAR` prints `£` and `-£1.00`.
+  The corpus normalises the symbol with `SUBSTITUTE` and leaves negatives out; Open365 implements the documented en-US form `($1,200)`.
+* `CHAR`/`CODE` use Windows-1252 (`CODE` gives 63 for other characters); `UNICHAR` gives `#N/A` for surrogates and
+  noncharacters (`U+FDD0..FDEF`, `U+xFFFE/xFFFF`). `CLEAN` removes `U+0000..001F` and `U+0080..009F`.
+* `PROPER` works on BMP letters only; its first letter is `UPPER(LOWER(c))`. `LOWER` turns a capital sigma into `ς`
+  unless a letter or digit follows, and keeps the Kelvin, Ohm and Angstrom signs.
+* `TEXTBEFORE`/`TEXTAFTER`/`TEXTSPLIT`: non-overlapping matches, longest delimiter wins, case-insensitive mode lower-cases
+  text and every delimiter separately (asymmetric for sigma). `|instance| > LEN` is `#VALUE!`, within it and absent `#N/A`.
+* `NUMBERVALUE` ignores space, tab, CR and LF (not NBSP), allows group separators only before the decimal one, divides by 100 per `%`,
+  and falls back to date and time text. Currency symbols and day-first dates are locale-dependent and not in the corpus.
+* `VALUETOTEXT` never returns an error (errors and non-intersecting ranges are shown as text); `ARRAYTOTEXT(blank cell)` is `#VALUE!`.
+* Byte functions (no double-byte language): `LENB`, `MIDB`, `FINDB`, `SEARCHB`, `REPLACEB` count UTF-16 units (`MIDB` can split
+  a surrogate pair, shown as U+FFFD); `LEFTB`/`RIGHTB` equal `LEFT`/`RIGHT`.
+
+Not done yet: the date/time batch (TIME, HOUR, MINUTE, SECOND, WEEKDAY, WEEKNUM, ISOWEEKNUM, EDATE, EOMONTH, DATEDIF, DAYS,
+DAYS360, NETWORKDAYS(.INTL), WORKDAY(.INTL), YEARFRAC, DATEVALUE, TIMEVALUE) and the five accounting-fill differences.
