@@ -2,37 +2,23 @@
 
 use super::Out;
 use super::parse::{Section, Tok};
+use crate::fmtlocale::FormatLocale;
 use crate::functions::serial_to_ymd;
-
-const MONTHS: [&str; 12] = [
-    "January",
-    "February",
-    "March",
-    "April",
-    "May",
-    "June",
-    "July",
-    "August",
-    "September",
-    "October",
-    "November",
-    "December",
-];
-const DAYS: [&str; 7] = [
-    "Sunday",
-    "Monday",
-    "Tuesday",
-    "Wednesday",
-    "Thursday",
-    "Friday",
-    "Saturday",
-];
 
 const MAX_SERIAL_1900: f64 = 2_958_465.0;
 const MAX_SERIAL_1904: f64 = 2_957_003.0;
 
 /// Renders a date/time section. Returns false when the value cannot be shown (Excel prints `####`).
-pub(super) fn render_date(sec: &Section, v: f64, date1904: bool, out: &mut Out) -> bool {
+pub(super) fn render_date(
+    sec: &Section,
+    v: f64,
+    date1904: bool,
+    default_locale: &FormatLocale,
+    out: &mut Out,
+) -> bool {
+    // A `[$-LCID]` prefix selects the names of that language.
+    let by_lcid = sec.lcid.and_then(FormatLocale::for_lcid);
+    let loc: &FormatLocale = by_lcid.as_deref().unwrap_or(default_locale);
     if !v.is_finite() || v < 0.0 {
         return false;
     }
@@ -117,16 +103,16 @@ pub(super) fn render_date(sec: &Section, v: f64, date1904: bool, out: &mut Out) 
                 match n {
                     1 => out.push(&ymd.1.to_string()),
                     2 => out.push(&format!("{:02}", ymd.1)),
-                    3 => out.push(&MONTHS[m][..3]),
-                    5 => out.push(&MONTHS[m][..1]),
-                    _ => out.push(MONTHS[m]),
+                    3 => out.push(&loc.month_abbr[m]),
+                    5 => out.push(&loc.month_full[m].chars().take(1).collect::<String>()),
+                    _ => out.push(&loc.month_full[m]),
                 }
             }
             Tok::Day(n) => match n {
                 1 => out.push(&ymd.2.to_string()),
                 2 => out.push(&format!("{:02}", ymd.2)),
-                3 => out.push(&DAYS[weekday][..3]),
-                _ => out.push(DAYS[weekday]),
+                3 => out.push(&loc.day_abbr[weekday]),
+                _ => out.push(&loc.day_full[weekday]),
             },
             Tok::Hour(n) => {
                 let mut h = hour24 as i64;
@@ -163,16 +149,16 @@ pub(super) fn render_date(sec: &Section, v: f64, date1904: bool, out: &mut Out) 
             Tok::AmPm { short, upper } => {
                 let pm = hour24 >= 12.0;
                 // `AM/PM` is always upper case; `a/p` keeps the case written in the format code.
-                let s = match (short, pm) {
-                    (false, false) => "AM",
-                    (false, true) => "PM",
-                    (true, false) => "A",
-                    (true, true) => "P",
-                };
-                if *short && !*upper {
-                    out.push(&s.to_ascii_lowercase());
+                let full = if pm { &loc.pm } else { &loc.am };
+                if !*short {
+                    out.push(full);
                 } else {
-                    out.push(s);
+                    let s: String = full.chars().take(1).collect();
+                    if *upper {
+                        out.push(&s);
+                    } else {
+                        out.push(&s.to_lowercase());
+                    }
                 }
             }
             Tok::BuddhistYear(n) => {

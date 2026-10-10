@@ -8,6 +8,7 @@ license.workspace = true
 publish.workspace = true
 
 [dependencies]
+open365-locale = { workspace = true }
 
 [dev-dependencies]
 serde = { version = "1.0.229", features = ["derive"] }

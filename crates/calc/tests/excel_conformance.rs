@@ -6,13 +6,16 @@
 //! in `fixtures/calc/known-differences.toml` with a reason. A listed case that starts to pass is an error too, so
 //! the list can only shrink.
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::cell::RefCell;
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::fs;
 use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::path::PathBuf;
+use std::sync::Arc;
 
-use open365_calc::numfmt::{format_value, validate_format};
-use open365_calc::{Engine, ErrorKind, Value};
+use open365_calc::numfmt::{format_value_in, validate_format};
+use open365_calc::{Engine, ErrorKind, FormatLocale, Value};
+use open365_locale::Locale;
 use serde::Deserialize;
 
 #[derive(Debug, Deserialize)]
@@ -33,6 +36,26 @@ struct Case {
     date1904: bool,
     /// Number format applied to the formula cell; the case then also checks `Range.Text`.
     format: Option<String>,
+    /// `"en-GB"`: the case depends on the oracle's system locale and Open365 evaluates it in that locale.
+    /// Without it the case must give the same answer in every locale.
+    locale: Option<String>,
+}
+
+/// The locale a case is evaluated in (en-US unless the case names one); built once per tag.
+fn case_locale(case: &Case) -> Arc<FormatLocale> {
+    thread_local! {
+        static CACHE: RefCell<HashMap<String, Arc<FormatLocale>>> = RefCell::new(HashMap::new());
+    }
+    let tag = case.locale.as_deref().unwrap_or("en-US").to_owned();
+    CACHE.with(|c| {
+        c.borrow_mut()
+            .entry(tag.clone())
+            .or_insert_with(|| {
+                let locale = Locale::from_bcp47(&tag).expect("locale tag");
+                Arc::new(FormatLocale::new(&locale))
+            })
+            .clone()
+    })
 }
 
 #[derive(Debug, Deserialize)]
@@ -117,6 +140,7 @@ enum Outcome {
 fn run_case(case: &Case) -> Outcome {
     let mut engine = Engine::new();
     engine.set_date1904(case.date1904);
+    engine.set_format_locale(case_locale(case));
     engine.add_sheet("Sheet1");
     engine.add_sheet("Sheet2");
     load_cells(&mut engine, "Sheet1", &case.cells);
@@ -207,7 +231,7 @@ fn compare_display(case: &Case, expected: &Expected, outcome: &Outcome) -> Optio
     let Outcome::Value(value) = outcome else {
         return None;
     };
-    let shown = format_value(value, format, case.date1904);
+    let shown = format_value_in(value, format, case.date1904, &case_locale(case));
     let want = expected.text.as_deref().unwrap_or_default();
     (shown != want)
         .then(|| format!("Range.Text: Excel {want:?}  Open365 {shown:?}  (format {format:?})"))

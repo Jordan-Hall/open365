@@ -16,6 +16,7 @@ mod parse;
 
 use std::fmt;
 
+use crate::fmtlocale::FormatLocale;
 use crate::value::Value;
 use parse::{Kind, NumberFormat, Section};
 
@@ -210,8 +211,29 @@ fn format_general(value: &Value) -> String {
 
 /// Like [`format_value`], reporting an invalid format code.
 pub fn try_format_value(value: &Value, code: &str, date1904: bool) -> Result<String, FormatError> {
+    try_format_value_in(value, code, date1904, &FormatLocale::en_us())
+}
+
+/// Like [`format_value`] in a locale: month and day names and AM/PM follow it, unless the code carries its own
+/// `[$-LCID]` prefix. Separators are not locale-dependent (measured: a `[$-LCID]` prefix leaves them alone).
+pub fn format_value_in(value: &Value, code: &str, date1904: bool, locale: &FormatLocale) -> String {
+    try_format_value_in(value, code, date1904, locale).unwrap_or_else(|_| format_general(value))
+}
+
+/// Like [`try_format_value`] in a locale.
+pub fn try_format_value_in(
+    value: &Value,
+    code: &str,
+    date1904: bool,
+    locale: &FormatLocale,
+) -> Result<String, FormatError> {
     let format = NumberFormat::parse(code)?;
-    Ok(format_with(&format, value, date1904))
+    Ok(format_with_in(&format, value, date1904, locale))
+}
+
+/// The built-in format code of a `numFmtId` in a locale (see [`FormatLocale::builtin_format_code`]).
+pub fn builtin_format_code_in(id: u32, locale: &FormatLocale) -> Option<String> {
+    locale.builtin_format_code(id)
 }
 
 /// The text of the `TEXT` function: like a cell display without the column (no `####`, no `*x` fill).
@@ -221,8 +243,24 @@ pub fn text_function(
     code: &str,
     date1904: bool,
 ) -> Result<Option<String>, FormatError> {
+    text_function_in(value, code, date1904, &FormatLocale::en_us())
+}
+
+/// Like [`text_function`] in a locale.
+pub fn text_function_in(
+    value: &Value,
+    code: &str,
+    date1904: bool,
+    locale: &FormatLocale,
+) -> Result<Option<String>, FormatError> {
     let format = NumberFormat::parse(code)?;
-    Ok(format_target(&format, value, date1904, Target::Function))
+    Ok(format_target(
+        &format,
+        value,
+        date1904,
+        Target::Function,
+        locale,
+    ))
 }
 
 /// `|x|` rounded half away from zero (on its 15 significant digits) to `decimals` places, `decimals` may be
@@ -249,7 +287,17 @@ pub fn fixed_digits(x: f64, decimals: i32, grouping: bool) -> (String, bool) {
 
 /// Formats with an already parsed code.
 pub fn format_with(format: &NumberFormat, value: &Value, date1904: bool) -> String {
-    format_target(format, value, date1904, Target::Cell).unwrap_or_else(hashes)
+    format_with_in(format, value, date1904, &FormatLocale::en_us())
+}
+
+/// Like [`format_with`] in a locale.
+pub fn format_with_in(
+    format: &NumberFormat,
+    value: &Value,
+    date1904: bool,
+    locale: &FormatLocale,
+) -> String {
+    format_target(format, value, date1904, Target::Cell, locale).unwrap_or_else(hashes)
 }
 
 fn format_target(
@@ -257,9 +305,10 @@ fn format_target(
     value: &Value,
     date1904: bool,
     target: Target,
+    locale: &FormatLocale,
 ) -> Option<String> {
     Some(match value {
-        Value::Number(n) => return format_number(format, *n, date1904, target),
+        Value::Number(n) => return format_number(format, *n, date1904, target, locale),
         Value::Text(s) => format_text(format, s, target),
         Value::Bool(b) => format_text(format, if *b { "TRUE" } else { "FALSE" }, target),
         Value::Error(e) => e.as_str().to_owned(),
@@ -336,7 +385,13 @@ fn choose_section(format: &NumberFormat, x: f64) -> Option<(usize, bool)> {
     None
 }
 
-fn format_number(format: &NumberFormat, x: f64, date1904: bool, target: Target) -> Option<String> {
+fn format_number(
+    format: &NumberFormat,
+    x: f64,
+    date1904: bool,
+    target: Target,
+    locale: &FormatLocale,
+) -> Option<String> {
     if !x.is_finite() {
         return Some(crate::value::ErrorKind::Num.as_str().to_owned());
     }
@@ -348,7 +403,7 @@ fn format_number(format: &NumberFormat, x: f64, date1904: bool, target: Target) 
     let sec = &secs[idx];
     let mut out = Out::new(target);
     let negative = x < 0.0 && !own_sign;
-    let ok = render_section(sec, x.abs(), negative, date1904, &mut out);
+    let ok = render_section(sec, x.abs(), negative, date1904, locale, &mut out);
     let overflow = target == Target::Cell && sec.kind != Kind::Text && out.width > COLUMN_UNITS;
     if !ok || overflow {
         return None;
@@ -356,7 +411,14 @@ fn format_number(format: &NumberFormat, x: f64, date1904: bool, target: Target) 
     Some(out.finish())
 }
 
-fn render_section(sec: &Section, x: f64, negative: bool, date1904: bool, out: &mut Out) -> bool {
+fn render_section(
+    sec: &Section,
+    x: f64,
+    negative: bool,
+    date1904: bool,
+    locale: &FormatLocale,
+    out: &mut Out,
+) -> bool {
     use parse::Tok;
     match sec.kind {
         Kind::Date => {
@@ -364,7 +426,7 @@ fn render_section(sec: &Section, x: f64, negative: bool, date1904: bool, out: &m
             if negative && !date1904 {
                 return false;
             }
-            let ok = date::render_date(sec, x, date1904, out);
+            let ok = date::render_date(sec, x, date1904, locale, out);
             if ok && negative {
                 out.insert_minus();
             }

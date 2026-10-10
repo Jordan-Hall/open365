@@ -9,6 +9,7 @@ pub mod ast;
 mod collate;
 mod datetext;
 pub mod eval;
+mod fmtlocale;
 pub mod functions;
 pub mod graph;
 pub mod numfmt;
@@ -16,9 +17,11 @@ pub mod parser;
 pub mod value;
 
 use std::collections::{HashMap, HashSet};
+use std::sync::Arc;
 
 pub use ast::{Ast, to_formula_string};
 pub use eval::{CellSource, Clock, EvalContext, FixedClock, SystemClock, evaluate, evaluate_root};
+pub use fmtlocale::{DateOrder, FormatLocale, cldr_to_excel};
 pub use parser::{ParseError, ParseErrorKind, parse_formula};
 pub use value::{ErrorKind, Value};
 
@@ -100,6 +103,7 @@ pub struct Engine {
     names: HashMap<String, Ast>,
     name_users: HashMap<String, HashSet<CellId>>,
     date1904: bool,
+    locale: Arc<FormatLocale>,
     clock: Box<dyn Clock>,
     dirty: HashSet<CellId>,
     circular: HashSet<CellId>,
@@ -131,6 +135,7 @@ impl Engine {
             names: HashMap::new(),
             name_users: HashMap::new(),
             date1904: false,
+            locale: FormatLocale::en_us(),
             clock,
             dirty: HashSet::new(),
             circular: HashSet::new(),
@@ -156,6 +161,22 @@ impl Engine {
             self.date1904 = date1904;
             self.all_dirty = true;
         }
+    }
+
+    /// The locale of the workbook (default en-US): number-format names, date text and currency.
+    pub fn locale(&self) -> &FormatLocale {
+        &self.locale
+    }
+
+    /// Selects the locale and schedules a full recalculation.
+    pub fn set_locale(&mut self, locale: &open365_locale::Locale) {
+        self.set_format_locale(Arc::new(FormatLocale::new(locale)));
+    }
+
+    /// Like [`Engine::set_locale`] with locale data built earlier (building it takes milliseconds).
+    pub fn set_format_locale(&mut self, locale: Arc<FormatLocale>) {
+        self.locale = locale;
+        self.all_dirty = true;
     }
 
     /// Adds an (empty) sheet; existing sheets are left alone.
@@ -541,6 +562,7 @@ impl Engine {
             cell: Some((id.row, id.col)),
             date1904: self.date1904,
             clock,
+            locale: &self.locale,
         };
         evaluate_root(&formula.ast, &ctx, formula.snap_root)
     }

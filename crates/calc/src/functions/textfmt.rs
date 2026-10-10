@@ -26,7 +26,7 @@ pub(super) fn text(ctx: &EvalContext<'_>, args: &[Arg]) -> Res<Value> {
         other => other,
     };
     let code = text_arg(ctx, &args[1])?;
-    match numfmt::text_function(&value, &code, ctx.date1904) {
+    match numfmt::text_function_in(&value, &code, ctx.date1904, ctx.locale) {
         Ok(Some(s)) if s.encode_utf16().count() <= MAX_TEXT_RESULT => Ok(Value::Text(s)),
         _ => Err(ErrorKind::Value),
     }
@@ -67,10 +67,13 @@ pub(super) fn dollar(ctx: &EvalContext<'_>, args: &[Arg]) -> Res<Value> {
     let default = if args.len() > 1 { 0 } else { 2 };
     let decimals = decimals_arg(ctx, args, default)?;
     let (digits, _) = numfmt::fixed_digits(x, decimals, true);
-    Ok(Value::Text(if x < 0.0 {
-        format!("(${digits})")
+    let symbol = &ctx.locale.currency;
+    Ok(Value::Text(if x < 0.0 && ctx.locale.currency_parens {
+        format!("({symbol}{digits})")
+    } else if x < 0.0 {
+        format!("-{symbol}{digits}")
     } else {
-        format!("${digits}")
+        format!("{symbol}{digits}")
     }))
 }
 
@@ -188,7 +191,7 @@ pub(super) fn arraytotext(ctx: &EvalContext<'_>, args: &[Arg]) -> Res<Value> {
     arity(args, 1, 2)?;
     let strict = format_arg(ctx, args)?;
     let rows: Vec<Vec<Value>> = match &args[0] {
-        Arg::Missing | Arg::Union(_) => return Err(ErrorKind::Value),
+        Arg::Missing | Arg::Union(_) | Arg::Refs(_) => return Err(ErrorKind::Value),
         Arg::Value(v) => vec![vec![v.clone()]],
         Arg::Array(rows) => rows.clone(),
         Arg::Range(_) => {

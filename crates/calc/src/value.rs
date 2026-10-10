@@ -333,7 +333,15 @@ fn parse_signed_text(s: &str, allow_sign: bool) -> Option<f64> {
         neg = c == '-';
         rest = rest[1..].trim_start_matches(' ');
     }
-    rest = rest.strip_prefix('$').unwrap_or(rest);
+    // The currency symbol of the locale; Excel under en-GB also reads `€` and refuses `$` (measured).
+    let locale = crate::fmtlocale::current();
+    if let Some(r) = rest.strip_prefix(locale.currency.as_str()) {
+        rest = r;
+    } else if locale.currency != "$"
+        && let Some(r) = rest.strip_prefix('\u{20ac}')
+    {
+        rest = r;
+    }
     let mut percent = false;
     if let Some(r) = rest.strip_prefix('%') {
         percent = true;

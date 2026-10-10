@@ -17,6 +17,15 @@ fn text(s: String) -> Res<Value> {
     }
 }
 
+/// `CONCAT` and `TEXTJOIN` give `#CALC!` (error code -2146826238) past the cell limit; `SUBSTITUTE` gives `#VALUE!`.
+fn text_calc(s: String) -> Res<Value> {
+    if s.chars().count() > MAX_TEXT {
+        Err(ErrorKind::Calc)
+    } else {
+        Ok(Value::Text(s))
+    }
+}
+
 fn count(n: usize) -> Res<Value> {
     Ok(Value::Number(n as f64))
 }
@@ -181,7 +190,7 @@ pub(super) fn concat(ctx: &EvalContext<'_>, args: &[Arg]) -> Res<Value> {
             out.push_str(&v.to_text()?);
         }
     }
-    text(out)
+    text_calc(out)
 }
 
 pub(super) fn textjoin(ctx: &EvalContext<'_>, args: &[Arg]) -> Res<Value> {
@@ -203,7 +212,7 @@ pub(super) fn textjoin(ctx: &EvalContext<'_>, args: &[Arg]) -> Res<Value> {
             }
         }
     }
-    text(parts.join(&delimiter))
+    text_calc(parts.join(&delimiter))
 }
 
 /// Shared start-position handling for `FIND` and `SEARCH`; `max` is the largest valid 1-based start.

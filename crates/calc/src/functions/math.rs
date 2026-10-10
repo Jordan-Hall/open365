@@ -101,6 +101,8 @@ pub(super) fn count(ctx: &EvalContext<'_>, args: &[Arg]) -> Value {
     for arg in args {
         match arg {
             Arg::Missing => n += 1,
+            // References are not numbers: COUNT of an array of references is 0 (measured).
+            Arg::Refs(_) => {}
             Arg::Value(v) => {
                 let counted = match v {
                     Value::Number(_) | Value::Bool(_) => true,
@@ -129,6 +131,8 @@ pub(super) fn counta(ctx: &EvalContext<'_>, args: &[Arg]) -> Value {
         match arg {
             Arg::Missing => n += 1,
             Arg::Value(v) => n += u32::from(*v != Value::Empty),
+            // Every element counts, whatever it points at.
+            Arg::Refs(refs) => n += refs.iter().map(Vec::len).sum::<usize>() as u32,
             _ => n += ctx.cells(arg).filter(|v| *v != Value::Empty).count() as u32,
         }
     }
@@ -152,6 +156,23 @@ pub(super) fn countblank(ctx: &EvalContext<'_>, args: &[Arg]) -> Res<Value> {
                 }
             }
             total - non_empty + empty_text
+        }
+        // Blank single-cell elements; an error element is the result.
+        Arg::Refs(refs) => {
+            let mut blank = 0u64;
+            for element in refs.iter().flatten() {
+                match element {
+                    Ok(r) if r.is_single_cell() => {
+                        blank += u64::from(matches!(
+                            ctx.source.cell(&r.sheet, r.row1, r.col1),
+                            Value::Empty
+                        ));
+                    }
+                    Ok(_) => {}
+                    Err(e) => return Err(*e),
+                }
+            }
+            blank
         }
         _ => return Err(ErrorKind::Value),
     };

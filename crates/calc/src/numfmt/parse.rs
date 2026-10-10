@@ -107,6 +107,8 @@ pub(super) struct Section {
     pub scale: u32,
     pub percents: u32,
     pub has_ampm: bool,
+    /// The language of a `[$-LCID]` prefix (calendar and number-shape bits removed): names in a date section.
+    pub lcid: Option<u32>,
 }
 
 /// A parsed format code.
@@ -196,6 +198,7 @@ struct Tokenizer<'a> {
     pos: usize,
     out: Vec<Tok>,
     cond: Option<Cond>,
+    lcid: Option<u32>,
     _src: &'a str,
 }
 
@@ -206,6 +209,7 @@ impl<'a> Tokenizer<'a> {
             pos: 0,
             out: Vec::new(),
             cond: None,
+            lcid: None,
             _src: src,
         }
     }
@@ -444,6 +448,11 @@ impl<'a> Tokenizer<'a> {
             return Ok(());
         }
         if body.starts_with('$') {
+            if let Some((_, tail)) = body.rsplit_once('-')
+                && let Ok(code) = u32::from_str_radix(tail, 16)
+            {
+                self.lcid = Some(code & 0xFFFF);
+            }
             let text = currency_text(&body);
             self.lit(&text);
             return Ok(());
@@ -501,7 +510,11 @@ fn classify(toks: &[Tok]) -> Kind {
 }
 
 /// Resolves comma candidates (`\u{1}` literals) into grouping or scaling, and `m` into minutes.
-fn finish_section(mut toks: Vec<Tok>, cond: Option<Cond>) -> Result<Section, FormatError> {
+fn finish_section(
+    mut toks: Vec<Tok>,
+    cond: Option<Cond>,
+    lcid: Option<u32>,
+) -> Result<Section, FormatError> {
     let kind = classify(&toks);
     let mut grouping = false;
     let mut scale = 0;
@@ -640,6 +653,7 @@ fn finish_section(mut toks: Vec<Tok>, cond: Option<Cond>) -> Result<Section, For
         scale,
         percents,
         has_ampm,
+        lcid,
     })
 }
 
@@ -681,6 +695,7 @@ impl NumberFormat {
             let mut tk = Tokenizer::new(part);
             tk.tokenize()?;
             let cond = tk.cond;
+            let lcid = tk.lcid;
             let mut toks = tk.out;
             // Fractional seconds are recognised here, where the token order is known.
             let mut i = 0;
@@ -698,7 +713,7 @@ impl NumberFormat {
                 }
                 i += 1;
             }
-            sections.push(finish_section(toks, cond)?);
+            sections.push(finish_section(toks, cond, lcid)?);
         }
         Ok(NumberFormat { sections })
     }

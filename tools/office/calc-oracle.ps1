@@ -24,7 +24,9 @@ replaced and the current case is retried.
 
 A case with "format" gets that number format on the formula cell (applied after the formula, so a text format
 cannot turn the formula into text); the recorded "text" is Range.Text, which the numfmt conformance group checks.
-A format code Excel refuses is recorded as kind "rejected" (hresult "NumberFormat"). Excel keeps every distinct custom
+A case with "locale": "en-GB" depends on the machine's system locale (date order, currency symbol, date text); the
+script refuses to run it on a machine whose culture is different, because the stored answer would describe another
+locale. Cases without "locale" must give the same answer in every locale. A format code Excel refuses is recorded as kind "rejected" (hresult "NumberFormat"). Excel keeps every distinct custom
 format in the workbook and fails after roughly 250, so the script swaps in a fresh workbook every 100 formats.
 Both workbooks use a 60-character-wide column, so Range.Text of "####" overflow, "*x" fill and the like reflects that
 width.
@@ -274,6 +276,9 @@ try {
   $n = 0
   foreach ($case in $cases) {
     $n++
+    if ($case.locale -and $case.locale -ne $excelInfo.culture) {
+      throw "case $($case.id) needs the $($case.locale) system locale but this machine is $($excelInfo.culture)"
+    }
     $result = $null
     for ($attempt = 1; $attempt -le 4 -and $null -eq $result; $attempt++) {
       try {

@@ -5,7 +5,7 @@ never needs Excel.
 
 | File | Role |
 |---|---|
-| `fixtures/calc/conformance.json` | The corpus: 22,269 cases. Edited by hand or by script; one case per line. |
+| `fixtures/calc/conformance.json` | The corpus: 24,696 cases. Edited by hand or by script; one case per line. |
 | `tools/office/calc-oracle.ps1` | Local-only tool. Runs every case in Excel over COM and writes the results. |
 | `fixtures/reference/calc/conformance-results.json` | Excel's answers, committed. Includes Excel version, build and decimal separator. |
 | `fixtures/calc/known-differences.toml` | Cases where Open365 intentionally or temporarily differs, each with a reason. |
@@ -66,10 +66,9 @@ forms; the corpus has no case for them.
 
 ## Current state
 
-22,269 cases, 22,201 pass (99.69%), 68 known differences (listed with reasons in `known-differences.toml`: the `**` parse
+24,696 cases, 24,638 pass, 58 known differences (listed with reasons in `known-differences.toml`: the `**` parse
 quirk, XLOOKUP array results (no spill), a few undocumented Excel quirks, large COMBIN, trigonometric last digits, variance
-accumulation order, accounting fill, and arrays of references returned by `OFFSET`/`INDIRECT`
-for array arguments, which Open365 does not model). The test also fails for a corpus case without an Excel
+accumulation order, accounting fill, and two `IFERROR` over arrays of references). The test also fails for a corpus case without an Excel
 result or a stored result without a case.
 
 ## Behaviour measured against Excel
@@ -230,3 +229,19 @@ Implemented but NOT verified (no corpus cases; generators `gen_fin1.py`..`gen_fi
   bit for bit; Excel's final iterate is noise-limited, so its exact stopping rule is unknown. Excel's `XIRR` result is the true root
   (`XIRR({-100,150},{43831,44562})` = 0.2244052527 in exact arithmetic, Excel 0.22440524697), so its tolerance is looser than 1e-8.
   `XNPV` needs `rate > 0`. `CUMIPMT` takes `ceil(start)` and `trunc(end)`. `DDB` is `cost*(1-f/life)^(period-1)*f/life`, capped at salvage.
+
+## Locale (ADR-011), arrays of references, long text
+
+* `"locale": "en-GB"` marks a case that depends on the oracle machine's system locale (date order, currency symbol, date
+  text); Open365 evaluates it with that locale and the oracle script refuses to run it on another culture. Cases without
+  it must be locale-independent. `Engine::set_locale` / `EvalContext::with_locale` take an `open365_locale::Locale`.
+* Measured: a `[$-LCID]` prefix changes month, day and AM/PM names only (group `loc`, 40 LCIDs); separators stay.
+  en-GB date text: `1/2/2024` is 1 Feb, `15.03.2024`, month-first names and `$1` are refused, `Mar 15` and `3/15` are
+  March 2015, two-digit years below 30 are 20xx (group `locgb`, `datevalue.gb_*`).
+* Not verified: built-in format ids 14/22/currency in other locales (Excel keeps the en-US code it is given over COM, so the
+  oracle cannot show them; derived from CLDR), `[$-F800]`/`[$-F400]` and eras (`ggg`) per locale, `DOLLAR` negatives.
+  Locale reaches value coercion through a thread-local scope set by `evaluate_root`.
+* Arrays of references (`Arg::Refs`; group `refarr`, 1,989 cases): `OFFSET`/`INDIRECT` with an array argument return one
+  reference per element when evaluated in array mode (inside `SUMPRODUCT`, `N`, or two function calls deep). Per-function
+  behaviour is in `functions::refs_mode`.
+* `CONCAT`/`TEXTJOIN` past 32,767 characters give `#CALC!`.

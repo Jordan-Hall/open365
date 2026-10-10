@@ -10,6 +10,9 @@ use std::cmp::Ordering;
 use std::fmt;
 
 use crate::ast::{AreaKind, AreaRef, Ast, BinOp, CellRef, MAX_COL, MAX_ROW, UnaryOp};
+use std::sync::{Arc, OnceLock};
+
+use crate::fmtlocale::{FormatLocale, Scope};
 use crate::functions::{self, Func, Lifting};
 use crate::value::{ErrorKind, Value, compare_values};
 
@@ -91,6 +94,13 @@ pub struct EvalContext<'a> {
     pub date1904: bool,
     /// Time source for volatile date functions.
     pub clock: &'a dyn Clock,
+    /// Locale for date text, currency and number-format names.
+    pub locale: &'a Arc<FormatLocale>,
+}
+
+fn default_locale() -> &'static Arc<FormatLocale> {
+    static EN_US: OnceLock<Arc<FormatLocale>> = OnceLock::new();
+    EN_US.get_or_init(FormatLocale::en_us)
 }
 
 impl fmt::Debug for EvalContext<'_> {
@@ -112,7 +122,15 @@ impl<'a> EvalContext<'a> {
             cell: None,
             date1904: false,
             clock: &SYSTEM_CLOCK,
+            locale: default_locale(),
         }
+    }
+
+    /// Selects the locale.
+    #[must_use]
+    pub fn with_locale(mut self, locale: &'a Arc<FormatLocale>) -> Self {
+        self.locale = locale;
+        self
     }
 
     /// Sets the formula cell (1-based row, column).
@@ -149,6 +167,12 @@ impl<'a> EvalContext<'a> {
                 .unwrap_or(Value::Error(ErrorKind::Value)),
             Arg::Range(r) => self.implicit_intersection(r),
             Arg::Union(_) => Value::Error(ErrorKind::Value),
+            // Functions that do not know reference arrays see the first element.
+            Arg::Refs(refs) => match refs.first().and_then(|row| row.first()) {
+                Some(Ok(r)) => self.implicit_intersection(r),
+                Some(Err(e)) => Value::Error(*e),
+                None => Value::Error(ErrorKind::Value),
+            },
         }
     }
 
@@ -176,6 +200,17 @@ impl<'a> EvalContext<'a> {
             Arg::Array(rows) => Box::new(rows.iter().flatten().cloned()),
             Arg::Range(r) => self.range_cells(r),
             Arg::Union(rs) => Box::new(rs.iter().flat_map(move |r| self.range_cells(r))),
+            Arg::Refs(refs) => Box::new(refs.iter().flatten().map(move |e| self.ref_element(e))),
+        }
+    }
+
+    /// The value an aggregate function (`SUM`, `MAX`, ...) reads from one element of an array of references:
+    /// the cell of a single-cell element, `#VALUE!` for a multi-cell one, the element's own error.
+    fn ref_element(&self, element: &Result<RangeRef, ErrorKind>) -> Value {
+        match element {
+            Ok(r) if r.is_single_cell() => self.source.cell(&r.sheet, r.row1, r.col1),
+            Ok(_) => Value::Error(ErrorKind::Value),
+            Err(e) => Value::Error(*e),
         }
     }
 
@@ -222,6 +257,19 @@ impl<'a> EvalContext<'a> {
             Arg::Range(r) => GridData::Range(r),
             Arg::Array(rows) => GridData::Rows(rows),
             Arg::Value(v) => GridData::Owned(vec![vec![v.clone()]]),
+            // `SUMPRODUCT` sees references as non-numbers; an error element is the element's error.
+            Arg::Refs(refs) => GridData::Owned(
+                refs.iter()
+                    .map(|row| {
+                        row.iter()
+                            .map(|e| match e {
+                                Ok(_) => Value::Empty,
+                                Err(e) => Value::Error(*e),
+                            })
+                            .collect()
+                    })
+                    .collect(),
+            ),
             Arg::Missing | Arg::Union(_) => return None,
         };
         Some(Grid { ctx: self, data })
@@ -301,6 +349,9 @@ pub enum Arg {
     Range(RangeRef),
     /// A union of references such as `(A1:A3,C1:C3)`.
     Union(Vec<RangeRef>),
+    /// An array of references, rows of elements, what `OFFSET` and `INDIRECT` return when an argument is an
+    /// array. An element is a reference or the error `OFFSET`/`INDIRECT` gave for that position.
+    Refs(Vec<Vec<Result<RangeRef, ErrorKind>>>),
 }
 
 impl Arg {
@@ -403,10 +454,13 @@ pub fn evaluate(ast: &Ast, ctx: &EvalContext<'_>) -> Value {
 /// not for `=(0.1+0.2-0.3)`, nor for the same expression inside a function argument). Pass false for a formula
 /// written entirely inside parentheses.
 pub fn evaluate_root(ast: &Ast, ctx: &EvalContext<'_>, snap_root: bool) -> Value {
+    // Coercion of date text and currency reads the locale of the evaluation in progress.
+    let _locale = Scope::enter(ctx.locale);
     let ev = Evaluator {
         ctx,
         name_depth: Cell::new(0),
-        ref_lift: Cell::new(false),
+        under_n: Cell::new(false),
+        fn_depth: Cell::new(0),
     };
     let arg = match ast {
         Ast::Binary {
@@ -426,15 +480,23 @@ pub fn evaluate_root(ast: &Ast, ctx: &EvalContext<'_>, snap_root: bool) -> Value
             v => v,
         },
         Arg::Union(_) => Value::Error(ErrorKind::Value),
+        // A cell shows the first element.
+        refs @ Arg::Refs(_) => match ctx.scalar(&refs) {
+            Value::Empty => Value::Number(0.0),
+            v => v,
+        },
     }
 }
 
 struct Evaluator<'c, 'a> {
     ctx: &'c EvalContext<'a>,
     name_depth: Cell<u32>,
-    /// Set by `N(OFFSET(..))`/`N(INDIRECT(..))`: the call that follows lifts over array arguments, giving one
-    /// value per element (Excel hands `N` an array of references).
-    ref_lift: Cell<bool>,
+    /// Set by `N(OFFSET(..))`/`N(INDIRECT(..))`: Excel evaluates the call in array mode, so an array argument
+    /// gives an array of references even outside an array context.
+    under_n: Cell<bool>,
+    /// How many function calls enclose the expression being evaluated. A call nested in another call's
+    /// arguments is evaluated in array mode, so `OFFSET`/`INDIRECT` given an array return references per element.
+    fn_depth: Cell<u32>,
 }
 
 /// Operand of an arithmetic operator after reference resolution.
@@ -555,11 +617,15 @@ impl Evaluator<'_, '_> {
             return Arg::error(ErrorKind::Name);
         };
         let reference_fn = functions::takes_reference(name);
-        let ref_lift = self.ref_lift.replace(false);
-        let feeds_ref_lift = name.eq_ignore_ascii_case("N")
+        // `OFFSET` and `INDIRECT` given an array return an array of references, and `N(OFFSET(..))` hands the
+        // array context down to them.
+        let under_n = self.under_n.replace(false);
+        let nested = self.fn_depth.get() >= 2;
+        let ref_fn = functions::ref_lifting(name).filter(|_| array || under_n || nested);
+        let feeds_refs = name.eq_ignore_ascii_case("N")
             && matches!(args, [Ast::Func { name: inner, .. }] if functions::ref_lifting(inner).is_some());
-        if feeds_ref_lift {
-            self.ref_lift.set(true);
+        if feeds_refs {
+            self.under_n.set(true);
         }
         // Excel answers `ISREF(XLOOKUP(..))` with the reference the lookup returns; Open365 returns values.
         if name.eq_ignore_ascii_case("ISREF")
@@ -572,12 +638,10 @@ impl Evaluator<'_, '_> {
         // A function with scalar parameters is applied to every element of an array argument. Ranges are
         // expanded only where Excel evaluates array parameters (`array`); elsewhere they take the implicit
         // intersection, but computed arrays and array constants always lift.
-        let lifting = if ref_lift {
-            functions::ref_lifting(name)
-        } else {
-            functions::lifting(name).filter(|l| !l.array_only || array)
-        };
+        let lifting =
+            ref_fn.or_else(|| functions::lifting(name).filter(|l| !l.array_only || array));
         let expand = array && lifting.is_some_and(|l| l.expand_ranges);
+        self.fn_depth.set(self.fn_depth.get() + 1);
         let evaluated: Vec<Arg> = args
             .iter()
             .enumerate()
@@ -587,10 +651,11 @@ impl Evaluator<'_, '_> {
                 }
                 let lifted = expand && lifting.is_some_and(|l| (l.scalar_param)(i));
                 // `N(OFFSET(..))` passes the array context on to the reference function.
+                let feeds_array_of_refs = (feeds_refs || functions::lifts_over_refs(name))
+                    && matches!(a, Ast::Func { name: inner, .. } if functions::ref_lifting(inner).is_some());
                 let lifted = lifted
                     || array
-                        && (feeds_ref_lift
-                            || ref_lift && lifting.is_some_and(|l| (l.scalar_param)(i)));
+                        && (feeds_array_of_refs || ref_fn.is_some_and(|l| (l.scalar_param)(i)));
                 let arg = self.eval_in(a, lifted || functions::is_array_param(name, i));
                 // `IFERROR(A1,0)` is a value for `ROW`, `ISREF` and friends, though `ISBLANK` sees through it.
                 match (&arg, a) {
@@ -605,22 +670,32 @@ impl Evaluator<'_, '_> {
                 }
             })
             .collect();
+        self.fn_depth.set(self.fn_depth.get() - 1);
         if let Some(l) = lifting {
             let triggers = evaluated.iter().enumerate().any(|(i, a)| {
                 l.trigger.unwrap_or(l.scalar_param)(i)
                     && match a {
                         Arg::Array(rows) => {
-                            rows.len() > 1 || rows.first().is_some_and(|r| r.len() > 1)
+                            rows.len() > 1
+                                || rows.first().is_some_and(|r| r.len() > 1)
+                                || ref_fn.is_some()
                         }
                         Arg::Range(r) => expand && !r.is_single_cell(),
                         _ => false,
                     }
             });
             if triggers {
-                return self.lift_call(func, &evaluated, l, ref_lift);
+                if ref_fn.is_some() {
+                    return self.lift_refs(func, &evaluated, l);
+                }
+                return self.lift_call(func, &evaluated, l);
             }
         }
-        let result = call_function(self.ctx, func, &evaluated);
+        let result = if evaluated.iter().any(|a| matches!(a, Arg::Refs(_))) {
+            self.refs_call(name, func, &evaluated, array)
+        } else {
+            call_function(self.ctx, func, &evaluated)
+        };
         // `ROW(A1:A3)` is an array only where Excel evaluates arrays; in a plain formula it is its first row.
         if !array
             && functions::returns_array_in_array_context(name)
@@ -639,7 +714,175 @@ impl Evaluator<'_, '_> {
     /// Calls a scalar function once per element of its array arguments (scalars broadcast, a single row or
     /// column stretches, anything shorter than the largest operand is `#N/A`). Once an array makes the call lift,
     /// ranges among the other scalar arguments are read as arrays too (`IF({TRUE,FALSE},A1:A2,B1:B2)`).
-    fn lift_call(&self, func: &Func, args: &[Arg], lifting: &Lifting, ref_lift: bool) -> Arg {
+    fn lift_call(&self, func: &Func, args: &[Arg], lifting: &Lifting) -> Arg {
+        let out = self
+            .lift_elements(func, args, lifting)
+            .into_iter()
+            .map(|row| {
+                row.into_iter()
+                    .map(|arg| match arg {
+                        Arg::Value(v) => v,
+                        Arg::Array(rows) => rows
+                            .first()
+                            .and_then(|row| row.first())
+                            .cloned()
+                            .unwrap_or(Value::Error(ErrorKind::Value)),
+                        other => self.ctx.scalar(&other),
+                    })
+                    .collect()
+            })
+            .collect();
+        Arg::Array(out)
+    }
+
+    /// `OFFSET`/`INDIRECT` with an array argument: one reference (or error) per element.
+    fn lift_refs(&self, func: &Func, args: &[Arg], lifting: &Lifting) -> Arg {
+        Arg::Refs(
+            self.lift_elements(func, args, lifting)
+                .into_iter()
+                .map(|row| {
+                    row.into_iter()
+                        .map(|arg| match arg {
+                            Arg::Range(r) => Ok(r),
+                            Arg::Value(Value::Error(e)) => Err(e),
+                            _ => Err(ErrorKind::Value),
+                        })
+                        .collect()
+                })
+                .collect(),
+        )
+    }
+
+    /// A function called with an array of references (what `OFFSET`/`INDIRECT` return for array arguments).
+    /// Excel's answers were measured per function (group `refarr` of the corpus).
+    fn refs_call(&self, name: &str, func: &Func, args: &[Arg], array: bool) -> Arg {
+        use functions::RefsMode;
+        let shape = args.iter().find_map(|a| match a {
+            Arg::Refs(refs) => Some((refs.len(), refs.first().map_or(0, Vec::len))),
+            _ => None,
+        });
+        let (rows, cols) = shape.unwrap_or((1, 1));
+        let mode = functions::refs_mode(name);
+        // `ROWS(OFFSET(..))` at the top of a formula sees the first element, like the other functions there.
+        if self.fn_depth.get() == 0
+            && (name.eq_ignore_ascii_case("ROWS") || name.eq_ignore_ascii_case("COLUMNS"))
+        {
+            let converted: Vec<Arg> = args.iter().map(refs_first).collect();
+            return call_function(self.ctx, func, &converted);
+        }
+        // Functions with value parameters see an array of references only where Excel evaluates arrays;
+        // inside `SUM(f(..))` they take the first element.
+        if matches!(
+            mode,
+            RefsMode::ValueLifted | RefsMode::Type | RefsMode::FalseArray
+        ) && !array
+        {
+            let converted: Vec<Arg> = args.iter().map(refs_first).collect();
+            return call_function(self.ctx, func, &converted);
+        }
+        match mode {
+            RefsMode::Native => call_function(self.ctx, func, args),
+            RefsMode::LiftOver => {
+                // The criteria are not dereferenced: an array of references matches nothing.
+                let is_criteria = |i: usize| {
+                    if name.eq_ignore_ascii_case("COUNTIFS") {
+                        i % 2 == 1
+                    } else {
+                        i == 1
+                    }
+                };
+                if args
+                    .iter()
+                    .enumerate()
+                    .any(|(i, a)| is_criteria(i) && matches!(a, Arg::Refs(_)))
+                {
+                    if array {
+                        return Arg::Value(Value::Number(0.0));
+                    }
+                    let converted: Vec<Arg> = args
+                        .iter()
+                        .enumerate()
+                        .map(|(i, a)| {
+                            if is_criteria(i) {
+                                refs_first(a)
+                            } else {
+                                a.clone()
+                            }
+                        })
+                        .collect();
+                    return call_function(self.ctx, func, &converted);
+                }
+                self.lift_over_refs(func, args)
+            }
+            RefsMode::Union => {
+                let mut converted = Vec::with_capacity(args.len());
+                for a in args {
+                    match a {
+                        Arg::Refs(refs) => {
+                            let mut ranges = Vec::new();
+                            for e in refs.iter().flatten() {
+                                match e {
+                                    Ok(r) => ranges.push(r.clone()),
+                                    Err(e) => return Arg::error(*e),
+                                }
+                            }
+                            converted.push(Arg::Union(ranges));
+                        }
+                        other => converted.push(other.clone()),
+                    }
+                }
+                call_function(self.ctx, func, &converted)
+            }
+            RefsMode::Value | RefsMode::ValueLifted => Arg::error(ErrorKind::Value),
+            RefsMode::NA => Arg::error(ErrorKind::NA),
+            RefsMode::Type => Arg::Value(Value::Number(64.0)),
+            RefsMode::NotRef => Arg::Value(Value::Bool(false)),
+            RefsMode::FalseArray => Arg::Array(vec![vec![Value::Bool(false); cols]; rows]),
+            RefsMode::First => {
+                let converted: Vec<Arg> = args.iter().map(refs_first).collect();
+                call_function(self.ctx, func, &converted)
+            }
+        }
+    }
+
+    /// `COUNTIF(INDIRECT(..),..)`: a function whose range parameter is given an array of references runs once
+    /// per element. An error element is that element's result.
+    fn lift_over_refs(&self, func: &Func, args: &[Arg]) -> Arg {
+        let shape = args.iter().find_map(|a| match a {
+            Arg::Refs(refs) => Some(refs),
+            _ => None,
+        });
+        let Some(shape) = shape else {
+            return call_function(self.ctx, func, args);
+        };
+        let out = shape
+            .iter()
+            .enumerate()
+            .map(|(r, row)| {
+                (0..row.len())
+                    .map(|c| {
+                        let mut call_args = Vec::with_capacity(args.len());
+                        for a in args {
+                            match a {
+                                Arg::Refs(refs) => match refs.get(r).and_then(|x| x.get(c)) {
+                                    Some(Ok(range)) => call_args.push(Arg::Range(range.clone())),
+                                    Some(Err(e)) => return Value::Error(*e),
+                                    None => return Value::Error(ErrorKind::NA),
+                                },
+                                other => call_args.push(other.clone()),
+                            }
+                        }
+                        let result = call_function(self.ctx, func, &call_args);
+                        self.ctx.scalar(&result)
+                    })
+                    .collect()
+            })
+            .collect();
+        Arg::Array(out)
+    }
+
+    /// The result of the function for every element position of its array arguments.
+    fn lift_elements(&self, func: &Func, args: &[Arg], lifting: &Lifting) -> Vec<Vec<Arg>> {
         let operands: Vec<Option<Operand>> = args
             .iter()
             .enumerate()
@@ -686,7 +929,7 @@ impl Evaluator<'_, '_> {
                 }
             }
         };
-        let out = (0..rows)
+        (0..rows)
             .map(|r| {
                 (0..cols)
                     .map(|c| {
@@ -698,24 +941,11 @@ impl Evaluator<'_, '_> {
                                 None => original.clone(),
                             })
                             .collect();
-                        match call_function(self.ctx, func, &call_args) {
-                            Arg::Value(v) => v,
-                            Arg::Array(rows) => rows
-                                .first()
-                                .and_then(|row| row.first())
-                                .cloned()
-                                .unwrap_or(Value::Error(ErrorKind::Value)),
-                            // `N` takes the first cell of a reference.
-                            Arg::Range(r) if ref_lift => {
-                                self.ctx.source.cell(&r.sheet, r.row1, r.col1)
-                            }
-                            other => self.ctx.scalar(&other),
-                        }
+                        call_function(self.ctx, func, &call_args)
                     })
                     .collect()
             })
-            .collect();
-        Arg::Array(out)
+            .collect()
     }
 
     fn operand(&self, arg: Arg, array: bool) -> Operand {
@@ -750,6 +980,8 @@ impl Evaluator<'_, '_> {
                 Operand::Grid(grid)
             }
             Arg::Union(_) => Operand::Scalar(Value::Error(ErrorKind::Value)),
+            // Arithmetic and comparison on an array of references are `#VALUE!` (measured).
+            Arg::Refs(_) => Operand::Scalar(Value::Error(ErrorKind::Value)),
         }
     }
 
@@ -791,6 +1023,18 @@ impl Evaluator<'_, '_> {
                 )
             }
         }
+    }
+}
+
+/// An array of references reduced to its first element, for functions that do not model reference arrays.
+fn refs_first(arg: &Arg) -> Arg {
+    match arg {
+        Arg::Refs(refs) => match refs.first().and_then(|row| row.first()) {
+            Some(Ok(r)) => Arg::Range(r.clone()),
+            Some(Err(e)) => Arg::error(*e),
+            None => Arg::error(ErrorKind::Value),
+        },
+        other => other.clone(),
     }
 }
 

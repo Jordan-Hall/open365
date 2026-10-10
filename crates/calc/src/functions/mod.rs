@@ -585,8 +585,7 @@ fn lifting_table() -> &'static HashMap<String, Lifting> {
     MAP.get_or_init(|| LIFTING.iter().map(|(n, l)| ((*n).to_owned(), *l)).collect())
 }
 
-/// `OFFSET` and `INDIRECT` take the first element of an array argument, except directly under `N`, which
-/// Excel feeds an array of references: there they lift, one value per element.
+/// `OFFSET` and `INDIRECT` given an array argument return an array of references, one per element.
 pub(crate) fn ref_lifting(name: &str) -> Option<&'static Lifting> {
     static OFFSET: Lifting = Lifting {
         array_only: false,
@@ -607,6 +606,105 @@ pub(crate) fn ref_lifting(name: &str) -> Option<&'static Lifting> {
     } else {
         None
     }
+}
+
+/// What a function does with an array of references among its arguments (measured, corpus group `refarr`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum RefsMode {
+    /// The function reads the array itself.
+    Native,
+    /// Runs once per element (`COUNTIF`, `SUMIF`, ...).
+    LiftOver,
+    /// The elements form a multi-area reference (`SUBTOTAL`).
+    Union,
+    /// `#VALUE!`
+    Value,
+    /// `#VALUE!` where Excel evaluates arrays, the first element elsewhere (scalar functions such as `ABS`).
+    ValueLifted,
+    /// `#N/A`
+    NA,
+    /// `TYPE` is 64, the type of an array.
+    Type,
+    /// `ISREF` is FALSE.
+    NotRef,
+    /// `ISNUMBER`, `ISERROR`, ...: an array of FALSE.
+    FalseArray,
+    /// Everything else sees the first element.
+    First,
+}
+
+/// How `name` treats an array of references.
+pub(crate) fn refs_mode(name: &str) -> RefsMode {
+    let is = |list: &[&str]| list.iter().any(|f| f.eq_ignore_ascii_case(name));
+    if is(&[
+        "SUMPRODUCT",
+        "N",
+        "T",
+        "SUM",
+        "MAX",
+        "MIN",
+        "AVERAGE",
+        "PRODUCT",
+        "COUNT",
+        "COUNTA",
+        "COUNTBLANK",
+        "ROWS",
+        "COLUMNS",
+        "STDEV",
+        "STDEV.S",
+        "STDEV.P",
+        "STDEVP",
+        "VAR",
+        "VAR.S",
+        "VAR.P",
+        "VARP",
+    ]) {
+        RefsMode::Native
+    } else if is(&["COUNTIF", "COUNTIFS", "SUMIF", "AVERAGEIF"]) {
+        RefsMode::LiftOver
+    } else if is(&["SUBTOTAL"]) {
+        RefsMode::Union
+    } else if is(&["TYPE"]) {
+        RefsMode::Type
+    } else if is(&["ISREF"]) {
+        RefsMode::NotRef
+    } else if is(&[
+        "ISNUMBER",
+        "ISERROR",
+        "ISERR",
+        "ISBLANK",
+        "ISTEXT",
+        "ISNA",
+        "ISLOGICAL",
+        "ISNONTEXT",
+    ]) {
+        RefsMode::FalseArray
+    } else if is(&["AND", "OR", "MATCH"]) {
+        RefsMode::NA
+    } else if is(&[
+        "CONCAT",
+        "TEXTJOIN",
+        "LARGE",
+        "SMALL",
+        "MEDIAN",
+        "AGGREGATE",
+    ]) {
+        RefsMode::Value
+    } else if lifting(name).is_some()
+        && !is(&[
+            "IF", "IFS", "IFERROR", "IFNA", "CHOOSE", "SWITCH", "INDEX", "LOOKUP", "ISEVEN",
+            "ISODD",
+        ])
+    {
+        RefsMode::ValueLifted
+    } else {
+        RefsMode::First
+    }
+}
+
+/// Functions that run once per element when a range parameter is an array of references.
+pub(crate) fn lifts_over_refs(name: &str) -> bool {
+    refs_mode(name) == RefsMode::LiftOver
 }
 
 /// How `name` lifts over arrays, if it is a function with scalar parameters.

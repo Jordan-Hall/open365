@@ -27,6 +27,7 @@ fn dimensions(arg: &Arg) -> Res<(usize, usize)> {
     }
     Ok(match arg {
         Arg::Array(rows) => (rows.len(), rows.first().map_or(0, Vec::len)),
+        Arg::Refs(refs) => (refs.len(), refs.first().map_or(0, Vec::len)),
         _ => (1, 1),
     })
 }

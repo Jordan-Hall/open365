@@ -118,6 +118,23 @@ pub(super) fn clean(ctx: &EvalContext<'_>, args: &[Arg]) -> Res<Value> {
 /// `T`: the value if it is text, otherwise empty text. A range or array gives its top-left cell.
 pub(super) fn t(ctx: &EvalContext<'_>, args: &[Arg]) -> Res<Value> {
     arity(args, 1, 1)?;
+    if let Arg::Refs(refs) = &args[0] {
+        return Ok(Value::Array(
+            refs.iter()
+                .map(|row| {
+                    row.iter()
+                        .map(|e| match e {
+                            Ok(r) => match ctx.source.cell(&r.sheet, r.row1, r.col1) {
+                                v @ (Value::Text(_) | Value::Error(_)) => v,
+                                _ => Value::Text(String::new()),
+                            },
+                            Err(e) => Value::Error(*e),
+                        })
+                        .collect()
+                })
+                .collect(),
+        ));
+    }
     match first_cell(ctx, &args[0])? {
         v @ Value::Text(_) => Ok(v),
         _ => Ok(Value::Text(String::new())),
@@ -127,6 +144,27 @@ pub(super) fn t(ctx: &EvalContext<'_>, args: &[Arg]) -> Res<Value> {
 /// `N`: numbers as they are, `TRUE` as 1, everything else 0.
 pub(super) fn n(ctx: &EvalContext<'_>, args: &[Arg]) -> Res<Value> {
     arity(args, 1, 1)?;
+    // An array of references: the top-left cell of each element; an error element stays an error.
+    if let Arg::Refs(refs) = &args[0] {
+        let as_number = |v: Value| match v {
+            Value::Number(x) => Value::Number(x),
+            Value::Bool(true) => Value::Number(1.0),
+            Value::Error(e) => Value::Error(e),
+            _ => Value::Number(0.0),
+        };
+        return Ok(Value::Array(
+            refs.iter()
+                .map(|row| {
+                    row.iter()
+                        .map(|e| match e {
+                            Ok(r) => as_number(ctx.source.cell(&r.sheet, r.row1, r.col1)),
+                            Err(e) => Value::Error(*e),
+                        })
+                        .collect()
+                })
+                .collect(),
+        ));
+    }
     Ok(Value::Number(match first_cell(ctx, &args[0])? {
         Value::Number(x) => x,
         Value::Bool(true) => 1.0,
