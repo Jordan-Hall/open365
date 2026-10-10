@@ -77,23 +77,23 @@ matched = 160
 total = 221
 
 [fixtures.layout-table-basic]
-matched = 114
+matched = 134
 total = 138
 
 [fixtures.layout-table-flow]
-matched = 45
+matched = 132
 total = 136
 
 [fixtures.layout-table-pages]
-matched = 1006
+matched = 1168
 total = 1208
 
 [fixtures.layout-table-rows]
-matched = 127
+matched = 137
 total = 143
 
 [fixtures.layout-table-width]
-matched = 211
+matched = 213
 total = 217
 
 [fixtures.layout-tabs]
@@ -117,7 +117,7 @@ matched = 3
 total = 3
 
 [fixtures.table-merged-cells]
-matched = 3
+matched = 31
 total = 31
 
 [fixtures.tracked-changes]
@@ -205,23 +205,23 @@ matched = 221
 total = 221
 
 [system.layout-table-basic]
-matched = 114
+matched = 134
 total = 138
 
 [system.layout-table-flow]
-matched = 45
+matched = 132
 total = 136
 
 [system.layout-table-pages]
-matched = 1006
+matched = 1168
 total = 1208
 
 [system.layout-table-rows]
-matched = 127
+matched = 137
 total = 143
 
 [system.layout-table-width]
-matched = 211
+matched = 213
 total = 217
 
 [system.layout-tabs]
@@ -249,7 +249,7 @@ matched = 2
 total = 4
 
 [system.table-merged-cells]
-matched = 3
+matched = 31
 total = 31
 
 [system.tracked-changes]

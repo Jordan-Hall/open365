@@ -5,11 +5,12 @@
 //! `docs/architecture/word-layout.md`.
 
 use open365_docx::{
-    Block, Cell, CellMargins, CellPosition, HeightRule, Table, TableJustification, TableProps,
-    VerticalAlign,
+    Block, Border, Cell, CellMargins, CellPosition, HeightRule, Table, TableJustification,
+    TableProps, VerticalAlign,
 };
 
 use crate::build::Builder;
+use crate::para::AtomClass;
 
 /// Word's default cell margins when neither the table, its style nor the cell state one.
 const DEFAULT_MARGIN_X: f64 = 5.4;
@@ -60,12 +61,26 @@ pub(crate) struct CellLayout {
     /// Top of the content box relative to the table's top, vertical alignment applied.
     pub content_top: f64,
     pub valign: VerticalAlign,
+    /// Half the border on the cell's left and right grid lines: the drawn rectangle is the
+    /// cell between the borders, so it starts and ends this far inside `x` and `x + w`.
+    pub inset_l: f64,
+    pub inset_r: f64,
+    /// Widths of the borders on the cell's four sides, as resolved for the table.
+    border_top: f64,
+    border_bottom: f64,
+    border_left: f64,
+    border_right: f64,
 }
 
 #[derive(Debug)]
 pub(crate) struct RowLayout {
     pub top: f64,
+    /// Includes the border below the row and, for the first row, the one above the table.
     pub height: f64,
+    /// Border above the row (the table's top border, on the first row only) and below it (the
+    /// border between this row and the next, or the table's bottom border).
+    pub above: f64,
+    pub below: f64,
     pub cant_split: bool,
     pub is_header: bool,
     /// `w:hRule="exact"`: the content is clipped, never split.
@@ -88,6 +103,13 @@ impl TableLayout {
     }
 }
 
+/// Width of a border that is set: its line width when drawn, 0 for `nil`/`none`. `None` when
+/// the level states no border at all.
+fn border_width(b: &Option<Border>) -> Option<f64> {
+    b.as_ref()
+        .map(|b| if b.is_visible() { b.width } else { 0.0 })
+}
+
 struct Prev {
     after: f64,
     contextual: bool,
@@ -105,11 +127,21 @@ fn layout_cell(
     let mut boxes = Vec::new();
     let mut y = 0.0;
     let mut prev: Option<Prev> = None;
-    for block in &cell.blocks {
+    let count = cell.blocks.len();
+    for (bi, block) in cell.blocks.iter().enumerate() {
         match block {
             Block::Paragraph(p) => {
                 let idx = b.paragraph(p, content_w, Some(fmt));
                 let pl = &b.arena[idx];
+                // Measured (layout-table-flow): the empty paragraph that must follow a nested
+                // table at the end of a cell takes no height.
+                let after_table = bi > 0 && matches!(cell.blocks[bi - 1], Block::Table(_));
+                if after_table
+                    && bi + 1 == count
+                    && pl.atoms.iter().all(|a| a.class == AtomClass::Mark)
+                {
+                    continue;
+                }
                 let mut before = f64::from(pl.props.space_before_pt);
                 let mut after_prev = prev.as_ref().map_or(0.0, |p| p.after);
                 if let Some(pv) = &prev
@@ -178,9 +210,9 @@ impl TableLayout {
                 }
                 let h = self.span_height(row, cell);
                 boxes.push(FlowBox {
-                    dx: dx + self.x + cell.x,
-                    dy: dy + row.top,
-                    w: cell.w,
+                    dx: dx + self.x + cell.x + cell.inset_l,
+                    dy: dy + row.top + row.above,
+                    w: cell.w - cell.inset_l - cell.inset_r,
                     h,
                 });
                 for bx in &cell.boxes {
@@ -209,10 +241,9 @@ impl TableLayout {
             .iter()
             .position(|r| std::ptr::eq(r, row))
             .unwrap_or(0);
-        self.rows[first..(first + cell.row_span.max(1)).min(self.rows.len())]
-            .iter()
-            .map(|r| r.height)
-            .sum()
+        let covered = &self.rows[first..(first + cell.row_span.max(1)).min(self.rows.len())];
+        let total: f64 = covered.iter().map(|r| r.height).sum();
+        total - covered.first().map_or(0.0, |r| r.above) - covered.last().map_or(0.0, |r| r.below)
     }
 }
 
@@ -316,6 +347,36 @@ pub(crate) fn layout_table(b: &mut Builder<'_>, table: &Table, avail: f64) -> Ta
                 .unwrap_or_default();
             let content_w = (cell_w - pad.left - pad.right).max(1.0);
             let (lines, boxes, content_h) = layout_cell(b, c.cell, content_w, &fmt);
+            // Borders: the cell's own, then its table style's, then the table's.
+            let last_col = c.col + c.span >= grid.len();
+            let last_row = r + c.row_span.max(1) >= nrows;
+            let (own, sty, tb) = (&c.props.borders, &fmt.cell.borders, &props.borders);
+            let pick = |a: &Option<Border>, b: &Option<Border>, t: &Option<Border>| {
+                border_width(a)
+                    .or_else(|| border_width(b))
+                    .or_else(|| border_width(t))
+                    .unwrap_or(0.0)
+            };
+            let border_top = pick(
+                &own.top,
+                &sty.top,
+                if r == 0 { &tb.top } else { &tb.inside_h },
+            );
+            let border_bottom = pick(
+                &own.bottom,
+                &sty.bottom,
+                if last_row { &tb.bottom } else { &tb.inside_h },
+            );
+            let border_left = pick(
+                &own.left,
+                &sty.left,
+                if c.col == 0 { &tb.left } else { &tb.inside_v },
+            );
+            let border_right = pick(
+                &own.right,
+                &sty.right,
+                if last_col { &tb.right } else { &tb.inside_v },
+            );
             let valign = c
                 .props
                 .v_align
@@ -331,6 +392,12 @@ pub(crate) fn layout_table(b: &mut Builder<'_>, table: &Table, avail: f64) -> Ta
                 content_h,
                 content_top: 0.0,
                 valign,
+                inset_l: 0.0,
+                inset_r: 0.0,
+                border_top,
+                border_bottom,
+                border_left,
+                border_right,
             });
         }
         // The row end mark is one more character of the story.
@@ -338,12 +405,42 @@ pub(crate) fn layout_table(b: &mut Builder<'_>, table: &Table, avail: f64) -> Ta
         rows.push(RowLayout {
             top: 0.0,
             height: 0.0,
+            above: 0.0,
+            below: 0.0,
             cant_split: row.props.cant_split,
             is_header: row.props.is_header,
             exact: matches!(row.props.height, Some((_, HeightRule::Exact))),
             cells,
         });
     }
+
+    // Border geometry. Word puts the grid line in the middle of each border and draws the cell
+    // between the borders; vertically a row's height includes the whole border below it and the
+    // table's top border sits above the first row (measured with 0.25 to 6 pt borders).
+    let mut vlines = vec![0.0f64; col_x.len()];
+    let mut hlines = vec![0.0f64; nrows + 1];
+    let last_line = vlines.len() - 1;
+    for (r, row) in rows.iter().enumerate() {
+        for (cv, cell) in view.rows[r].cells.iter().zip(&row.cells) {
+            let (a, e) = (cv.col.min(last_line), (cv.col + cv.span).min(last_line));
+            vlines[a] = vlines[a].max(cell.border_left);
+            vlines[e] = vlines[e].max(cell.border_right);
+            if cv.row_span > 0 {
+                hlines[r] = hlines[r].max(cell.border_top);
+                let end = (r + cv.row_span).min(nrows);
+                hlines[end] = hlines[end].max(cell.border_bottom);
+            }
+        }
+    }
+    for (r, row) in rows.iter_mut().enumerate() {
+        row.above = if r == 0 { hlines[0] } else { 0.0 };
+        row.below = hlines[r + 1];
+        for (cv, cell) in view.rows[r].cells.iter().zip(row.cells.iter_mut()) {
+            cell.inset_l = vlines[cv.col.min(last_line)] / 2.0;
+            cell.inset_r = vlines[(cv.col + cv.span).min(last_line)] / 2.0;
+        }
+    }
+    let x = x + vlines[0] / 2.0;
 
     // Row heights: the tallest single-row cell, then the row height rule, then the extra
     // that vertically merged cells need goes to the last row they cover.
@@ -355,18 +452,21 @@ pub(crate) fn layout_table(b: &mut Builder<'_>, table: &Table, avail: f64) -> Ta
             .filter(|c| c.row_span == 1)
             .map(need)
             .fold(0.0, f64::max);
-        row.height = match view.rows[r].props.height {
+        let content = match view.rows[r].props.height {
             Some((h, HeightRule::Exact)) => h,
             Some((h, HeightRule::AtLeast)) => natural.max(h),
             _ => natural,
         };
+        row.height = row.above + content + row.below;
     }
     for r in 0..rows.len() {
         for c in 0..rows[r].cells.len() {
             let span = rows[r].cells[c].row_span;
             if span > 1 {
                 let last = (r + span).min(rows.len()) - 1;
-                let total: f64 = rows[r..=last].iter().map(|x| x.height).sum();
+                let total: f64 = rows[r..=last].iter().map(|x| x.height).sum::<f64>()
+                    - rows[r].above
+                    - rows[last].below;
                 let extra = need(&rows[r].cells[c]) - total;
                 if extra > 0.0 && !rows[last].exact {
                     rows[last].height += extra;
@@ -387,8 +487,8 @@ pub(crate) fn layout_table(b: &mut Builder<'_>, table: &Table, avail: f64) -> Ta
                 continue;
             }
             let last = (r + span).min(rows.len()) - 1;
-            let outer = rows[last].top + rows[last].height - rows[r].top;
-            let row_top = rows[r].top;
+            let row_top = rows[r].top + rows[r].above;
+            let outer = rows[last].top + rows[last].height - rows[last].below - row_top;
             let cell = &mut rows[r].cells[c];
             cell.content_top = row_top + cell.pad.top + cell.valign_shift(outer);
         }

@@ -136,7 +136,7 @@ impl PageBuild {
             number: self.number,
             section: self.section,
             lines: self.lines,
-            cells: self.cells,
+            cells: self.cells.into_iter().map(snap_cell).collect(),
         }
     }
 }
@@ -251,6 +251,20 @@ const BASELINE_GRID: f64 = 0.24;
 
 fn snap_baseline(y: f64) -> f64 {
     ((y - 1e-6) / BASELINE_GRID).ceil() * BASELINE_GRID
+}
+
+/// A cell rectangle as Word draws it: the top and bottom edges lie on the same 0.24 pt grid as
+/// baselines, each rounded to the nearest line (measured over 120-row probe tables: the row
+/// boundaries are `round(exact_y / 0.24) * 0.24`, so rows alternate 13.44 and 13.20 pt for a
+/// 13.43 pt line). Left and right edges are not snapped (columns are exact twips).
+fn snap_cell(c: CellBox) -> CellBox {
+    let top = (c.y / BASELINE_GRID).round() * BASELINE_GRID;
+    let bottom = ((c.y + c.height) / BASELINE_GRID).round() * BASELINE_GRID;
+    CellBox {
+        y: top,
+        height: bottom - top,
+        ..c
+    }
 }
 
 /// Builds the placed line `lb` of `para`, its text area starting at `origin_x` on the page.
@@ -417,14 +431,14 @@ impl Paginator<'_> {
                 match s.box_idx {
                     Some(i) => {
                         let b = &mut self.page.cells[i];
-                        b.height = y + row.height - b.y;
+                        b.height = y + row.height - row.below - b.y;
                     }
                     None => {
                         self.page.cells.push(CellBox {
-                            x: origin + cell.x,
+                            x: origin + cell.x + cell.inset_l,
                             y,
-                            width: cell.w,
-                            height: row.height,
+                            width: cell.w - cell.inset_l - cell.inset_r,
+                            height: row.height - row.below,
                         });
                         s.box_idx = Some(self.page.cells.len() - 1);
                     }
@@ -436,10 +450,10 @@ impl Paginator<'_> {
                 continue;
             }
             self.page.cells.push(CellBox {
-                x: origin + cell.x,
-                y,
-                width: cell.w,
-                height: row.height,
+                x: origin + cell.x + cell.inset_l,
+                y: y + row.above,
+                width: cell.w - cell.inset_l - cell.inset_r,
+                height: row.height - row.above - row.below,
             });
             if cell.row_span > 1 && !repeated {
                 active.push(ActiveSpan {
@@ -536,9 +550,9 @@ impl Paginator<'_> {
         let origin = self.page.origin_x() + table.x;
         for (ci, cell) in row.cells.iter().enumerate() {
             self.page.cells.push(CellBox {
-                x: origin + cell.x,
+                x: origin + cell.x + cell.inset_l,
                 y,
-                width: cell.w,
+                width: cell.w - cell.inset_l - cell.inset_r,
                 height,
             });
             let base = if from[ci] == 0 {

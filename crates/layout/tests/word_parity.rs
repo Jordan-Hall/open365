@@ -36,8 +36,11 @@ const TOLERANCE: f64 = 0.5;
 /// Table cell rectangles are compared much tighter than text: the PDF writes five significant
 /// digits and Word snaps edges to its 600 dpi device grid (0.12 pt), so 0.1 pt is one device pixel
 /// less the rounding of the numbers.
-const CELL_TOLERANCE: f64 = 0.25;
+const CELL_TOLERANCE_X: f64 = 0.25;
+/// Vertical edges follow the 0.24 pt grid the engine models, so only the PDF's rounding is left.
+const CELL_TOLERANCE_Y: f64 = 0.05;
 /// Word's PDF places glyph origins 0.024 pt (1/3000 in) right of the layout position.
+const PDF_SCALE: f64 = 1.0003;
 const PDF_X_OFFSET: f64 = 0.024;
 
 fn root() -> PathBuf {
@@ -237,10 +240,10 @@ fn score(name: &str, detail: bool, mode: Mode, fonts: &FontLibrary) -> Result<Sc
             })
             .find(|(pn, i, b)| {
                 !used.contains(&(*pn, *i))
-                    && (b.x - (c.x - PDF_X_OFFSET)).abs() <= CELL_TOLERANCE
-                    && (b.y - c.y).abs() <= CELL_TOLERANCE
-                    && (b.width - c.w).abs() <= CELL_TOLERANCE
-                    && (b.height - c.h).abs() <= CELL_TOLERANCE
+                    && (b.x - c.x / PDF_SCALE).abs() <= CELL_TOLERANCE_X
+                    && (b.y - c.y / PDF_SCALE).abs() <= CELL_TOLERANCE_Y
+                    && (b.width - c.w / PDF_SCALE).abs() <= CELL_TOLERANCE_X
+                    && (b.height - c.h / PDF_SCALE).abs() <= CELL_TOLERANCE_Y
             });
         if let Some((pn, i, _)) = hit {
             used.push((pn, i));
