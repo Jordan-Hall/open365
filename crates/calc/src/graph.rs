@@ -388,6 +388,9 @@ pub struct Deps {
     pub names: Vec<String>,
     /// The formula calls a volatile function such as `NOW`.
     pub volatile: bool,
+    /// The formula calls `OFFSET` or `INDIRECT`: it reads cells that no reference in the formula names, so
+    /// the engine re-evaluates it until those cells have settled.
+    pub dynamic: bool,
     /// The formula calls `SUBTOTAL` or `AGGREGATE`, so other subtotals skip its cell.
     pub subtotal: bool,
 }
@@ -437,10 +440,23 @@ fn walk(ast: &Ast, sheet: &str, resolve: &dyn Fn(&str) -> Option<Ast>, out: &mut
             if is_volatile(name) {
                 out.volatile = true;
             }
+            if name.eq_ignore_ascii_case("OFFSET") || name.eq_ignore_ascii_case("INDIRECT") {
+                out.dynamic = true;
+            }
             if name.eq_ignore_ascii_case("SUBTOTAL") || name.eq_ignore_ascii_case("AGGREGATE") {
                 out.subtotal = true;
             }
-            for a in args {
+            // `ROW(A1)`, `COLUMNS(A:Z)` and the base of `OFFSET(A1,..)` only use the position of a
+            // reference, never its value: they do not depend on the cells (`=ROW(A1)` in A1 is no cycle).
+            let position_only = ["ROW", "COLUMN", "ROWS", "COLUMNS"]
+                .iter()
+                .any(|n| n.eq_ignore_ascii_case(name));
+            let offset = name.eq_ignore_ascii_case("OFFSET");
+            for (i, a) in args.iter().enumerate() {
+                let literal = matches!(a, Ast::Ref(_) | Ast::Area(_));
+                if literal && (position_only || offset && i == 0) {
+                    continue;
+                }
                 walk(a, sheet, resolve, out, depth);
             }
         }

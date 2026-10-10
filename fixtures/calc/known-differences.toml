@@ -241,5 +241,49 @@ id = "text.fmt_nested_bracket"
 reason = "TEXT refuses two colour codes in one section (`[Red][Blue]0`, #VALUE!); numfmt accepts and ignores the second."
 
 [[difference]]
-id = "textsplit.sumv"
-reason = "SUM(VALUE(TEXTSPLIT(..))): Excel applies the scalar VALUE to every element of a computed array in a plain formula (10); the evaluator only lifts scalar functions inside array parameters such as SUMPRODUCT's, so Open365 gives 1."
+id = "isformula.t033"
+reason = "ISFORMULA(J20) in J20 itself: Excel answers TRUE, Open365 keeps the self reference in the dependency graph and reports a cycle (0)."
+
+[[difference]]
+id = "isformula.self"
+reason = "Same as isformula.t033."
+
+[[difference]]
+id = "isformula.chain"
+reason = "ISFORMULA(J20) in K20 where J20 is a cycle through ISFORMULA(J20); same cause as isformula.t033."
+
+[[difference]]
+id = "offset.t122"
+reason = "OFFSET with an array argument returns an array of references. SUMPRODUCT of it is 0 in Excel; Open365 has no reference arrays and takes the first element (11)."
+
+[[difference]]
+id = "offset.t123"
+reason = "Same as offset.t122 (array row and column offsets)."
+
+[[difference]]
+id = "offset.t124"
+reason = "Same as offset.t122 (array height)."
+
+[[difference]]
+id = "indirect.t163"
+reason = "INDIRECT with an array of texts returns an array of references; SUMPRODUCT of it is 0 in Excel, Open365 takes the first element."
+
+[[difference]]
+id = "indirect.t164"
+reason = "Same as indirect.t163."
+
+[[difference]]
+id = "indirect.t169"
+reason = "Same as indirect.t163."
+
+[[difference]]
+id = "indirect.t172"
+reason = "Same as indirect.t163 (ranges instead of cells)."
+
+[[difference]]
+id = "indirect.t170"
+reason = "Excel gives #VALUE! when a comparison is applied to the array of references INDIRECT returns for an array argument; Open365 compares the first element."
+
+[[difference]]
+id = "indirect.t171"
+reason = "COUNTIF over each reference of the array INDIRECT returns (3 in Excel); Open365 has no reference arrays and counts the first only."

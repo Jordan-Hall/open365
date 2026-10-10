@@ -10,7 +10,7 @@ use std::cmp::Ordering;
 use std::fmt;
 
 use crate::ast::{AreaKind, AreaRef, Ast, BinOp, CellRef, MAX_COL, MAX_ROW, UnaryOp};
-use crate::functions::{self, Func};
+use crate::functions::{self, Func, Lifting};
 use crate::value::{ErrorKind, Value, compare_values};
 
 const MAX_NAME_DEPTH: u32 = 16;
@@ -28,6 +28,11 @@ pub trait CellSource {
     /// Whether a sheet exists. References to missing sheets evaluate to `#REF!`.
     fn sheet_exists(&self, _sheet: &str) -> bool {
         true
+    }
+
+    /// Whether the cell holds a formula (for `ISFORMULA`).
+    fn has_formula(&self, _sheet: &str, _row: u32, _col: u32) -> bool {
+        false
     }
 
     /// Whether the cell holds a formula that calls `SUBTOTAL` or `AGGREGATE` (such cells are skipped by those functions).
@@ -401,6 +406,7 @@ pub fn evaluate_root(ast: &Ast, ctx: &EvalContext<'_>, snap_root: bool) -> Value
     let ev = Evaluator {
         ctx,
         name_depth: Cell::new(0),
+        ref_lift: Cell::new(false),
     };
     let arg = match ast {
         Ast::Binary {
@@ -426,6 +432,9 @@ pub fn evaluate_root(ast: &Ast, ctx: &EvalContext<'_>, snap_root: bool) -> Value
 struct Evaluator<'c, 'a> {
     ctx: &'c EvalContext<'a>,
     name_depth: Cell<u32>,
+    /// Set by `N(OFFSET(..))`/`N(INDIRECT(..))`: the call that follows lifts over array arguments, giving one
+    /// value per element (Excel hands `N` an array of references).
+    ref_lift: Cell<bool>,
 }
 
 /// Operand of an arithmetic operator after reference resolution.
@@ -491,6 +500,11 @@ impl Evaluator<'_, '_> {
         if !self.ctx.source.sheet_exists(sheet) {
             return Arg::error(ErrorKind::Ref);
         }
+        self.cell_range(r)
+    }
+
+    fn cell_range(&self, r: &CellRef) -> Arg {
+        let sheet = self.sheet_of(r.sheet.as_ref());
         Arg::Range(RangeRef::new(sheet, r.row, r.col, r.row, r.col))
     }
 
@@ -499,12 +513,27 @@ impl Evaluator<'_, '_> {
         if !self.ctx.source.sheet_exists(sheet) {
             return Arg::error(ErrorKind::Ref);
         }
+        self.area_range(a)
+    }
+
+    fn area_range(&self, a: &AreaRef) -> Arg {
+        let sheet = self.sheet_of(a.sheet.as_ref());
         let (row1, row2, col1, col2) = match a.kind {
             AreaKind::Cells => (a.row1, a.row2, a.col1, a.col2),
             AreaKind::Cols => (1, MAX_ROW, a.col1, a.col2),
             AreaKind::Rows => (a.row1, a.row2, 1, MAX_COL),
         };
         Arg::Range(RangeRef::new(sheet, row1, col1, row2, col2))
+    }
+
+    /// A literal reference without the sheet check: `ROWS(Sheet9!A1)` and `ISREF(Sheet9!A1)` still see a
+    /// reference to a sheet that does not exist.
+    fn unchecked_ref(&self, ast: &Ast) -> Option<Arg> {
+        match ast {
+            Ast::Ref(r) => Some(self.cell_range(r)),
+            Ast::Area(a) => Some(self.area_range(a)),
+            _ => None,
+        }
     }
 
     fn eval_name(&self, name: &str) -> Arg {
@@ -525,31 +554,106 @@ impl Evaluator<'_, '_> {
         let Some(func) = functions::lookup(name) else {
             return Arg::error(ErrorKind::Name);
         };
-        // Inside an array context (an array parameter such as SUMPRODUCT's), element-wise functions
-        // are applied to every element of their array arguments.
-        let lift = array && functions::is_elementwise(name);
+        let reference_fn = functions::takes_reference(name);
+        let ref_lift = self.ref_lift.replace(false);
+        let feeds_ref_lift = name.eq_ignore_ascii_case("N")
+            && matches!(args, [Ast::Func { name: inner, .. }] if functions::ref_lifting(inner).is_some());
+        if feeds_ref_lift {
+            self.ref_lift.set(true);
+        }
+        // Excel answers `ISREF(XLOOKUP(..))` with the reference the lookup returns; Open365 returns values.
+        if name.eq_ignore_ascii_case("ISREF")
+            && let [Ast::Func { name: inner, .. }] = args
+            && inner.eq_ignore_ascii_case("XLOOKUP")
+        {
+            let found = self.eval(&args[0]);
+            return Arg::Value(Value::Bool(!matches!(found, Arg::Value(Value::Error(_)))));
+        }
+        // A function with scalar parameters is applied to every element of an array argument. Ranges are
+        // expanded only where Excel evaluates array parameters (`array`); elsewhere they take the implicit
+        // intersection, but computed arrays and array constants always lift.
+        let lifting = if ref_lift {
+            functions::ref_lifting(name)
+        } else {
+            functions::lifting(name).filter(|l| !l.array_only || array)
+        };
+        let expand = array && lifting.is_some_and(|l| l.expand_ranges);
         let evaluated: Vec<Arg> = args
             .iter()
             .enumerate()
-            .map(|(i, a)| self.eval_in(a, lift || functions::is_array_param(name, i)))
-            .collect();
-        if lift
-            && evaluated.iter().any(|a| match a {
-                Arg::Array(_) => true,
-                Arg::Range(r) => !r.is_single_cell(),
-                _ => false,
+            .map(|(i, a)| {
+                if reference_fn && let Some(r) = self.unchecked_ref(a) {
+                    return r;
+                }
+                let lifted = expand && lifting.is_some_and(|l| (l.scalar_param)(i));
+                // `N(OFFSET(..))` passes the array context on to the reference function.
+                let lifted = lifted
+                    || array
+                        && (feeds_ref_lift
+                            || ref_lift && lifting.is_some_and(|l| (l.scalar_param)(i)));
+                let arg = self.eval_in(a, lifted || functions::is_array_param(name, i));
+                // `IFERROR(A1,0)` is a value for `ROW`, `ISREF` and friends, though `ISBLANK` sees through it.
+                match (&arg, a) {
+                    (Arg::Range(r), Ast::Func { name: inner, .. })
+                        if reference_fn
+                            && (inner.eq_ignore_ascii_case("IFERROR")
+                                || inner.eq_ignore_ascii_case("IFNA")) =>
+                    {
+                        Arg::Value(self.ctx.scalar(&Arg::Range(r.clone())))
+                    }
+                    _ => arg,
+                }
             })
-        {
-            return self.lift_call(func, &evaluated);
+            .collect();
+        if let Some(l) = lifting {
+            let triggers = evaluated.iter().enumerate().any(|(i, a)| {
+                l.trigger.unwrap_or(l.scalar_param)(i)
+                    && match a {
+                        Arg::Array(rows) => {
+                            rows.len() > 1 || rows.first().is_some_and(|r| r.len() > 1)
+                        }
+                        Arg::Range(r) => expand && !r.is_single_cell(),
+                        _ => false,
+                    }
+            });
+            if triggers {
+                return self.lift_call(func, &evaluated, l, ref_lift);
+            }
         }
-        call_function(self.ctx, func, &evaluated)
+        let result = call_function(self.ctx, func, &evaluated);
+        // `ROW(A1:A3)` is an array only where Excel evaluates arrays; in a plain formula it is its first row.
+        if !array
+            && functions::returns_array_in_array_context(name)
+            && let Arg::Array(rows) = &result
+        {
+            return Arg::from_value(
+                rows.first()
+                    .and_then(|r| r.first())
+                    .cloned()
+                    .unwrap_or(Value::Error(ErrorKind::Value)),
+            );
+        }
+        result
     }
 
-    /// Calls a scalar function once per element of its array arguments (scalars broadcast).
-    fn lift_call(&self, func: &Func, args: &[Arg]) -> Arg {
-        let operands: Vec<Operand> = args.iter().map(|a| self.operand(a.clone(), true)).collect();
+    /// Calls a scalar function once per element of its array arguments (scalars broadcast, a single row or
+    /// column stretches, anything shorter than the largest operand is `#N/A`). Once an array makes the call lift,
+    /// ranges among the other scalar arguments are read as arrays too (`IF({TRUE,FALSE},A1:A2,B1:B2)`).
+    fn lift_call(&self, func: &Func, args: &[Arg], lifting: &Lifting, ref_lift: bool) -> Arg {
+        let operands: Vec<Option<Operand>> = args
+            .iter()
+            .enumerate()
+            .map(|(i, a)| {
+                if (lifting.scalar_param)(i) && !matches!(a, Arg::Missing) {
+                    Some(self.operand(a.clone(), true))
+                } else {
+                    None
+                }
+            })
+            .collect();
         let rows = operands
             .iter()
+            .flatten()
             .map(|o| match o {
                 Operand::Grid(g) => g.len(),
                 Operand::Scalar(_) => 1,
@@ -558,6 +662,7 @@ impl Evaluator<'_, '_> {
             .unwrap_or(1);
         let cols = operands
             .iter()
+            .flatten()
             .map(|o| match o {
                 Operand::Grid(g) => g.first().map_or(0, Vec::len),
                 Operand::Scalar(_) => 1,
@@ -585,8 +690,14 @@ impl Evaluator<'_, '_> {
             .map(|r| {
                 (0..cols)
                     .map(|c| {
-                        let call_args: Vec<Arg> =
-                            operands.iter().map(|o| Arg::Value(pick(o, r, c))).collect();
+                        let call_args: Vec<Arg> = operands
+                            .iter()
+                            .zip(args)
+                            .map(|(o, original)| match o {
+                                Some(o) => Arg::Value(pick(o, r, c)),
+                                None => original.clone(),
+                            })
+                            .collect();
                         match call_function(self.ctx, func, &call_args) {
                             Arg::Value(v) => v,
                             Arg::Array(rows) => rows
@@ -594,6 +705,10 @@ impl Evaluator<'_, '_> {
                                 .and_then(|row| row.first())
                                 .cloned()
                                 .unwrap_or(Value::Error(ErrorKind::Value)),
+                            // `N` takes the first cell of a reference.
+                            Arg::Range(r) if ref_lift => {
+                                self.ctx.source.cell(&r.sheet, r.row1, r.col1)
+                            }
                             other => self.ctx.scalar(&other),
                         }
                     })

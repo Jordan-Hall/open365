@@ -1,4 +1,4 @@
-//! Lookup and reference functions: `VLOOKUP`, `HLOOKUP`, `INDEX`, `MATCH`, `XLOOKUP`, `CHOOSE`.
+//! Lookup and reference functions: `VLOOKUP`, `HLOOKUP`, `INDEX`, `MATCH`, `LOOKUP`, `XLOOKUP`, `CHOOSE`.
 //!
 //! Exact matches compare numbers bit for bit (unlike `=`, which equates values equal to 15 digits).
 //! An ascending approximate match (`MATCH` type 1, `VLOOKUP` without FALSE) is the binary search Excel
@@ -221,6 +221,63 @@ pub(super) fn match_(ctx: &EvalContext<'_>, args: &[Arg]) -> Res<Value> {
     found
         .map(|i| Value::Number((i + 1) as f64))
         .ok_or(ErrorKind::NA)
+}
+
+/// `LOOKUP(value, vector, [result_vector])`: an ascending approximate search. With a result vector the match
+/// position indexes it (a single cell counts as a row, and the vector is not clipped to its own size). Without
+/// one, `vector` is an array: a wide one is searched along its first row and answers from its last row, any
+/// other along its first column and answers from its last column.
+pub(super) fn lookup(ctx: &EvalContext<'_>, args: &[Arg]) -> Res<Value> {
+    arity(args, 2, 3)?;
+    let wanted = lookup_value(ctx, &args[0])?;
+    let grid = table_grid(ctx, &args[1])?;
+    let wide = grid.cols() > grid.rows();
+    let n = if wide {
+        grid.scan_cols()
+    } else {
+        grid.scan_rows()
+    };
+    let get = |i: usize| if wide { grid.get(0, i) } else { grid.get(i, 0) };
+    let pos = find_last_le(&wanted, n, &get).ok_or(ErrorKind::NA)?;
+    let Some(result) = args.get(2) else {
+        return Ok(if wide {
+            grid.get(grid.rows() - 1, pos)
+        } else {
+            grid.get(pos, grid.cols() - 1)
+        });
+    };
+    let result = table_grid(ctx, result)?;
+    let (rows, cols) = (result.rows(), result.cols());
+    if rows > 1 && cols > 1 {
+        return Err(ErrorKind::NA);
+    }
+    let vertical = cols == 1 && rows > 1;
+    if let Arg::Range(r) = result_range(args) {
+        let (row, col) = if vertical {
+            (r.row1 + pos as u32, r.col1)
+        } else {
+            (r.row1, r.col1 + pos as u32)
+        };
+        if row > crate::ast::MAX_ROW || col > crate::ast::MAX_COL {
+            return Err(ErrorKind::NA);
+        }
+        return Ok(ctx.source.cell(&r.sheet, row, col));
+    }
+    if vertical {
+        if pos < rows {
+            Ok(result.get(pos, 0))
+        } else {
+            Err(ErrorKind::NA)
+        }
+    } else if pos < cols {
+        Ok(result.get(0, pos))
+    } else {
+        Err(ErrorKind::NA)
+    }
+}
+
+fn result_range(args: &[Arg]) -> &Arg {
+    &args[2]
 }
 
 pub(super) fn index(ctx: &EvalContext<'_>, args: &[Arg]) -> Arg {

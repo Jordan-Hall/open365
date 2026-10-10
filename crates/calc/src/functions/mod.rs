@@ -4,10 +4,12 @@ mod arith;
 mod criteria;
 mod datecalc;
 mod datetime;
+mod info;
 mod letters;
 mod logical;
 mod lookup;
 mod math;
+mod refs;
 mod stats;
 mod text;
 mod textbyte;
@@ -139,6 +141,25 @@ static TABLE: &[(&str, Func)] = &[
     ("ISTEXT", Func::Res(logical::istext)),
     ("ISERROR", Func::Res(logical::iserror)),
     ("ISNA", Func::Res(logical::isna)),
+    ("ISLOGICAL", Func::Res(logical::islogical)),
+    ("ISNONTEXT", Func::Res(logical::isnontext)),
+    ("ISERR", Func::Res(logical::iserr)),
+    ("IFS", Func::Arg(logical::ifs)),
+    ("SWITCH", Func::Arg(logical::switch)),
+    ("ISEVEN", Func::Res(info::iseven)),
+    ("ISODD", Func::Res(info::isodd)),
+    ("ISREF", Func::Res(info::isref)),
+    ("ISFORMULA", Func::Res(info::isformula)),
+    ("TYPE", Func::Res(info::type_)),
+    ("ERROR.TYPE", Func::Res(info::error_type)),
+    ("ROWS", Func::Res(refs::rows)),
+    ("COLUMNS", Func::Res(refs::columns)),
+    ("ROW", Func::Arg(refs::row)),
+    ("COLUMN", Func::Arg(refs::column)),
+    ("ADDRESS", Func::Res(refs::address)),
+    ("OFFSET", Func::Arg(refs::offset)),
+    ("INDIRECT", Func::Arg(refs::indirect)),
+    ("LOOKUP", Func::Res(lookup::lookup)),
     ("NA", Func::Res(logical::na)),
     // text
     ("LEN", Func::Res(text::len)),
@@ -237,91 +258,319 @@ pub fn lookup(name: &str) -> Option<&'static Func> {
 pub(crate) fn is_array_param(name: &str, index: usize) -> bool {
     if name.eq_ignore_ascii_case("INDEX") {
         index == 0
-    } else if name.eq_ignore_ascii_case("XLOOKUP") {
+    } else if name.eq_ignore_ascii_case("XLOOKUP") || name.eq_ignore_ascii_case("LOOKUP") {
         index == 1 || index == 2
+    } else if name.eq_ignore_ascii_case("ROWS") || name.eq_ignore_ascii_case("COLUMNS") {
+        true
     } else {
         name.eq_ignore_ascii_case("SUMPRODUCT")
     }
 }
 
-/// Functions whose parameters are all scalars: in an array context they are applied element by element.
-pub(crate) fn is_elementwise(name: &str) -> bool {
-    const NAMES: &[&str] = &[
-        "ABS",
-        "INT",
-        "SQRT",
-        "ISNUMBER",
-        "ISTEXT",
-        "ISBLANK",
-        "ISERROR",
-        "ISNA",
-        "NOT",
-        "LEN",
-        "LEFT",
-        "RIGHT",
-        "MID",
-        "UPPER",
-        "LOWER",
-        "TRIM",
-        "ROUND",
-        "ROUNDUP",
-        "ROUNDDOWN",
-        "MOD",
-        "POWER",
-        "SIGN",
-        "EXP",
-        "LN",
-        "LOG",
-        "LOG10",
-        "SIN",
-        "COS",
-        "TAN",
-        "ASIN",
-        "ACOS",
-        "ATAN",
-        "ATAN2",
-        "SINH",
-        "COSH",
-        "TANH",
-        "DEGREES",
-        "RADIANS",
-        "CEILING",
-        "FLOOR",
-        "TRUNC",
-        "MROUND",
-        "FACT",
-        "EVEN",
-        "ODD",
-        "QUOTIENT",
-        "VALUE",
-        "SUBSTITUTE",
-        "REPT",
-        "FIND",
-        "SEARCH",
-        "TEXT",
-        "FIXED",
-        "DOLLAR",
-        "NUMBERVALUE",
-        "CHAR",
-        "CODE",
-        "UNICHAR",
-        "UNICODE",
-        "EXACT",
-        "PROPER",
-        "CLEAN",
-        "REPLACE",
-        "REPLACEB",
-        "LENB",
-        "LEFTB",
-        "RIGHTB",
-        "MIDB",
-        "FINDB",
-        "SEARCHB",
-        "YEAR",
-        "MONTH",
-        "DAY",
-    ];
-    NAMES.iter().any(|n| n.eq_ignore_ascii_case(name))
+/// Functions that take a reference: a literal reference to a missing sheet is still a reference for them.
+pub(crate) fn takes_reference(name: &str) -> bool {
+    ["ROW", "COLUMN", "ROWS", "COLUMNS", "ISREF", "ISFORMULA"]
+        .iter()
+        .any(|n| n.eq_ignore_ascii_case(name))
+}
+
+/// Functions that return a whole array for a multi-cell reference only where Excel evaluates arrays.
+pub(crate) fn returns_array_in_array_context(name: &str) -> bool {
+    name.eq_ignore_ascii_case("ROW") || name.eq_ignore_ascii_case("COLUMN")
+}
+
+/// How a function applies to arrays passed for its scalar parameters: once per element, with `1xN`/`Nx1`
+/// operands broadcast and mismatched sizes padded with `#N/A`.
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct Lifting {
+    /// Lift only where Excel evaluates array parameters (inside `SUMPRODUCT`, `INDEX`, ...). Elsewhere the
+    /// function takes the first element of an array argument (`IFERROR`).
+    pub array_only: bool,
+    /// The parameters whose arrays make the call lift, when that is fewer than the scalar ones (`IF`,
+    /// `CHOOSE`, `IFS`): with a scalar condition the chosen branch is returned whole.
+    pub trigger: Option<fn(usize) -> bool>,
+    /// Whether multi-cell ranges are expanded where Excel evaluates array parameters. False for functions
+    /// that lift array values but take the implicit intersection of a range (`IF`, `IFS`, `ISEVEN`).
+    pub expand_ranges: bool,
+    /// Whether parameter `i` is a scalar parameter (lifted); the others (ranges, arrays) pass through.
+    pub scalar_param: fn(usize) -> bool,
+}
+
+fn all_params(_: usize) -> bool {
+    true
+}
+fn only_second(i: usize) -> bool {
+    i == 1
+}
+fn not_second(i: usize) -> bool {
+    i != 1
+}
+fn only_first(i: usize) -> bool {
+    i == 0
+}
+fn first_two(i: usize) -> bool {
+    i < 2
+}
+fn first_three(i: usize) -> bool {
+    i < 3
+}
+fn criteria_pairs(i: usize) -> bool {
+    i >= 2 && i.is_multiple_of(2)
+}
+fn even_params(i: usize) -> bool {
+    i.is_multiple_of(2)
+}
+fn criteria_odd(i: usize) -> bool {
+    i % 2 == 1
+}
+
+const fn lift(scalar_param: fn(usize) -> bool) -> Lifting {
+    Lifting {
+        array_only: false,
+        trigger: None,
+        expand_ranges: true,
+        scalar_param,
+    }
+}
+
+const ALWAYS: Lifting = lift(all_params);
+
+static LIFTING: &[(&str, Lifting)] = &[
+    ("ABS", ALWAYS),
+    ("INT", ALWAYS),
+    ("SQRT", ALWAYS),
+    ("ISNUMBER", ALWAYS),
+    ("ISTEXT", ALWAYS),
+    ("ISBLANK", ALWAYS),
+    ("ISERROR", ALWAYS),
+    ("ISNA", ALWAYS),
+    ("NOT", ALWAYS),
+    ("LEN", ALWAYS),
+    ("LEFT", ALWAYS),
+    ("RIGHT", ALWAYS),
+    ("MID", ALWAYS),
+    ("UPPER", ALWAYS),
+    ("LOWER", ALWAYS),
+    ("TRIM", ALWAYS),
+    ("ROUND", ALWAYS),
+    ("ROUNDUP", ALWAYS),
+    ("ROUNDDOWN", ALWAYS),
+    ("MOD", ALWAYS),
+    ("POWER", ALWAYS),
+    ("SIGN", ALWAYS),
+    ("EXP", ALWAYS),
+    ("LN", ALWAYS),
+    ("LOG", ALWAYS),
+    ("LOG10", ALWAYS),
+    ("SIN", ALWAYS),
+    ("COS", ALWAYS),
+    ("TAN", ALWAYS),
+    ("ASIN", ALWAYS),
+    ("ACOS", ALWAYS),
+    ("ATAN", ALWAYS),
+    ("ATAN2", ALWAYS),
+    ("SINH", ALWAYS),
+    ("COSH", ALWAYS),
+    ("TANH", ALWAYS),
+    ("DEGREES", ALWAYS),
+    ("RADIANS", ALWAYS),
+    ("CEILING", ALWAYS),
+    ("FLOOR", ALWAYS),
+    ("TRUNC", ALWAYS),
+    ("MROUND", ALWAYS),
+    ("FACT", ALWAYS),
+    ("EVEN", ALWAYS),
+    ("ODD", ALWAYS),
+    ("QUOTIENT", ALWAYS),
+    ("VALUE", ALWAYS),
+    ("SUBSTITUTE", ALWAYS),
+    ("REPT", ALWAYS),
+    ("FIND", ALWAYS),
+    ("SEARCH", ALWAYS),
+    ("TEXT", ALWAYS),
+    ("FIXED", ALWAYS),
+    ("DOLLAR", ALWAYS),
+    ("NUMBERVALUE", ALWAYS),
+    ("CHAR", ALWAYS),
+    ("CODE", ALWAYS),
+    ("UNICHAR", ALWAYS),
+    ("UNICODE", ALWAYS),
+    ("EXACT", ALWAYS),
+    ("PROPER", ALWAYS),
+    ("CLEAN", ALWAYS),
+    ("REPLACE", ALWAYS),
+    ("REPLACEB", ALWAYS),
+    ("LENB", ALWAYS),
+    ("LEFTB", ALWAYS),
+    ("RIGHTB", ALWAYS),
+    ("MIDB", ALWAYS),
+    ("FINDB", ALWAYS),
+    ("SEARCHB", ALWAYS),
+    ("YEAR", ALWAYS),
+    ("MONTH", ALWAYS),
+    ("DAY", ALWAYS),
+    (
+        "IF",
+        Lifting {
+            trigger: Some(only_first),
+            expand_ranges: false,
+            ..ALWAYS
+        },
+    ),
+    (
+        "CHOOSE",
+        Lifting {
+            trigger: Some(only_first),
+            expand_ranges: false,
+            ..ALWAYS
+        },
+    ),
+    (
+        "IFS",
+        Lifting {
+            trigger: Some(even_params),
+            expand_ranges: false,
+            ..ALWAYS
+        },
+    ),
+    (
+        "SWITCH",
+        Lifting {
+            trigger: Some(only_first),
+            expand_ranges: false,
+            ..ALWAYS
+        },
+    ),
+    (
+        "ISEVEN",
+        Lifting {
+            expand_ranges: false,
+            ..ALWAYS
+        },
+    ),
+    (
+        "ISODD",
+        Lifting {
+            expand_ranges: false,
+            ..ALWAYS
+        },
+    ),
+    (
+        "N",
+        Lifting {
+            expand_ranges: false,
+            ..ALWAYS
+        },
+    ),
+    ("LOOKUP", lift(only_first)),
+    (
+        "IFERROR",
+        Lifting {
+            array_only: true,
+            expand_ranges: false,
+            ..ALWAYS
+        },
+    ),
+    (
+        "IFNA",
+        Lifting {
+            array_only: true,
+            expand_ranges: false,
+            ..ALWAYS
+        },
+    ),
+    ("MATCH", lift(not_second)),
+    ("SUMIF", lift(only_second)),
+    ("COUNTIF", lift(only_second)),
+    ("AVERAGEIF", lift(only_second)),
+    ("SUMIFS", lift(criteria_pairs)),
+    ("AVERAGEIFS", lift(criteria_pairs)),
+    ("MAXIFS", lift(criteria_pairs)),
+    ("MINIFS", lift(criteria_pairs)),
+    ("COUNTIFS", lift(criteria_odd)),
+    ("LARGE", lift(only_second)),
+    ("SMALL", lift(only_second)),
+    ("PERCENTILE", lift(only_second)),
+    ("PERCENTILE.INC", lift(only_second)),
+    ("PERCENTILE.EXC", lift(only_second)),
+    ("QUARTILE", lift(only_second)),
+    ("QUARTILE.INC", lift(only_second)),
+    ("QUARTILE.EXC", lift(only_second)),
+    ("RANK", lift(not_second)),
+    ("RANK.EQ", lift(not_second)),
+    ("RANK.AVG", lift(not_second)),
+    ("SUBTOTAL", lift(only_first)),
+    ("AGGREGATE", lift(first_two)),
+    ("NETWORKDAYS", lift(first_two)),
+    ("WORKDAY", lift(first_two)),
+    ("NETWORKDAYS.INTL", lift(first_three)),
+    ("WORKDAY.INTL", lift(first_three)),
+    ("ISLOGICAL", ALWAYS),
+    ("ISNONTEXT", ALWAYS),
+    ("ISERR", ALWAYS),
+    ("ERROR.TYPE", ALWAYS),
+    ("DATE", ALWAYS),
+    ("WEEKDAY", ALWAYS),
+    ("EDATE", ALWAYS),
+    ("EOMONTH", ALWAYS),
+    ("DAYS", ALWAYS),
+    ("HOUR", ALWAYS),
+    ("MINUTE", ALWAYS),
+    ("SECOND", ALWAYS),
+    ("TIME", ALWAYS),
+    ("DATEVALUE", ALWAYS),
+    ("TIMEVALUE", ALWAYS),
+    ("DATEDIF", ALWAYS),
+    ("DAYS360", ALWAYS),
+    ("YEARFRAC", ALWAYS),
+    ("WEEKNUM", ALWAYS),
+    ("ISOWEEKNUM", ALWAYS),
+    ("COMBIN", ALWAYS),
+    ("PERMUT", ALWAYS),
+    ("CEILING.MATH", ALWAYS),
+    ("FLOOR.MATH", ALWAYS),
+    ("T", ALWAYS),
+    ("CONCATENATE", ALWAYS),
+    ("TEXTBEFORE", lift(only_first)),
+    ("TEXTAFTER", lift(only_first)),
+    ("VALUETOTEXT", ALWAYS),
+    ("ADDRESS", ALWAYS),
+];
+
+fn lifting_table() -> &'static HashMap<String, Lifting> {
+    static MAP: OnceLock<HashMap<String, Lifting>> = OnceLock::new();
+    MAP.get_or_init(|| LIFTING.iter().map(|(n, l)| ((*n).to_owned(), *l)).collect())
+}
+
+/// `OFFSET` and `INDIRECT` take the first element of an array argument, except directly under `N`, which
+/// Excel feeds an array of references: there they lift, one value per element.
+pub(crate) fn ref_lifting(name: &str) -> Option<&'static Lifting> {
+    static OFFSET: Lifting = Lifting {
+        array_only: false,
+        trigger: None,
+        expand_ranges: false,
+        scalar_param: |i| i >= 1,
+    };
+    static INDIRECT: Lifting = Lifting {
+        array_only: false,
+        trigger: None,
+        expand_ranges: false,
+        scalar_param: |_| true,
+    };
+    if name.eq_ignore_ascii_case("OFFSET") {
+        Some(&OFFSET)
+    } else if name.eq_ignore_ascii_case("INDIRECT") {
+        Some(&INDIRECT)
+    } else {
+        None
+    }
+}
+
+/// How `name` lifts over arrays, if it is a function with scalar parameters.
+pub(crate) fn lifting(name: &str) -> Option<&'static Lifting> {
+    let map = lifting_table();
+    map.get(name)
+        .or_else(|| map.get(name.to_ascii_uppercase().as_str()))
 }
 
 /// All implemented function names, sorted.

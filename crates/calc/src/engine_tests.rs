@@ -420,3 +420,111 @@ fn lookups_over_whole_columns_use_the_used_area() {
     assert_eq!(e.get(SHEET, 2, 4), n(500.0));
     assert_eq!(e.get(SHEET, 3, 4), n(10.0));
 }
+
+#[test]
+fn indirect_follows_its_target_after_set_value() {
+    let mut e = engine();
+    e.set_value(SHEET, 1, 1, n(1.0));
+    e.set_value(SHEET, 1, 2, t("A1"));
+    e.set_formula(SHEET, 1, 3, "=INDIRECT(B1)*10").unwrap();
+    e.recalc_dirty();
+    assert_eq!(e.get(SHEET, 1, 3), n(10.0));
+    // The referenced cell changes: no static reference connects it to C1.
+    e.set_value(SHEET, 1, 1, n(7.0));
+    e.recalc_dirty();
+    assert_eq!(e.get(SHEET, 1, 3), n(70.0));
+    // The text that names the target changes.
+    e.set_value(SHEET, 2, 1, n(3.0));
+    e.set_value(SHEET, 1, 2, t("A2"));
+    e.recalc_dirty();
+    assert_eq!(e.get(SHEET, 1, 3), n(30.0));
+}
+
+#[test]
+fn offset_follows_its_target_after_set_value() {
+    let mut e = engine();
+    e.set_value(SHEET, 1, 1, n(1.0));
+    e.set_value(SHEET, 2, 1, n(2.0));
+    e.set_value(SHEET, 3, 1, n(3.0));
+    e.set_value(SHEET, 1, 3, n(1.0)); // C1: how far to move
+    e.set_formula(SHEET, 1, 2, "=OFFSET(A1,C1,0)+SUM(OFFSET(A1,0,0,C1+1,1))")
+        .unwrap();
+    e.recalc_dirty();
+    assert_eq!(e.get(SHEET, 1, 2), n(5.0)); // A2 + (A1 + A2)
+    e.set_value(SHEET, 2, 1, n(20.0));
+    e.recalc_dirty();
+    assert_eq!(e.get(SHEET, 1, 2), n(41.0));
+    e.set_value(SHEET, 1, 3, n(2.0));
+    e.recalc_dirty();
+    assert_eq!(e.get(SHEET, 1, 2), n(3.0 + 24.0));
+}
+
+#[test]
+fn indirect_reads_a_formula_that_is_calculated_later() {
+    let mut e = engine();
+    // C1 is placed before the formula it reads in plan order only by accident of insertion: either way the
+    // result must be the settled value of A2.
+    e.set_formula(SHEET, 1, 3, "=INDIRECT(\"A2\")+1").unwrap();
+    e.set_formula(SHEET, 2, 1, "=A1*2").unwrap();
+    e.set_value(SHEET, 1, 1, n(4.0));
+    e.recalc_dirty();
+    assert_eq!(e.get(SHEET, 2, 1), n(8.0));
+    assert_eq!(e.get(SHEET, 1, 3), n(9.0));
+    e.set_value(SHEET, 1, 1, n(10.0));
+    e.recalc_dirty();
+    assert_eq!(e.get(SHEET, 1, 3), n(21.0));
+}
+
+#[test]
+fn chains_of_indirect_and_offset_settle() {
+    let mut e = engine();
+    // D1 reads C1 through INDIRECT, C1 reads B1 through OFFSET, B1 reads A1 through INDIRECT, and a plain
+    // formula depends on D1. Insert them in the worst order for a single pass.
+    e.set_formula(SHEET, 1, 5, "=D1+1").unwrap();
+    e.set_formula(SHEET, 1, 4, "=INDIRECT(\"C1\")+1").unwrap();
+    e.set_formula(SHEET, 1, 3, "=OFFSET(A1,0,1)+1").unwrap();
+    e.set_formula(SHEET, 1, 2, "=INDIRECT(\"A\"&1)+1").unwrap();
+    e.set_value(SHEET, 1, 1, n(1.0));
+    e.recalc_dirty();
+    assert_eq!(e.get(SHEET, 1, 5), n(5.0));
+    e.set_value(SHEET, 1, 1, n(100.0));
+    e.recalc_dirty();
+    assert_eq!(e.get(SHEET, 1, 2), n(101.0));
+    assert_eq!(e.get(SHEET, 1, 3), n(102.0));
+    assert_eq!(e.get(SHEET, 1, 4), n(103.0));
+    assert_eq!(e.get(SHEET, 1, 5), n(104.0));
+}
+
+#[test]
+fn indirect_to_a_missing_sheet_recovers_when_the_sheet_appears() {
+    let mut e = engine();
+    e.set_formula(SHEET, 1, 1, "=INDIRECT(\"Later!A1\")")
+        .unwrap();
+    e.recalc_dirty();
+    assert_eq!(e.get(SHEET, 1, 1), err(Ref));
+    e.set_value("Later", 1, 1, n(9.0));
+    e.recalc_dirty();
+    assert_eq!(e.get(SHEET, 1, 1), n(9.0));
+}
+
+#[test]
+fn position_functions_do_not_make_a_cycle() {
+    let mut e = engine();
+    e.set_formula(SHEET, 3, 2, "=ROW(B3)*100+COLUMN(B3)+ROWS(A1:C3)")
+        .unwrap();
+    e.recalc_dirty();
+    assert_eq!(e.get(SHEET, 3, 2), n(305.0));
+    assert!(!e.is_circular(SHEET, 3, 2));
+}
+
+#[test]
+fn isformula_follows_edits() {
+    let mut e = engine();
+    e.set_value(SHEET, 1, 1, n(1.0));
+    e.set_formula(SHEET, 1, 2, "=ISFORMULA(A1)").unwrap();
+    e.recalc_dirty();
+    assert_eq!(e.get(SHEET, 1, 2), Value::Bool(false));
+    e.set_formula(SHEET, 1, 1, "=1+1").unwrap();
+    e.recalc_dirty();
+    assert_eq!(e.get(SHEET, 1, 2), Value::Bool(true));
+}

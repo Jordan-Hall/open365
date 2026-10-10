@@ -1,7 +1,8 @@
 //! Logical and information functions.
 
 use super::{Res, arity, bool_arg};
-use crate::eval::{Arg, EvalContext};
+use crate::ast::BinOp;
+use crate::eval::{Arg, EvalContext, binary_scalar};
 use crate::value::{ErrorKind, Value};
 
 fn branch(arg: Option<&Arg>) -> Arg {
@@ -143,4 +144,69 @@ pub(super) fn isna(ctx: &EvalContext<'_>, args: &[Arg]) -> Res<Value> {
 pub(super) fn na(_ctx: &EvalContext<'_>, args: &[Arg]) -> Res<Value> {
     arity(args, 0, 0)?;
     Err(ErrorKind::NA)
+}
+
+pub(super) fn islogical(ctx: &EvalContext<'_>, args: &[Arg]) -> Res<Value> {
+    test(ctx, args, |v| matches!(v, Value::Bool(_)))
+}
+
+pub(super) fn isnontext(ctx: &EvalContext<'_>, args: &[Arg]) -> Res<Value> {
+    test(ctx, args, |v| !matches!(v, Value::Text(_)))
+}
+
+/// `ISERR`: any error except `#N/A`.
+pub(super) fn iserr(ctx: &EvalContext<'_>, args: &[Arg]) -> Res<Value> {
+    test(
+        ctx,
+        args,
+        |v| matches!(v, Value::Error(e) if *e != ErrorKind::NA),
+    )
+}
+
+/// `IFS(test1, value1, ...)`: the value after the first true test, `#N/A` when none is. A test that is not
+/// a boolean is `#VALUE!`; an error test is that error. The chosen value is returned as it is (references
+/// stay references).
+pub(super) fn ifs(ctx: &EvalContext<'_>, args: &[Arg]) -> Arg {
+    if args.len() < 2 || !args.len().is_multiple_of(2) {
+        return Arg::error(ErrorKind::Value);
+    }
+    for pair in args.chunks(2) {
+        match ctx.scalar(&pair[0]).to_bool() {
+            Err(e) => return Arg::error(e),
+            Ok(true) => return branch(Some(&pair[1])),
+            Ok(false) => {}
+        }
+    }
+    Arg::error(ErrorKind::NA)
+}
+
+/// `SWITCH(expression, value1, result1, ..., [default])`. Values compare as `=` does (text without case,
+/// 15 digits); a blank is the number 0. An error expression is returned at once; an error in a value that
+/// is reached is returned too, while later pairs are never looked at.
+pub(super) fn switch(ctx: &EvalContext<'_>, args: &[Arg]) -> Arg {
+    if args.len() < 3 {
+        return Arg::error(ErrorKind::Value);
+    }
+    let blank_as_zero = |v: Value| match v {
+        Value::Empty => Value::Number(0.0),
+        v => v,
+    };
+    let expression = blank_as_zero(ctx.scalar(&args[0]));
+    if let Value::Error(e) = expression {
+        return Arg::error(e);
+    }
+    let pairs = (args.len() - 1) / 2;
+    for i in 0..pairs {
+        let candidate = blank_as_zero(ctx.scalar(&args[1 + 2 * i]));
+        match binary_scalar(BinOp::Eq, &expression, &candidate) {
+            Value::Bool(true) => return branch(Some(&args[2 + 2 * i])),
+            Value::Error(e) => return Arg::error(e),
+            _ => {}
+        }
+    }
+    if (args.len() - 1) % 2 == 1 {
+        branch(args.last())
+    } else {
+        Arg::error(ErrorKind::NA)
+    }
 }

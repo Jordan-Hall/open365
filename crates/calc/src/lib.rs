@@ -24,6 +24,9 @@ pub use value::{ErrorKind, Value};
 
 use graph::{CellId, Dep, Graph, extract_deps};
 
+/// Most extra passes over `OFFSET`/`INDIRECT` formulas in one recalculation (the longest chain of them).
+const MAX_DYNAMIC_ROUNDS: usize = 64;
+
 /// A cell address with its sheet name.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct CellAddr {
@@ -100,6 +103,8 @@ pub struct Engine {
     clock: Box<dyn Clock>,
     dirty: HashSet<CellId>,
     circular: HashSet<CellId>,
+    /// Formulas that call `OFFSET` or `INDIRECT`.
+    dynamic: HashSet<CellId>,
     all_dirty: bool,
 }
 
@@ -126,6 +131,7 @@ impl Engine {
             clock,
             dirty: HashSet::new(),
             circular: HashSet::new(),
+            dynamic: HashSet::new(),
             all_dirty: false,
         }
     }
@@ -238,6 +244,7 @@ impl Engine {
         self.graph.remove(id);
         self.dirty.remove(&id);
         self.circular.remove(&id);
+        self.dynamic.remove(&id);
     }
 
     fn mark_dependents(&mut self, id: CellId) {
@@ -313,6 +320,9 @@ impl Engine {
             })
             .collect();
         self.graph.set_formula(id, graph_deps, deps.volatile);
+        if deps.dynamic {
+            self.dynamic.insert(id);
+        }
         for name in &deps.names {
             self.name_users
                 .entry(name.to_ascii_lowercase())
@@ -436,24 +446,55 @@ impl Engine {
         let now = FixedClock(self.clock.now_unix_seconds());
         let dirty = std::mem::take(&mut self.dirty);
         let plan = self.graph.plan(&dirty);
+        let mut seen: HashSet<CellId> = HashSet::new();
         let mut recomputed = Vec::with_capacity(plan.order.len());
+        self.run_plan(plan, &now, &mut seen, &mut recomputed);
+        // `OFFSET` and `INDIRECT` read cells the dependency graph does not know, so the first pass may have
+        // evaluated them before the cells they point at. Evaluate them (and what depends on them) again until
+        // nothing changes; each round settles one more link of a chain of such formulas.
+        if !self.dynamic.is_empty() {
+            let dynamic: Vec<CellId> = self.dynamic.iter().copied().collect();
+            for _ in 0..MAX_DYNAMIC_ROUNDS {
+                let mut again = self.graph.dirty_from(&dynamic);
+                again.extend(dynamic.iter().copied());
+                let plan = self.graph.plan(&again);
+                if !self.run_plan(plan, &now, &mut seen, &mut recomputed) {
+                    break;
+                }
+            }
+        }
+        recomputed
+    }
+
+    /// Evaluates the cells of a plan in order; true when any value changed.
+    fn run_plan(
+        &mut self,
+        plan: graph::RecalcPlan,
+        now: &FixedClock,
+        seen: &mut HashSet<CellId>,
+        recomputed: &mut Vec<CellAddr>,
+    ) -> bool {
+        let mut changed = false;
         for id in plan.order {
             let value = if plan.cyclic.contains(&id) {
                 self.circular.insert(id);
                 Value::Number(0.0)
             } else {
                 self.circular.remove(&id);
-                self.eval_cell(id, &now)
+                self.eval_cell(id, now)
             };
             if let Some(cell) = self.sheets[id.sheet as usize]
                 .cells
                 .get_mut(&(id.row, id.col))
             {
+                changed |= cell.value != value;
                 cell.value = value;
             }
-            recomputed.push(self.addr(id));
+            if seen.insert(id) {
+                recomputed.push(self.addr(id));
+            }
         }
-        recomputed
+        changed
     }
 
     /// Recalculates every formula in the workbook.
@@ -495,6 +536,11 @@ impl CellSource for Engine {
     fn sheet_exists(&self, sheet: &str) -> bool {
         self.find_sheet(sheet)
             .is_some_and(|i| self.sheets[i].exists)
+    }
+
+    fn has_formula(&self, sheet: &str, row: u32, col: u32) -> bool {
+        self.cell_data(sheet, row, col)
+            .is_some_and(|c| c.formula.is_some())
     }
 
     fn is_subtotal(&self, sheet: &str, row: u32, col: u32) -> bool {

@@ -930,3 +930,54 @@ fn text_functions_added_with_the_text_batch() {
     assert_eq!(eval("=LENB(\"😀x\")"), n(3.0));
     assert_eq!(eval("=FIXED(1234.5678,-2)"), t("1,200"));
 }
+
+#[test]
+fn scalar_functions_lift_over_computed_arrays() {
+    let mut e = engine_with(&[]);
+    assert_eq!(
+        eval_in(&mut e, "SUM(VALUE(TEXTSPLIT(\"1,2;3,4\",\",\",\";\")))"),
+        n(10.0)
+    );
+    assert_eq!(eval_in(&mut e, "SUM(ABS({1,-2,3}))"), n(6.0));
+    assert_eq!(eval_in(&mut e, "SUM({1,2,3}*{10;20})"), n(180.0));
+    assert_eq!(
+        eval_in(&mut e, "SUM({1,2,3}+{10,20})"),
+        err(crate::ErrorKind::NA)
+    );
+    assert_eq!(eval_in(&mut e, "SUM(IF({1,0,1},5,7))"), n(17.0));
+    assert_eq!(
+        eval_in(&mut e, "SUM(IF({TRUE;FALSE},{1,2},{10,20}))"),
+        n(33.0)
+    );
+}
+
+#[test]
+fn info_and_logic_functions() {
+    let mut e = engine_with(&[("A1", n(4.0)), ("A2", t("x"))]);
+    assert_eq!(eval_in(&mut e, "ISEVEN(A1)"), b(true));
+    assert_eq!(eval_in(&mut e, "ISODD(-3.9)"), b(true));
+    assert_eq!(
+        eval_in(&mut e, "ISEVEN(TRUE)"),
+        err(crate::ErrorKind::Value)
+    );
+    assert_eq!(eval_in(&mut e, "TYPE(A2)"), n(2.0));
+    assert_eq!(eval_in(&mut e, "TYPE({1,2})"), n(64.0));
+    assert_eq!(eval_in(&mut e, "ERROR.TYPE(#N/A)"), n(7.0));
+    assert_eq!(eval_in(&mut e, "ERROR.TYPE(1)"), err(crate::ErrorKind::NA));
+    assert_eq!(eval_in(&mut e, "IFS(FALSE,1,TRUE,2)"), n(2.0));
+    assert_eq!(eval_in(&mut e, "IFS(FALSE,1)"), err(crate::ErrorKind::NA));
+    assert_eq!(eval_in(&mut e, "SWITCH(2,1,\"a\",2,\"b\",\"c\")"), t("b"));
+    assert_eq!(eval_in(&mut e, "SWITCH(9,1,\"a\",\"c\")"), t("c"));
+    assert_eq!(eval_in(&mut e, "ISREF(A1)"), b(true));
+    assert_eq!(eval_in(&mut e, "ISREF(1)"), b(false));
+    assert_eq!(
+        eval_in(&mut e, "ADDRESS(5,3,4,TRUE,\"My Sheet\")"),
+        t("'My Sheet'!C5")
+    );
+    assert_eq!(eval_in(&mut e, "ADDRESS(5,3,3,FALSE)"), t("R[5]C3"));
+    assert_eq!(
+        eval_in(&mut e, "LOOKUP(2.5,{1,2,3},{\"a\",\"b\",\"c\"})"),
+        t("b")
+    );
+    assert_eq!(eval_in(&mut e, "ROWS(A1:C3)*10+COLUMNS(A1:C3)"), n(33.0));
+}

@@ -5,7 +5,7 @@ never needs Excel.
 
 | File | Role |
 |---|---|
-| `fixtures/calc/conformance.json` | The corpus: 18,706 cases. Edited by hand or by script; one case per line. |
+| `fixtures/calc/conformance.json` | The corpus: 20,496 cases. Edited by hand or by script; one case per line. |
 | `tools/office/calc-oracle.ps1` | Local-only tool. Runs every case in Excel over COM and writes the results. |
 | `fixtures/reference/calc/conformance-results.json` | Excel's answers, committed. Includes Excel version, build and decimal separator. |
 | `fixtures/calc/known-differences.toml` | Cases where Open365 intentionally or temporarily differs, each with a reason. |
@@ -66,9 +66,10 @@ forms; the corpus has no case for them.
 
 ## Current state
 
-18,706 cases, 18,646 pass (99.68%), 60 known differences (listed with reasons in `known-differences.toml`: the `**` parse
+20,496 cases, 20,425 pass (99.65%), 71 known differences (listed with reasons in `known-differences.toml`: the `**` parse
 quirk, XLOOKUP array results (no spill), a few undocumented Excel quirks, large COMBIN, trigonometric last digits, variance
-accumulation order, accounting fill, array lifting `textsplit.sumv`). The test also fails for a corpus case without an Excel
+accumulation order, accounting fill, `ISFORMULA` of its own cell, and arrays of references returned by `OFFSET`/`INDIRECT`
+for array arguments, which Open365 does not model). The test also fails for a corpus case without an Excel
 result or a stored result without a case.
 
 ## Behaviour measured against Excel
@@ -184,3 +185,24 @@ DAYS360, NETWORKDAYS(.INTL), WORKDAY(.INTL), YEARFRAC, DATEVALUE, TIMEVALUE; abo
 Not done yet: array lifting of scalar functions over computed arrays in plain formulas (known difference `textsplit.sumv`), the
 info/logic/lookup batch (ISEVEN, ISODD, ISLOGICAL, ISNONTEXT, ISERR, ISREF, ISFORMULA, TYPE, ERROR.TYPE, IFS, SWITCH, ROWS, COLUMNS, ROW,
 COLUMN, LOOKUP, ADDRESS, OFFSET, INDIRECT and volatile-dependency tests) and the financial batch (PMT ... SYD), and the five accounting-fill differences.
+
+Added with array lifting and the info/logic/reference batch (groups `lift`, `iseven`, `isodd`, `islogical`, `isnontext`,
+`iserr`, `isref`, `isformula`, `type`, `errortype`, `ifs`, `switch`, `rows`, `columns`, `row`, `column`, `lookup`,
+`address`, `offset`, `indirect`):
+
+* A scalar function given a computed array or array constant runs once per element in any formula; ranges are expanded
+  only inside array parameters (`SUMPRODUCT`, `INDEX`, `ROWS`, `LOOKUP` vectors) and elsewhere take the implicit
+  intersection. `1xN` and `Nx1` stretch, other size mismatches give `#N/A`. Once an array makes a call lift, ranges
+  among its other scalar arguments are read as arrays (`IF({TRUE,FALSE},A1:A2,B1:B2)`).
+* `IF`, `IFS`, `CHOOSE`, `SWITCH` lift only when the condition/selector is an array (a scalar condition returns the chosen
+  value whole). `IFERROR`/`IFNA` lift only in array contexts. `VLOOKUP`/`HLOOKUP`/`XLOOKUP`/`INDEX` never lift.
+  `IF`, `IFS`, `SWITCH`, `IFERROR`, `ISEVEN` do not pass the array context to ranges (`SUMPRODUCT(IF(A1:A3>0,..))` is `#VALUE!`).
+* `ROW`/`COLUMN` of a multi-cell reference are arrays only in array contexts. `ROW(A1)` in A1 is no cycle.
+  `ROWS`/`COLUMNS`/`ROW`/`ISREF` of a reference to a missing sheet still see a reference.
+* `ISEVEN`/`ISODD` refuse booleans, empty text and multi-cell ranges. `TYPE` of an array is 64, of a multi-cell range outside
+  the formula's row/column 16. `ISFORMULA` reads the top-left cell of a range.
+* `LOOKUP` result vectors are not clipped to their size and a single cell counts as a row; arrays search by row when wider.
+* `ADDRESS` quotes sheet names that look like cells, R1C1 references, booleans or contain symbols; relative R1C1 parts
+  cannot be 16384 columns. `INDIRECT` rejects leading spaces, operators and several `!`; relative R1C1 wraps at the sheet edge.
+* `OFFSET`/`INDIRECT` are re-evaluated (with everything downstream) until values stop changing, so chains settle
+  after `set_value` + `recalc_dirty`. `OFFSET`'s base reference is not a dependency.
