@@ -44,6 +44,22 @@ total = 98
 matched = 1207
 total = 1471
 
+[fixtures.layout-keep]
+matched = 1100
+total = 1100
+
+[fixtures.layout-lists-multilevel]
+matched = 27
+total = 27
+
+[fixtures.layout-lists-style]
+matched = 22
+total = 22
+
+[fixtures.layout-lists-suff]
+matched = 49
+total = 57
+
 [fixtures.layout-marks]
 matched = 17
 total = 17
@@ -132,6 +148,26 @@ total = 98
 matched = 1351
 total = 1471
 
+[system.layout-keep]
+matched = 1100
+total = 1100
+
+[system.layout-lists-formats]
+matched = 112
+total = 112
+
+[system.layout-lists-multilevel]
+matched = 27
+total = 27
+
+[system.layout-lists-style]
+matched = 22
+total = 22
+
+[system.layout-lists-suff]
+matched = 57
+total = 57
+
 [system.layout-marks]
 matched = 17
 total = 17
@@ -157,7 +193,7 @@ matched = 34
 total = 34
 
 [system.numbering]
-matched = 0
+matched = 9
 total = 9
 
 [system.plain-paragraphs]

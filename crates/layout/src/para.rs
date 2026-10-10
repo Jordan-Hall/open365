@@ -3,8 +3,8 @@
 use std::ops::Range;
 
 use open365_docx::{
-    Alignment, EffectiveParagraph, EffectiveRun, ElementHead, Inline, Paragraph, Run, RunContent,
-    RunProps, Styles,
+    Alignment, EffectiveParagraph, EffectiveRun, Inline, Paragraph, ParagraphProps, Run,
+    RunContent, RunLayoutProps, Styles,
 };
 use open365_text::{
     BreakKind, FaceId, FontChain, FontLibrary, FontStyle, ShapeFeatures, break_opportunities,
@@ -12,7 +12,8 @@ use open365_text::{
 };
 
 use crate::metrics::{LineMetricModel, line_height};
-use crate::props::{DocExtras, ParaExtra, TabKind, TabStop};
+use crate::numbering::{IndentOverride, LabelAlign, ListLabel, Suffix, direct_indent};
+use crate::props::{TabKind, TabLeader, TabStop};
 
 const EPS: f64 = 1e-6;
 
@@ -34,6 +35,12 @@ pub(crate) struct RunStyle {
     pub underline: bool,
     pub strike: bool,
     pub color: Option<[u8; 3]>,
+    /// Pair kerning on (`w:kern` at or below the run's size).
+    pub kerning: bool,
+    /// Extra character spacing in points (`w:spacing`).
+    pub spacing: f64,
+    /// Horizontal glyph scale, 1.0 for 100 percent (`w:w`).
+    pub scale: f64,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -85,12 +92,25 @@ pub(crate) struct LineBox {
     pub page_break_after: bool,
 }
 
+/// The list label of a numbered paragraph, drawn left of the first line.
+#[derive(Debug)]
+pub(crate) struct LabelLayout {
+    /// Index into [`ParaLayout::styles`].
+    pub style: usize,
+    pub glyphs: Vec<PlacedGlyphRaw>,
+    /// X of the label's first glyph, text-area coordinates.
+    pub x: f64,
+}
+
 /// A paragraph laid out into lines, ready for pagination.
 #[derive(Debug)]
 pub(crate) struct ParaLayout {
     pub index: usize,
     pub props: EffectiveParagraph,
-    pub extra: ParaExtra,
+    pub flow: ParagraphProps,
+    /// Paragraph style id, the default paragraph style when unset.
+    pub style_id: Option<String>,
+    pub label: Option<LabelLayout>,
     pub lines: Vec<LineBox>,
     pub atoms: Vec<Atom>,
     pub glyphs: Vec<PlacedGlyphRaw>,
@@ -101,20 +121,9 @@ pub(crate) struct ParaLayout {
 pub(crate) struct Context<'a> {
     pub fonts: &'a FontLibrary,
     pub styles: Option<&'a Styles>,
-    pub extras: &'a DocExtras,
+    /// `w:defaultTabStop` in points.
+    pub default_tab: f64,
     pub model: LineMetricModel,
-}
-
-fn dummy_run() -> Run {
-    Run {
-        head: ElementHead {
-            name: "w:r".to_owned(),
-            ns: None,
-            attrs: Vec::new(),
-        },
-        props: RunProps::default(),
-        content: Vec::new(),
-    }
 }
 
 fn fallback_run(er: Option<EffectiveRun>) -> EffectiveRun {
@@ -129,7 +138,7 @@ fn fallback_run(er: Option<EffectiveRun>) -> EffectiveRun {
     })
 }
 
-fn style_from(ctx: &Context<'_>, er: &EffectiveRun) -> RunStyle {
+fn style_from(ctx: &Context<'_>, er: &EffectiveRun, lay: &RunLayoutProps) -> RunStyle {
     let fs = FontStyle {
         bold: er.bold,
         italic: er.italic,
@@ -150,6 +159,9 @@ fn style_from(ctx: &Context<'_>, er: &EffectiveRun) -> RunStyle {
         underline: er.underline,
         strike: er.strike,
         color: er.color,
+        kerning: lay.kern_half_points > 0 && er.size_half_points >= lay.kern_half_points,
+        spacing: f64::from(lay.spacing_pt()),
+        scale: f64::from(lay.scale_percent) / 100.0,
     }
 }
 
@@ -181,8 +193,13 @@ impl Collector<'_, '_> {
             .styles
             .map(|s| s.effective_run_props(self.para, run));
         let er = fallback_run(eff);
+        let lay = self
+            .ctx
+            .styles
+            .map(|s| s.effective_run_layout(self.para, run))
+            .unwrap_or_default();
         let style = {
-            let st = style_from(self.ctx, &er);
+            let st = style_from(self.ctx, &er, &lay);
             self.styles.push(st);
             self.styles.len() - 1
         };
@@ -222,12 +239,32 @@ pub(crate) fn layout_paragraph(
     index: usize,
     story_start: usize,
     text_width: f64,
+    label: Option<&ListLabel>,
 ) -> ParaLayout {
-    let props = ctx
+    let mut props = ctx
         .styles
         .map(|s| s.effective_para_props(para))
         .unwrap_or_default();
-    let extra = ctx.extras.para_extra(para);
+    if let Some(l) = label {
+        // Numbering level indents sit between the style's and the paragraph's own.
+        let below = IndentOverride {
+            left: Some(f64::from(props.indent_left_pt)),
+            right: Some(f64::from(props.indent_right_pt)),
+            first_line: Some(f64::from(props.first_line_pt)),
+        };
+        let merged = direct_indent(para).over(l.indent).over(below);
+        props.indent_left_pt = merged.left.unwrap_or_default() as f32;
+        props.indent_right_pt = merged.right.unwrap_or_default() as f32;
+        props.first_line_pt = merged.first_line.unwrap_or_default() as f32;
+    }
+    let flow = ctx
+        .styles
+        .map(|s| s.paragraph_flow_props(para))
+        .unwrap_or_default();
+    let style_id = para.style_id().map(str::to_owned).or_else(|| {
+        ctx.styles
+            .and_then(|s| s.default_paragraph_style().map(str::to_owned))
+    });
 
     let mut col = Collector {
         ctx,
@@ -238,27 +275,33 @@ pub(crate) fn layout_paragraph(
     };
     col.inlines(&para.content);
 
-    // Paragraph mark style: the paragraph style's run properties plus the mark's own rPr.
-    let mut mark_er = fallback_run(
-        ctx.styles
-            .map(|s| s.effective_run_props(para, &dummy_run())),
-    );
-    if let Some(hp) = extra.mark_size_half_points {
-        mark_er.size_half_points = hp;
-    }
-    if let Some(font) = &extra.mark_font {
-        mark_er.font.clone_from(font);
-    }
-    if let Some(b) = extra.mark_bold {
-        mark_er.bold = b;
-    }
-    if let Some(i) = extra.mark_italic {
-        mark_er.italic = i;
-    }
+    // Paragraph mark style: defaults, the paragraph style's run properties, then the mark's own
+    // `w:pPr/w:rPr`.
+    let mark = ctx.styles.map(|s| s.paragraph_mark_props(para));
+    let mark_lay = mark.as_ref().map(|m| m.layout).unwrap_or_default();
+    let mark_er = fallback_run(mark.map(|m| m.run));
     let mark_style = {
-        col.styles.push(style_from(ctx, &mark_er));
+        col.styles.push(style_from(ctx, &mark_er, &mark_lay));
         col.styles.len() - 1
     };
+    // The label takes the paragraph mark's formatting, then the level's own run properties.
+    let label_style = label.map(|l| {
+        let mut er = mark_er.clone();
+        let r = &l.run;
+        if let Some(f) = &r.font {
+            er.font.clone_from(f);
+        }
+        er.size_half_points = r.size_half_points.unwrap_or(er.size_half_points);
+        er.bold = r.bold.unwrap_or(er.bold);
+        er.italic = r.italic.unwrap_or(er.italic);
+        er.underline = r.underline.unwrap_or(er.underline);
+        er.strike = r.strike.unwrap_or(er.strike);
+        if r.color.is_some() {
+            er.color = r.color;
+        }
+        col.styles.push(style_from(ctx, &er, &mark_lay));
+        col.styles.len() - 1
+    });
     col.push("\r", mark_style);
     let Collector {
         text,
@@ -273,7 +316,15 @@ pub(crate) fn layout_paragraph(
     for (range, style_idx) in &spans {
         let st = &styles[*style_idx];
         let seg = &text[range.clone()];
-        let shaped = shape_run(ctx.fonts, &st.chain, seg, ShapeFeatures::default());
+        let shaped = shape_run(
+            ctx.fonts,
+            &st.chain,
+            seg,
+            ShapeFeatures {
+                kerning: st.kerning,
+                ligatures: true,
+            },
+        );
         let mut idx = 0;
         let gl = &shaped.glyphs;
         while idx < gl.len() {
@@ -297,10 +348,10 @@ pub(crate) fn layout_paragraph(
             if matches!(class, AtomClass::Text | AtomClass::Space) {
                 for g in &gl[idx..j] {
                     let upem = f64::from(ctx.fonts.face(g.face).units_per_em());
-                    let adv = f64::from(g.x_advance) * st.size / upem;
+                    let adv = f64::from(g.x_advance) * st.size / upem * st.scale + st.spacing;
                     glyphs.push(PlacedGlyphRaw {
                         glyph_id: g.glyph_id,
-                        x_offset: f64::from(g.x_offset) * st.size / upem,
+                        x_offset: f64::from(g.x_offset) * st.size / upem * st.scale,
                         y_offset: f64::from(g.y_offset) * st.size / upem,
                         adv,
                     });
@@ -340,22 +391,54 @@ pub(crate) fn layout_paragraph(
     let mut opp: Vec<(usize, BreakKind)> = breaks.iter().map(|b| (b.offset, b.kind)).collect();
     opp.sort_by_key(|o| o.0);
 
-    let lb = LineBuilder {
+    // Shape the label and find where the text of the first line starts.
+    let label_shape = label.zip(label_style).map(|(l, ls)| {
+        let st = &styles[ls];
+        let shape = |s: &str| shape_glyphs(ctx, st, s);
+        let (glyphs, width) = shape(&l.text);
+        let space = shape(" ").1;
+        (l, ls, glyphs, width, space)
+    });
+    let mut lb = LineBuilder {
         ctx,
         atoms: &atoms,
         styles: &styles,
         props: &props,
-        extra: &extra,
+        flow: &flow,
         text_width,
         opp: &opp,
         story_of: &story_of,
+        first_x: None,
+        label_style,
     };
+    let mut label_layout = None;
+    if let Some((l, ls, glyphs, width, space)) = label_shape {
+        let at = f64::from(props.indent_left_pt) + f64::from(props.first_line_pt);
+        let x = match l.align {
+            LabelAlign::Left => at,
+            LabelAlign::Center => at - width / 2.0,
+            LabelAlign::Right => at - width,
+        };
+        let end = x + width;
+        lb.first_x = Some(match l.suffix {
+            Suffix::Nothing => end,
+            Suffix::Space => end + space,
+            Suffix::Tab => lb.next_stop(end).pos_twips as f64 / 20.0,
+        });
+        label_layout = Some(LabelLayout {
+            style: ls,
+            glyphs,
+            x,
+        });
+    }
     let lines = lb.build();
 
     ParaLayout {
         index,
         props,
-        extra,
+        flow,
+        style_id,
+        label: label_layout,
         lines,
         atoms,
         glyphs,
@@ -369,10 +452,14 @@ struct LineBuilder<'a> {
     atoms: &'a [Atom],
     styles: &'a [RunStyle],
     props: &'a EffectiveParagraph,
-    extra: &'a ParaExtra,
+    flow: &'a ParagraphProps,
     text_width: f64,
     opp: &'a [(usize, BreakKind)],
     story_of: &'a [usize],
+    /// Where the text of the first line starts when a list label precedes it.
+    first_x: Option<f64>,
+    /// Style of the list label, which also sizes the first line.
+    label_style: Option<usize>,
 }
 
 impl LineBuilder<'_> {
@@ -413,28 +500,31 @@ impl LineBuilder<'_> {
     /// Next tab stop after `x` (text-area coordinates).
     fn next_stop(&self, x: f64) -> TabStop {
         let mut best: Option<TabStop> = None;
-        for t in &self.extra.tabs {
-            if t.pos > x + 0.01 && t.kind != TabKind::Bar {
+        for t in &self.flow.tabs {
+            if tab_pos(t) > x + 0.01 && !matches!(t.kind, TabKind::Bar) {
                 best = Some(*t);
                 break;
             }
         }
         // A hanging indent makes the left indent an implicit tab stop.
         let ind = self.props.indent_left_pt as f64;
-        if self.props.first_line_pt < 0.0 && ind > x + 0.01 && best.is_none_or(|b| ind < b.pos) {
+        if self.props.first_line_pt < 0.0
+            && ind > x + 0.01
+            && best.is_none_or(|b| ind < tab_pos(&b))
+        {
             best = Some(TabStop {
-                pos: ind,
+                pos_twips: (ind * 20.0).round() as i32,
                 kind: TabKind::Left,
-                leader: crate::props::TabLeader::None,
+                leader: TabLeader::None,
             });
         }
         best.unwrap_or_else(|| {
-            let dt = self.ctx.extras.default_tab.max(1.0);
+            let dt = self.ctx.default_tab.max(1.0);
             let k = ((x + 0.01) / dt).floor() + 1.0;
             TabStop {
-                pos: k * dt,
+                pos_twips: (k * dt * 20.0).round() as i32,
                 kind: TabKind::Left,
-                leader: crate::props::TabLeader::None,
+                leader: TabLeader::None,
             }
         })
     }
@@ -443,7 +533,7 @@ impl LineBuilder<'_> {
     fn tab_advance(&self, i: usize, x: f64, right_limit: f64) -> f64 {
         let stop = self.next_stop(x);
         let target = match stop.kind {
-            TabKind::Left | TabKind::Bar => stop.pos,
+            TabKind::Left | TabKind::Bar | TabKind::Num => tab_pos(&stop),
             TabKind::Center | TabKind::Right | TabKind::Decimal => {
                 // Width of the text that follows, up to the next tab or line end.
                 let mut w = 0.0;
@@ -474,9 +564,9 @@ impl LineBuilder<'_> {
                 }
                 w -= trailing_space;
                 let start = match stop.kind {
-                    TabKind::Center => stop.pos - w / 2.0,
-                    TabKind::Right => stop.pos - w,
-                    _ => stop.pos - before_dec.unwrap_or(w),
+                    TabKind::Center => tab_pos(&stop) - w / 2.0,
+                    TabKind::Right => tab_pos(&stop) - w,
+                    _ => tab_pos(&stop) - before_dec.unwrap_or(w),
                 };
                 start.max(x)
             }
@@ -490,7 +580,11 @@ impl LineBuilder<'_> {
         let indent_left = f64::from(self.props.indent_left_pt);
         let indent_right = f64::from(self.props.indent_right_pt);
         let first_line = f64::from(self.props.first_line_pt);
-        let left_edge = indent_left + if first { first_line } else { 0.0 };
+        let left_edge = match (first, self.first_x) {
+            (true, Some(x)) => x,
+            (true, None) => indent_left + first_line,
+            (false, _) => indent_left,
+        };
         let right_limit = self.text_width - indent_right;
 
         let mut xs: Vec<f64> = Vec::new();
@@ -648,6 +742,14 @@ impl LineBuilder<'_> {
             asc = asc.max(ca);
             desc = desc.max(cd);
         }
+        if first && let Some(ls) = self.label_style {
+            let st = &self.styles[ls];
+            let m = self.ctx.fonts.face(st.face).metrics();
+            // Measured (layout-lists-suff): a 20 pt label raises the first baseline but its
+            // descent does not deepen the line.
+            let (ca, _) = self.ctx.model.ascent_descent(m, st.size);
+            asc = asc.max(ca);
+        }
         let (height, baseline_off) = line_height(asc, desc, self.props.line, self.ctx.model);
 
         let last_x = xs.last().copied().unwrap_or(left_edge);
@@ -669,4 +771,39 @@ fn shift_all(xs: &mut [f64], by: f64) {
     for x in xs {
         *x += by;
     }
+}
+
+/// Tab position in points, from twips without the `f32` rounding of `TabStop::pos_pt`.
+fn tab_pos(t: &TabStop) -> f64 {
+    f64::from(t.pos_twips) / 20.0
+}
+
+/// Shapes `text` in `st` and returns the glyphs with their advances and the total width.
+fn shape_glyphs(ctx: &Context<'_>, st: &RunStyle, text: &str) -> (Vec<PlacedGlyphRaw>, f64) {
+    let shaped = shape_run(
+        ctx.fonts,
+        &st.chain,
+        text,
+        ShapeFeatures {
+            kerning: st.kerning,
+            ligatures: true,
+        },
+    );
+    let mut width = 0.0;
+    let glyphs = shaped
+        .glyphs
+        .iter()
+        .map(|g| {
+            let upem = f64::from(ctx.fonts.face(g.face).units_per_em());
+            let adv = f64::from(g.x_advance) * st.size / upem * st.scale + st.spacing;
+            width += adv;
+            PlacedGlyphRaw {
+                glyph_id: g.glyph_id,
+                x_offset: f64::from(g.x_offset) * st.size / upem * st.scale,
+                y_offset: f64::from(g.y_offset) * st.size / upem,
+                adv,
+            }
+        })
+        .collect();
+    (glyphs, width)
 }

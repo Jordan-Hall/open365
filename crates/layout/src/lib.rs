@@ -11,22 +11,23 @@
 //! mark, a tab and a break as one each, which is how Word's `Range.Start` counts.
 //!
 //! Not supported yet (reported in [`Layout::notes`]): tables are laid out as sequential
-//! paragraphs, and images, numbering, fields, footnotes, headers, footers, columns,
+//! paragraphs, and images, fields, footnotes, headers, footers, columns,
 //! right-to-left text and bidi are ignored.
 
 mod flow;
 mod metrics;
+mod numbering;
 mod para;
 mod props;
 
-use open365_docx::{Block, Document, Paragraph, RawXml, Styles};
+use open365_docx::{Block, Document, Paragraph, Styles};
 use open365_text::{FaceId, FontLibrary, FontMatch};
 
 pub use metrics::LineMetricModel;
 pub use props::{SectionProps, TabKind, TabLeader, TabStop};
 
+use numbering::{Numbering, NumberingState};
 use para::{Context, ParaLayout, layout_paragraph};
-use props::{DocExtras, paragraph_section};
 
 /// Knobs for layout. The defaults are the measured Word behaviour.
 #[derive(Debug, Clone, Copy)]
@@ -132,40 +133,25 @@ impl Layout {
 
 struct Item<'a> {
     para: &'a Paragraph,
-    section: usize,
     /// Extra story characters after this paragraph (a table row end mark).
     extra_chars: usize,
 }
 
-fn collect_items<'a>(
-    blocks: &'a [Block],
-    section: &mut usize,
-    sections: &mut Vec<Option<SectionProps>>,
-    items: &mut Vec<Item<'a>>,
-    notes: &mut Vec<String>,
-    in_table: bool,
-) {
+/// Paragraphs in document order, the order `Document::sections` indexes them in.
+fn collect_items<'a>(blocks: &'a [Block], items: &mut Vec<Item<'a>>, notes: &mut Vec<String>) {
     for block in blocks {
         match block {
-            Block::Paragraph(p) => {
-                items.push(Item {
-                    para: p,
-                    section: *section,
-                    extra_chars: 0,
-                });
-                if !in_table && let Some(props) = paragraph_section(p) {
-                    sections[*section] = Some(props);
-                    *section += 1;
-                    sections.push(None);
-                }
-            }
+            Block::Paragraph(p) => items.push(Item {
+                para: p,
+                extra_chars: 0,
+            }),
             Block::Table(t) => {
                 if !notes.iter().any(|n| n.starts_with("tables")) {
                     notes.push("tables are laid out as sequential paragraphs".to_owned());
                 }
                 for row in t.rows() {
                     for cell in row.cells() {
-                        collect_items(&cell.blocks, section, sections, items, notes, true);
+                        collect_items(&cell.blocks, items, notes);
                     }
                     if let Some(last) = items.last_mut() {
                         last.extra_chars += 1;
@@ -177,13 +163,23 @@ fn collect_items<'a>(
     }
 }
 
-fn body_section(doc: &Document) -> Option<SectionProps> {
-    doc.body().blocks.iter().rev().find_map(|b| match b {
-        Block::Raw(RawXml::Element(e)) if e.head.is_w("sectPr") => {
-            Some(SectionProps::from_element(e))
-        }
-        _ => None,
-    })
+/// The list label of every paragraph in document order (tables included), `None` for a
+/// paragraph that is not numbered. Bullets carry their symbol character as written in the
+/// numbering definition (often a private-use code point of the Symbol font).
+pub fn list_labels(doc: &Document) -> Vec<Option<String>> {
+    let mut items: Vec<Item<'_>> = Vec::new();
+    collect_items(&doc.body().blocks, &mut items, &mut Vec::new());
+    let numbering = Numbering::new(doc);
+    let mut state = NumberingState::default();
+    items
+        .iter()
+        .map(|i| {
+            numbering
+                .as_ref()
+                .and_then(|n| n.label(&mut state, i.para))
+                .map(|l| l.text)
+        })
+        .collect()
 }
 
 /// Lays out the main story of `doc` with `fonts`.
@@ -195,42 +191,43 @@ pub fn layout_document(doc: &Document, fonts: &FontLibrary, options: LayoutOptio
         layout.notes.push("font library is empty".to_owned());
         return layout;
     }
-    let extras = DocExtras::new(doc);
     let styles: Option<&Styles> = doc.styles();
     let ctx = Context {
         fonts,
         styles,
-        extras: &extras,
+        default_tab: f64::from(doc.settings().default_tab_stop_twips) / 20.0,
         model: options.metric_model,
     };
 
     let mut items: Vec<Item<'_>> = Vec::new();
-    let mut sections: Vec<Option<SectionProps>> = vec![None];
-    let mut section = 0usize;
-    collect_items(
-        &doc.body().blocks,
-        &mut section,
-        &mut sections,
-        &mut items,
-        &mut layout.notes,
-        false,
-    );
-    let last = sections.len() - 1;
-    if sections[last].is_none() {
-        sections[last] = Some(body_section(doc).unwrap_or_default());
+    collect_items(&doc.body().blocks, &mut items, &mut layout.notes);
+    let doc_sections = doc.sections();
+    let sections: Vec<SectionProps> = doc_sections.iter().map(SectionProps::from).collect();
+    for (i, s) in doc_sections.iter().enumerate() {
+        if s.columns.count > 1 && !layout.notes.iter().any(|n| n.starts_with("columns")) {
+            layout
+                .notes
+                .push(format!("columns are ignored (section {i})"));
+        }
     }
-    let sections: Vec<SectionProps> = sections
-        .into_iter()
-        .map(std::option::Option::unwrap_or_default)
-        .collect();
 
     let mut laid: Vec<(ParaLayout, usize)> = Vec::with_capacity(items.len());
     let mut story = 0usize;
+    let mut section = 0usize;
+    let numbering = Numbering::new(doc);
+    let mut numbers = NumberingState::default();
     for (index, item) in items.iter().enumerate() {
-        let width = sections[item.section].text_width();
-        let pl = layout_paragraph(&ctx, item.para, index, story, width);
+        let width = sections[section].text_width();
+        let label = numbering
+            .as_ref()
+            .and_then(|n| n.label(&mut numbers, item.para));
+        let pl = layout_paragraph(&ctx, item.para, index, story, width, label.as_ref());
         story = pl.story_end + item.extra_chars;
-        laid.push((pl, item.section));
+        laid.push((pl, section));
+        // The paragraph that carries a `w:sectPr` is the last of its section.
+        if doc_sections[section].end_paragraph == Some(index) {
+            section += 1;
+        }
     }
 
     let mut requested: Vec<&str> = laid

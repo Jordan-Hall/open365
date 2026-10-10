@@ -1,0 +1,211 @@
+{
+  "source": "fixtures/docx/layout-lists-suff.docx",
+  "oracle": "Word Range.ListFormat.ListString",
+  "paragraphs": [
+    {
+      "paragraph": 0,
+      "level": 1,
+      "label": ""
+    },
+    {
+      "paragraph": 1,
+      "level": 1,
+      "label": "8."
+    },
+    {
+      "paragraph": 2,
+      "level": 1,
+      "label": "9."
+    },
+    {
+      "paragraph": 3,
+      "level": 1,
+      "label": "10."
+    },
+    {
+      "paragraph": 4,
+      "level": 1,
+      "label": ""
+    },
+    {
+      "paragraph": 5,
+      "level": 1,
+      "label": "8."
+    },
+    {
+      "paragraph": 6,
+      "level": 1,
+      "label": "9."
+    },
+    {
+      "paragraph": 7,
+      "level": 1,
+      "label": "10."
+    },
+    {
+      "paragraph": 8,
+      "level": 1,
+      "label": ""
+    },
+    {
+      "paragraph": 9,
+      "level": 1,
+      "label": "8."
+    },
+    {
+      "paragraph": 10,
+      "level": 1,
+      "label": "9."
+    },
+    {
+      "paragraph": 11,
+      "level": 1,
+      "label": "10."
+    },
+    {
+      "paragraph": 12,
+      "level": 1,
+      "label": ""
+    },
+    {
+      "paragraph": 13,
+      "level": 1,
+      "label": "Step 8:"
+    },
+    {
+      "paragraph": 14,
+      "level": 1,
+      "label": "Step 9:"
+    },
+    {
+      "paragraph": 15,
+      "level": 1,
+      "label": "Step 10:"
+    },
+    {
+      "paragraph": 16,
+      "level": 1,
+      "label": ""
+    },
+    {
+      "paragraph": 17,
+      "level": 1,
+      "label": "8."
+    },
+    {
+      "paragraph": 18,
+      "level": 1,
+      "label": "9."
+    },
+    {
+      "paragraph": 19,
+      "level": 1,
+      "label": "10."
+    },
+    {
+      "paragraph": 20,
+      "level": 1,
+      "label": ""
+    },
+    {
+      "paragraph": 21,
+      "level": 1,
+      "label": "8."
+    },
+    {
+      "paragraph": 22,
+      "level": 1,
+      "label": "9."
+    },
+    {
+      "paragraph": 23,
+      "level": 1,
+      "label": "10."
+    },
+    {
+      "paragraph": 24,
+      "level": 1,
+      "label": ""
+    },
+    {
+      "paragraph": 25,
+      "level": 1,
+      "label": "8."
+    },
+    {
+      "paragraph": 26,
+      "level": 1,
+      "label": "9."
+    },
+    {
+      "paragraph": 27,
+      "level": 1,
+      "label": "10."
+    },
+    {
+      "paragraph": 28,
+      "level": 1,
+      "label": ""
+    },
+    {
+      "paragraph": 29,
+      "level": 1,
+      "label": "8."
+    },
+    {
+      "paragraph": 30,
+      "level": 1,
+      "label": "9."
+    },
+    {
+      "paragraph": 31,
+      "level": 1,
+      "label": "10."
+    },
+    {
+      "paragraph": 32,
+      "level": 1,
+      "label": ""
+    },
+    {
+      "paragraph": 33,
+      "level": 1,
+      "label": "1."
+    },
+    {
+      "paragraph": 34,
+      "level": 1,
+      "label": "2."
+    },
+    {
+      "paragraph": 35,
+      "level": 1,
+      "label": "3."
+    },
+    {
+      "paragraph": 36,
+      "level": 1,
+      "label": ""
+    },
+    {
+      "paragraph": 37,
+      "level": 1,
+      "label": "1."
+    },
+    {
+      "paragraph": 38,
+      "level": 1,
+      "label": "2."
+    },
+    {
+      "paragraph": 39,
+      "level": 1,
+      "label": "3."
+    },
+    {
+      "paragraph": 40,
+      "level": 1,
+      "label": ""
+    }
+  ]
+}

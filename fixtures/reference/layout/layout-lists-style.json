@@ -1,0 +1,31 @@
+{
+  "source": "fixtures/docx/layout-lists-style.docx",
+  "oracle": "Microsoft Word 16.0 (16.0.20430), Print Layout, tools/office/word-layout-oracle.ps1",
+  "units": "points; page and top/left/baseline measured from the page top-left corner; start/end are UTF-16 offsets in the main story",
+  "precision": "top/left/lastX are screen-quantised (+-0.3 pt); baseline/inkLeft come from the 600 dpi PDF and are exact",
+  "pageCount": 1,
+  "lines": [
+    {"page": 1, "start": 0, "end": 10, "top": 78.0, "left": 108.0, "lastX": 163.2, "baseline": 91.46, "inkLeft": 72.024, "text": "Chapter 1\u000d"},
+    {"page": 1, "start": 10, "end": 107, "top": 100.8, "left": 72.0, "lastX": 521.4, "baseline": 111.62, "inkLeft": 72.024, "text": "Words long enough to wrap onto a second line so the hanging indent shows: Typesetting depends on "},
+    {"page": 1, "start": 107, "end": 207, "top": 114.0, "left": 72.0, "lastX": 526.8, "baseline": 125.09, "inkLeft": 72.024, "text": "small decisions repeated thousands of times: where a line ends, how much space follows a paragraph, "},
+    {"page": 1, "start": 207, "end": 235, "top": 127.8, "left": 72.0, "lastX": 198.0, "baseline": 138.53, "inkLeft": 72.024, "text": "and which words travel toge\u000d"},
+    {"page": 1, "start": 235, "end": 247, "top": 147.6, "left": 108.0, "lastX": 171.0, "baseline": 160.85, "inkLeft": 72.024, "text": "Section 1.1\u000d"},
+    {"page": 1, "start": 247, "end": 260, "top": 170.4, "left": 108.0, "lastX": 172.2, "baseline": 183.89, "inkLeft": 108.05, "text": "Detail 1.1.a\u000d"},
+    {"page": 1, "start": 260, "end": 330, "top": 193.8, "left": 108.0, "lastX": 496.2, "baseline": 206.71, "inkLeft": 108.05, "text": "Detail 1.1.b with a long wrapping title: Typesetting depends on small "},
+    {"page": 1, "start": 330, "end": 397, "top": 210.6, "left": 72.0, "lastX": 535.8, "baseline": 223.99, "inkLeft": 144.05, "text": "decisions repeated thousands of times: where a line ends, how much "},
+    {"page": 1, "start": 397, "end": 422, "top": 228.0, "left": 72.0, "lastX": 283.8, "baseline": 241.27, "inkLeft": 144.05, "text": "space follows a paragrap\u000d"},
+    {"page": 1, "start": 422, "end": 434, "top": 250.8, "left": 108.0, "lastX": 171.0, "baseline": 264.31, "inkLeft": 72.024, "text": "Section 1.2\u000d"},
+    {"page": 1, "start": 434, "end": 444, "top": 274.2, "left": 108.0, "lastX": 163.2, "baseline": 287.38, "inkLeft": 72.024, "text": "Chapter 2\u000d"},
+    {"page": 1, "start": 444, "end": 541, "top": 297.0, "left": 72.0, "lastX": 521.4, "baseline": 307.54, "inkLeft": 72.024, "text": "Words long enough to wrap onto a second line so the hanging indent shows: Typesetting depends on "},
+    {"page": 1, "start": 541, "end": 641, "top": 310.2, "left": 72.0, "lastX": 526.8, "baseline": 320.98, "inkLeft": 72.024, "text": "small decisions repeated thousands of times: where a line ends, how much space follows a paragraph, "},
+    {"page": 1, "start": 641, "end": 669, "top": 324.0, "left": 72.0, "lastX": 198.0, "baseline": 334.42, "inkLeft": 72.024, "text": "and which words travel toge\u000d"},
+    {"page": 1, "start": 669, "end": 681, "top": 343.2, "left": 108.0, "lastX": 171.0, "baseline": 356.74, "inkLeft": 72.024, "text": "Section 2.1\u000d"},
+    {"page": 1, "start": 681, "end": 694, "top": 366.6, "left": 108.0, "lastX": 172.2, "baseline": 380.04, "inkLeft": 108.05, "text": "Detail 2.1.a\u000d"},
+    {"page": 1, "start": 694, "end": 764, "top": 389.4, "left": 108.0, "lastX": 496.2, "baseline": 402.84, "inkLeft": 108.05, "text": "Detail 2.1.b with a long wrapping title: Typesetting depends on small "},
+    {"page": 1, "start": 764, "end": 831, "top": 406.2, "left": 72.0, "lastX": 535.8, "baseline": 419.88, "inkLeft": 144.05, "text": "decisions repeated thousands of times: where a line ends, how much "},
+    {"page": 1, "start": 831, "end": 856, "top": 423.6, "left": 72.0, "lastX": 211.8, "baseline": 437.16, "inkLeft": 144.05, "text": "space follows a paragrap\u000d"},
+    {"page": 1, "start": 856, "end": 868, "top": 447.0, "left": 108.0, "lastX": 171.0, "baseline": 460.22, "inkLeft": 72.024, "text": "Section 2.2\u000d"},
+    {"page": 1, "start": 868, "end": 895, "top": 469.8, "left": 108.0, "lastX": 313.2, "baseline": 483.5, "inkLeft": 126.05, "text": "Heading with direct indent\u000d"},
+    {"page": 1, "start": 895, "end": 896, "top": 493.2, "left": 72.0, "lastX": 72.0, "baseline": 503.66, "inkLeft": 72.024, "text": "\u000d"}
+  ]
+}

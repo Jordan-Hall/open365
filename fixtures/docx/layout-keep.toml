@@ -1,0 +1,5 @@
+feature = "layout-keep"
+made_with = "Microsoft Word 16.0.20430 (Windows)"
+author = "project member"
+expect_dropped = []
+notes = "keep-with-next chains, keep-with-next before a page-break-before paragraph, keep-with-next on multi-line paragraphs, keep-lines with keep-with-next, space before between kept paragraphs, widow control off with keep-lines; each scenario starts on a fresh page"

@@ -63,6 +63,21 @@ try {
     $s.TypeParagraph()
     $s.ParagraphFormat.Reset(); $s.Font.Reset()
   }
+  # Word's own list label (Range.ListFormat.ListString) per paragraph, for fixtures that have lists:
+  # fixtures/reference/layout/<name>.lists.json, read by crates/layout/tests/list_labels.rs.
+  function Write-ListLabels($d, $name) {
+    if ($d.ListParagraphs.Count -eq 0) { return }
+    $refDir = Join-Path $script:root 'fixtures\reference\layout'
+    $rows = @()
+    $i = 0
+    foreach ($par in $d.Paragraphs) {
+      $lf = $par.Range.ListFormat
+      $rows += [ordered]@{ paragraph = $i; level = [int]$lf.ListLevelNumber; label = [string]$lf.ListString }
+      $i++
+    }
+    $json = ConvertTo-Json -InputObject ([ordered]@{ source = "fixtures/docx/$name.docx"; oracle = 'Word Range.ListFormat.ListString'; paragraphs = $rows }) -Depth 4
+    [IO.File]::WriteAllText((Join-Path $refDir "$name.lists.json"), $json, (New-Object Text.UTF8Encoding($false)))
+  }
   function L-Fixture($name, $feature, $notes, [scriptblock]$build) {
     $doc = $null; $path = Join-Path $docxDir "$name.docx"
     if ($script:Only.Count -gt 0 -and $name -notin $script:Only) { return }
@@ -72,6 +87,7 @@ try {
       $script:doc = $doc
       & $build
       $doc.RemovePersonalInformation = $true
+      Write-ListLabels $doc $name
       $doc.SaveAs2($path, 16)
       Write-Manifest $docxDir $name $feature $script:word $notes
       $script:created.Add("docx/$name")
@@ -287,6 +303,189 @@ try {
       L-Para ('Justified text that finishes with a manual line break, followed by a short tail. ' + $B.Substring(0, 120) + $VT + 'Tail.') { param($f) $f.Alignment = 3; $f.RightIndent = $ri }
     }
   }
+  # ---- lists -------------------------------------------------------------------------------------------
+  # Number styles (WdListNumberStyle): 0 arabic, 1 upper roman, 2 lower roman, 3 upper letter, 4 lower letter,
+  # 5 ordinal, 6 cardinal text, 7 ordinal text, 22 arabic with leading zero, 23 bullet.
+  function New-Level($lt, $n, $fmt, $style, $numPos, $textPos, $trail, $start, $align) {
+    $lv = $lt.ListLevels.Item($n)
+    $lv.NumberFormat = $fmt; $lv.NumberStyle = $style; $lv.TrailingCharacter = $trail
+    $lv.NumberPosition = $numPos; $lv.Alignment = $align; $lv.TextPosition = $textPos
+    $lv.TabPosition = [single]9999999; $lv.StartAt = $start; $lv.ResetOnHigher = $n - 1
+    $lv.LinkedStyle = ''
+    return $lv
+  }
+  # One list paragraph. $cont false starts the list, true continues the previous list of this template.
+  function L-Item($text, $lt, $level, $cont) {
+    $s = $script:word.Selection; [void]$s.EndKey(6)
+    $s.ParagraphFormat.Reset(); $s.Font.Reset()
+    $s.TypeText($text)
+    $r = $s.Paragraphs.Item(1).Range
+    $r.ListFormat.ApplyListTemplate($lt, $cont, 0, 2)
+    $r.ListFormat.ListLevelNumber = $level
+    $s.TypeParagraph()
+    $s.Range.ListFormat.RemoveNumbers()
+    $s.ParagraphFormat.Reset(); $s.Font.Reset()
+  }
+  $W3 = 'Words long enough to wrap onto a second line so the hanging indent shows: ' + $B.Substring(0, 150)
+
+  L-Fixture 'layout-lists-formats' 'layout-lists-formats' 'numbered and bulleted lists: decimal, letters, roman, zero-padded and ordinal formats, large start values that push the label past the hanging indent, bullets' {
+    Init-Doc 6
+    $specs = @(
+      @('%1.', 0, 1), @('%1)', 4, 1), @('(%1)', 3, 1), @('%1.', 2, 1), @('%1.', 1, 1), @('%1.', 22, 1), @('%1.', 5, 1), @('%1.', 6, 1), @('%1.', 7, 1),
+      @('%1.', 0, 98), @('%1.', 4, 24), @('%1.', 2, 8), @('%1.', 1, 38)
+    )
+    foreach ($sp in $specs) {
+      $lt = $doc.ListTemplates.Add($false)
+      [void](New-Level $lt 1 $sp[0] $sp[1] 18 36 0 $sp[2] 0)
+      L-Para ("List " + $sp[0] + " style " + $sp[1] + " start " + $sp[2]) $null { param($f) $f.Bold = 1 }
+      foreach ($i in 1..4) { L-Item "Item $i of the list" $lt 1 ($i -gt 1) }
+      L-Item $W3 $lt 1 $true
+    }
+    $bt = $doc.ListTemplates.Add($false)
+    $bl = New-Level $bt 1 ([string][char]0xF0B7) 23 18 36 0 1 0
+    $bl.Font.Name = 'Symbol'
+    L-Para 'Bulleted list' $null { param($f) $f.Bold = 1 }
+    foreach ($i in 1..3) { L-Item "Bullet $i" $bt 1 ($i -gt 1) }
+    L-Item $W3 $bt 1 $true
+  }
+
+  L-Fixture 'layout-lists-multilevel' 'layout-lists-multilevel' 'multilevel numbering: nested level counters and restarts, joined numbers, continuing versus restarted lists, empty list items' {
+    Init-Doc 6
+    $lt = $doc.ListTemplates.Add($true)
+    [void](New-Level $lt 1 '%1.' 0 18 36 0 1 0)
+    [void](New-Level $lt 2 '%1.%2.' 0 36 72 0 1 0)
+    [void](New-Level $lt 3 '%1.%2.%3' 0 72 126 0 1 0)
+    [void](New-Level $lt 4 '(%4)' 4 108 144 0 1 0)
+    [void](New-Level $lt 5 '%5)' 2 144 180 0 1 0)
+    L-Para 'Outline' $null { param($f) $f.Bold = 1 }
+    $plan = @(1,2,2,3,3,1,2,3,4,5,4,3,2,1,3,1)
+    $first = $true
+    foreach ($lvl in $plan) { L-Item "Level $lvl entry" $lt $lvl (-not $first); $first = $false }
+    L-Para 'Same list continued after a plain paragraph' $null { param($f) $f.Bold = 1 }
+    L-Item 'Continues the outline' $lt 1 $true
+    L-Item 'Nested under it' $lt 2 $true
+    L-Para 'A separate list restarts at one' $null { param($f) $f.Bold = 1 }
+    L-Item 'Restarted first' $lt 1 $false
+    L-Item 'Restarted second' $lt 1 $true
+    L-Item 'Restarted nested' $lt 2 $true
+    L-Item '' $lt 1 $true
+    L-Item 'After an empty item' $lt 1 $true
+  }
+
+  L-Fixture 'layout-lists-suff' 'layout-lists-suff' 'trailing character (tab, space, nothing), label alignment, first-line (non-hanging) lists, label run formatting, direct indent overrides' {
+    Init-Doc 6
+    $variants = @(
+      @('tab, hanging 18', '%1.', 0, 0, 18, 36, 0, 0),
+      @('space', '%1.', 0, 1, 18, 36, 0, 0),
+      @('nothing', '%1.', 0, 2, 18, 36, 0, 0),
+      @('tab, label wider than hanging', 'Step %1:', 0, 0, 18, 36, 0, 0),
+      @('tab, no hanging (text at number position)', '%1.', 0, 0, 36, 36, 0, 0),
+      @('tab, text before number', '%1.', 0, 0, 54, 36, 0, 0),
+      @('right aligned label', '%1.', 0, 0, 54, 72, 0, 2),
+      @('centered label', '%1.', 0, 0, 54, 72, 0, 1)
+    )
+    foreach ($v in $variants) {
+      $lt = $doc.ListTemplates.Add($false)
+      [void](New-Level $lt 1 $v[1] $v[2] $v[4] $v[5] $v[3] 8 $v[7])
+      L-Para ("Variant: " + $v[0]) $null { param($f) $f.Bold = 1 }
+      foreach ($i in 1..2) { L-Item "Item $i" $lt 1 ($i -gt 1) }
+      L-Item $W3 $lt 1 $true
+    }
+    $fl = $doc.ListTemplates.Add($false)
+    $fv = New-Level $fl 1 '%1.' 0 18 36 0 1 0
+    $fv.Font.Bold = 1; $fv.Font.Size = 20; $fv.Font.Name = 'Cambria'
+    L-Para 'Variant: label font bold 20 pt Cambria' $null { param($f) $f.Bold = 1 }
+    foreach ($i in 1..3) { L-Item "Item $i" $fl 1 ($i -gt 1) }
+    $ml = $doc.ListTemplates.Add($false)
+    [void](New-Level $ml 1 '%1.' 0 18 36 0 1 0)
+    L-Para 'Variant: direct indent override, then a paragraph mark larger than its text' $null { param($f) $f.Bold = 1 }
+    L-Item 'Direct left indent 90, first line -18' $ml 1 $false
+    $pp = $doc.Paragraphs.Item($doc.Paragraphs.Count - 1)
+    $pp.LeftIndent = 90; $pp.FirstLineIndent = -18
+    L-Item 'Big mark' $ml 1 $true
+    $pp = $doc.Paragraphs.Item($doc.Paragraphs.Count - 1)
+    $pp.Range.Characters.Last.Font.Size = 28
+    L-Item 'Back to plain' $ml 1 $true
+  }
+  L-Fixture 'layout-lists-style' 'layout-lists-style' 'numbering linked to paragraph styles (Heading 1 and 2 carry the list, paragraphs have no numPr); direct formatting on a numbered style paragraph' {
+    Init-Doc 6
+    $lt = $doc.ListTemplates.Add($true)
+    $l1 = New-Level $lt 1 '%1.' 0 0 36 0 1 0
+    $l1.LinkedStyle = 'Heading 1'
+    $l2 = New-Level $lt 2 '%1.%2' 0 0 36 0 1 0
+    $l2.LinkedStyle = 'Heading 2'
+    $l3 = New-Level $lt 3 '%3)' 4 36 72 0 1 0
+    $l3.LinkedStyle = 'Heading 3'
+    foreach ($h in 'Heading 1', 'Heading 2', 'Heading 3') {
+      $doc.Styles.Item($h).Font.Name = 'Calibri'; $doc.Styles.Item($h).Font.Size = 14
+      $doc.Styles.Item($h).ParagraphFormat.SpaceBefore = 6; $doc.Styles.Item($h).ParagraphFormat.SpaceAfter = 6
+    }
+    foreach ($i in 1..2) {
+      L-Para "Chapter $i" { param($f) $f.Style = 'Heading 1' }
+      L-Para $W3 $null
+      L-Para "Section $i.1" { param($f) $f.Style = 'Heading 2' }
+      L-Para "Detail $i.1.a" { param($f) $f.Style = 'Heading 3' }
+      L-Para "Detail $i.1.b with a long wrapping title: $($B.Substring(0, 120))" { param($f) $f.Style = 'Heading 3' }
+      L-Para "Section $i.2" { param($f) $f.Style = 'Heading 2' }
+    }
+    L-Para 'Heading with direct indent' { param($f) $f.Style = 'Heading 1'; $f.LeftIndent = 90; $f.FirstLineIndent = -36 }
+  }
+
+  L-Fixture 'layout-keep' 'layout-keep' 'keep-with-next chains, keep-with-next before a page-break-before paragraph, keep-with-next on multi-line paragraphs, keep-lines with keep-with-next, space before between kept paragraphs, widow control off with keep-lines; each scenario starts on a fresh page' {
+    Init-Doc 0
+    function Fill($n) { foreach ($i in 1..$n) { L-Para "Filler line $i." } }
+    function PageBrk() { $s = $script:word.Selection; [void]$s.EndKey(6); $s.InsertBreak(7) }
+    $four = 'Line one of four.' + $VT + 'Line two of four.' + $VT + 'Line three of four.' + $VT + 'Line four of four.'
+    $two = 'Line one of two.' + $VT + 'Line two of two.'
+    $keep = { param($f) $f.KeepWithNext = -1 }
+    foreach ($fill in 43, 44, 45, 46) {
+      # chain of three kept headings, then a body paragraph
+      Fill $fill
+      L-Para 'Chain heading one' $keep
+      L-Para 'Chain heading two' $keep
+      L-Para 'Chain heading three' $keep
+      L-Para $four
+      L-Para 'After chain.'
+      PageBrk
+    }
+    foreach ($fill in 45, 46, 47) {
+      # kept paragraph followed by page-break-before: nothing to keep with on this page
+      Fill $fill
+      L-Para $two $keep
+      L-Para 'Starts a new page by itself.' { param($f) $f.PageBreakBefore = -1 }
+      PageBrk
+    }
+    foreach ($fill in 43, 44, 45, 46) {
+      # multi-line kept paragraph followed by a multi-line paragraph
+      Fill $fill
+      L-Para $four $keep
+      L-Para $four
+      PageBrk
+    }
+    foreach ($fill in 43, 44, 45, 46) {
+      # keep lines together and keep with next
+      Fill $fill
+      L-Para $four { param($f) $f.KeepTogether = -1; $f.KeepWithNext = -1 }
+      L-Para $two
+      PageBrk
+    }
+    foreach ($fill in 44, 45, 46) {
+      # space before and after between a kept paragraph and its follower
+      Fill $fill
+      L-Para $two { param($f) $f.KeepWithNext = -1; $f.SpaceBefore = 20; $f.SpaceAfter = 4 }
+      L-Para $two { param($f) $f.SpaceBefore = 14; $f.SpaceAfter = 10 }
+      L-Para 'Tail.'
+      PageBrk
+    }
+    foreach ($fill in 44, 45, 46) {
+      # widow control off, keep lines
+      Fill $fill
+      L-Para $four { param($f) $f.WidowControl = 0; $f.KeepTogether = -1 }
+      L-Para $four { param($f) $f.WidowControl = 0 }
+      PageBrk
+    }
+  }
+
 } finally {
   if ($word) {
     try { $word.UserName = $oldUser; $word.UserInitials = $oldInit; $word.Options.UseLocalUserInfo = $oldLocal } catch {}

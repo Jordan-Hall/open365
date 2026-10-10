@@ -1,0 +1,76 @@
+{
+  "source": "fixtures/docx/layout-lists-style.docx",
+  "oracle": "Word Range.ListFormat.ListString",
+  "paragraphs": [
+    {
+      "paragraph": 0,
+      "level": 1,
+      "label": "1."
+    },
+    {
+      "paragraph": 1,
+      "level": 1,
+      "label": ""
+    },
+    {
+      "paragraph": 2,
+      "level": 2,
+      "label": "1.1"
+    },
+    {
+      "paragraph": 3,
+      "level": 3,
+      "label": "a)"
+    },
+    {
+      "paragraph": 4,
+      "level": 3,
+      "label": "b)"
+    },
+    {
+      "paragraph": 5,
+      "level": 2,
+      "label": "1.2"
+    },
+    {
+      "paragraph": 6,
+      "level": 1,
+      "label": "2."
+    },
+    {
+      "paragraph": 7,
+      "level": 1,
+      "label": ""
+    },
+    {
+      "paragraph": 8,
+      "level": 2,
+      "label": "2.1"
+    },
+    {
+      "paragraph": 9,
+      "level": 3,
+      "label": "a)"
+    },
+    {
+      "paragraph": 10,
+      "level": 3,
+      "label": "b)"
+    },
+    {
+      "paragraph": 11,
+      "level": 2,
+      "label": "2.2"
+    },
+    {
+      "paragraph": 12,
+      "level": 1,
+      "label": "3."
+    },
+    {
+      "paragraph": 13,
+      "level": 1,
+      "label": ""
+    }
+  ]
+}

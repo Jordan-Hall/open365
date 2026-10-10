@@ -1,0 +1,5 @@
+feature = "layout-lists-suff"
+made_with = "Microsoft Word 16.0.20430 (Windows)"
+author = "project member"
+expect_dropped = []
+notes = "trailing character (tab, space, nothing), label alignment, first-line (non-hanging) lists, label run formatting, direct indent overrides"

@@ -83,9 +83,9 @@ fn decide(para: &ParaLayout, from: usize, y0: f64, bottom: f64, at_top: bool) ->
     let mut k = raw;
     if k < n {
         let first_segment = from == 0;
-        if para.props.keep_lines && first_segment && k > 0 {
+        if para.flow.keep_lines && first_segment && k > 0 {
             k = 0;
-        } else if para.extra.widow_control && n >= 2 {
+        } else if para.flow.widow_control && n >= 2 {
             if first_segment && k == 1 {
                 k = 0;
             } else if n - k == 1 && k >= 1 {
@@ -115,13 +115,22 @@ fn can_start(
     bottom: f64,
     depth: usize,
 ) -> bool {
-    let (para, _) = &paras[p];
-    let y0 = y + prev_after + para.props.space_before_pt as f64;
+    let (para, section) = &paras[p];
+    // A follower that starts its own page (page-break-before, a new section) is not kept with.
+    if para.flow.page_break_before
+        || p.checked_sub(1)
+            .and_then(|q| paras.get(q))
+            .is_some_and(|(_, s)| s != section)
+    {
+        return true;
+    }
+    // Space between paragraphs is the larger of space after and space before.
+    let y0 = y + prev_after.max(f64::from(para.props.space_before_pt));
     let place = decide(para, 0, y0, bottom, false);
     if place.take == 0 {
         return false;
     }
-    if para.props.keep_next && place.take == para.lines.len() && p + 1 < paras.len() && depth < 8 {
+    if para.flow.keep_next && place.take == para.lines.len() && p + 1 < paras.len() && depth < 8 {
         let used: f64 = para.lines.iter().map(|l| l.height).sum();
         return can_start(
             paras,
@@ -154,6 +163,36 @@ fn build_line(
     let left_origin = section.margin_left + section.gutter;
     let mut runs: Vec<GlyphRun> = Vec::new();
     let mut cur_style: Option<usize> = None;
+    if lb.atoms.start == 0
+        && let Some(label) = &para.label
+    {
+        let st = &para.styles[label.style];
+        let mut x = left_origin + label.x;
+        let glyphs = label
+            .glyphs
+            .iter()
+            .map(|g| {
+                let placed = PlacedGlyph {
+                    glyph_id: g.glyph_id,
+                    x: x + g.x_offset,
+                    y_offset: g.y_offset,
+                    advance: g.adv,
+                };
+                x += g.adv;
+                placed
+            })
+            .collect();
+        runs.push(GlyphRun {
+            face: st.face,
+            size: st.size,
+            bold: st.bold,
+            italic: st.italic,
+            underline: st.underline,
+            strike: st.strike,
+            color: st.color,
+            glyphs,
+        });
+    }
     for (k, ai) in lb.atoms.clone().enumerate() {
         let atom = &para.atoms[ai];
         if !matches!(atom.class, AtomClass::Text | AtomClass::Space) {
@@ -230,7 +269,7 @@ pub(crate) fn paginate(
 
     let mut force_break = false;
     for (p, (para, section)) in paras.iter().enumerate() {
-        let wants_break = force_break || para.extra.page_break_before;
+        let wants_break = force_break || para.flow.page_break_before;
         if *section != page.section_index || (wants_break && page.has_content()) {
             // Space before is dropped at the top of every page after the first, whether the page
             // began naturally, after a break character or at `pageBreakBefore`; a new section
@@ -239,11 +278,8 @@ pub(crate) fn paginate(
         }
         force_break = false;
 
-        let contextual_same = |pg: &PageBuild| {
-            pg.prev_style
-                .as_ref()
-                .is_some_and(|s| *s == para.extra.style_id)
-        };
+        let contextual_same =
+            |pg: &PageBuild| pg.prev_style.as_ref().is_some_and(|s| *s == para.style_id);
         let mut from = 0usize;
         let n = para.lines.len();
         while from < n {
@@ -259,7 +295,7 @@ pub(crate) fn paginate(
                     if pg.prev_contextual {
                         after = 0.0;
                     }
-                    if para.extra.contextual_spacing {
+                    if para.flow.contextual_spacing {
                         before = 0.0;
                     }
                 }
@@ -277,7 +313,7 @@ pub(crate) fn paginate(
             let mut place = decide(para, from, y0, page.bottom(), at_top);
             if first_segment
                 && place.take == para.lines.len()
-                && para.props.keep_next
+                && para.flow.keep_next
                 && !at_top
                 && p + 1 < paras.len()
             {
@@ -291,7 +327,21 @@ pub(crate) fn paginate(
                     0,
                 );
                 if !ok {
-                    place.take = 0;
+                    // The last line cannot sit with its follower here: Word moves as few lines
+                    // as it may (never leaving a lone line when widow control is on) and
+                    // only moves the whole paragraph when it cannot be split.
+                    let n = para.lines.len();
+                    let (min_head, min_tail) = if para.flow.widow_control {
+                        (2, 2)
+                    } else {
+                        (1, 1)
+                    };
+                    let head = n.saturating_sub(min_tail);
+                    place.take = if para.flow.keep_lines || head < min_head {
+                        0
+                    } else {
+                        head
+                    };
                 }
             }
             if place.take == 0 {
@@ -321,8 +371,8 @@ pub(crate) fn paginate(
             }
         }
         page.pending_after = f64::from(para.props.space_after_pt);
-        page.prev_style = Some(para.extra.style_id.clone());
-        page.prev_contextual = para.extra.contextual_spacing;
+        page.prev_style = Some(para.style_id.clone());
+        page.prev_contextual = para.flow.contextual_spacing;
     }
     done.push(page.finish());
     done

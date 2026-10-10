@@ -1,0 +1,426 @@
+{
+  "source": "fixtures/docx/layout-lists-formats.docx",
+  "oracle": "Word Range.ListFormat.ListString",
+  "paragraphs": [
+    {
+      "paragraph": 0,
+      "level": 1,
+      "label": ""
+    },
+    {
+      "paragraph": 1,
+      "level": 1,
+      "label": "1."
+    },
+    {
+      "paragraph": 2,
+      "level": 1,
+      "label": "2."
+    },
+    {
+      "paragraph": 3,
+      "level": 1,
+      "label": "3."
+    },
+    {
+      "paragraph": 4,
+      "level": 1,
+      "label": "4."
+    },
+    {
+      "paragraph": 5,
+      "level": 1,
+      "label": "5."
+    },
+    {
+      "paragraph": 6,
+      "level": 1,
+      "label": ""
+    },
+    {
+      "paragraph": 7,
+      "level": 1,
+      "label": "a)"
+    },
+    {
+      "paragraph": 8,
+      "level": 1,
+      "label": "b)"
+    },
+    {
+      "paragraph": 9,
+      "level": 1,
+      "label": "c)"
+    },
+    {
+      "paragraph": 10,
+      "level": 1,
+      "label": "d)"
+    },
+    {
+      "paragraph": 11,
+      "level": 1,
+      "label": "e)"
+    },
+    {
+      "paragraph": 12,
+      "level": 1,
+      "label": ""
+    },
+    {
+      "paragraph": 13,
+      "level": 1,
+      "label": "(A)"
+    },
+    {
+      "paragraph": 14,
+      "level": 1,
+      "label": "(B)"
+    },
+    {
+      "paragraph": 15,
+      "level": 1,
+      "label": "(C)"
+    },
+    {
+      "paragraph": 16,
+      "level": 1,
+      "label": "(D)"
+    },
+    {
+      "paragraph": 17,
+      "level": 1,
+      "label": "(E)"
+    },
+    {
+      "paragraph": 18,
+      "level": 1,
+      "label": ""
+    },
+    {
+      "paragraph": 19,
+      "level": 1,
+      "label": "i."
+    },
+    {
+      "paragraph": 20,
+      "level": 1,
+      "label": "ii."
+    },
+    {
+      "paragraph": 21,
+      "level": 1,
+      "label": "iii."
+    },
+    {
+      "paragraph": 22,
+      "level": 1,
+      "label": "iv."
+    },
+    {
+      "paragraph": 23,
+      "level": 1,
+      "label": "v."
+    },
+    {
+      "paragraph": 24,
+      "level": 1,
+      "label": ""
+    },
+    {
+      "paragraph": 25,
+      "level": 1,
+      "label": "I."
+    },
+    {
+      "paragraph": 26,
+      "level": 1,
+      "label": "II."
+    },
+    {
+      "paragraph": 27,
+      "level": 1,
+      "label": "III."
+    },
+    {
+      "paragraph": 28,
+      "level": 1,
+      "label": "IV."
+    },
+    {
+      "paragraph": 29,
+      "level": 1,
+      "label": "V."
+    },
+    {
+      "paragraph": 30,
+      "level": 1,
+      "label": ""
+    },
+    {
+      "paragraph": 31,
+      "level": 1,
+      "label": "01."
+    },
+    {
+      "paragraph": 32,
+      "level": 1,
+      "label": "02."
+    },
+    {
+      "paragraph": 33,
+      "level": 1,
+      "label": "03."
+    },
+    {
+      "paragraph": 34,
+      "level": 1,
+      "label": "04."
+    },
+    {
+      "paragraph": 35,
+      "level": 1,
+      "label": "05."
+    },
+    {
+      "paragraph": 36,
+      "level": 1,
+      "label": ""
+    },
+    {
+      "paragraph": 37,
+      "level": 1,
+      "label": "1st."
+    },
+    {
+      "paragraph": 38,
+      "level": 1,
+      "label": "2nd."
+    },
+    {
+      "paragraph": 39,
+      "level": 1,
+      "label": "3rd."
+    },
+    {
+      "paragraph": 40,
+      "level": 1,
+      "label": "4th."
+    },
+    {
+      "paragraph": 41,
+      "level": 1,
+      "label": "5th."
+    },
+    {
+      "paragraph": 42,
+      "level": 1,
+      "label": ""
+    },
+    {
+      "paragraph": 43,
+      "level": 1,
+      "label": "One."
+    },
+    {
+      "paragraph": 44,
+      "level": 1,
+      "label": "Two."
+    },
+    {
+      "paragraph": 45,
+      "level": 1,
+      "label": "Three."
+    },
+    {
+      "paragraph": 46,
+      "level": 1,
+      "label": "Four."
+    },
+    {
+      "paragraph": 47,
+      "level": 1,
+      "label": "Five."
+    },
+    {
+      "paragraph": 48,
+      "level": 1,
+      "label": ""
+    },
+    {
+      "paragraph": 49,
+      "level": 1,
+      "label": "First."
+    },
+    {
+      "paragraph": 50,
+      "level": 1,
+      "label": "Second."
+    },
+    {
+      "paragraph": 51,
+      "level": 1,
+      "label": "Third."
+    },
+    {
+      "paragraph": 52,
+      "level": 1,
+      "label": "Fourth."
+    },
+    {
+      "paragraph": 53,
+      "level": 1,
+      "label": "Fifth."
+    },
+    {
+      "paragraph": 54,
+      "level": 1,
+      "label": ""
+    },
+    {
+      "paragraph": 55,
+      "level": 1,
+      "label": "98."
+    },
+    {
+      "paragraph": 56,
+      "level": 1,
+      "label": "99."
+    },
+    {
+      "paragraph": 57,
+      "level": 1,
+      "label": "100."
+    },
+    {
+      "paragraph": 58,
+      "level": 1,
+      "label": "101."
+    },
+    {
+      "paragraph": 59,
+      "level": 1,
+      "label": "102."
+    },
+    {
+      "paragraph": 60,
+      "level": 1,
+      "label": ""
+    },
+    {
+      "paragraph": 61,
+      "level": 1,
+      "label": "x."
+    },
+    {
+      "paragraph": 62,
+      "level": 1,
+      "label": "y."
+    },
+    {
+      "paragraph": 63,
+      "level": 1,
+      "label": "z."
+    },
+    {
+      "paragraph": 64,
+      "level": 1,
+      "label": "aa."
+    },
+    {
+      "paragraph": 65,
+      "level": 1,
+      "label": "bb."
+    },
+    {
+      "paragraph": 66,
+      "level": 1,
+      "label": ""
+    },
+    {
+      "paragraph": 67,
+      "level": 1,
+      "label": "viii."
+    },
+    {
+      "paragraph": 68,
+      "level": 1,
+      "label": "ix."
+    },
+    {
+      "paragraph": 69,
+      "level": 1,
+      "label": "x."
+    },
+    {
+      "paragraph": 70,
+      "level": 1,
+      "label": "xi."
+    },
+    {
+      "paragraph": 71,
+      "level": 1,
+      "label": "xii."
+    },
+    {
+      "paragraph": 72,
+      "level": 1,
+      "label": ""
+    },
+    {
+      "paragraph": 73,
+      "level": 1,
+      "label": "XXXVIII."
+    },
+    {
+      "paragraph": 74,
+      "level": 1,
+      "label": "XXXIX."
+    },
+    {
+      "paragraph": 75,
+      "level": 1,
+      "label": "XL."
+    },
+    {
+      "paragraph": 76,
+      "level": 1,
+      "label": "XLI."
+    },
+    {
+      "paragraph": 77,
+      "level": 1,
+      "label": "XLII."
+    },
+    {
+      "paragraph": 78,
+      "level": 1,
+      "label": ""
+    },
+    {
+      "paragraph": 79,
+      "level": 1,
+      "label": ""
+    },
+    {
+      "paragraph": 80,
+      "level": 1,
+      "label": ""
+    },
+    {
+      "paragraph": 81,
+      "level": 1,
+      "label": ""
+    },
+    {
+      "paragraph": 82,
+      "level": 1,
+      "label": ""
+    },
+    {
+      "paragraph": 83,
+      "level": 1,
+      "label": ""
+    }
+  ]
+}

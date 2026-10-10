@@ -1,0 +1,5 @@
+feature = "layout-lists-style"
+made_with = "Microsoft Word 16.0.20430 (Windows)"
+author = "project member"
+expect_dropped = []
+notes = "numbering linked to paragraph styles (Heading 1 and 2 carry the list, paragraphs have no numPr); direct formatting on a numbered style paragraph"

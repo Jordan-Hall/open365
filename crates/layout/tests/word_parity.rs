@@ -256,7 +256,7 @@ total = {total}
 }
 
 /// Families the system mode loads from the machine.
-const SYSTEM_FAMILIES: [&str; 9] = [
+const SYSTEM_FAMILIES: [&str; 10] = [
     "Calibri",
     "Calibri Light",
     "Cambria",
@@ -266,6 +266,7 @@ const SYSTEM_FAMILIES: [&str; 9] = [
     "Arial",
     "Times New Roman",
     "Segoe UI",
+    "Symbol",
 ];
 
 fn library(mode: Mode) -> FontLibrary {
@@ -291,6 +292,8 @@ fn reference_names() -> Vec<String> {
         .map(|e| e.path())
         .filter(|p| p.extension().is_some_and(|x| x == "json"))
         .filter_map(|p| p.file_stem().map(|s| s.to_string_lossy().into_owned()))
+        // `<name>.lists.json` holds Word's list labels, not line positions.
+        .filter(|n| !n.ends_with(".lists"))
         .collect();
     names.sort();
     names
