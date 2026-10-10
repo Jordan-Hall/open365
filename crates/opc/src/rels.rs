@@ -4,7 +4,7 @@
 //! re-serialised here: parts stay byte-identical unless their owner edits them (ADR-001).
 
 use quick_xml::XmlVersion;
-use quick_xml::events::Event;
+use quick_xml::events::{BytesStart, Event};
 use quick_xml::reader::Reader;
 
 use crate::{OpcError, PartName};
@@ -31,27 +31,17 @@ pub struct Relationships {
     items: Vec<Relationship>,
 }
 
-/// A parsed XML element: local name and unescaped attributes (keyed by local name).
-pub(crate) struct Element {
-    pub name: String,
-    attrs: Vec<(String, String)>,
-}
-
-impl Element {
-    pub(crate) fn attr(&self, key: &str) -> Option<&str> {
-        self.attrs
-            .iter()
-            .find(|(k, _)| k == key)
-            .map(|(_, v)| v.as_str())
-    }
-}
-
-/// Collects every element in document order. Any DOCTYPE is rejected outright
-/// (threat model T1): we never process DTDs or entity declarations.
-pub(crate) fn scan_elements(xml: &[u8]) -> Result<Vec<Element>, OpcError> {
+/// Calls `f` for every element in document order (`first` is true for the root). Any
+/// DOCTYPE is rejected outright (threat model T1): we never process DTDs or entity
+/// declarations. Nothing is allocated per element; `f` decodes only the attributes it
+/// needs with [`attr`].
+pub(crate) fn visit_elements(
+    xml: &[u8],
+    mut f: impl FnMut(&BytesStart<'_>, bool) -> Result<(), OpcError>,
+) -> Result<(), OpcError> {
     let mut reader = Reader::from_reader(xml);
     let mut buf = Vec::new();
-    let mut out = Vec::new();
+    let mut first = true;
     loop {
         let event = reader
             .read_event_into(&mut buf)
@@ -59,47 +49,57 @@ pub(crate) fn scan_elements(xml: &[u8]) -> Result<Vec<Element>, OpcError> {
         match event {
             Event::DocType(_) => return Err(OpcError::DoctypeForbidden),
             Event::Start(e) | Event::Empty(e) => {
-                let mut attrs = Vec::new();
-                for attr in e.attributes() {
-                    let attr = attr.map_err(|e| OpcError::Xml(e.to_string()))?;
-                    let key = attr.key.local_name().as_ref().to_owned();
-                    let value = attr
-                        .normalized_value(XmlVersion::Explicit1_0)
-                        .map_err(|e| OpcError::Xml(e.to_string()))?
-                        .into_owned();
-                    attrs.push((key, value));
-                }
-                out.push(Element {
-                    name: e.local_name().as_ref().to_owned(),
-                    attrs,
-                });
+                f(&e, first)?;
+                first = false;
             }
-            Event::Eof => break,
+            Event::Eof => return Ok(()),
             _ => {}
         }
         buf.clear();
     }
-    Ok(out)
+}
+
+/// The unescaped value of the attribute whose local name is `key`. Malformed attribute
+/// syntax anywhere on the element is an error.
+pub(crate) fn attr(e: &BytesStart<'_>, key: &str) -> Result<Option<String>, OpcError> {
+    let mut found = None;
+    for attr in e.attributes() {
+        let attr = attr.map_err(|e| OpcError::Xml(e.to_string()))?;
+        if found.is_none() && attr.key.local_name().as_ref() == key {
+            found = Some(
+                attr.normalized_value(XmlVersion::Explicit1_0)
+                    .map_err(|e| OpcError::Xml(e.to_string()))?
+                    .into_owned(),
+            );
+        }
+    }
+    Ok(found)
 }
 
 impl Relationships {
     /// Parses a relationships part. Rejects DOCTYPEs and malformed entries.
     pub fn parse(xml: &[u8]) -> Result<Self, OpcError> {
-        let elements = scan_elements(xml)?;
         let malformed = |msg: &str| OpcError::MalformedPart(msg.to_owned());
-        match elements.first() {
-            Some(root) if root.name == "Relationships" => {}
-            _ => return Err(malformed("root element is not <Relationships>")),
-        }
         let mut items = Vec::new();
-        for element in elements.iter().skip(1).filter(|e| e.name == "Relationship") {
+        let mut has_root = false;
+        visit_elements(xml, |element, first| {
+            let name = element.local_name();
+            if first {
+                has_root = true;
+                return if name.as_ref() == "Relationships" {
+                    Ok(())
+                } else {
+                    Err(malformed("root element is not <Relationships>"))
+                };
+            }
+            if name.as_ref() != "Relationship" {
+                return Ok(());
+            }
             let get = |key: &str| {
-                element
-                    .attr(key)
-                    .map(str::to_owned)
+                attr(element, key)?
                     .ok_or_else(|| malformed(&format!("<Relationship> missing {key}")))
             };
-            let target_mode = match element.attr("TargetMode") {
+            let target_mode = match attr(element, "TargetMode")?.as_deref() {
                 None | Some("Internal") => TargetMode::Internal,
                 Some("External") => TargetMode::External,
                 Some(_) => return Err(malformed("unknown TargetMode")),
@@ -110,6 +110,10 @@ impl Relationships {
                 target: get("Target")?,
                 target_mode,
             });
+            Ok(())
+        })?;
+        if !has_root {
+            return Err(malformed("root element is not <Relationships>"));
         }
         Ok(Self { items })
     }

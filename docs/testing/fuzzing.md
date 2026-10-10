@@ -95,6 +95,34 @@ Copy any crash artifact into `fuzz/repros/<crate>/` after minimising it with
 The targets use the same operations as the smoke harness with smaller `Limits` so executions
 stay fast. `cargo check --manifest-path fuzz/Cargo.toml` type-checks them on stable.
 
+## M1 gate result
+
+| Item | Value |
+|---|---|
+| Command | `OPEN365_FUZZ_SECS=3600 OPEN365_FUZZ_STRICT=1 cargo test --release -p open365-testkit --test fuzz_smoke -- --nocapture` |
+| Seed | 1918371904 |
+| Iterations | 43 336 (7 109 formula cases; 36 227 package mutants, of which 21 985 still opened as valid documents) |
+| Duration | 3600 s (finished in 3604.8 s with the build already warm) |
+| Panics | 0 distinct panic sites (strict mode: any crate) |
+| Slow cases | 0 (none over 10 s in one stage) |
+| Aborts (OOM, stack overflow) | 0 |
+| Repros | none: `fuzz/repros/` is empty |
+| Machine | Intel Core i7-13850HX (20 cores, 28 threads), 64 GB RAM, Windows 11 Pro 10.0.26300, rustc 1.95.0 |
+| Date | 2026-10-10 23:12 to 2026-10-11 00:12 (local) |
+| Code | `opc` and `testkit` with the M1 hardening changes (part index, streaming parsers, content-type checks); other crates as they stood in the working tree |
+
+The harness is single-threaded; the machine was shared with other builds.
+
+An earlier attempt (seed 1454911672) aborted after 15 036 iterations in 1 600 s with
+`memory allocation of ... bytes failed`. The cause was not the harness: another process on
+the host (a Python script) had taken about 41 GB of commit, leaving the machine with
+under 1 GB free. Replaying iterations 15 000 to 15 199 of that seed with the same binary
+on a machine with free memory finished with no panic. The result above is a fresh seed on
+the full hour.
+
+Limits: seeded mutation, not coverage-guided. It shows that the listed mutations do not
+panic, not that none exists. Start `cargo fuzz` (section 2) for depth.
+
 ## What the harness does not prove
 
 Coverage-guided fuzzing finds deeper bugs than seeded mutation. The smoke harness is a

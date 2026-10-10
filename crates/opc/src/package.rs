@@ -1,9 +1,10 @@
-use std::collections::HashSet;
+use std::collections::HashMap;
 use std::io::{Cursor, Read, Write};
 
 use zip::write::SimpleFileOptions;
 use zip::{CompressionMethod, ZipArchive, ZipWriter};
 
+use crate::main_part::{CONTENT_TYPES_PART, without_override};
 use crate::{OpcError, PartName};
 
 /// Resource limits applied while reading an untrusted package.
@@ -73,6 +74,9 @@ impl Part {
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Package {
     parts: Vec<Part>,
+    /// Lower-cased part name to position in `parts`. Always rebuilt or patched together
+    /// with `parts`, so lookups are O(1) and zip order is untouched.
+    index: HashMap<String, usize>,
 }
 
 impl Package {
@@ -87,15 +91,15 @@ impl Package {
             )));
         }
         let mut parts = Vec::with_capacity(archive.len());
-        let mut seen = HashSet::new();
+        let mut index = HashMap::with_capacity(archive.len());
         let mut total: u64 = 0;
-        for index in 0..archive.len() {
-            let mut entry = archive.by_index(index)?;
+        for position in 0..archive.len() {
+            let mut entry = archive.by_index(position)?;
             if entry.is_dir() {
                 continue;
             }
             let name = PartName::new(&entry.name()?)?;
-            if !seen.insert(name.key()) {
+            if index.insert(name.key(), parts.len()).is_some() {
                 return Err(OpcError::DuplicatePart(name.to_string()));
             }
             let too_big = |size: u64| {
@@ -143,7 +147,7 @@ impl Package {
                 dirty: false,
             });
         }
-        Ok(Self { parts })
+        Ok(Self { parts, index })
     }
 
     /// Writes the package as zip bytes, keeping part order and compression method.
@@ -167,34 +171,67 @@ impl Package {
         self.parts.iter()
     }
 
-    /// Looks up a part by name, case-insensitively.
+    /// Looks up a part by name, case-insensitively, in O(1).
     pub fn part(&self, name: &str) -> Option<&Part> {
-        let key = name.to_ascii_lowercase();
-        self.parts.iter().find(|p| p.name.key() == key)
+        self.position(name).map(|i| &self.parts[i])
+    }
+
+    fn position(&self, name: &str) -> Option<usize> {
+        // Names that are already lower case (the common lookup) need no allocation.
+        if name.bytes().any(|b| b.is_ascii_uppercase()) {
+            self.index.get(&name.to_ascii_lowercase()).copied()
+        } else {
+            self.index.get(name).copied()
+        }
     }
 
     /// Replaces a part's bytes, or appends a new deflated part. Either way it becomes dirty.
     pub fn set_part(&mut self, name: PartName, data: Vec<u8>) {
-        let key = name.key();
-        match self.parts.iter_mut().find(|p| p.name.key() == key) {
-            Some(part) => {
+        match self.position(name.as_str()) {
+            Some(i) => {
+                let part = &mut self.parts[i];
                 part.data = data;
                 part.dirty = true;
             }
-            None => self.parts.push(Part {
-                name,
-                data,
-                compression: Compression::Deflated,
-                dirty: true,
-            }),
+            None => {
+                self.index.insert(name.key(), self.parts.len());
+                self.parts.push(Part {
+                    name,
+                    data,
+                    compression: Compression::Deflated,
+                    dirty: true,
+                });
+            }
         }
     }
 
-    /// Removes a part by name, case-insensitively.
+    /// Removes a part by name, case-insensitively. Later parts keep their relative order.
     pub fn remove_part(&mut self, name: &str) -> Option<Part> {
-        let key = name.to_ascii_lowercase();
-        let index = self.parts.iter().position(|p| p.name.key() == key)?;
-        Some(self.parts.remove(index))
+        let position = self.position(name)?;
+        let part = self.parts.remove(position);
+        self.index.remove(&part.name.key());
+        for slot in self.index.values_mut() {
+            if *slot > position {
+                *slot -= 1;
+            }
+        }
+        Some(part)
+    }
+
+    /// Removes a part and, in the same step, its `Override` in `[Content_Types].xml`, so no
+    /// dangling override is left behind. Only the bytes of the matching `<Override>`
+    /// elements are cut; the rest of the content-types part stays byte-identical. Returns
+    /// the removed part, if there was one. The override is also cut when the part itself is
+    /// already gone.
+    pub fn remove_part_and_override(&mut self, name: &str) -> Option<Part> {
+        let removed = self.remove_part(name);
+        if let Some(types) = self.part(CONTENT_TYPES_PART)
+            && let Some(cut) = without_override(types.data(), name)
+            && let Ok(types_name) = PartName::new(CONTENT_TYPES_PART)
+        {
+            self.set_part(types_name, cut);
+        }
+        removed
     }
 }
 
@@ -352,5 +389,64 @@ mod tests {
             Package::read(b"not a zip", &Limits::default()),
             Err(OpcError::Zip(_))
         ));
+    }
+
+    #[test]
+    fn index_is_case_insensitive_and_survives_set_and_remove() {
+        let mut package = Package::read(&sample(), &Limits::default()).unwrap();
+        for name in [
+            "WORD/DOCUMENT.XML",
+            "word/document.xml",
+            "Word/Document.xml",
+        ] {
+            assert!(package.part(name).is_some(), "{name}");
+        }
+        assert!(package.part("word/missing.xml").is_none());
+        package.set_part(PartName::new("Extra/New.xml").unwrap(), b"n".to_vec());
+        assert_eq!(package.part("extra/new.xml").unwrap().data(), b"n");
+        let removed = package.remove_part("_RELS/.RELS").unwrap();
+        assert_eq!(removed.name().as_str(), "_rels/.rels");
+        assert!(package.part("_rels/.rels").is_none());
+        // Positions after the removed part still resolve to the right part.
+        for part in package
+            .parts()
+            .map(|p| p.name().clone())
+            .collect::<Vec<_>>()
+        {
+            assert_eq!(package.part(part.as_str()).unwrap().name(), &part);
+        }
+        let names: Vec<_> = package.parts().map(|p| p.name().as_str()).collect();
+        assert_eq!(
+            names,
+            [
+                "[Content_Types].xml",
+                "word/document.xml",
+                "word/media/image1.png",
+                "Extra/New.xml"
+            ]
+        );
+    }
+
+    #[test]
+    fn remove_part_and_override_leaves_other_bytes_alone() {
+        let types = b"<Types xmlns=\"x\">
+ <Override PartName=\"/a.xml\" ContentType=\"a\"/>
+ <Override PartName=\"/b.xml\" ContentType=\"b\"/>
+</Types>";
+        let mut package = Package::default();
+        package.set_part(
+            PartName::new("[Content_Types].xml").unwrap(),
+            types.to_vec(),
+        );
+        package.set_part(PartName::new("a.xml").unwrap(), b"a".to_vec());
+        assert!(package.remove_part_and_override("A.xml").is_some());
+        assert!(package.part("a.xml").is_none());
+        assert_eq!(
+            package.part("[Content_Types].xml").unwrap().data(),
+            b"<Types xmlns=\"x\">
+ 
+ <Override PartName=\"/b.xml\" ContentType=\"b\"/>
+</Types>"
+        );
     }
 }

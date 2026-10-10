@@ -3,17 +3,28 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
+use open365_opc::MainPartKind;
 use open365_testkit::roundtrip;
+
+/// Any main-part type, minus Office lock files (`~$name`), which are not packages.
+fn is_package(path: &Path) -> bool {
+    let lock = path
+        .file_name()
+        .and_then(|n| n.to_str())
+        .is_none_or(|n| n.starts_with("~$"));
+    !lock
+        && path
+            .extension()
+            .and_then(|e| e.to_str())
+            .is_some_and(|e| MainPartKind::ALL.iter().any(|k| k.extension() == e))
+}
 
 fn collect(dir: &Path, out: &mut Vec<PathBuf>) -> std::io::Result<()> {
     for entry in fs::read_dir(dir)? {
         let path = entry?.path();
         if path.is_dir() {
             collect(&path, out)?;
-        } else if matches!(
-            path.extension().and_then(|e| e.to_str()),
-            Some("docx" | "xlsx")
-        ) {
+        } else if is_package(&path) {
             out.push(path);
         }
     }

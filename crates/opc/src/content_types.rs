@@ -2,7 +2,10 @@
 
 use std::collections::HashMap;
 
-use crate::rels::{Relationships, TargetMode, rels_source, resolve_target, scan_elements};
+use crate::main_part::{CONTENT_TYPES_PART, MainPartKind, OFFICE_DOCUMENT_RELS};
+use crate::rels::{
+    Relationships, TargetMode, attr, rels_part_name, rels_source, resolve_target, visit_elements,
+};
 use crate::{OpcError, Package, PartName};
 
 /// Parsed `[Content_Types].xml`: extension defaults plus per-part overrides.
@@ -17,40 +20,41 @@ pub struct ContentTypes {
 impl ContentTypes {
     /// Parses `[Content_Types].xml`. Rejects DOCTYPEs and malformed entries.
     pub fn parse(xml: &[u8]) -> Result<Self, OpcError> {
-        let elements = scan_elements(xml)?;
         let malformed = |msg: &str| OpcError::MalformedPart(msg.to_owned());
-        match elements.first() {
-            Some(root) if root.name == "Types" => {}
-            _ => return Err(malformed("root element is not <Types>")),
-        }
         let mut types = Self::default();
-        for element in elements.iter().skip(1) {
-            let content_type = || {
-                element
-                    .attr("ContentType")
-                    .map(str::to_owned)
-                    .ok_or_else(|| malformed("missing ContentType"))
-            };
-            match element.name.as_str() {
+        let mut has_root = false;
+        visit_elements(xml, |element, first| {
+            let name = element.local_name();
+            if first {
+                has_root = true;
+                return if name.as_ref() == "Types" {
+                    Ok(())
+                } else {
+                    Err(malformed("root element is not <Types>"))
+                };
+            }
+            let content_type =
+                || attr(element, "ContentType")?.ok_or_else(|| malformed("missing ContentType"));
+            match name.as_ref() {
                 "Default" => {
-                    let ext = element
-                        .attr("Extension")
+                    let ext = attr(element, "Extension")?
                         .ok_or_else(|| malformed("<Default> missing Extension"))?;
                     types
                         .defaults
                         .insert(ext.to_ascii_lowercase(), content_type()?);
                 }
                 "Override" => {
-                    let part = element
-                        .attr("PartName")
-                        .and_then(|p| p.strip_prefix('/'))
+                    let part = attr(element, "PartName")?
+                        .and_then(|p| p.strip_prefix('/').map(str::to_ascii_lowercase))
                         .ok_or_else(|| malformed("<Override> PartName missing or not absolute"))?;
-                    types
-                        .overrides
-                        .insert(part.to_ascii_lowercase(), content_type()?);
+                    types.overrides.insert(part, content_type()?);
                 }
                 _ => {}
             }
+            Ok(())
+        })?;
+        if !has_root {
+            return Err(malformed("root element is not <Types>"));
         }
         Ok(types)
     }
@@ -91,7 +95,7 @@ impl ContentTypes {
 }
 
 /// A problem found by [`Package::check_integrity`].
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum IntegrityIssue {
     /// The package has no `[Content_Types].xml`.
     MissingContentTypes,
@@ -114,9 +118,43 @@ pub enum IntegrityIssue {
     },
     /// A part has neither an override nor a default content type.
     MissingContentType { part: PartName },
+    /// An `<Override>` names a part that is not in the package.
+    DanglingOverride {
+        /// Lower-cased part name, no leading `/`.
+        part: String,
+    },
+    /// The part the package-level `officeDocument` relationship points at has a content
+    /// type that is none of the [`MainPartKind`] types (or none at all).
+    UnrecognisedMainPart {
+        part: PartName,
+        content_type: Option<String>,
+    },
 }
 
 impl Package {
+    /// The main part (the target of the package-level `officeDocument` relationship) and
+    /// the kind its content type declares. `None` when the package has no readable
+    /// `officeDocument` relationship, or the type is not a [`MainPartKind`].
+    pub fn main_part_kind(&self) -> Option<(PartName, MainPartKind)> {
+        let types = ContentTypes::parse(self.part(CONTENT_TYPES_PART)?.data()).ok()?;
+        let (name, content_type) = self.main_part_type(&types)?;
+        let kind = MainPartKind::from_content_type(content_type.as_deref()?)?;
+        Some((name, kind))
+    }
+
+    fn main_part_type(&self, types: &ContentTypes) -> Option<(PartName, Option<String>)> {
+        let rels = Relationships::parse(self.part(rels_part_name(None).as_str())?.data()).ok()?;
+        rels.iter()
+            .filter(|r| r.target_mode == TargetMode::Internal)
+            .filter(|r| OFFICE_DOCUMENT_RELS.contains(&r.rel_type.as_str()))
+            .filter_map(|r| resolve_target(None, &r.target).ok())
+            .find(|t| self.part(t.as_str()).is_some())
+            .map(|t| {
+                let ct = types.content_type_of(&t).map(str::to_owned);
+                (t, ct)
+            })
+    }
+
     /// Inspects the package without modifying it. External relationship targets are
     /// never fetched or resolved.
     pub fn check_integrity(&self) -> Vec<IntegrityIssue> {
@@ -138,6 +176,24 @@ impl Package {
             },
         };
 
+        if let Some(types) = &content_types {
+            for (part, _) in types.overrides() {
+                if self.part(part).is_none() {
+                    issues.push(IntegrityIssue::DanglingOverride {
+                        part: part.to_owned(),
+                    });
+                }
+            }
+            if let Some((part, content_type)) = self.main_part_type(types)
+                && content_type
+                    .as_deref()
+                    .and_then(MainPartKind::from_content_type)
+                    .is_none()
+            {
+                issues.push(IntegrityIssue::UnrecognisedMainPart { part, content_type });
+            }
+        }
+
         for part in self.parts() {
             let name = part.name();
             if let Some(types) = &content_types
@@ -147,7 +203,10 @@ impl Package {
                 issues.push(IntegrityIssue::MissingContentType { part: name.clone() });
             }
 
-            if !name.as_str().to_ascii_lowercase().ends_with(".rels") {
+            let is_rels = name.as_str().len() >= 5
+                && name.as_str().as_bytes()[name.as_str().len() - 5..]
+                    .eq_ignore_ascii_case(b".rels");
+            if !is_rels {
                 continue;
             }
             let Some(source) = rels_source(name) else {
@@ -308,5 +367,72 @@ mod tests {
                 .check_integrity()
                 .contains(&IntegrityIssue::MissingContentTypes)
         );
+    }
+
+    fn office_package(kind: MainPartKind, vba: bool) -> Package {
+        let dir = if kind.is_word() { "word" } else { "xl" };
+        let main = if kind.is_word() {
+            "document.xml"
+        } else {
+            "workbook.xml"
+        };
+        let mut types = format!(
+            r#"<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="bin" ContentType="{}"/><Override PartName="/{dir}/{main}" ContentType="{}"/><Override PartName="/{dir}/vbaData.xml" ContentType="{}"/></Types>"#,
+            crate::VBA_PROJECT_CONTENT_TYPE,
+            kind.content_type(),
+            crate::VBA_DATA_CONTENT_TYPE,
+        );
+        if !vba {
+            types = types.replace(crate::VBA_DATA_CONTENT_TYPE, "application/xml");
+        }
+        let mut package = Package::default();
+        package.set_part(name("[Content_Types].xml"), types.into_bytes());
+        package.set_part(
+            name("_rels/.rels"),
+            format!(
+                r#"<Relationships><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="{dir}/{main}"/></Relationships>"#
+            )
+            .into_bytes(),
+        );
+        package.set_part(name(&format!("{dir}/{main}")), b"<x/>".to_vec());
+        package.set_part(name(&format!("{dir}/vbaData.xml")), b"<v/>".to_vec());
+        package.set_part(name(&format!("{dir}/vbaProject.bin")), b"x".to_vec());
+        package
+    }
+
+    #[test]
+    fn every_main_part_kind_is_recognised_without_issues() {
+        for kind in MainPartKind::ALL {
+            for vba in [false, true] {
+                let package = office_package(kind, vba);
+                assert_eq!(package.check_integrity(), Vec::new(), "{kind:?}");
+                assert_eq!(package.main_part_kind().map(|(_, k)| k), Some(kind));
+            }
+        }
+    }
+
+    #[test]
+    fn unknown_main_type_and_dangling_override_are_reported() {
+        let mut package = office_package(MainPartKind::Docx, true);
+        package.remove_part("word/vbaData.xml");
+        assert_eq!(
+            package.check_integrity(),
+            vec![IntegrityIssue::DanglingOverride {
+                part: "word/vbadata.xml".to_owned()
+            }]
+        );
+        package.remove_part_and_override("word/vbaData.xml");
+        assert_eq!(package.check_integrity(), Vec::new());
+
+        let types = package.part("[Content_Types].xml").unwrap().data().to_vec();
+        let types = String::from_utf8(types)
+            .unwrap()
+            .replace(MainPartKind::Docx.content_type(), "application/xml");
+        package.set_part(name("[Content_Types].xml"), types.into_bytes());
+        assert!(matches!(
+            package.check_integrity().as_slice(),
+            [IntegrityIssue::UnrecognisedMainPart { .. }]
+        ));
+        assert_eq!(package.main_part_kind(), None);
     }
 }

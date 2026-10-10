@@ -6,11 +6,15 @@
 //! [`Limits`] against zip bombs and path tricks (threat model T1).
 
 mod content_types;
+mod main_part;
 mod name;
 mod package;
 mod rels;
 
 pub use content_types::{ContentTypes, IntegrityIssue};
+pub use main_part::{
+    MainPartKind, VBA_DATA_CONTENT_TYPE, VBA_PROJECT_CONTENT_TYPE, is_vba_content_type,
+};
 pub use name::PartName;
 pub use package::{Compression, Limits, Package, Part};
 pub use rels::{Relationship, Relationships, TargetMode, rels_part_name, resolve_target};
