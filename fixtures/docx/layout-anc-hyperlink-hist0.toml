@@ -1,0 +1,5 @@
+feature = "layout-anc"
+made_with = "Microsoft Word 16.0.20430 (Windows), document.xml edited"
+author = "project member"
+expect_dropped = []
+notes = "layout-anc-hyperlink with w:history="0": whether the field code length changes"

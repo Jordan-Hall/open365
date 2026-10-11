@@ -1,0 +1,5 @@
+feature = "layout-frame"
+made_with = "Microsoft Word 16.0.20430 (Windows)"
+author = "project member"
+expect_dropped = []
+notes = "a 2 x 2 floating table of two 100 pt columns, left at the column and 0 pt below the top of paragraph 3, 9 pt text distance on the sides: how the text of paragraphs 3 to 9 wraps beside it"

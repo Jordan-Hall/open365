@@ -1,0 +1,5 @@
+feature = "layout-trh"
+made_with = "Microsoft Word 16.0.20430 (Windows)"
+author = "project member"
+expect_dropped = []
+notes = "five next-page sections with 46 to 50 single-line paragraphs each, the break in an empty paragraph of its own: where the section break paragraph lands when it does not fit the page"

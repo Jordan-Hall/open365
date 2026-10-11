@@ -60,6 +60,7 @@ pub enum Toggle {
     Bold,
     Italic,
     Underline,
+    Strike,
 }
 
 impl Toggle {
@@ -68,6 +69,7 @@ impl Toggle {
             Self::Bold => style.bold,
             Self::Italic => style.italic,
             Self::Underline => style.underline,
+            Self::Strike => style.strike,
         }
     }
 
@@ -80,6 +82,10 @@ impl Toggle {
             },
             Self::Underline => RunPropsPatch {
                 underline: Some(on),
+                ..RunPropsPatch::default()
+            },
+            Self::Strike => RunPropsPatch {
+                strike: Some(on),
                 ..RunPropsPatch::default()
             },
         }
@@ -185,6 +191,11 @@ struct LineGeom {
 /// State of the document view.
 #[derive(Debug)]
 pub struct DocView {
+    /// Page colour, automatic text colour and optional page outline (Word dark mode draws a dark
+    /// page with an outline instead of the shadow). See [`DocView::set_page_colors`].
+    page_fill: Color32,
+    auto_text: Color32,
+    page_border: Option<Color32>,
     models: Vec<ParaModel>,
     model_revision: Option<u64>,
     fonts: FontSet,
@@ -248,6 +259,9 @@ impl Default for DocView {
 impl DocView {
     pub fn new() -> Self {
         Self {
+            page_fill: Color32::WHITE,
+            auto_text: Color32::BLACK,
+            page_border: None,
             models: Vec::new(),
             model_revision: None,
             fonts: FontSet::bundled(),
@@ -285,6 +299,14 @@ impl DocView {
     }
 
     /// Gives the document keyboard focus on the next frame (after a toolbar action).
+    /// Sets the page fill, the colour of text with the automatic colour (and the caret) and the page
+    /// outline. Defaults: white page, black text, shadow.
+    pub fn set_page_colors(&mut self, fill: Color32, auto_text: Color32, border: Option<Color32>) {
+        self.page_fill = fill;
+        self.auto_text = auto_text;
+        self.page_border = border;
+    }
+
     pub fn focus(&mut self) {
         self.want_focus = true;
     }
@@ -1180,12 +1202,14 @@ impl DocView {
                 Toggle::Bold => self.pending.bold.unwrap_or(current.bold),
                 Toggle::Italic => self.pending.italic.unwrap_or(current.italic),
                 Toggle::Underline => self.pending.underline.unwrap_or(current.underline),
+                Toggle::Strike => self.pending.strike.unwrap_or(current.strike),
             };
             let flipped = which.patch(!on);
             match which {
                 Toggle::Bold => self.pending.bold = flipped.bold,
                 Toggle::Italic => self.pending.italic = flipped.italic,
                 Toggle::Underline => self.pending.underline = flipped.underline,
+                Toggle::Strike => self.pending.strike = flipped.strike,
             }
             return;
         }
@@ -1200,6 +1224,36 @@ impl DocView {
             start: a,
             end: b,
             patch: which.patch(!all),
+        };
+        if self.run(target, command).is_some() {
+            for p in a.para..=b.para {
+                self.refresh_para(target, p);
+            }
+        }
+    }
+
+    /// Applies character formatting (font name, size, colour...) over the selection, or to the
+    /// text typed next when there is none.
+    pub fn set_run_props(&mut self, target: &mut Target, patch: RunPropsPatch) {
+        if self.models.is_empty() || patch.is_empty() {
+            return;
+        }
+        if !self.has_selection() {
+            let p = &mut self.pending;
+            p.bold = patch.bold.or(p.bold);
+            p.italic = patch.italic.or(p.italic);
+            p.underline = patch.underline.or(p.underline);
+            p.strike = patch.strike.or(p.strike);
+            p.size_half_points = patch.size_half_points.or(p.size_half_points);
+            p.color = patch.color.or_else(|| p.color.take());
+            p.font = patch.font.or_else(|| p.font.take());
+            return;
+        }
+        let (a, b) = self.range();
+        let command = Command::DocxSetRunProps {
+            start: a,
+            end: b,
+            patch,
         };
         if self.run(target, command).is_some() {
             for p in a.para..=b.para {
@@ -1242,6 +1296,18 @@ impl DocView {
         }
         if let Some(v) = self.pending.underline {
             style.underline = v;
+        }
+        if let Some(v) = self.pending.strike {
+            style.strike = v;
+        }
+        if let Some(v) = self.pending.size_half_points {
+            style.size_half_points = v;
+        }
+        if let Some(v) = &self.pending.font {
+            style.font = std::sync::Arc::from(v.as_str());
+        }
+        if let Some(v) = &self.pending.color {
+            style.color = parse_hex_color(v);
         }
         style
     }
@@ -1552,7 +1618,7 @@ impl DocView {
                 if self.engine.layout().pages.is_empty() {
                     let origin = self.page_origin(canvas, 0);
                     let size = vec2(612.0, 792.0) * scale;
-                    painter.rect_filled(Rect::from_min_size(origin, size), 0.0, Color32::WHITE);
+                    painter.rect_filled(Rect::from_min_size(origin, size), 0.0, self.page_fill);
                 } else {
                     let fill = ui.visuals().selection.bg_fill;
                     for page in first..=last.max(first) {
@@ -1566,7 +1632,7 @@ impl DocView {
                 // Caret.
                 let caret_rect = self.caret_rect(canvas);
                 if focused && !self.has_selection() {
-                    painter.rect_filled(caret_rect, 0.0, Color32::BLACK);
+                    painter.rect_filled(caret_rect, 0.0, self.auto_text);
                 }
                 self.last_paint_ms = paint_started.elapsed().as_secs_f32() * 1000.0;
                 if self.scroll_to_caret {
@@ -1752,7 +1818,7 @@ impl DocView {
                     let px = run.size as f32 * s * ppp;
                     let color = run
                         .color
-                        .map_or(Color32::BLACK, |[r, g, b]| Color32::from_rgb(r, g, b))
+                        .map_or(self.auto_text, |[r, g, b]| Color32::from_rgb(r, g, b))
                         .gamma_multiply(dim);
                     for g in &run.glyphs {
                         let at =
@@ -1894,12 +1960,25 @@ impl DocView {
         let section = self.engine.layout().pages[page].section;
         let size = vec2(section.page_width as f32, section.page_height as f32) * s;
         let rect = Rect::from_min_size(origin, size);
-        painter.rect_filled(
-            rect.translate(vec2(2.0, 3.0)),
-            0.0,
-            Color32::from_black_alpha(40),
-        );
-        painter.rect_filled(rect, 0.0, Color32::WHITE);
+        match self.page_border {
+            Some(border) => {
+                painter.rect_filled(rect, 0.0, self.page_fill);
+                painter.rect_stroke(
+                    rect,
+                    0.0,
+                    Stroke::new(1.0, border),
+                    egui::StrokeKind::Outside,
+                );
+            }
+            None => {
+                painter.rect_filled(
+                    rect.translate(vec2(2.0, 3.0)),
+                    0.0,
+                    Color32::from_black_alpha(40),
+                );
+                painter.rect_filled(rect, 0.0, self.page_fill);
+            }
+        }
         if !rect.intersects(clip) {
             return;
         }
@@ -1987,7 +2066,7 @@ impl DocView {
                 let px = run.size as f32 * s * ppp;
                 let color = run
                     .color
-                    .map_or(Color32::BLACK, |[r, g, b]| Color32::from_rgb(r, g, b));
+                    .map_or(self.auto_text, |[r, g, b]| Color32::from_rgb(r, g, b));
                 let move_x = |g: &PlacedGlyph| match dx {
                     Some((x, w)) if g.x >= x - 1e-6 => g.x + w,
                     _ => g.x,
@@ -2017,7 +2096,7 @@ impl DocView {
             }
             // The IME preedit text, underlined, in the gap that was made for it.
             if let (Some((glyphs, width, size)), Some((x, _))) = (&composing, dx) {
-                let color = Color32::BLACK;
+                let color = self.auto_text;
                 let px = *size as f32 * s * ppp;
                 for (glyph, face, off) in glyphs {
                     let at = Pos2::new(origin.x + (x + off) as f32 * s, base_y);
@@ -2422,4 +2501,13 @@ fn decode_picture(bytes: &[u8], max_side: u32) -> Option<egui::ColorImage> {
         size,
         rgba.as_raw(),
     ))
+}
+
+/// `RRGGBB` (or `auto`) to a colour; `None` for automatic or malformed input.
+fn parse_hex_color(v: &str) -> Option<[u8; 3]> {
+    if v.len() != 6 {
+        return None;
+    }
+    let n = u32::from_str_radix(v, 16).ok()?;
+    Some([(n >> 16) as u8, (n >> 8) as u8, n as u8])
 }

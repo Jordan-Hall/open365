@@ -518,6 +518,19 @@ pub(crate) fn layout_table(b: &mut Builder<'_>, table: &Table, avail: f64) -> Ta
                 border_right,
             });
         }
+        // Measured (corpus): the vertical padding is the row's. Every cell takes the largest top
+        // and bottom padding any cell of the row states, for its content position and its clip.
+        let (top_pad, bottom_pad) = cells
+            .iter()
+            .fold((0.0f64, 0.0f64), |(t, bm), c: &CellLayout| {
+                (t.max(c.pad.top), bm.max(c.pad.bottom))
+            });
+        for c in &mut cells {
+            c.pad.top = top_pad;
+            c.pad.bottom = bottom_pad;
+            c.meta.pad_top = top_pad;
+            c.meta.pad_bottom = bottom_pad;
+        }
         // The row end mark is one more character of the story.
         b.story += 1;
         rows.push(RowLayout {
@@ -547,6 +560,9 @@ pub(crate) fn layout_table(b: &mut Builder<'_>, table: &Table, avail: f64) -> Ta
                 hlines[r] = hlines[r].max(cell.border_top);
                 let end = (r + cv.row_span).min(nrows);
                 hlines[end] = hlines[end].max(cell.border_bottom);
+                if cv.row_span > 1 {
+                    hlines[r + 1] = hlines[r + 1].max(cell.border_bottom);
+                }
             }
         }
     }
@@ -580,8 +596,21 @@ pub(crate) fn layout_table(b: &mut Builder<'_>, table: &Table, avail: f64) -> Ta
             .map(need)
             .fold(0.0, f64::max);
         let content = match view.rows[r].props.height {
-            Some((h, HeightRule::Exact)) => h,
-            Some((h, HeightRule::AtLeast)) => natural.max(h),
+            // Measured (layout-trh-pad, layout-trh-asym, layout-trh-small): an exact row is its
+            // height plus the bottom padding; Word's clip rectangle runs from the top padding to
+            // the exact height, and is absent when the height does not exceed the top padding.
+            Some((h, HeightRule::Exact)) => row
+                .cells
+                .iter()
+                .filter(|c| c.row_span == 1)
+                .map(|c| h + c.pad.bottom)
+                .fold(h, f64::max),
+            Some((h, HeightRule::AtLeast)) => row
+                .cells
+                .iter()
+                .filter(|c| c.row_span == 1)
+                .map(|c| c.pad.top + c.content_h.max(h) + c.pad.bottom)
+                .fold(natural.max(h), f64::max),
             _ => natural,
         };
         row.height = row.above + content + row.below;

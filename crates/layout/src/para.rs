@@ -1,6 +1,7 @@
 //! Paragraph layout: text and runs to shaped atoms to lines (independent of the page).
 
 use std::collections::HashMap;
+use std::fmt::Write as _;
 use std::ops::Range;
 use std::sync::Arc;
 
@@ -395,6 +396,9 @@ pub(crate) struct ParaLayout {
     pub role: ParaRole,
     /// The paragraph's borders, `None` without any.
     pub border: Option<Arc<crate::rules::BorderSpec>>,
+    /// The paragraph holds nothing but a section break: it takes no height and no spacing, and
+    /// the spacing around it passes straight through.
+    pub section_mark: bool,
 }
 
 /// Length of the footnote and endnote separator rule in points (measured: the paragraph mark
@@ -468,6 +472,8 @@ pub(crate) struct Context<'a> {
     pub order: Option<&'a NoteOrder>,
     /// (is endnote, ordinal) of the note being laid out: what its `w:footnoteRef` shows.
     pub own_mark: Option<(bool, usize)>,
+    /// External hyperlink targets of the main part by relationship id.
+    pub links: Option<&'a HashMap<String, String>>,
 }
 
 fn fallback_run(er: Option<EffectiveRun>) -> EffectiveRun {
@@ -756,6 +762,32 @@ impl Collector<'_, '_> {
         self.push(text, style);
     }
 
+    /// The instruction Word builds for a `w:hyperlink`: ` HYPERLINK "url" \l "anchor" <TAB> "frame"
+    /// \o "tip"` (only the length is observable).
+    fn hyperlink_code(&self, head: &open365_docx::ElementHead) -> String {
+        let mut code = String::from(" HYPERLINK");
+        let target = head
+            .attrs
+            .iter()
+            .find(|a| a.local_name() == "id" && a.name.contains(':') && !a.name.starts_with("w:"))
+            .and_then(|a| self.ctx.links?.get(&a.value));
+        if let Some(url) = target {
+            let _ = write!(code, " \"{url}\"");
+        }
+        if !head
+            .attr_w("history")
+            .is_some_and(|v| matches!(v, "1" | "true" | "on"))
+        {
+            code.push_str(" \\h");
+        }
+        for (attr, switch) in [("anchor", 'l'), ("tgtFrame", 't'), ("tooltip", 'o')] {
+            if let Some(v) = head.attr_w(attr) {
+                let _ = write!(code, " \\{switch} \"{v}\"");
+            }
+        }
+        code
+    }
+
     fn inlines(&mut self, content: &[Inline]) {
         for inline in content {
             match inline {
@@ -777,6 +809,13 @@ impl Collector<'_, '_> {
                         let style = self.styles.len().saturating_sub(1);
                         self.push(&rep, style);
                     }
+                    self.hide(1);
+                }
+                Inline::Group(g) if g.head.is_w("hyperlink") => {
+                    // Word reads a hyperlink as a field: begin, code, separator, result, end
+                    // (`layout-anc-hyperlink`).
+                    self.hide(1 + utf16_len(&self.hyperlink_code(&g.head)) + 1);
+                    self.inlines(&g.content);
                     self.hide(1);
                 }
                 Inline::Group(g) if g.head.is_w("sdt") => {
@@ -1086,7 +1125,7 @@ pub(crate) fn layout_paragraph(
             x,
         });
     }
-    let lines = LineBuilder {
+    let mut lines = LineBuilder {
         atoms: &atoms,
         props: &props,
         flow: &flow,
@@ -1094,6 +1133,28 @@ pub(crate) fn layout_paragraph(
         fd: &fd,
     }
     .build();
+    // Measured (layout-sect-empty, layout-sect-space, layout-sect-tail): a paragraph that holds
+    // nothing but a section break (continuous, next, even or odd page) takes no height and none of
+    // its spacing, and never moves to another page; Word's line of the paragraph before it ends
+    // after the break character.
+    let section_mark = atoms.len() == 1
+        && objects.is_empty()
+        && label_layout.is_none()
+        && para.props.as_ref().is_some_and(|p| {
+            p.children
+                .iter()
+                .filter_map(RawXml::as_element)
+                .any(|e| e.head.is_w("sectPr"))
+        });
+    if section_mark {
+        for l in &mut lines {
+            l.height = 0.0;
+            l.lead = 0.0;
+            l.baseline_off = 0.0;
+        }
+        props.space_before_pt = 0.0;
+        props.space_after_pt = 0.0;
+    }
     let role = if label_layout.is_some() {
         ParaRole::ListItem
     } else {
@@ -1119,6 +1180,7 @@ pub(crate) fn layout_paragraph(
         text: Arc::from(text.as_str()),
         role,
         border,
+        section_mark,
     }
 }
 

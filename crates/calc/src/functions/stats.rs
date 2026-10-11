@@ -261,7 +261,7 @@ pub(super) fn var_p(ctx: &EvalContext<'_>, args: &[Arg]) -> Res<Value> {
 
 /// Values seen by `AVERAGEA`, `MAXA` and `MINA`: text in a reference counts as 0 and booleans as 1/0;
 /// blanks are skipped. Direct arguments are coerced.
-fn a_values(ctx: &EvalContext<'_>, args: &[Arg], text_as_zero: bool) -> Res<Vec<f64>> {
+pub(super) fn a_values(ctx: &EvalContext<'_>, args: &[Arg], text_as_zero: bool) -> Res<Vec<f64>> {
     arity(args, 1, usize::MAX)?;
     let mut out = Vec::new();
     for arg in args {

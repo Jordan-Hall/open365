@@ -80,7 +80,11 @@ fn run(name: &str, mode: OrderMode) -> (usize, usize, usize, usize) {
             pok += 1;
         } else if std::env::var_os("PIVOT_VERBOSE").is_some() {
             println!("{name}/{sheet} {} ({} diffs)", p["case"], bad.len());
-            for b in bad.iter().take(6) {
+            let cap: usize = std::env::var("PIVOT_VERBOSE")
+                .ok()
+                .and_then(|v| v.parse().ok())
+                .unwrap_or(6);
+            for b in bad.iter().take(cap) {
                 println!("    {b}");
             }
         }
@@ -99,12 +103,16 @@ fn stored_cache_reproduces_excel_output() {
 
 /// Pivots (per fixture workbook) that match Excel cell for cell. `showas` and `grouping` are
 /// not computed yet and are absent on purpose. Raise a floor when the engine improves.
-const FLOORS: [(&str, usize); 5] = [
-    ("layouts", 27),
+const FLOORS: [(&str, usize); 9] = [
+    ("grouping", 17),
+    ("holdout-showas", 39),
+    ("showas", 21),
+    ("values", 48),
+    ("layouts", 30),
     ("aggregates", 26),
-    ("subtotals", 27),
+    ("subtotals", 28),
     ("holdout-a", 14),
-    ("holdout-b", 11),
+    ("holdout-b", 14),
 ];
 
 #[test]
@@ -122,6 +130,8 @@ fn refreshed_source_reproduces_excel_output() {
 fn untouched_parts_round_trip_byte_identical() {
     use open365_pivot::{CacheDefinition, CacheRecords, PivotTable};
     for name in [
+        "values",
+        "holdout-showas",
         "layouts",
         "aggregates",
         "subtotals",

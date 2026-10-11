@@ -38,30 +38,57 @@ values with `Workbook::set_cell_value`. `open365-xlsx` has no cell-style setter,
 formats are returned in `GridCell::num_fmt_id` but not applied, and the `location/@ref` of the
 pivot part is not rewritten when the output size changes.
 
+## Values field, Show Values As, grouping
+
+* **Values field** (`x="-2"` in `rowFields`/`colFields`) is a level of the axis whose items are the
+  data fields, so `dataOnRows`, several data fields and the Σ Values position (first, between,
+  last; rows or columns) share one axis builder. A field directly above Values has no subtotal
+  lines; a field with Values below it gets one subtotal line per data field (`East Sum of
+  Revenue`); grand totals become `Total <data field>` lines. With only Values on the rows there is
+  no grand total line.
+* **Show Values As** (`showas.rs`): `showDataAs` and the x14 `pivotShowAs` extension (percent of
+  parent, rank). Every line carries its item constraints; a cell's denominator or base cell is
+  re-aggregated from the records under adjusted constraints. Measured rules: an empty numerator
+  counts as 0; `% of total/row/column` over an empty denominator is `#DIV/0!`, `% of parent` is
+  blank; `% of` and `% difference` give `#NULL!` for an empty cell and blank for a value over an
+  empty base; `previous`/`next` skip items that have no line; the named base item shows blank for
+  difference and 100% for `% of`.
+* **Grouping** (`grouping.rs`): a grouped field (derived `databaseField="0"` date fields or a
+  numeric field with `rangePr`) reads the stored `groupItems` as its items; each source value is
+  bucketed (below start/blank, in range, above end) for months, quarters, years, days by N,
+  hours, minutes, seconds and numeric ranges. Group items are not regenerated on refresh: the
+  stored start/end and labels are used.
+
 ## Evidence (oracle, en-GB)
 
-`cargo test -p open365-pivot` compares every non-empty cell of 112 pivots (value; number
+`cargo test -p open365-pivot` compares every non-empty cell of the pivots below (value; number
 format and display text are in the reference JSON but not compared yet). Floors are in
 `tests/oracle.rs`.
 
 | set | role | pivots matching |
 | --- | --- | --- |
-| layouts | in-sample | 27/30 |
+| layouts | in-sample | 30/30 |
 | aggregates | in-sample | 26/26 |
-| subtotals | in-sample | 27/28 |
+| subtotals | in-sample | 28/28 |
+| values (Σ Values positions) | in-sample | 48/48 |
+| showas | in-sample | 21/21 |
+| grouping (one cache per pivot) | in-sample | 17/17 |
 | holdout-a | hold-out, random layouts | 14/14 |
-| holdout-b | hold-out, random layouts | 11/14 |
+| holdout-b | hold-out, random layouts | 14/14 |
+| holdout-showas | hold-out, random Show Values As | 39/40 |
 
-`showas` (21 pivots) and `grouping` (10) fixtures exist but are not computed yet.
+The open hold-out case is `rankDescending` with the base field outermost over three row
+levels (the leaf ranks are not among the sibling items; the comparison set Excel uses is not
+identified).
 
 ## Not done
 
-* Data fields on rows (`dataOnRows` with several data fields).
-* Show Values As (percent of total/row/column/parent, difference, running total, index, rank).
-* Date and number grouping (`fieldGroup`), including the derived group cache fields.
-* Outline/tabular rows with several data fields and subtotal columns; outline row labels with
-  several data fields shift the column labels by one (holdout-b P5/P6).
-* Label and value filters, top-N, calculated fields/items, OLAP and data-model caches,
-  `missingCaption`/`errorCaption`, `showAll` empty items, `dataField` number format fallback.
-* Text and number-format comparison against the reference `nf` and `t` fields.
-* Writing a refreshed cache (`pivotCacheRecords`) back, location resize, cell styles.
+* Group items are not regenerated on refresh (auto start/end, changed bounds); manual
+  (discrete) groups and date parts with the 1904 date system are untested; the oracle has no
+  time-of-day source data yet (hours/minutes/seconds are implemented but not measured).
+* Writing: number formats and styles of refreshed cells, `location/@ref` rewrite and a refreshed
+  cache (needs a cell-style setter in `open365-xlsx`).
+* Calculated fields and items, GETPIVOTDATA (needs a hook in `open365-calc`).
+* Label and value filters, top-N, OLAP and data-model caches, `missingCaption`/`errorCaption`,
+  `showAll` empty items.
+* Rank with the base field outermost over three or more row levels (see above).

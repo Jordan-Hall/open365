@@ -8,9 +8,11 @@ use open365_opc::{PartName, Relationships, rels_part_name, resolve_target};
 use open365_xlsx::{Workbook, parse_cell_ref, parse_range};
 
 use crate::error::PivotError;
+use crate::grouping::grouped_column;
 use crate::model::{
     Axis, CacheDefinition, CacheRecords, CacheSource, Func, PivotTable, Record, VALUES_FIELD,
 };
+use crate::showas::{Calc, Cons, Mode};
 use crate::value::{ItemKey, Value, compare_values};
 
 /// Captions Excel does not store in the file; they follow the UI language of the
@@ -200,6 +202,8 @@ struct Line {
     recs: Vec<u32>,
     func: Option<Func>,
     data: Option<usize>,
+    /// Item constraints of the line (field, item position), outermost first.
+    cons: Cons,
     /// Whether data cells of this line carry values.
     values: bool,
     /// (column for row lines, header row for column lines, label)
@@ -268,22 +272,54 @@ struct Walk {
     prev: Vec<usize>,
 }
 
+/// One level of an axis: a pivot field or the Values field (the data fields as items).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Lvl {
+    Field(usize),
+    Values,
+}
+
+/// Shape of the axis being built.
+#[derive(Clone, Copy)]
+struct AxisShape {
+    is_row: bool,
+    tabular: bool,
+    compact: bool,
+}
+
+fn level_label(ctx: &Ctx, lvl: Lvl, pos: usize) -> Label {
+    match lvl {
+        Lvl::Field(f) => Label::Item(f, ctx.order[f][pos].clone()),
+        Lvl::Values => Label::Text(ctx.pt.data_fields[pos].name.clone()),
+    }
+}
+
+fn level_fill(ctx: &Ctx, lvl: Lvl) -> bool {
+    match lvl {
+        Lvl::Field(f) => ctx.pt.fields[f].fill_down,
+        Lvl::Values => false,
+    }
+}
+
 #[allow(clippy::too_many_arguments)]
 fn build_axis(
     ctx: &Ctx,
-    fields: &[usize],
+    levels: &[Lvl],
     level: usize,
     recs: &[u32],
     path: &mut Vec<usize>,
     out: &mut Vec<Line>,
     walk: &mut Walk,
-    is_row: bool,
-    tabular: bool,
-    compact: bool,
+    shape: AxisShape,
+    cur: Option<usize>,
 ) {
-    let field = fields[level];
-    let last = level + 1 == fields.len();
-    let n_items = ctx.order[field].len();
+    let AxisShape {
+        is_row,
+        tabular,
+        compact,
+    } = shape;
+    let last = level + 1 == levels.len();
+    let stacked = is_row && !tabular;
     // label slot: column for rows, header row for columns
     let slot = |lvl: usize| -> usize {
         if is_row {
@@ -292,6 +328,97 @@ fn build_axis(
             lvl + 1
         }
     };
+    // Labels of a leaf line: every level whose label changed since the previous line.
+    let leaf_labels = |path: &[usize], walk: &Walk| -> Vec<(usize, Label)> {
+        let mut labels = Vec::new();
+        let fill = (0..level).any(|l| level_fill(ctx, levels[l]));
+        if stacked && !fill {
+            labels.push((slot(level), level_label(ctx, levels[level], path[level])));
+        } else {
+            for l in 0..=level {
+                let changed = !stacked && (walk.prev.len() <= l || walk.prev[..=l] != path[..=l])
+                    || level_fill(ctx, levels[l])
+                    || (stacked && l == level)
+                    || (fill && l < level);
+                if changed {
+                    labels.push((slot(l), level_label(ctx, levels[l], path[l])));
+                }
+            }
+        }
+        labels
+    };
+    // Subtotal lines repeat the outer labels when "repeat all labels" is on (tabular and the like).
+    let sub_labels = |path: &[usize], text: String| -> Vec<(usize, Label)> {
+        let mut labels = Vec::new();
+        if !stacked {
+            for l in 0..level {
+                if level_fill(ctx, levels[l]) {
+                    labels.push((slot(l), level_label(ctx, levels[l], path[l])));
+                }
+            }
+        }
+        labels.push((slot(level), Label::Text(text)));
+        labels
+    };
+    let cons_at = |path: &[usize]| -> Cons {
+        path.iter()
+            .enumerate()
+            .filter_map(|(l, p)| match levels[l] {
+                Lvl::Field(f) => Some((f, *p)),
+                Lvl::Values => None,
+            })
+            .collect()
+    };
+    let field = match levels[level] {
+        Lvl::Values => {
+            for j in 0..ctx.pt.data_fields.len() {
+                path.push(j);
+                if last {
+                    let labels = leaf_labels(path, walk);
+                    walk.prev = path.clone();
+                    out.push(Line {
+                        kind: Kind::DataLeaf,
+                        recs: recs.to_vec(),
+                        func: None,
+                        data: Some(j),
+                        cons: cons_at(path),
+                        values: true,
+                        labels,
+                    });
+                } else {
+                    if stacked {
+                        out.push(Line {
+                            kind: Kind::Item,
+                            recs: recs.to_vec(),
+                            func: None,
+                            data: Some(j),
+                            cons: cons_at(path),
+                            values: false,
+                            labels: vec![(slot(level), level_label(ctx, Lvl::Values, j))],
+                        });
+                    }
+                    build_axis(
+                        ctx,
+                        levels,
+                        level + 1,
+                        recs,
+                        path,
+                        out,
+                        walk,
+                        shape,
+                        Some(j),
+                    );
+                }
+                path.pop();
+            }
+            return;
+        }
+        Lvl::Field(f) => f,
+    };
+    let n_items = ctx.order[field].len();
+    let values_below = cur.is_none() && levels[level + 1..].contains(&Lvl::Values);
+    // Only Values follows: the next level holds the data lines, so this field has no subtotals.
+    let leaf_parent = levels[level + 1..].iter().all(|l| *l == Lvl::Values);
     let pf = &ctx.pt.fields[field];
     let mut positions: Vec<usize> = (0..n_items).collect();
     if let Some(j) = pf.sort_by
@@ -335,73 +462,66 @@ fn build_axis(
             continue;
         }
         path.push(pos);
-        let item_label = Label::Item(field, ctx.order[field][pos].clone());
+        let item_label = level_label(ctx, levels[level], pos);
         let funcs = sub_funcs(ctx, field);
-        // Row lines in the stacked (compact/outline) forms carry the item on their own line.
-        let stacked = is_row && !tabular;
         if last {
-            let mut labels = Vec::new();
-            let fill = (0..level).any(|l| ctx.pt.fields[fields[l]].fill_down);
-            if stacked && !fill {
-                labels.push((slot(level), item_label));
-            } else {
-                for l in 0..=level {
-                    let changed = !stacked
-                        && (walk.prev.len() <= l || walk.prev[..=l] != path[..=l])
-                        || ctx.pt.fields[fields[l]].fill_down
-                        || (stacked && l == level)
-                        || (fill && l < level);
-                    if changed {
-                        let fl = fields[l];
-                        labels.push((slot(l), Label::Item(fl, ctx.order[fl][path[l]].clone())));
-                    }
-                }
-            }
+            let labels = leaf_labels(path, walk);
             walk.prev = path.clone();
             out.push(Line {
                 kind: Kind::Item,
                 recs: sub,
                 func: None,
-                data: None,
+                data: cur,
+                cons: cons_at(path),
                 values: true,
                 labels,
             });
         } else {
-            let top_auto =
-                stacked && pf.subtotal_top && pf.default_subtotal && pf.subtotals.is_empty();
+            let top_auto = stacked
+                && pf.subtotal_top
+                && pf.default_subtotal
+                && pf.subtotals.is_empty()
+                && !values_below;
             if stacked {
                 out.push(Line {
                     kind: Kind::Item,
                     recs: sub.clone(),
                     func: None,
-                    data: None,
+                    data: cur,
+                    cons: cons_at(path),
                     values: top_auto,
                     labels: vec![(slot(level), item_label)],
                 });
             }
-            build_axis(
-                ctx,
-                fields,
-                level + 1,
-                &sub,
-                path,
-                out,
-                walk,
-                is_row,
-                tabular,
-                compact,
-            );
+            build_axis(ctx, levels, level + 1, &sub, path, out, walk, shape, cur);
             let name = item_text(ctx, &ctx.order[field][pos]);
-            if !top_auto {
-                for f in &funcs {
-                    out.push(Line {
-                        kind: Kind::Subtotal,
-                        recs: sub.clone(),
-                        func: *f,
-                        data: None,
-                        values: true,
-                        labels: vec![(slot(level), Label::Text(total_label(ctx, &name, *f)))],
-                    });
+            if !top_auto && !leaf_parent {
+                if values_below {
+                    if !funcs.is_empty() {
+                        for (j, df) in ctx.pt.data_fields.iter().enumerate() {
+                            out.push(Line {
+                                kind: Kind::Subtotal,
+                                recs: sub.clone(),
+                                func: None,
+                                data: Some(j),
+                                cons: cons_at(path),
+                                values: true,
+                                labels: sub_labels(path, format!("{name} {}", df.name)),
+                            });
+                        }
+                    }
+                } else {
+                    for f in &funcs {
+                        out.push(Line {
+                            kind: Kind::Subtotal,
+                            recs: sub.clone(),
+                            func: *f,
+                            data: cur,
+                            cons: cons_at(path),
+                            values: true,
+                            labels: sub_labels(path, total_label(ctx, &name, *f)),
+                        });
+                    }
                 }
             }
             if is_row && pf.insert_blank_row {
@@ -410,6 +530,7 @@ fn build_axis(
                     recs: Vec::new(),
                     func: None,
                     data: None,
+                    cons: cons_at(path),
                     values: false,
                     labels: Vec::new(),
                 });
@@ -435,6 +556,27 @@ pub fn compute(
         .collator_with(CollationStrength::Secondary)
         .map_err(|_| PivotError::Unsupported("collation data"))?;
     let text_cmp = |a: &str, b: &str| collator.compare(a, b);
+    // Grouped axis fields read their group item instead of the source value.
+    let mut owned: Option<Dataset> = None;
+    for (fi, cf) in cache.fields.iter().enumerate() {
+        let on_axis = pt
+            .fields
+            .get(fi)
+            .is_some_and(|p| matches!(p.axis, Some(Axis::Row | Axis::Col | Axis::Page)));
+        let Some(g) = cf.group.as_ref().filter(|_| on_axis) else {
+            continue;
+        };
+        let base = if cf.database_field {
+            fi
+        } else {
+            g.base.map_or(fi, |b| b as usize)
+        };
+        let src = data.columns.get(base).map_or(&[][..], Vec::as_slice);
+        if let Some(col) = grouped_column(cf, src, false) {
+            owned.get_or_insert_with(|| data.clone()).columns[fi] = col;
+        }
+    }
+    let data: &Dataset = owned.as_ref().unwrap_or(data);
     let nf = pt.fields.len();
     // Item order per pivot field.
     let mut order: Vec<Vec<Value>> = vec![Vec::new(); nf];
@@ -446,7 +588,12 @@ pub fn compute(
             .items
             .iter()
             .filter_map(|i| i.x)
-            .map(|x| cf.shared.get(x as usize).cloned().unwrap_or(Value::Blank))
+            .map(|x| {
+                cf.item_values()
+                    .get(x as usize)
+                    .cloned()
+                    .unwrap_or(Value::Blank)
+            })
             .collect();
         let on_axis = matches!(pf.axis, Some(Axis::Row | Axis::Col | Axis::Page));
         if !on_axis {
@@ -454,6 +601,14 @@ pub fn compute(
         }
         if mode == OrderMode::Stored && !stored.is_empty() {
             order[fi] = stored;
+            continue;
+        }
+        if cf.group.as_ref().is_some_and(|g| !g.items.is_empty()) {
+            let mut items = cf.item_values().to_vec();
+            if pf.sort_type == "descending" {
+                items.reverse();
+            }
+            order[fi] = items;
             continue;
         }
         let mut seen: HashMap<ItemKey, ()> = HashMap::new();
@@ -532,7 +687,12 @@ pub fn compute(
                 .items
                 .get(sel as usize)
                 .and_then(|i| i.x)
-                .and_then(|x| cache.fields.get(fi).and_then(|c| c.shared.get(x as usize)))
+                .and_then(|x| {
+                    cache
+                        .fields
+                        .get(fi)
+                        .and_then(|c| c.item_values().get(x as usize))
+                })
                 .map(ItemKey::of);
             if let Some(want) = want {
                 let col = data.columns.get(fi).map_or(&[][..], Vec::as_slice);
@@ -553,44 +713,81 @@ pub fn compute(
         rpos,
     };
 
-    let row_fields: Vec<usize> = pt
-        .row_fields
-        .iter()
-        .filter(|f| **f != VALUES_FIELD)
-        .map(|f| *f as usize)
-        .collect();
-    let col_fields: Vec<usize> = pt
-        .col_fields
-        .iter()
-        .filter(|f| **f != VALUES_FIELD)
-        .map(|f| *f as usize)
-        .collect();
-    if pt.data_on_rows && pt.data_fields.len() > 1 {
-        return Err(PivotError::Unsupported("data fields on rows"));
-    }
+    let to_levels = |list: &[u32]| -> Vec<Lvl> {
+        list.iter()
+            .map(|f| {
+                if *f == VALUES_FIELD {
+                    Lvl::Values
+                } else {
+                    Lvl::Field(*f as usize)
+                }
+            })
+            .collect()
+    };
+    let mut row_levels = to_levels(&pt.row_fields);
+    let mut col_levels = to_levels(&pt.col_fields);
     let nd = pt.data_fields.len();
+    if nd <= 1 {
+        row_levels.retain(|l| *l != Lvl::Values);
+        col_levels.retain(|l| *l != Lvl::Values);
+    } else if !row_levels.contains(&Lvl::Values) && !col_levels.contains(&Lvl::Values) {
+        if pt.data_on_rows {
+            row_levels.push(Lvl::Values);
+        } else {
+            col_levels.push(Lvl::Values);
+        }
+    }
+    let values_on_rows = row_levels.contains(&Lvl::Values);
+    let values_on_cols = col_levels.contains(&Lvl::Values);
+    let col_has_fields = col_levels.iter().any(|l| matches!(l, Lvl::Field(_)));
     let tabular = !pt.compact && !pt.outline;
     let compact = pt.compact;
-    let nlabel = if row_fields.is_empty() {
-        usize::from(!col_fields.is_empty() && pt.data_fields.len() == 1)
+    let nlabel = if row_levels.is_empty() {
+        usize::from(col_has_fields && nd == 1)
     } else if compact {
         1
     } else {
-        row_fields.len()
+        row_levels.len()
     };
     let gt = pt
         .grand_total_caption
         .clone()
         .unwrap_or_else(|| strings.grand_total.clone());
+    let grand_lines = |slot: usize, with_values: bool| -> Vec<Line> {
+        let mk = |data: Option<usize>, text: String| Line {
+            kind: Kind::Grand,
+            recs: alive_recs.clone(),
+            func: None,
+            data,
+            cons: Vec::new(),
+            values: true,
+            labels: vec![(slot, Label::Text(text))],
+        };
+        if with_values {
+            pt.data_fields
+                .iter()
+                .enumerate()
+                .map(|(j, df)| {
+                    mk(
+                        Some(j),
+                        format!("{} {}", strings.grand_total_prefix, df.name),
+                    )
+                })
+                .collect()
+        } else {
+            vec![mk(None, gt.clone())]
+        }
+    };
 
     // Row lines.
     let mut rows: Vec<Line> = Vec::new();
-    if row_fields.is_empty() {
+    if row_levels.is_empty() {
         rows.push(Line {
             kind: Kind::Grand,
             recs: alive_recs.clone(),
             func: None,
             data: None,
+            cons: Vec::new(),
             values: true,
             labels: if nlabel == 1 {
                 vec![(0, Label::Text(pt.data_fields[0].name.clone()))]
@@ -601,102 +798,75 @@ pub fn compute(
     } else {
         build_axis(
             &ctx,
-            &row_fields,
+            &row_levels,
             0,
             &alive_recs,
             &mut Vec::new(),
             &mut rows,
             &mut Walk::default(),
-            true,
-            tabular,
-            compact,
+            AxisShape {
+                is_row: true,
+                tabular,
+                compact,
+            },
+            None,
         );
-        if pt.row_grand_totals {
-            rows.push(Line {
-                kind: Kind::Grand,
-                recs: alive_recs.clone(),
-                func: None,
-                data: None,
-                values: true,
-                labels: vec![(0, Label::Text(gt.clone()))],
-            });
+        if pt.row_grand_totals && row_levels.iter().any(|l| matches!(l, Lvl::Field(_))) {
+            rows.extend(grand_lines(0, values_on_rows));
         }
     }
 
     // Column lines.
     let mut cols: Vec<Line> = Vec::new();
-    let nc = col_fields.len();
-    if nc == 0 {
-        for (j, df) in pt.data_fields.iter().enumerate() {
+    if !col_has_fields {
+        if values_on_rows {
             cols.push(Line {
                 kind: Kind::DataLeaf,
                 recs: alive_recs.clone(),
                 func: None,
-                data: Some(j),
+                data: None,
+                cons: Vec::new(),
                 values: true,
-                labels: vec![(0, Label::Text(df.name.clone()))],
+                labels: Vec::new(),
             });
+        } else {
+            for (j, df) in pt.data_fields.iter().enumerate() {
+                cols.push(Line {
+                    kind: Kind::DataLeaf,
+                    recs: alive_recs.clone(),
+                    func: None,
+                    data: Some(j),
+                    cons: Vec::new(),
+                    values: true,
+                    labels: vec![(0, Label::Text(df.name.clone()))],
+                });
+            }
         }
     } else {
-        let mut base: Vec<Line> = Vec::new();
         build_axis(
             &ctx,
-            &col_fields,
+            &col_levels,
             0,
             &alive_recs,
             &mut Vec::new(),
-            &mut base,
+            &mut cols,
             &mut Walk::default(),
-            false,
-            true,
-            false,
+            AxisShape {
+                is_row: false,
+                tabular: true,
+                compact: false,
+            },
+            None,
         );
         if pt.col_grand_totals {
-            base.push(Line {
-                kind: Kind::Grand,
-                recs: alive_recs.clone(),
-                func: None,
-                data: None,
-                values: true,
-                labels: vec![(1, Label::Text(gt.clone()))],
-            });
-        }
-        if nd > 1 {
-            for line in base {
-                for (j, df) in pt.data_fields.iter().enumerate() {
-                    let mut l = line.clone();
-                    if line.kind == Kind::Grand {
-                        l.labels = vec![(
-                            1,
-                            Label::Text(format!("{} {}", strings.grand_total_prefix, df.name)),
-                        )];
-                    } else if line.kind == Kind::Subtotal {
-                        let suffix = strings.total_of.replace("{0}", "");
-                        for (_, lb) in &mut l.labels {
-                            if let Label::Text(t) = lb {
-                                let item = t.strip_suffix(suffix.as_str()).unwrap_or(t.as_str());
-                                *t = format!("{item} {}", df.name);
-                            }
-                        }
-                    } else if j > 0 {
-                        l.labels.clear();
-                    }
-                    if line.kind != Kind::Grand {
-                        l.labels.push((nc + 1, Label::Text(df.name.clone())));
-                    }
-                    l.data = Some(j);
-                    cols.push(l);
-                }
-            }
-        } else {
-            cols = base;
+            cols.extend(grand_lines(1, values_on_cols));
         }
     }
 
-    let hdr_rows = if nc == 0 {
-        1
+    let hdr_rows = if col_has_fields {
+        col_levels.len() + 1
     } else {
-        nc + usize::from(nd > 1) + 1
+        1
     };
     let (or, oc) = {
         let plain: String = pt.reference.chars().filter(|c| *c != '$').collect();
@@ -723,8 +893,18 @@ pub fn compute(
         }
     };
     // Header area.
+    let level_caption = |l: &Lvl| -> String {
+        match l {
+            Lvl::Field(f) => cache
+                .fields
+                .get(*f)
+                .map_or("", |c| c.name.as_str())
+                .to_owned(),
+            Lvl::Values => pt.data_caption.clone(),
+        }
+    };
     let row_hdr = |put: &mut dyn FnMut(usize, usize, GridValue, u32), r: usize| {
-        if row_fields.is_empty() {
+        if row_levels.is_empty() {
             return;
         }
         if compact {
@@ -732,15 +912,20 @@ pub fn compute(
                 .row_header_caption
                 .clone()
                 .unwrap_or_else(|| strings.row_labels.clone());
+            let only_values = row_levels.iter().all(|l| *l == Lvl::Values);
+            let t = if only_values {
+                pt.data_caption.clone()
+            } else {
+                t
+            };
             put(r, 0, GridValue::Text(t), 0);
         } else {
-            for (k, f) in row_fields.iter().enumerate() {
-                let name = cache.fields.get(*f).map_or("", |c| c.name.as_str());
-                put(r, k, GridValue::Text(name.to_owned()), 0);
+            for (k, l) in row_levels.iter().enumerate() {
+                put(r, k, GridValue::Text(level_caption(l)), 0);
             }
         }
     };
-    if nc == 0 {
+    if !col_has_fields {
         row_hdr(&mut put, 0);
         for (j, line) in cols.iter().enumerate() {
             for (_, lb) in &line.labels {
@@ -749,7 +934,7 @@ pub fn compute(
             }
         }
     } else {
-        if nd == 1 && !row_fields.is_empty() {
+        if nd == 1 && !row_levels.is_empty() {
             put(0, 0, GridValue::Text(pt.data_fields[0].name.clone()), 0);
         }
         if compact {
@@ -759,12 +944,8 @@ pub fn compute(
                 .unwrap_or_else(|| strings.column_labels.clone());
             put(0, nlabel, GridValue::Text(t), 0);
         } else {
-            for (k, f) in col_fields.iter().enumerate() {
-                let name = cache.fields.get(*f).map_or("", |c| c.name.as_str());
-                put(0, nlabel + k, GridValue::Text(name.to_owned()), 0);
-            }
-            if nd > 1 {
-                put(0, nlabel + nc, GridValue::Text(pt.data_caption.clone()), 0);
+            for (k, l) in col_levels.iter().enumerate() {
+                put(0, nlabel + k, GridValue::Text(level_caption(l)), 0);
             }
         }
         row_hdr(&mut put, hdr_rows - 1);
@@ -776,6 +957,22 @@ pub fn compute(
         }
     }
     // Rows and data.
+    let calc = if pt.data_fields.iter().any(|d| Mode::of(d) != Mode::Normal) {
+        let row_cons: Vec<&Cons> = rows.iter().map(|l| &l.cons).collect();
+        let col_cons: Vec<&Cons> = cols.iter().map(|l| &l.cons).collect();
+        Some(Calc::new(
+            pt,
+            cache,
+            &data.columns,
+            &ctx.rpos,
+            &ctx.order,
+            &alive_recs,
+            &row_cons,
+            &col_cons,
+        ))
+    } else {
+        None
+    };
     let mut mark = vec![false; n];
     for (i, rl) in rows.iter().enumerate() {
         for (slot, lb) in &rl.labels {
@@ -789,7 +986,7 @@ pub fn compute(
             mark[*r as usize] = true;
         }
         for (j, cl) in cols.iter().enumerate() {
-            let di = cl.data.unwrap_or(0);
+            let di = rl.data.or(cl.data).unwrap_or(0);
             let Some(df) = pt.data_fields.get(di) else {
                 continue;
             };
@@ -804,7 +1001,12 @@ pub fn compute(
                 .filter(|r| mark[**r as usize])
                 .filter_map(|r| col.get(*r as usize))
                 .collect();
-            if let Some(v) = aggregate(func, &vals) {
+            let v = aggregate(func, &vals);
+            let v = match &calc {
+                Some(c) => c.apply(di, &rl.cons, &cl.cons, v),
+                None => v,
+            };
+            if let Some(v) = v {
                 put(hdr_rows + i, nlabel + j, v, df.num_fmt_id);
             }
         }
@@ -826,7 +1028,7 @@ pub fn compute(
             cache
                 .fields
                 .get(pg.fld as usize)?
-                .shared
+                .item_values()
                 .get(x as usize)
                 .cloned()
         });
@@ -862,7 +1064,7 @@ fn num_err(code: &str) -> GridValue {
 }
 
 /// Aggregates source values; `None` is an empty cell (no non-blank source value).
-fn aggregate(func: Func, vals: &[&Value]) -> Option<GridValue> {
+pub(crate) fn aggregate(func: Func, vals: &[&Value]) -> Option<GridValue> {
     let non_blank = vals.iter().filter(|v| !v.is_blank()).count();
     if non_blank == 0 {
         return None;

@@ -29,6 +29,8 @@ Units are points. Baselines come from Word's 600 dpi PDF and sit on a 0.24 pt gr
 | The inset of a cell is half the wider border that meets at its grid line **in its own row**, not in the whole table. | `layout-table-flow` (header row) |
 | A table style's cell borders `left` and `right` name the region's outer edges; the edges between cells use `insideV`. A header row with `insideV` nil has no vertical borders between its cells. | `layout-table-flow` |
 | The empty paragraph after a nested table at the end of a cell takes no height. | `layout-table-flow` |
+| A cell that a vertical merge covers keeps its own top and bottom border at the edges of its row, and the first cell of a merge also puts its bottom border at the end of its first row: Word leaves that border's gap between two rows of the other columns (a 0.5 pt `insideH` between rows 6 and 7 of a masthead table where only the merged column had no explicit bottom border). Corpus evidence only (+54 lines over `ad265748` and one more template, no regression), no probe fixture yet. | corpus |
+| Word snaps the clip rectangle of a cell, not its padding: `CellBox::pad_top` and `pad_bottom` are the distances from the 0.24 pt-snapped box to the clip rectangle `snap(y + pad_top)` .. `snap(y + height - pad_bottom)`. A 2 pt padding is no multiple of 0.24 pt. | `layout-trh-asym` 11 to 17 of 66, `layout-trh-pad` 100 of 100, `layout-table-basic` 138 of 138 |
 | A composite cell border (`thickThinSmallGap`, `double`, ...) takes its full extent (`border_extent`) in the half-border inset of the cell, not only its `w:sz`: the first row of a masthead table with a 3 pt `thickThinSmallGap` top border sits 1.5 pt lower in Word than with `w:sz`. Corpus evidence only (+41 lines in one template, 1385 -> 1426 of 8118, no fixture changed); no probe fixture yet. | corpus |
 
 ## Caps and small caps (`para.rs`)
@@ -111,6 +113,44 @@ tables in unequal columns use the first column's width, documents with columns a
 | The clip rectangle Word draws is the shape inset by half the outline width (`a:ln/@w`) all round and by `tIns`/`bIns` vertically; `spAutoFit` does not resize the shape on open (Epsilon keeps its 30 pt clip while its third line falls outside). | `layout-txbx-basic` clip rectangles |
 
 Body text wraps around square and top-and-bottom boxes through the same float code as pictures (`layout-txbx-wrap`, 65 of 66). The box text is not clipped in the PDF or the desktop view.
+
+## Table row heights and section-break paragraphs (probes `layout-trh-*`, `layout-sect-*`; `tools/office/make-table-probes.ps1`)
+
+| Rule | Evidence |
+|---|---|
+| An "at least" row is its height plus the top and bottom cell padding (`tblCellMar`, `tcMar`); an auto row is content plus padding. Word's clip rectangle of a cell is the cell inset by the padding, so the parity test compares `y + pad_top` and `height - pad_top - pad_bottom`. | `layout-trh-pad` (86 of 100), corpus +900 lines |
+| An exact row is its height plus the **bottom** padding; the clip rectangle runs from the top padding to the exact height (`CellBox::pad_bottom` is the bottom padding as for any row). When the exact height does not exceed the top padding the clip is empty: Word emits no rectangle and draws no text, but the row still takes height + bottom padding (12/2 pt padding: exact 4 -> 6 pt, 8 -> 10, 12 -> 14, 12.5 -> 14.5 with a 0.5 pt clip). | `layout-trh-pad`, `layout-trh-asym` (66 of 66), `layout-trh-small` (210 of 210) |
+| The vertical padding is the row's: every cell takes the largest top and bottom padding any cell of its row states (content position, vertical alignment, clip). | corpus (card templates) |
+| A row taller than a page whose content fits is clamped to the page height, not split. | `layout-trh-tall` (36 of 36) |
+| A paragraph that holds only a section break (continuous, next, even or odd page) takes no height and none of its spacing, never moves to another page, and the spacing around it passes through; Word's line of the paragraph before it ends after the break character. | `layout-sect-empty` (12 of 12), `layout-sect-tail` (242 of 242), `layout-sect-space` |
+
+Open: space before at the top of a page after a next-page section break is ignored in `layout-sect-space` (Word, 3 pt before) but kept in the corpus
+(`15d030a7`, 6 pt), so the engine keeps it (`hard_start`); the cause is unknown.
+
+## Hyperlinks (`w:hyperlink`; `para.rs`, probes `layout-anc-hyperlink*`; `tools/office/make-anchor-probes.ps1`)
+
+| Rule | Evidence |
+|---|---|
+| Word reads a `w:hyperlink` as a field: begin, code, separator, result, end. The hidden code is ` HYPERLINK "url"` (url from the relationship target) + ` \l "anchor"` + ` 	 "frame"` + ` \o "tooltip"` for the attributes present, + ` \h` when `w:history` is not true. Story offsets count 1 + code + 1 before the text and 1 after. | `layout-anc-hyperlink` (10 of 10), `-nohist`, `-hist0`; corpus 4376 to 4731 lines |
+
+Header, footer, footnote and endnote parts have relationship ids of their own, so the URL (and with it the hidden field code length) is read from the part's own
+relationships (`incremental.rs` `related_links`, `Furniture::links`, `NoteStore`): `layout-anc-hyperlink-hf` (12 of 12, all line ends).
+
+Row-level content controls (`w:sdt` around `w:tc`, 13 in the corpus, `ad265748` has 4) count a start and an end character in Word: `flatten.rs` `row()` puts
+`SDT_START` on the first paragraph of the first wrapped cell and `SDT_END` on the last paragraph of the last one (`crates/docx/tests/flatten_rows.rs`; corpus +26 lines).
+
+Open (anchors): in `7fc3ccc4` (table 0, merged first cell) Word numbers the paragraph-mark line after an inline `wpg` group at @287
+(x after the group, the baseline of the group) and the empty paragraph below it at @314, after the title paragraph, so the lines of a
+merged cell are not in document order in the reference (possibly the oracle's pairing of empty paragraphs, not Word); not changed.
+`ad265748`: the empty paragraphs of vertically merged, centre-aligned cells (@1243, @1410, @1426) are paired with other y values in the reference; not understood.
+
+Floating objects not started, probes exist with Word references (`tools/office/make-frame-probes.ps1`, `fixtures/docx/layout-tblp-*`, `layout-frame-*`; floors record today's low scores):
+
+| Finding | Evidence |
+|---|---|
+| A table with `w:tblpPr` is out of the flow: the next paragraph is its anchor and starts at the same top; text wraps like around a square float over `[left - leftFromText, right + rightFromText] x [top - topFromText, bottom + bottomFromText]`. Word writes position 0 as 1 twip. The table's left edge is exactly the anchor (no cell-padding shift): `horzAnchor` text = column, margin, page; `tblpXSpec` right puts the right edge on the base's right edge, center centres the table; `vertAnchor=text` is the anchor paragraph's top, `tblpY` below it; a second floating table before the same paragraph has the same anchor. The oracle also reports one extra clip rectangle per table: the wrap zone including the distances. | `layout-tblp-basic/-right/-page` (reference geometry) |
+| `w:framePr` paragraphs (frames, drop caps) are floats of the same kind; a frame inside a table cell has no effect (`4e493df5`). Word saves a frame distance only as `hSpace`/`vSpace`; drop caps save `dropCap`, `lines`, `wrap=around`. | `layout-frame-*` |
+| Anchored shapes in table cells: no template of the corpus has one. Square-wrapped floats in `layout-float-incell` make the cell taller and wrap its text; the vertical `margin` base of a picture in a cell is the row top, `layoutInCell=0` made no difference in the current mode (`layout-float-incell`). | `layout-float-incell` (9 of 38) |
 
 ## Not matched yet
 

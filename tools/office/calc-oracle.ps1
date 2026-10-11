@@ -34,6 +34,7 @@ width.
 Output is stable: corpus order, LF line endings, ASCII only, no absolute paths and no user information.
 #>
 param(
+  [int]$BatchTimeoutSeconds = 600,   # watchdog: one batch (the whole run, or one -Update chunk) may take this long
   [string]$Corpus,
   [string]$Output,
   [string]$Only,        # regex over case ids; requires -Output so the committed file is never half-written
@@ -89,6 +90,7 @@ function Start-Excel {
   $app.DisplayAlerts = $false
   $app.ScreenUpdating = $false
   $app.EnableEvents = $false
+  $app.AutomationSecurity = 3   # msoAutomationSecurityForceDisable: no macros or add-in code run in the oracle instance
   $procId = [uint32]0
   [void][Native.Win32]::GetWindowThreadProcessId([IntPtr]$app.Hwnd, [ref]$procId)
   $script:xl = $app
@@ -118,12 +120,34 @@ function Stop-Excel {
   $script:xlPid = 0
 }
 
+# Watchdog: a timer that kills ONLY the Excel process this script started (same pid check as Stop-Excel) when the
+# batch exceeds its timeout, so a hung Excel (for example a 1E+300 shape parameter) cannot block the run forever.
+$script:watchdog = $null
+function Start-Watchdog([int]$seconds) {
+  Stop-Watchdog
+  $t = New-Object System.Timers.Timer ($seconds * 1000)
+  $t.AutoReset = $false
+  [void](Register-ObjectEvent -InputObject $t -EventName Elapsed -SourceIdentifier 'calc-oracle-watchdog' -MessageData $script:xlPid -Action {
+    $p = Get-Process -Id $Event.MessageData -ErrorAction SilentlyContinue
+    if ($p -and $p.ProcessName -eq 'EXCEL') { Stop-Process -Id $Event.MessageData -Force -ErrorAction SilentlyContinue }
+  })
+  $t.Start()
+  $script:watchdog = $t
+}
+function Stop-Watchdog {
+  if ($script:watchdog) { try { $script:watchdog.Stop(); $script:watchdog.Dispose() } catch {} }
+  $script:watchdog = $null
+  Unregister-Event -SourceIdentifier 'calc-oracle-watchdog' -ErrorAction SilentlyContinue
+  Remove-Job -Name 'calc-oracle-watchdog' -Force -ErrorAction SilentlyContinue
+}
+
 function Restart-Excel {
   $script:restarts++
   Write-Host "  restarting Excel instance (restart $($script:restarts))"
   try { Stop-Excel } catch {}
   Start-Sleep -Milliseconds 500
   Start-Excel
+  Start-Watchdog $BatchTimeoutSeconds   # the replacement has a new pid
 }
 
 function Test-Transient($ex) {
@@ -281,6 +305,7 @@ $stopwatch = [Diagnostics.Stopwatch]::StartNew()
 $excelInfo = $null
 try {
   Start-Excel
+  Start-Watchdog $BatchTimeoutSeconds
   $excelInfo = @{
     version = [string]$script:xl.Version
     build = [string]$script:xl.Build
@@ -322,6 +347,8 @@ try {
   }
 }
 finally {
+  Stop-Watchdog
+  try { if ($script:xl) { $script:xl.Quit() } } catch {}   # always Quit, even when the run failed half-way
   Stop-Excel
 }
 

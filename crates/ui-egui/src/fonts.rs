@@ -155,6 +155,20 @@ impl FontBook {
         }
     }
 
+    /// Makes `bytes` the proportional and monospace UI face (the bundled Carlito stays behind it
+    /// as a fallback). Chrome text then uses the operating system's UI font.
+    pub fn set_ui_font(&mut self, name: &str, bytes: Vec<u8>) {
+        self.defs
+            .font_data
+            .insert(name.to_owned(), Arc::new(FontData::from_owned(bytes)));
+        for family in [FontFamily::Proportional, FontFamily::Monospace] {
+            self.defs
+                .families
+                .insert(family, vec![name.to_owned(), BUNDLED[0].0.to_owned()]);
+        }
+        self.defs_gen += 1;
+    }
+
     /// Pushes new definitions to egui and notes when they have taken effect. Call once per
     /// frame before laying out any text.
     pub fn sync(&mut self, ctx: &Context) {

@@ -52,8 +52,12 @@ use crate::grid_text::{
     fill_text, fit_number, fit_padding, is_numeric, line_px, overflow_room,
 };
 
-const ROW_HEADER_W: f32 = 54.0;
-const COL_HEADER_H: f32 = 24.0;
+/// Header sizes in points, measured from Excel at 125 % (`fixtures/reference/ui/excel-ribbon.json`,
+/// `metrics.scanRowY500` / `scanColX300`): 34 x 24 px including the 1 px border. Excel widens the row
+/// header for 3+ digit row numbers; whole points (27 x 19 = 33.75 x 23.75 px at 125 %, within 1 px)
+/// keep cell edges on pixels; this view keeps the 2-digit width (see docs/architecture/app-shell.md).
+const ROW_HEADER_W: f32 = 27.0;
+const COL_HEADER_H: f32 = 19.0;
 /// How close (in points) the pointer must be to a header border to grab it.
 const GRAB: f32 = 3.0;
 /// Excel's largest column width in characters and row height in points.
@@ -527,8 +531,32 @@ struct Palette {
     text: Color32,
     grid_line: Color32,
     header_bg: Color32,
+    header_sel_bg: Option<Color32>,
+    header_text: Color32,
+    header_sel_text: Color32,
+    header_line: Color32,
     cell_bg: Color32,
     accent: Color32,
+}
+
+/// Colours of the grid, set by the application so the grid follows the application theme
+/// (Excel keeps cells white in dark mode; only headers, lines and chrome change).
+#[derive(Debug, Clone, Copy)]
+pub struct GridColors {
+    /// Cell text with the automatic colour.
+    pub text: Color32,
+    /// Grid lines between cells.
+    pub grid_line: Color32,
+    pub cell_bg: Color32,
+    pub header_bg: Color32,
+    /// Background of a header whose row or column is selected.
+    pub header_sel_bg: Color32,
+    pub header_text: Color32,
+    pub header_sel_text: Color32,
+    /// Border under and beside the headers.
+    pub header_border: Color32,
+    /// Selection outline and selected-header underline.
+    pub accent: Color32,
 }
 
 /// State of the grid view.
@@ -588,6 +616,7 @@ pub struct GridView {
     pub status: Option<String>,
     /// Milliseconds spent drawing the grid in the last frame.
     pub last_frame_ms: f32,
+    colors: Option<GridColors>,
 }
 
 impl Default for GridView {
@@ -690,7 +719,19 @@ impl GridView {
             hints: RefCell::new(HintCache::default()),
             status: None,
             last_frame_ms: 0.0,
+            colors: None,
         }
+    }
+
+    /// Sets the colours the grid draws with; `None` derives them from egui's visuals.
+    pub fn set_colors(&mut self, colors: Option<GridColors>) {
+        self.colors = colors;
+    }
+
+    /// Makes `bytes` (a TrueType font, e.g. the operating system's UI font) the face of the
+    /// chrome text. The grid owns egui's font table, so the application hands the font here.
+    pub fn set_ui_font(&mut self, name: &str, bytes: Vec<u8>) {
+        self.fonts.borrow_mut().set_ui_font(name, bytes);
     }
 
     /// A grid that draws with the application's shared font book (which the application syncs).
@@ -835,6 +876,11 @@ impl GridView {
         self.scroll_target = Some(self.extent);
     }
 
+    /// Moves keyboard focus back to the grid (after the Name Box or formula bar).
+    pub fn focus(&mut self) {
+        self.want_focus = true;
+    }
+
     pub fn select_sheet(&mut self, sheet: usize) {
         if sheet != self.sheet {
             self.sheet = sheet;
@@ -910,7 +956,8 @@ impl GridView {
         });
     }
 
-    fn cancel_edit(&mut self, ctx: &Context) {
+    /// Abandons the cell or formula-bar edit in progress.
+    pub fn cancel_edit(&mut self, ctx: &Context) {
         self.editing = false;
         self.keys_consumed = true;
         self.focus_active(ctx);
@@ -1202,9 +1249,38 @@ impl GridView {
     /// Shows the formula bar, the grid and the sheet tabs.
     pub fn show(&mut self, ui: &mut Ui, target: &mut Target) {
         let started = Instant::now();
+        if !self.prepare(ui, target) {
+            return;
+        }
+        self.formula_bar(ui, target);
+        let tabs_changed = self.sheet_tabs(ui, target);
+        let _ = tabs_changed;
+
+        egui::CentralPanel::default_margins()
+            .frame(egui::Frame::NONE)
+            .show(ui, |ui| self.grid(ui, target));
+        self.last_frame_ms = started.elapsed().as_secs_f32() * 1000.0;
+    }
+
+    /// Shows only the grid (headers, cells, scrollbars) in `ui`, with no formula bar and no sheet
+    /// tabs. The application draws those (see [`Self::formula_text_ui`], [`Self::name_box_text`],
+    /// [`Self::go_to`], [`Self::sheet_names`], [`Self::select_sheet`]).
+    pub fn show_grid(&mut self, ui: &mut Ui, target: &mut Target) {
+        let started = Instant::now();
+        if !self.prepare(ui, target) {
+            return;
+        }
+        self.grid_text_sync(target);
+        self.grid(ui, target);
+        self.last_frame_ms = started.elapsed().as_secs_f32() * 1000.0;
+    }
+
+    /// Per-frame set-up shared by [`Self::show`] and [`Self::show_grid`]. False when no
+    /// spreadsheet is open (a message is shown).
+    fn prepare(&mut self, ui: &mut Ui, target: &Target) -> bool {
         let Some(wb) = target.xlsx() else {
             ui.label("No spreadsheet is open.");
-            return;
+            return false;
         };
         if self.sheet >= wb.sheets().len() {
             self.sheet = 0;
@@ -1224,15 +1300,94 @@ impl GridView {
         if let Some((row, col)) = self.pending_focus.take() {
             self.set_active(row, col);
         }
+        true
+    }
 
-        self.formula_bar(ui, target);
-        let tabs_changed = self.sheet_tabs(ui, target);
-        let _ = tabs_changed;
+    /// While not editing, the formula text follows the active cell.
+    fn grid_text_sync(&mut self, target: &Target) {
+        let (row, col) = self.active;
+        if !self.editing
+            && let Some(wb) = target.xlsx()
+        {
+            self.edit_text = Self::source_text(wb, self.sheet, row, col);
+        }
+    }
 
-        egui::CentralPanel::default_margins()
+    /// The Name Box text: the address of the selection (`B2`, `B2:C4`, `A:D`).
+    pub fn name_box_text(&self) -> String {
+        range_label(self.selection())
+    }
+
+    /// Name Box entry: selects the cell or range `text` names. False when it is not an address.
+    pub fn go_to(&mut self, text: &str) -> bool {
+        let t = text.trim().replace('$', "");
+        match open365_xlsx::parse_range(&t) {
+            Some((r1, c1, r2, c2)) => {
+                self.set_active(r1, c1);
+                if (r1, c1) != (r2, c2) {
+                    self.select_range((r1, c1), (r2, c2));
+                }
+                self.scroll_target = Some((r1, c1));
+                true
+            }
+            None => false,
+        }
+    }
+
+    /// Visible worksheets as (sheet index, name), for a sheet tab bar.
+    pub fn sheet_names(&self, target: &Target) -> Vec<(usize, String)> {
+        target.xlsx().map_or_else(Vec::new, |wb| {
+            wb.sheets()
+                .iter()
+                .enumerate()
+                .filter(|(_, i)| i.kind == SheetKind::Worksheet && i.state == SheetState::Visible)
+                .map(|(i, info)| (i, info.name.clone()))
+                .collect()
+        })
+    }
+
+    /// Draws the formula text box into `ui` (the application supplies the rectangle) and commits
+    /// or cancels an edit on Enter, Tab or Escape. Use with [`Self::show_grid`].
+    pub fn formula_text_ui(&mut self, ui: &mut Ui, target: &mut Target) {
+        self.grid_text_sync(target);
+        let ctx = ui.ctx().clone();
+        let (row, col) = self.active;
+        let active_address = format!("{}{}", col_letters(col), row);
+        let edit = TextEdit::multiline(&mut self.edit_text)
+            .id(self.formula_id)
+            .desired_width(f32::INFINITY)
+            .desired_rows(1)
             .frame(egui::Frame::NONE)
-            .show(ui, |ui| self.grid(ui, target));
-        self.last_frame_ms = started.elapsed().as_secs_f32() * 1000.0;
+            .font(FontId::proportional(13.0));
+        let resp = ui.add(edit);
+        resp.widget_info(|| {
+            egui::WidgetInfo::labeled(
+                egui::WidgetType::TextEdit,
+                true,
+                format!("Formula bar for {active_address}"),
+            )
+        });
+        if resp.changed() || (resp.gained_focus() && !self.editing) {
+            self.editing = true;
+        }
+        let (enter, tab, escape, shift) = ctx.input(|i| {
+            (
+                i.key_pressed(Key::Enter),
+                i.key_pressed(Key::Tab),
+                i.key_pressed(Key::Escape),
+                i.modifiers.shift,
+            )
+        });
+        if self.editing && escape && (resp.has_focus() || resp.lost_focus()) {
+            self.cancel_edit(&ctx);
+        } else if self.editing && resp.lost_focus() && (enter || tab) {
+            let step = if enter {
+                Step::Enter(shift)
+            } else {
+                Step::Tab(shift)
+            };
+            self.commit(&ctx, target, Some(step));
+        }
     }
 
     fn formula_bar(&mut self, ui: &mut Ui, target: &mut Target) {
@@ -1355,12 +1510,29 @@ impl GridView {
         }
         let Some(wb) = target.xlsx() else { return };
 
-        let pal = Palette {
-            text: ui.visuals().text_color(),
-            grid_line: ui.visuals().widgets.noninteractive.bg_stroke.color,
-            header_bg: ui.visuals().faint_bg_color,
-            cell_bg: ui.visuals().extreme_bg_color,
-            accent: ui.visuals().selection.stroke.color,
+        let pal = match self.colors {
+            Some(c) => Palette {
+                text: c.text,
+                grid_line: c.grid_line,
+                header_bg: c.header_bg,
+                header_sel_bg: Some(c.header_sel_bg),
+                header_text: c.header_text,
+                header_sel_text: c.header_sel_text,
+                header_line: c.header_border,
+                cell_bg: c.cell_bg,
+                accent: c.accent,
+            },
+            None => Palette {
+                text: ui.visuals().text_color(),
+                grid_line: ui.visuals().widgets.noninteractive.bg_stroke.color,
+                header_bg: ui.visuals().faint_bg_color,
+                header_sel_bg: None,
+                header_text: ui.visuals().text_color(),
+                header_sel_text: ui.visuals().selection.stroke.color,
+                header_line: ui.visuals().widgets.noninteractive.bg_stroke.color,
+                cell_bg: ui.visuals().extreme_bg_color,
+                accent: ui.visuals().selection.stroke.color,
+            },
         };
         let font = FontId::proportional(13.0);
         let active = self.active;
@@ -3409,12 +3581,30 @@ fn paint_region(
                 .merge_at(active.0, active.1)
                 .unwrap_or((active.0, active.1, active.0, active.1));
             let ar = view.rect(span, region.shift);
+            // Two physical pixels: the left edge outside the cell, right and bottom one pixel
+            // either side of the cell's last pixel (pixel scan of the reference), plus the fill
+            // handle at the bottom-right corner.
+            let px = 1.0 / p.ctx().pixels_per_point();
+            let edge = Rect::from_min_max(ar.min - vec2(px, 0.0), ar.max + vec2(0.0, px));
             p.rect_stroke(
-                ar,
+                edge,
                 0.0,
-                Stroke::new(2.0, pal.accent),
-                egui::StrokeKind::Inside,
+                Stroke::new(2.0 * px, pal.accent),
+                egui::StrokeKind::Middle,
             );
+            if !multi {
+                let handle = Rect::from_center_size(
+                    edge.max - vec2(0.5 * px, 0.5 * px),
+                    vec2(7.0 * px, 7.0 * px),
+                );
+                p.rect_filled(handle, 0.0, pal.accent);
+                p.rect_stroke(
+                    handle,
+                    0.0,
+                    Stroke::new(px, pal.cell_bg),
+                    egui::StrokeKind::Outside,
+                );
+            }
         }
     }
 }
@@ -3961,7 +4151,7 @@ fn paint_headers(
     let layout = view.layout;
     let view_min = view.view_min;
     let fz = view.frozen_size();
-    let stroke = Stroke::new(1.0, pal.grid_line);
+    let stroke = Stroke::new(1.0, pal.header_line);
 
     painter.rect_filled(
         Rect::from_min_size(view_min, vec2(clip_all.width(), COL_HEADER_H)),
@@ -3973,6 +4163,14 @@ fn paint_headers(
         0.0,
         pal.header_bg,
     );
+    // Select-all triangle in the corner, pointing at the bottom-right like the reference.
+    let corner = Rect::from_min_size(view_min, vec2(ROW_HEADER_W, COL_HEADER_H));
+    let br = corner.right_bottom() - vec2(3.0, 3.0);
+    painter.add(egui::Shape::convex_polygon(
+        vec![br, br - vec2(11.0, 0.0), br - vec2(0.0, 11.0)],
+        pal.header_line,
+        Stroke::NONE,
+    ));
 
     let col_groups = [
         (
@@ -4008,7 +4206,15 @@ fn paint_headers(
             let r = Rect::from_min_size(Pos2::new(x, view_min.y), vec2(w, COL_HEADER_H));
             let selected = (selection.1..=selection.3).contains(&c);
             if selected {
-                p.rect_filled(r, 0.0, pal.accent.gamma_multiply(0.2));
+                p.rect_filled(
+                    r,
+                    0.0,
+                    pal.header_sel_bg
+                        .unwrap_or_else(|| pal.accent.gamma_multiply(0.2)),
+                );
+                if pal.header_sel_bg.is_some() {
+                    p.hline(r.x_range(), r.bottom() - 1.0, Stroke::new(2.0, pal.accent));
+                }
             }
             p.vline(r.left(), r.y_range(), stroke);
             if c > 1 && layout.geo.col_hidden(c - 1) {
@@ -4022,7 +4228,11 @@ fn paint_headers(
                 egui::Align2::CENTER_CENTER,
                 col_letters(c),
                 font.clone(),
-                if selected { pal.accent } else { pal.text },
+                if selected {
+                    pal.header_sel_text
+                } else {
+                    pal.header_text
+                },
             );
         }
     }
@@ -4060,7 +4270,15 @@ fn paint_headers(
             let rr = Rect::from_min_size(Pos2::new(view_min.x, y), vec2(ROW_HEADER_W, h));
             let selected = (selection.0..=selection.2).contains(&r);
             if selected {
-                p.rect_filled(rr, 0.0, pal.accent.gamma_multiply(0.2));
+                p.rect_filled(
+                    rr,
+                    0.0,
+                    pal.header_sel_bg
+                        .unwrap_or_else(|| pal.accent.gamma_multiply(0.2)),
+                );
+                if pal.header_sel_bg.is_some() {
+                    p.vline(rr.right() - 1.0, rr.y_range(), Stroke::new(2.0, pal.accent));
+                }
             }
             p.hline(rr.x_range(), rr.top(), stroke);
             if r > 1 && layout.geo.row_hidden(r - 1) {
@@ -4073,7 +4291,11 @@ fn paint_headers(
                 egui::Align2::CENTER_CENTER,
                 r.to_string(),
                 font.clone(),
-                if selected { pal.accent } else { pal.text },
+                if selected {
+                    pal.header_sel_text
+                } else {
+                    pal.header_text
+                },
             );
         }
     }

@@ -16,9 +16,25 @@ use crate::xml::{
     write_attrs, write_head, xml_err,
 };
 
+mod filter;
 mod resize;
+mod sort;
 mod structure;
+mod validation;
+pub use filter::{
+    AutoFilter, ColorFilter, CustomFilter, CustomFilters, DateGroup, DateTimeGrouping,
+    DynamicFilter, DynamicKind, FilterColumn, FilterContext, FilterCriteria, FilterOperator,
+    FilterOutcome, IconFilter, Top10, ValuesFilter,
+};
 pub use resize::{ColumnsSnapshot, MAX_COLUMN_WIDTH, MAX_ROW_HEIGHT, RowHeightsSnapshot};
+pub use sort::{
+    ColorKey, HeaderMode, MAX_SORT_KEYS, SortBy, SortCondition, SortKey, SortMethod, SortOn,
+    SortOrientation, SortOutcome, SortSpec, SortState, TextKey, TextOrder,
+};
+pub use validation::{
+    DataValidation, DataValidations, ErrorStyle, ValidationContext, ValidationOperator,
+    ValidationType, Validity, WorkbookCells,
+};
 
 /// A cell error value.
 #[derive(Debug, Clone, PartialEq, Eq)]

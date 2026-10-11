@@ -1,0 +1,19 @@
+{
+  "source": "fixtures/docx/layout-anc-hyperlink-hist0.docx",
+  "oracle": "Microsoft Word 16.0 (16.0.20430), Print Layout, tools/office/word-layout-oracle.ps1",
+  "units": "points; page and top/left/baseline measured from the page top-left corner; start/end are UTF-16 offsets in the main story",
+  "precision": "top/left/lastX are screen-quantised (+-0.3 pt); baseline/inkLeft and cell rectangles come from the 600 dpi PDF and are exact",
+  "pageCount": 1,
+  "lines": [
+    {"page": 1, "start": 0, "end": 6, "top": 72.0, "left": 72.0, "lastX": 93.6, "baseline": 82.58, "inkLeft": 72.024, "text": "intro\u000d"},
+    {"page": 1, "start": 6, "end": 55, "top": 85.2, "left": 72.0, "lastX": 123.6, "baseline": 96.02, "inkLeft": 72.024, "text": "x1 one tail1\u000d"},
+    {"page": 1, "start": 55, "end": 156, "top": 99.0, "left": 72.0, "lastX": 124.2, "baseline": 109.46, "inkLeft": 72.024, "text": "x2 two tail2\u000d"},
+    {"page": 1, "start": 156, "end": 214, "top": 112.2, "left": 72.0, "lastX": 130.8, "baseline": 122.93, "inkLeft": 72.024, "text": "x3 three tail3\u000d"},
+    {"page": 1, "start": 214, "end": 282, "top": 126.0, "left": 72.0, "lastX": 125.4, "baseline": 136.37, "inkLeft": 72.024, "text": "x4 four tail4\u000d"},
+    {"page": 1, "start": 282, "end": 289, "top": 139.2, "left": 72.0, "lastX": 98.4, "baseline": 149.81, "inkLeft": 72.024, "text": "target\u000d"},
+    {"page": 1, "start": 289, "end": 328, "top": 152.4, "left": 72.0, "lastX": 123.0, "baseline": 163.25, "inkLeft": 72.024, "text": "x5 five tail5\u000d"},
+    {"page": 1, "start": 328, "end": 419, "top": 166.2, "left": 72.0, "lastX": 146.4, "baseline": 176.69, "inkLeft": 72.024, "text": "x6 six seven tail6\u000d"},
+    {"page": 1, "start": 419, "end": 424, "top": 179.4, "left": 72.0, "lastX": 87.6, "baseline": 190.13, "inkLeft": 72.024, "text": "last\u000d"},
+    {"page": 1, "start": 424, "end": 425, "top": 192.6, "left": 72.0, "lastX": 72.0, "baseline": 203.35, "inkLeft": 72.024, "text": "\u000d"}
+  ]
+}

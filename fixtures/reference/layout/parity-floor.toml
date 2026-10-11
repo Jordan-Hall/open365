@@ -36,6 +36,22 @@ total = 3
 matched = 5
 total = 22
 
+[fixtures.layout-anc-hyperlink]
+matched = 10
+total = 10
+
+[fixtures.layout-anc-hyperlink-hf]
+matched = 12
+total = 12
+
+[fixtures.layout-anc-hyperlink-hist0]
+matched = 10
+total = 10
+
+[fixtures.layout-anc-hyperlink-nohist]
+matched = 10
+total = 10
+
 [fixtures.layout-caps]
 matched = 32
 total = 87
@@ -216,6 +232,18 @@ total = 130
 matched = 90
 total = 92
 
+[fixtures.layout-frame-basic]
+matched = 5
+total = 38
+
+[fixtures.layout-frame-dropcap]
+matched = 1
+total = 17
+
+[fixtures.layout-frame-page]
+matched = 2
+total = 41
+
 [fixtures.layout-hf-basic]
 matched = 115
 total = 115
@@ -320,12 +348,24 @@ total = 54
 matched = 19
 total = 19
 
+[fixtures.layout-sect-empty]
+matched = 12
+total = 12
+
+[fixtures.layout-sect-space]
+matched = 5
+total = 11
+
+[fixtures.layout-sect-tail]
+matched = 242
+total = 242
+
 [fixtures.layout-sizes]
 matched = 162
 total = 221
 
 [fixtures.layout-table-basic]
-matched = 134
+matched = 138
 total = 138
 
 [fixtures.layout-table-flow]
@@ -347,6 +387,34 @@ total = 217
 [fixtures.layout-tabs]
 matched = 9
 total = 18
+
+[fixtures.layout-tblp-basic]
+matched = 12
+total = 35
+
+[fixtures.layout-tblp-page]
+matched = 2
+total = 60
+
+[fixtures.layout-tblp-right]
+matched = 4
+total = 35
+
+[fixtures.layout-trh-asym]
+matched = 66
+total = 66
+
+[fixtures.layout-trh-pad]
+matched = 100
+total = 100
+
+[fixtures.layout-trh-small]
+matched = 210
+total = 210
+
+[fixtures.layout-trh-tall]
+matched = 36
+total = 36
 
 [fixtures.layout-txbx-basic]
 matched = 22
@@ -415,6 +483,22 @@ total = 3
 [system.layout-align]
 matched = 22
 total = 22
+
+[system.layout-anc-hyperlink]
+matched = 10
+total = 10
+
+[system.layout-anc-hyperlink-hf]
+matched = 12
+total = 12
+
+[system.layout-anc-hyperlink-hist0]
+matched = 10
+total = 10
+
+[system.layout-anc-hyperlink-nohist]
+matched = 10
+total = 10
 
 [system.layout-caps]
 matched = 87
@@ -604,6 +688,18 @@ total = 130
 matched = 90
 total = 92
 
+[system.layout-frame-basic]
+matched = 5
+total = 38
+
+[system.layout-frame-dropcap]
+matched = 1
+total = 17
+
+[system.layout-frame-page]
+matched = 2
+total = 41
+
 [system.layout-hf-basic]
 matched = 115
 total = 115
@@ -716,12 +812,24 @@ total = 54
 matched = 19
 total = 19
 
+[system.layout-sect-empty]
+matched = 12
+total = 12
+
+[system.layout-sect-space]
+matched = 5
+total = 11
+
+[system.layout-sect-tail]
+matched = 242
+total = 242
+
 [system.layout-sizes]
 matched = 221
 total = 221
 
 [system.layout-table-basic]
-matched = 134
+matched = 138
 total = 138
 
 [system.layout-table-flow]
@@ -743,6 +851,34 @@ total = 217
 [system.layout-tabs]
 matched = 17
 total = 18
+
+[system.layout-tblp-basic]
+matched = 12
+total = 35
+
+[system.layout-tblp-page]
+matched = 2
+total = 60
+
+[system.layout-tblp-right]
+matched = 4
+total = 35
+
+[system.layout-trh-asym]
+matched = 66
+total = 66
+
+[system.layout-trh-pad]
+matched = 100
+total = 100
+
+[system.layout-trh-small]
+matched = 210
+total = 210
+
+[system.layout-trh-tall]
+matched = 36
+total = 36
 
 [system.layout-txbx-basic]
 matched = 22

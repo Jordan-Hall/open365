@@ -12,7 +12,9 @@
 
 mod compute;
 mod error;
+mod grouping;
 mod model;
+mod showas;
 mod value;
 mod xmlutil;
 

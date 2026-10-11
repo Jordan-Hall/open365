@@ -1,0 +1,5 @@
+feature = "layout-frame"
+made_with = "Microsoft Word 16.0.20430 (Windows)"
+author = "project member"
+expect_dropped = []
+notes = "three paragraphs of body text, the first letter of the first and the third as a dropped capital over 3 and 2 lines"

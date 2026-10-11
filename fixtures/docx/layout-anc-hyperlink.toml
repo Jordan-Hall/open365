@@ -1,0 +1,5 @@
+feature = "layout-anc"
+made_with = "Microsoft Word 16.0.20430 (Windows)"
+author = "project member"
+expect_dropped = []
+notes = "hyperlinks with web, mail, short, long and bookmark targets and a screen tip, each followed by a tail and a one-line paragraph: how many story characters the hidden HYPERLINK field adds to the offsets"

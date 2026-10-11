@@ -51,6 +51,9 @@ pub struct FieldGroup {
     pub interval: Option<f64>,
     pub start_num: Option<f64>,
     pub end_num: Option<f64>,
+    /// `rangePr/@startDate` and `@endDate` as serial numbers.
+    pub start_date: Option<f64>,
+    pub end_date: Option<f64>,
     pub items: Vec<Value>,
 }
 
@@ -65,6 +68,17 @@ pub struct CacheField {
     pub formula: Option<String>,
     /// False for derived group fields that have no record column.
     pub database_field: bool,
+}
+
+impl CacheField {
+    /// The items `x` indices of pivot field items refer to: the group items of a grouped
+    /// field, the shared items otherwise.
+    pub fn item_values(&self) -> &[Value] {
+        match &self.group {
+            Some(g) if !g.items.is_empty() => &g.items,
+            _ => &self.shared,
+        }
+    }
 }
 
 /// `xl/pivotCache/pivotCacheDefinitionN.xml`.
@@ -113,6 +127,12 @@ impl CacheDefinition {
                         interval: range.and_then(|r| attr_f64(r, "groupInterval")),
                         start_num: range.and_then(|r| attr_f64(r, "startNum")),
                         end_num: range.and_then(|r| attr_f64(r, "endNum")),
+                        start_date: range
+                            .and_then(|r| r.head.attr("startDate"))
+                            .and_then(|t| iso_to_serial(t, date1904)),
+                        end_date: range
+                            .and_then(|r| r.head.attr("endDate"))
+                            .and_then(|t| iso_to_serial(t, date1904)),
                         items: g
                             .child_main("groupItems")
                             .map(|gi| {
@@ -274,6 +294,9 @@ pub struct DataField {
     pub fld: u32,
     pub func: Func,
     pub show_data_as: String,
+    /// `x14:dataField/@pivotShowAs` (percent of parent, rank, ...), which supersedes
+    /// `showDataAs` when present.
+    pub pivot_show_as: Option<String>,
     pub base_field: i32,
     pub base_item: u32,
     pub num_fmt_id: u32,
@@ -391,7 +414,14 @@ impl PivotTable {
             r.child_main(name)
                 .map(|e| {
                     children_main(e, "field")
-                        .filter_map(|f| attr_u32(f, "x"))
+                        .filter_map(|f| {
+                            let x: i64 = f.head.attr("x")?.parse().ok()?;
+                            if x == -2 {
+                                Some(VALUES_FIELD)
+                            } else {
+                                u32::try_from(x).ok()
+                            }
+                        })
                         .collect()
                 })
                 .unwrap_or_default()
@@ -410,6 +440,7 @@ impl PivotTable {
                             .unwrap_or(Func::Sum),
                         show_data_as: attr_string(f, "showDataAs")
                             .unwrap_or_else(|| "normal".into()),
+                        pivot_show_as: x14_show_as(f),
                         base_field: f
                             .head
                             .attr("baseField")
@@ -491,4 +522,14 @@ fn sort_scope_field(scope: &XmlElement) -> Option<usize> {
         e.elements().find_map(walk)
     }
     walk(scope)
+}
+
+/// `pivotShowAs` of the `x14:dataField` inside `extLst/ext` of a `dataField`.
+fn x14_show_as(f: &XmlElement) -> Option<String> {
+    let ext_lst = f.elements().find(|e| e.head.local_name() == "extLst")?;
+    ext_lst
+        .elements()
+        .flat_map(|ext| ext.elements())
+        .find(|e| e.head.local_name() == "dataField")
+        .and_then(|e| e.head.attr("pivotShowAs").map(str::to_owned))
 }

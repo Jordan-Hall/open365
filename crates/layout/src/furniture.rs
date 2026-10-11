@@ -22,6 +22,7 @@ use open365_docx::{Block, Document, HeaderFooterType, Inline, NoteKind, RawXml, 
 use crate::build::Builder;
 use crate::float::{self, Frame as FloatFrame};
 use crate::flow::{Base, build_line, line_images};
+use crate::incremental::{REL_FOOTNOTES, related_links};
 use crate::numbering::ListLabel;
 use crate::para::{Context, FieldEnv, NoteOrder, ParaLayout};
 use crate::props::SectionProps;
@@ -47,6 +48,9 @@ pub(crate) struct Furniture {
     stories: Vec<[[Blocks; 3]; 2]>,
     /// The relationship id of each story's part, parallel to `stories`.
     rels: Vec<[[Option<String>; 3]; 2]>,
+    /// External hyperlink targets of each header or footer part by its relationship id in the
+    /// main part (the part's own relationship ids differ from the main part's).
+    links: HashMap<String, HashMap<String, String>>,
     heights: Vec<[[f64; 3]; 2]>,
 }
 
@@ -157,8 +161,12 @@ impl Furniture {
         let mut current: [[Blocks; 3]; 2] = Default::default();
         let mut rels: Vec<[[Option<String>; 3]; 2]> = Vec::new();
         let mut current_rels: [[Option<String>; 3]; 2] = Default::default();
+        let mut links: HashMap<String, HashMap<String, String>> = HashMap::new();
         for s in doc_sections {
             for r in &s.header_footer_refs {
+                links
+                    .entry(r.rel_id.clone())
+                    .or_insert_with(|| related_links(doc, |id, _| id == r.rel_id));
                 let blocks = doc.header_footer_blocks(&r.rel_id).map(Arc::new);
                 current[usize::from(r.footer)][kind_index(r.kind)] = blocks;
                 current_rels[usize::from(r.footer)][kind_index(r.kind)] = Some(r.rel_id.clone());
@@ -173,7 +181,11 @@ impl Furniture {
             for (f, row) in st.iter().enumerate() {
                 for (k, blocks) in row.iter().enumerate() {
                     if let Some(blocks) = blocks {
-                        h[f][k] = height_of(&layout_blocks(ctx, blocks, width));
+                        let ctx = Context {
+                            links: rels[i][f][k].as_ref().and_then(|id| links.get(id)),
+                            ..*ctx
+                        };
+                        h[f][k] = height_of(&layout_blocks(&ctx, blocks, width));
                     }
                 }
             }
@@ -185,6 +197,7 @@ impl Furniture {
             even_odd: doc.settings().even_and_odd_headers,
             stories,
             rels,
+            links,
             heights,
         }
     }
@@ -236,6 +249,12 @@ impl Furniture {
                 section_pages: per_section.get(&sec).copied().unwrap_or(1),
                 section: sec,
             };
+            let part_links = |footer: usize| {
+                self.rels
+                    .get(sec)
+                    .and_then(|r| r[footer][k].as_ref())
+                    .and_then(|id| self.links.get(id))
+            };
             let ctx = Context {
                 fields: env,
                 ..*ctx
@@ -253,6 +272,10 @@ impl Furniture {
                     .map_or(ImageSource::Main, ImageSource::HeaderFooter)
             };
             if let Some(blocks) = &stories[0][k] {
+                let ctx = Context {
+                    links: part_links(0),
+                    ..ctx
+                };
                 let paras = layout_blocks(&ctx, blocks, width);
                 let story = [
                     StoryKind::PrimaryHeader,
@@ -271,6 +294,10 @@ impl Furniture {
                 page.header_images = placed.images.into_iter().map(|i| i.1).collect();
             }
             if let Some(blocks) = &stories[1][k] {
+                let ctx = Context {
+                    links: part_links(1),
+                    ..ctx
+                };
                 let paras = layout_blocks(&ctx, blocks, width);
                 let story = [
                     StoryKind::PrimaryFooter,
@@ -332,8 +359,10 @@ impl NoteStore {
         if notes.is_empty() {
             return Self::default();
         }
+        let links = related_links(doc, |_, t| t == REL_FOOTNOTES);
         let ctx = Context {
             order: Some(order),
+            links: Some(&links),
             ..*ctx
         };
         let sep_blocks: Vec<Block> = notes

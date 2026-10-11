@@ -15,9 +15,11 @@
 //! model has no edit that changes them). Call [`IncrementalLayout::invalidate`] when the
 //! document is replaced or the font library gets new faces.
 
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use open365_docx::{Block, Document, NoteKind, flatten_content_controls};
+use open365_opc::{PartName, Relationships, TargetMode, rels_part_name, resolve_target};
 use open365_text::FontLibrary;
 
 use crate::build::{UnitLayout, build_unit};
@@ -186,6 +188,8 @@ impl IncrementalLayout {
             return &self.layout;
         }
         let order = note_order(doc);
+        let links = part_links(doc, doc.main_part());
+        let end_links = related_links(doc, |_, t| t == REL_ENDNOTES);
         let ctx = Context {
             fonts,
             styles: doc.styles(),
@@ -195,6 +199,7 @@ impl IncrementalLayout {
             fields: FieldEnv::default(),
             order: Some(&order),
             own_mark: None,
+            links: Some(&links),
         };
         let doc_sections = doc.sections();
         let sections: Vec<SectionProps> = doc_sections.iter().map(SectionProps::from).collect();
@@ -340,6 +345,11 @@ impl IncrementalLayout {
                     stats.blocks_laid_out += 1;
                     let ctx = Context {
                         own_mark: mark.map(|o| (true, o)),
+                        links: if matches!(kind, StoryKind::Main) {
+                            ctx.links
+                        } else {
+                            Some(&end_links)
+                        },
                         ..ctx
                     };
                     Arc::new(build_unit(block, ctx, &labels, para, width))
@@ -616,3 +626,43 @@ fn font_uses(items: &[FlowItem], fonts: &FontLibrary) -> Vec<FontUse> {
         })
         .collect()
 }
+
+/// External relationship targets of `part` by id (hyperlink addresses).
+pub(crate) fn part_links(doc: &Document, part: &PartName) -> HashMap<String, String> {
+    doc.package()
+        .part(rels_part_name(Some(part)).as_str())
+        .and_then(|p| Relationships::parse(p.data()).ok())
+        .map(|rels| {
+            rels.iter()
+                .filter(|r| r.target_mode == TargetMode::External)
+                .map(|r| (r.id.clone(), r.target.clone()))
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+/// The hyperlink targets of the part the main part relates to for which `pick(id, type)` holds
+/// (a header, footer or note part has relationship ids of its own).
+pub(crate) fn related_links(
+    doc: &Document,
+    pick: impl Fn(&str, &str) -> bool,
+) -> HashMap<String, String> {
+    let main = doc.main_part();
+    let target = doc
+        .package()
+        .part(rels_part_name(Some(main)).as_str())
+        .and_then(|p| Relationships::parse(p.data()).ok())
+        .and_then(|rels| {
+            rels.iter()
+                .find(|r| r.target_mode == TargetMode::Internal && pick(&r.id, &r.rel_type))
+                .and_then(|r| resolve_target(Some(main), &r.target).ok())
+        });
+    target.map_or_else(HashMap::new, |part| part_links(doc, &part))
+}
+
+/// Relationship type of the footnotes part.
+pub(crate) const REL_FOOTNOTES: &str =
+    "http://schemas.openxmlformats.org/officeDocument/2006/relationships/footnotes";
+/// Relationship type of the endnotes part.
+pub(crate) const REL_ENDNOTES: &str =
+    "http://schemas.openxmlformats.org/officeDocument/2006/relationships/endnotes";

@@ -1,0 +1,5 @@
+feature = "layout-trh"
+made_with = "Microsoft Word 16.0.20430 (Windows)"
+author = "project member"
+expect_dropped = []
+notes = "three tables with 0, 3.6 and 10 pt top and bottom cell padding; rows of every height rule (auto, at least 30/5, exactly 30/8), a two line row, centred and bottom aligned cells: whether the row height counts the padding"

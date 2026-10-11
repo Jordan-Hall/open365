@@ -1,0 +1,5 @@
+feature = "layout-frame"
+made_with = "Microsoft Word 16.0.20430 (Windows)"
+author = "project member"
+expect_dropped = []
+notes = "a framed paragraph at 100 pt from the page left and 250 pt from the page top (exact height 60 pt), another one centred and 30 pt below the paragraph top, with distances"

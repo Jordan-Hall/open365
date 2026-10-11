@@ -1,0 +1,3656 @@
+{
+  "source": "fixtures/xlsx/sortfilter-sort.xlsx",
+  "sheets": [
+    {
+      "name": "mixed-asc",
+      "visible": -1,
+      "usedRange": "A1:A25",
+      "truncatedAt2000": false,
+      "cells": {
+        "A1": {
+          "value2": 3.0,
+          "text": "3",
+          "formula": null
+        },
+        "A2": {
+          "value2": "b",
+          "text": "b",
+          "formula": null
+        },
+        "A3": {
+          "value2": "A",
+          "text": "A",
+          "formula": null
+        },
+        "A4": {
+          "value2": "a",
+          "text": "a",
+          "formula": null
+        },
+        "A5": {
+          "value2": true,
+          "text": "TRUE",
+          "formula": null
+        },
+        "A6": {
+          "value2": false,
+          "text": "FALSE",
+          "formula": null
+        },
+        "A7": {
+          "value2": "B",
+          "text": "B",
+          "formula": null
+        },
+        "A9": {
+          "value2": "-x",
+          "text": "-x",
+          "formula": null
+        },
+        "A10": {
+          "value2": "x",
+          "text": "x",
+          "formula": null
+        },
+        "A11": {
+          "value2": "y",
+          "text": "y",
+          "formula": null
+        },
+        "A12": {
+          "value2": 1.5,
+          "text": "1.5",
+          "formula": null
+        },
+        "A13": {
+          "value2": "ab",
+          "text": "ab",
+          "formula": null
+        },
+        "A14": {
+          "value2": "a b",
+          "text": "a b",
+          "formula": null
+        },
+        "A15": {
+          "value2": "a-b",
+          "text": "a-b",
+          "formula": null
+        },
+        "A16": {
+          "value2": -2146826281,
+          "text": "#DIV/0!",
+          "formula": "=1/0"
+        },
+        "A18": {
+          "value2": -2146826246,
+          "text": "#N/A",
+          "formula": "=NA()"
+        },
+        "A19": {
+          "value2": 0.0,
+          "text": "0",
+          "formula": null
+        },
+        "A20": {
+          "value2": -2.0,
+          "text": "-2",
+          "formula": null
+        },
+        "A21": {
+          "value2": "Z",
+          "text": "Z",
+          "formula": null
+        },
+        "A22": {
+          "value2": "z",
+          "text": "z",
+          "formula": null
+        },
+        "A23": {
+          "value2": "é",
+          "text": "é",
+          "formula": null
+        },
+        "A24": {
+          "value2": "e",
+          "text": "e",
+          "formula": null
+        },
+        "A25": {
+          "value2": "f",
+          "text": "f",
+          "formula": null
+        }
+      }
+    },
+    {
+      "name": "mixed-desc",
+      "visible": -1,
+      "usedRange": "A1:A25",
+      "truncatedAt2000": false,
+      "cells": {
+        "A1": {
+          "value2": 3.0,
+          "text": "3",
+          "formula": null
+        },
+        "A2": {
+          "value2": "b",
+          "text": "b",
+          "formula": null
+        },
+        "A3": {
+          "value2": "A",
+          "text": "A",
+          "formula": null
+        },
+        "A4": {
+          "value2": "a",
+          "text": "a",
+          "formula": null
+        },
+        "A5": {
+          "value2": true,
+          "text": "TRUE",
+          "formula": null
+        },
+        "A6": {
+          "value2": false,
+          "text": "FALSE",
+          "formula": null
+        },
+        "A7": {
+          "value2": "B",
+          "text": "B",
+          "formula": null
+        },
+        "A9": {
+          "value2": "-x",
+          "text": "-x",
+          "formula": null
+        },
+        "A10": {
+          "value2": "x",
+          "text": "x",
+          "formula": null
+        },
+        "A11": {
+          "value2": "y",
+          "text": "y",
+          "formula": null
+        },
+        "A12": {
+          "value2": 1.5,
+          "text": "1.5",
+          "formula": null
+        },
+        "A13": {
+          "value2": "ab",
+          "text": "ab",
+          "formula": null
+        },
+        "A14": {
+          "value2": "a b",
+          "text": "a b",
+          "formula": null
+        },
+        "A15": {
+          "value2": "a-b",
+          "text": "a-b",
+          "formula": null
+        },
+        "A16": {
+          "value2": -2146826281,
+          "text": "#DIV/0!",
+          "formula": "=1/0"
+        },
+        "A18": {
+          "value2": -2146826246,
+          "text": "#N/A",
+          "formula": "=NA()"
+        },
+        "A19": {
+          "value2": 0.0,
+          "text": "0",
+          "formula": null
+        },
+        "A20": {
+          "value2": -2.0,
+          "text": "-2",
+          "formula": null
+        },
+        "A21": {
+          "value2": "Z",
+          "text": "Z",
+          "formula": null
+        },
+        "A22": {
+          "value2": "z",
+          "text": "z",
+          "formula": null
+        },
+        "A23": {
+          "value2": "é",
+          "text": "é",
+          "formula": null
+        },
+        "A24": {
+          "value2": "e",
+          "text": "e",
+          "formula": null
+        },
+        "A25": {
+          "value2": "f",
+          "text": "f",
+          "formula": null
+        }
+      }
+    },
+    {
+      "name": "case-insens",
+      "visible": -1,
+      "usedRange": "A1:A10",
+      "truncatedAt2000": false,
+      "cells": {
+        "A1": {
+          "value2": "banana",
+          "text": "banana",
+          "formula": null
+        },
+        "A2": {
+          "value2": "Apple",
+          "text": "Apple",
+          "formula": null
+        },
+        "A3": {
+          "value2": "cherry",
+          "text": "cherry",
+          "formula": null
+        },
+        "A4": {
+          "value2": "apple",
+          "text": "apple",
+          "formula": null
+        },
+        "A5": {
+          "value2": "Banana",
+          "text": "Banana",
+          "formula": null
+        },
+        "A6": {
+          "value2": "APPLE",
+          "text": "APPLE",
+          "formula": null
+        },
+        "A7": {
+          "value2": "cherry",
+          "text": "cherry",
+          "formula": null
+        },
+        "A8": {
+          "value2": "Cherry",
+          "text": "Cherry",
+          "formula": null
+        },
+        "A9": {
+          "value2": "date",
+          "text": "date",
+          "formula": null
+        },
+        "A10": {
+          "value2": "Date",
+          "text": "Date",
+          "formula": null
+        }
+      }
+    },
+    {
+      "name": "case-sens-asc",
+      "visible": -1,
+      "usedRange": "A1:A10",
+      "truncatedAt2000": false,
+      "cells": {
+        "A1": {
+          "value2": "banana",
+          "text": "banana",
+          "formula": null
+        },
+        "A2": {
+          "value2": "Apple",
+          "text": "Apple",
+          "formula": null
+        },
+        "A3": {
+          "value2": "cherry",
+          "text": "cherry",
+          "formula": null
+        },
+        "A4": {
+          "value2": "apple",
+          "text": "apple",
+          "formula": null
+        },
+        "A5": {
+          "value2": "Banana",
+          "text": "Banana",
+          "formula": null
+        },
+        "A6": {
+          "value2": "APPLE",
+          "text": "APPLE",
+          "formula": null
+        },
+        "A7": {
+          "value2": "cherry",
+          "text": "cherry",
+          "formula": null
+        },
+        "A8": {
+          "value2": "Cherry",
+          "text": "Cherry",
+          "formula": null
+        },
+        "A9": {
+          "value2": "date",
+          "text": "date",
+          "formula": null
+        },
+        "A10": {
+          "value2": "Date",
+          "text": "Date",
+          "formula": null
+        }
+      }
+    },
+    {
+      "name": "case-sens-desc",
+      "visible": -1,
+      "usedRange": "A1:A10",
+      "truncatedAt2000": false,
+      "cells": {
+        "A1": {
+          "value2": "banana",
+          "text": "banana",
+          "formula": null
+        },
+        "A2": {
+          "value2": "Apple",
+          "text": "Apple",
+          "formula": null
+        },
+        "A3": {
+          "value2": "cherry",
+          "text": "cherry",
+          "formula": null
+        },
+        "A4": {
+          "value2": "apple",
+          "text": "apple",
+          "formula": null
+        },
+        "A5": {
+          "value2": "Banana",
+          "text": "Banana",
+          "formula": null
+        },
+        "A6": {
+          "value2": "APPLE",
+          "text": "APPLE",
+          "formula": null
+        },
+        "A7": {
+          "value2": "cherry",
+          "text": "cherry",
+          "formula": null
+        },
+        "A8": {
+          "value2": "Cherry",
+          "text": "Cherry",
+          "formula": null
+        },
+        "A9": {
+          "value2": "date",
+          "text": "date",
+          "formula": null
+        },
+        "A10": {
+          "value2": "Date",
+          "text": "Date",
+          "formula": null
+        }
+      }
+    },
+    {
+      "name": "punct-accents",
+      "visible": -1,
+      "usedRange": "A1:A25",
+      "truncatedAt2000": false,
+      "cells": {
+        "A1": {
+          "value2": "co-op",
+          "text": "co-op",
+          "formula": null
+        },
+        "A2": {
+          "value2": "coop",
+          "text": "coop",
+          "formula": null
+        },
+        "A3": {
+          "value2": "co op",
+          "text": "co op",
+          "formula": null
+        },
+        "A4": {
+          "value2": "o'neil",
+          "text": "o'neil",
+          "formula": null
+        },
+        "A5": {
+          "value2": "oneil",
+          "text": "oneil",
+          "formula": null
+        },
+        "A6": {
+          "value2": "o neil",
+          "text": "o neil",
+          "formula": null
+        },
+        "A7": {
+          "value2": "Cote",
+          "text": "Cote",
+          "formula": null
+        },
+        "A8": {
+          "value2": "côte",
+          "text": "côte",
+          "formula": null
+        },
+        "A9": {
+          "value2": "coté",
+          "text": "coté",
+          "formula": null
+        },
+        "A10": {
+          "value2": "cote",
+          "text": "cote",
+          "formula": null
+        },
+        "A11": {
+          "value2": "a1",
+          "text": "a1",
+          "formula": null
+        },
+        "A12": {
+          "value2": "a10",
+          "text": "a10",
+          "formula": null
+        },
+        "A13": {
+          "value2": "a2",
+          "text": "a2",
+          "formula": null
+        },
+        "A14": {
+          "value2": "a-1",
+          "text": "a-1",
+          "formula": null
+        },
+        "A15": {
+          "value2": 10.0,
+          "text": "10",
+          "formula": null
+        },
+        "A16": {
+          "value2": 9.0,
+          "text": "9",
+          "formula": null
+        },
+        "A17": {
+          "value2": "_x",
+          "text": "_x",
+          "formula": null
+        },
+        "A18": {
+          "value2": "~y",
+          "text": "~y",
+          "formula": null
+        },
+        "A19": {
+          "value2": "#z",
+          "text": "#z",
+          "formula": null
+        },
+        "A20": {
+          "value2": "ß",
+          "text": "ß",
+          "formula": null
+        },
+        "A21": {
+          "value2": "ss",
+          "text": "ss",
+          "formula": null
+        },
+        "A22": {
+          "value2": "st",
+          "text": "st",
+          "formula": null
+        },
+        "A23": {
+          "value2": "æ",
+          "text": "æ",
+          "formula": null
+        },
+        "A24": {
+          "value2": "ae",
+          "text": "ae",
+          "formula": null
+        },
+        "A25": {
+          "value2": "af",
+          "text": "af",
+          "formula": null
+        }
+      }
+    },
+    {
+      "name": "numbers-text",
+      "visible": -1,
+      "usedRange": "A1:A11",
+      "truncatedAt2000": false,
+      "cells": {
+        "A1": {
+          "value2": "10",
+          "text": "10",
+          "formula": null
+        },
+        "A2": {
+          "value2": "9",
+          "text": "9",
+          "formula": null
+        },
+        "A3": {
+          "value2": 10.0,
+          "text": "10",
+          "formula": null
+        },
+        "A4": {
+          "value2": 9.0,
+          "text": "9",
+          "formula": null
+        },
+        "A5": {
+          "value2": "1e3",
+          "text": "1e3",
+          "formula": null
+        },
+        "A6": {
+          "value2": 1000.0,
+          "text": "1000",
+          "formula": null
+        },
+        "A7": {
+          "value2": -5.0,
+          "text": "-5",
+          "formula": null
+        },
+        "A8": {
+          "value2": "-5",
+          "text": "-5",
+          "formula": null
+        },
+        "A9": {
+          "value2": 0.5,
+          "text": "0.5",
+          "formula": null
+        },
+        "A11": {
+          "value2": "abc",
+          "text": "abc",
+          "formula": null
+        }
+      }
+    },
+    {
+      "name": "header-yes",
+      "visible": -1,
+      "usedRange": "A1:D9",
+      "truncatedAt2000": false,
+      "cells": {
+        "A1": {
+          "value2": "Name",
+          "text": "Name",
+          "formula": null
+        },
+        "B1": {
+          "value2": "Dept",
+          "text": "Dept",
+          "formula": null
+        },
+        "C1": {
+          "value2": "Score",
+          "text": "Score",
+          "formula": null
+        },
+        "D1": {
+          "value2": "Note",
+          "text": "Note",
+          "formula": null
+        },
+        "A2": {
+          "value2": "Ann",
+          "text": "Ann",
+          "formula": null
+        },
+        "B2": {
+          "value2": "Ops",
+          "text": "Ops",
+          "formula": null
+        },
+        "C2": {
+          "value2": 70.0,
+          "text": "70",
+          "formula": null
+        },
+        "D2": {
+          "value2": "a",
+          "text": "a",
+          "formula": null
+        },
+        "A3": {
+          "value2": "Bob",
+          "text": "Bob",
+          "formula": null
+        },
+        "B3": {
+          "value2": "Dev",
+          "text": "Dev",
+          "formula": null
+        },
+        "C3": {
+          "value2": 85.0,
+          "text": "85",
+          "formula": null
+        },
+        "D3": {
+          "value2": "b",
+          "text": "b",
+          "formula": null
+        },
+        "A4": {
+          "value2": "Cy",
+          "text": "Cy",
+          "formula": null
+        },
+        "B4": {
+          "value2": "Ops",
+          "text": "Ops",
+          "formula": null
+        },
+        "C4": {
+          "value2": 85.0,
+          "text": "85",
+          "formula": null
+        },
+        "D4": {
+          "value2": "c",
+          "text": "c",
+          "formula": null
+        },
+        "A5": {
+          "value2": "Di",
+          "text": "Di",
+          "formula": null
+        },
+        "B5": {
+          "value2": "Dev",
+          "text": "Dev",
+          "formula": null
+        },
+        "C5": {
+          "value2": 70.0,
+          "text": "70",
+          "formula": null
+        },
+        "D5": {
+          "value2": "d",
+          "text": "d",
+          "formula": null
+        },
+        "A6": {
+          "value2": "Ed",
+          "text": "Ed",
+          "formula": null
+        },
+        "B6": {
+          "value2": "Ops",
+          "text": "Ops",
+          "formula": null
+        },
+        "C6": {
+          "value2": 60.0,
+          "text": "60",
+          "formula": null
+        },
+        "D6": {
+          "value2": "e",
+          "text": "e",
+          "formula": null
+        },
+        "A7": {
+          "value2": "Flo",
+          "text": "Flo",
+          "formula": null
+        },
+        "B7": {
+          "value2": "Dev",
+          "text": "Dev",
+          "formula": null
+        },
+        "C7": {
+          "value2": 85.0,
+          "text": "85",
+          "formula": null
+        },
+        "D7": {
+          "value2": "f",
+          "text": "f",
+          "formula": null
+        },
+        "A8": {
+          "value2": "Gus",
+          "text": "Gus",
+          "formula": null
+        },
+        "B8": {
+          "value2": "Ops",
+          "text": "Ops",
+          "formula": null
+        },
+        "C8": {
+          "value2": 70.0,
+          "text": "70",
+          "formula": null
+        },
+        "D8": {
+          "value2": "g",
+          "text": "g",
+          "formula": null
+        },
+        "A9": {
+          "value2": "Hal",
+          "text": "Hal",
+          "formula": null
+        },
+        "B9": {
+          "value2": "Dev",
+          "text": "Dev",
+          "formula": null
+        },
+        "C9": {
+          "value2": 60.0,
+          "text": "60",
+          "formula": null
+        },
+        "D9": {
+          "value2": "h",
+          "text": "h",
+          "formula": null
+        }
+      }
+    },
+    {
+      "name": "header-no",
+      "visible": -1,
+      "usedRange": "A1:D9",
+      "truncatedAt2000": false,
+      "cells": {
+        "A1": {
+          "value2": "Name",
+          "text": "Name",
+          "formula": null
+        },
+        "B1": {
+          "value2": "Dept",
+          "text": "Dept",
+          "formula": null
+        },
+        "C1": {
+          "value2": "Score",
+          "text": "Score",
+          "formula": null
+        },
+        "D1": {
+          "value2": "Note",
+          "text": "Note",
+          "formula": null
+        },
+        "A2": {
+          "value2": "Ann",
+          "text": "Ann",
+          "formula": null
+        },
+        "B2": {
+          "value2": "Ops",
+          "text": "Ops",
+          "formula": null
+        },
+        "C2": {
+          "value2": 70.0,
+          "text": "70",
+          "formula": null
+        },
+        "D2": {
+          "value2": "a",
+          "text": "a",
+          "formula": null
+        },
+        "A3": {
+          "value2": "Bob",
+          "text": "Bob",
+          "formula": null
+        },
+        "B3": {
+          "value2": "Dev",
+          "text": "Dev",
+          "formula": null
+        },
+        "C3": {
+          "value2": 85.0,
+          "text": "85",
+          "formula": null
+        },
+        "D3": {
+          "value2": "b",
+          "text": "b",
+          "formula": null
+        },
+        "A4": {
+          "value2": "Cy",
+          "text": "Cy",
+          "formula": null
+        },
+        "B4": {
+          "value2": "Ops",
+          "text": "Ops",
+          "formula": null
+        },
+        "C4": {
+          "value2": 85.0,
+          "text": "85",
+          "formula": null
+        },
+        "D4": {
+          "value2": "c",
+          "text": "c",
+          "formula": null
+        },
+        "A5": {
+          "value2": "Di",
+          "text": "Di",
+          "formula": null
+        },
+        "B5": {
+          "value2": "Dev",
+          "text": "Dev",
+          "formula": null
+        },
+        "C5": {
+          "value2": 70.0,
+          "text": "70",
+          "formula": null
+        },
+        "D5": {
+          "value2": "d",
+          "text": "d",
+          "formula": null
+        },
+        "A6": {
+          "value2": "Ed",
+          "text": "Ed",
+          "formula": null
+        },
+        "B6": {
+          "value2": "Ops",
+          "text": "Ops",
+          "formula": null
+        },
+        "C6": {
+          "value2": 60.0,
+          "text": "60",
+          "formula": null
+        },
+        "D6": {
+          "value2": "e",
+          "text": "e",
+          "formula": null
+        },
+        "A7": {
+          "value2": "Flo",
+          "text": "Flo",
+          "formula": null
+        },
+        "B7": {
+          "value2": "Dev",
+          "text": "Dev",
+          "formula": null
+        },
+        "C7": {
+          "value2": 85.0,
+          "text": "85",
+          "formula": null
+        },
+        "D7": {
+          "value2": "f",
+          "text": "f",
+          "formula": null
+        },
+        "A8": {
+          "value2": "Gus",
+          "text": "Gus",
+          "formula": null
+        },
+        "B8": {
+          "value2": "Ops",
+          "text": "Ops",
+          "formula": null
+        },
+        "C8": {
+          "value2": 70.0,
+          "text": "70",
+          "formula": null
+        },
+        "D8": {
+          "value2": "g",
+          "text": "g",
+          "formula": null
+        },
+        "A9": {
+          "value2": "Hal",
+          "text": "Hal",
+          "formula": null
+        },
+        "B9": {
+          "value2": "Dev",
+          "text": "Dev",
+          "formula": null
+        },
+        "C9": {
+          "value2": 60.0,
+          "text": "60",
+          "formula": null
+        },
+        "D9": {
+          "value2": "h",
+          "text": "h",
+          "formula": null
+        }
+      }
+    },
+    {
+      "name": "header-guess-text-over-numbers",
+      "visible": -1,
+      "usedRange": "A1:D9",
+      "truncatedAt2000": false,
+      "cells": {
+        "A1": {
+          "value2": "Name",
+          "text": "Name",
+          "formula": null
+        },
+        "B1": {
+          "value2": "Dept",
+          "text": "Dept",
+          "formula": null
+        },
+        "C1": {
+          "value2": "Score",
+          "text": "Score",
+          "formula": null
+        },
+        "D1": {
+          "value2": "Note",
+          "text": "Note",
+          "formula": null
+        },
+        "A2": {
+          "value2": "Ann",
+          "text": "Ann",
+          "formula": null
+        },
+        "B2": {
+          "value2": "Ops",
+          "text": "Ops",
+          "formula": null
+        },
+        "C2": {
+          "value2": 70.0,
+          "text": "70",
+          "formula": null
+        },
+        "D2": {
+          "value2": "a",
+          "text": "a",
+          "formula": null
+        },
+        "A3": {
+          "value2": "Bob",
+          "text": "Bob",
+          "formula": null
+        },
+        "B3": {
+          "value2": "Dev",
+          "text": "Dev",
+          "formula": null
+        },
+        "C3": {
+          "value2": 85.0,
+          "text": "85",
+          "formula": null
+        },
+        "D3": {
+          "value2": "b",
+          "text": "b",
+          "formula": null
+        },
+        "A4": {
+          "value2": "Cy",
+          "text": "Cy",
+          "formula": null
+        },
+        "B4": {
+          "value2": "Ops",
+          "text": "Ops",
+          "formula": null
+        },
+        "C4": {
+          "value2": 85.0,
+          "text": "85",
+          "formula": null
+        },
+        "D4": {
+          "value2": "c",
+          "text": "c",
+          "formula": null
+        },
+        "A5": {
+          "value2": "Di",
+          "text": "Di",
+          "formula": null
+        },
+        "B5": {
+          "value2": "Dev",
+          "text": "Dev",
+          "formula": null
+        },
+        "C5": {
+          "value2": 70.0,
+          "text": "70",
+          "formula": null
+        },
+        "D5": {
+          "value2": "d",
+          "text": "d",
+          "formula": null
+        },
+        "A6": {
+          "value2": "Ed",
+          "text": "Ed",
+          "formula": null
+        },
+        "B6": {
+          "value2": "Ops",
+          "text": "Ops",
+          "formula": null
+        },
+        "C6": {
+          "value2": 60.0,
+          "text": "60",
+          "formula": null
+        },
+        "D6": {
+          "value2": "e",
+          "text": "e",
+          "formula": null
+        },
+        "A7": {
+          "value2": "Flo",
+          "text": "Flo",
+          "formula": null
+        },
+        "B7": {
+          "value2": "Dev",
+          "text": "Dev",
+          "formula": null
+        },
+        "C7": {
+          "value2": 85.0,
+          "text": "85",
+          "formula": null
+        },
+        "D7": {
+          "value2": "f",
+          "text": "f",
+          "formula": null
+        },
+        "A8": {
+          "value2": "Gus",
+          "text": "Gus",
+          "formula": null
+        },
+        "B8": {
+          "value2": "Ops",
+          "text": "Ops",
+          "formula": null
+        },
+        "C8": {
+          "value2": 70.0,
+          "text": "70",
+          "formula": null
+        },
+        "D8": {
+          "value2": "g",
+          "text": "g",
+          "formula": null
+        },
+        "A9": {
+          "value2": "Hal",
+          "text": "Hal",
+          "formula": null
+        },
+        "B9": {
+          "value2": "Dev",
+          "text": "Dev",
+          "formula": null
+        },
+        "C9": {
+          "value2": 60.0,
+          "text": "60",
+          "formula": null
+        },
+        "D9": {
+          "value2": "h",
+          "text": "h",
+          "formula": null
+        }
+      }
+    },
+    {
+      "name": "header-guess-all-text",
+      "visible": -1,
+      "usedRange": "A1:A4",
+      "truncatedAt2000": false,
+      "cells": {
+        "A1": {
+          "value2": "Name",
+          "text": "Name",
+          "formula": null
+        },
+        "A2": {
+          "value2": "zed",
+          "text": "zed",
+          "formula": null
+        },
+        "A3": {
+          "value2": "amy",
+          "text": "amy",
+          "formula": null
+        },
+        "A4": {
+          "value2": "bob",
+          "text": "bob",
+          "formula": null
+        }
+      }
+    },
+    {
+      "name": "header-guess-numbers",
+      "visible": -1,
+      "usedRange": "A1:A4",
+      "truncatedAt2000": false,
+      "cells": {
+        "A1": {
+          "value2": 5.0,
+          "text": "5",
+          "formula": null
+        },
+        "A2": {
+          "value2": 3.0,
+          "text": "3",
+          "formula": null
+        },
+        "A3": {
+          "value2": 9.0,
+          "text": "9",
+          "formula": null
+        },
+        "A4": {
+          "value2": 1.0,
+          "text": "1",
+          "formula": null
+        }
+      }
+    },
+    {
+      "name": "header-guess-two-cols",
+      "visible": -1,
+      "usedRange": "A1:B4",
+      "truncatedAt2000": false,
+      "cells": {
+        "A1": {
+          "value2": "Item",
+          "text": "Item",
+          "formula": null
+        },
+        "B1": {
+          "value2": "Qty",
+          "text": "Qty",
+          "formula": null
+        },
+        "A2": {
+          "value2": "pear",
+          "text": "pear",
+          "formula": null
+        },
+        "B2": {
+          "value2": 3.0,
+          "text": "3",
+          "formula": null
+        },
+        "A3": {
+          "value2": "fig",
+          "text": "fig",
+          "formula": null
+        },
+        "B3": {
+          "value2": 1.0,
+          "text": "1",
+          "formula": null
+        },
+        "A4": {
+          "value2": "kiwi",
+          "text": "kiwi",
+          "formula": null
+        },
+        "B4": {
+          "value2": 2.0,
+          "text": "2",
+          "formula": null
+        }
+      }
+    },
+    {
+      "name": "multi-key",
+      "visible": -1,
+      "usedRange": "A1:D9",
+      "truncatedAt2000": false,
+      "cells": {
+        "A1": {
+          "value2": "Name",
+          "text": "Name",
+          "formula": null
+        },
+        "B1": {
+          "value2": "Dept",
+          "text": "Dept",
+          "formula": null
+        },
+        "C1": {
+          "value2": "Score",
+          "text": "Score",
+          "formula": null
+        },
+        "D1": {
+          "value2": "Note",
+          "text": "Note",
+          "formula": null
+        },
+        "A2": {
+          "value2": "Ann",
+          "text": "Ann",
+          "formula": null
+        },
+        "B2": {
+          "value2": "Ops",
+          "text": "Ops",
+          "formula": null
+        },
+        "C2": {
+          "value2": 70.0,
+          "text": "70",
+          "formula": null
+        },
+        "D2": {
+          "value2": "a",
+          "text": "a",
+          "formula": null
+        },
+        "A3": {
+          "value2": "Bob",
+          "text": "Bob",
+          "formula": null
+        },
+        "B3": {
+          "value2": "Dev",
+          "text": "Dev",
+          "formula": null
+        },
+        "C3": {
+          "value2": 85.0,
+          "text": "85",
+          "formula": null
+        },
+        "D3": {
+          "value2": "b",
+          "text": "b",
+          "formula": null
+        },
+        "A4": {
+          "value2": "Cy",
+          "text": "Cy",
+          "formula": null
+        },
+        "B4": {
+          "value2": "Ops",
+          "text": "Ops",
+          "formula": null
+        },
+        "C4": {
+          "value2": 85.0,
+          "text": "85",
+          "formula": null
+        },
+        "D4": {
+          "value2": "c",
+          "text": "c",
+          "formula": null
+        },
+        "A5": {
+          "value2": "Di",
+          "text": "Di",
+          "formula": null
+        },
+        "B5": {
+          "value2": "Dev",
+          "text": "Dev",
+          "formula": null
+        },
+        "C5": {
+          "value2": 70.0,
+          "text": "70",
+          "formula": null
+        },
+        "D5": {
+          "value2": "d",
+          "text": "d",
+          "formula": null
+        },
+        "A6": {
+          "value2": "Ed",
+          "text": "Ed",
+          "formula": null
+        },
+        "B6": {
+          "value2": "Ops",
+          "text": "Ops",
+          "formula": null
+        },
+        "C6": {
+          "value2": 60.0,
+          "text": "60",
+          "formula": null
+        },
+        "D6": {
+          "value2": "e",
+          "text": "e",
+          "formula": null
+        },
+        "A7": {
+          "value2": "Flo",
+          "text": "Flo",
+          "formula": null
+        },
+        "B7": {
+          "value2": "Dev",
+          "text": "Dev",
+          "formula": null
+        },
+        "C7": {
+          "value2": 85.0,
+          "text": "85",
+          "formula": null
+        },
+        "D7": {
+          "value2": "f",
+          "text": "f",
+          "formula": null
+        },
+        "A8": {
+          "value2": "Gus",
+          "text": "Gus",
+          "formula": null
+        },
+        "B8": {
+          "value2": "Ops",
+          "text": "Ops",
+          "formula": null
+        },
+        "C8": {
+          "value2": 70.0,
+          "text": "70",
+          "formula": null
+        },
+        "D8": {
+          "value2": "g",
+          "text": "g",
+          "formula": null
+        },
+        "A9": {
+          "value2": "Hal",
+          "text": "Hal",
+          "formula": null
+        },
+        "B9": {
+          "value2": "Dev",
+          "text": "Dev",
+          "formula": null
+        },
+        "C9": {
+          "value2": 60.0,
+          "text": "60",
+          "formula": null
+        },
+        "D9": {
+          "value2": "h",
+          "text": "h",
+          "formula": null
+        }
+      }
+    },
+    {
+      "name": "multi-key-desc-first",
+      "visible": -1,
+      "usedRange": "A1:D9",
+      "truncatedAt2000": false,
+      "cells": {
+        "A1": {
+          "value2": "Name",
+          "text": "Name",
+          "formula": null
+        },
+        "B1": {
+          "value2": "Dept",
+          "text": "Dept",
+          "formula": null
+        },
+        "C1": {
+          "value2": "Score",
+          "text": "Score",
+          "formula": null
+        },
+        "D1": {
+          "value2": "Note",
+          "text": "Note",
+          "formula": null
+        },
+        "A2": {
+          "value2": "Ann",
+          "text": "Ann",
+          "formula": null
+        },
+        "B2": {
+          "value2": "Ops",
+          "text": "Ops",
+          "formula": null
+        },
+        "C2": {
+          "value2": 70.0,
+          "text": "70",
+          "formula": null
+        },
+        "D2": {
+          "value2": "a",
+          "text": "a",
+          "formula": null
+        },
+        "A3": {
+          "value2": "Bob",
+          "text": "Bob",
+          "formula": null
+        },
+        "B3": {
+          "value2": "Dev",
+          "text": "Dev",
+          "formula": null
+        },
+        "C3": {
+          "value2": 85.0,
+          "text": "85",
+          "formula": null
+        },
+        "D3": {
+          "value2": "b",
+          "text": "b",
+          "formula": null
+        },
+        "A4": {
+          "value2": "Cy",
+          "text": "Cy",
+          "formula": null
+        },
+        "B4": {
+          "value2": "Ops",
+          "text": "Ops",
+          "formula": null
+        },
+        "C4": {
+          "value2": 85.0,
+          "text": "85",
+          "formula": null
+        },
+        "D4": {
+          "value2": "c",
+          "text": "c",
+          "formula": null
+        },
+        "A5": {
+          "value2": "Di",
+          "text": "Di",
+          "formula": null
+        },
+        "B5": {
+          "value2": "Dev",
+          "text": "Dev",
+          "formula": null
+        },
+        "C5": {
+          "value2": 70.0,
+          "text": "70",
+          "formula": null
+        },
+        "D5": {
+          "value2": "d",
+          "text": "d",
+          "formula": null
+        },
+        "A6": {
+          "value2": "Ed",
+          "text": "Ed",
+          "formula": null
+        },
+        "B6": {
+          "value2": "Ops",
+          "text": "Ops",
+          "formula": null
+        },
+        "C6": {
+          "value2": 60.0,
+          "text": "60",
+          "formula": null
+        },
+        "D6": {
+          "value2": "e",
+          "text": "e",
+          "formula": null
+        },
+        "A7": {
+          "value2": "Flo",
+          "text": "Flo",
+          "formula": null
+        },
+        "B7": {
+          "value2": "Dev",
+          "text": "Dev",
+          "formula": null
+        },
+        "C7": {
+          "value2": 85.0,
+          "text": "85",
+          "formula": null
+        },
+        "D7": {
+          "value2": "f",
+          "text": "f",
+          "formula": null
+        },
+        "A8": {
+          "value2": "Gus",
+          "text": "Gus",
+          "formula": null
+        },
+        "B8": {
+          "value2": "Ops",
+          "text": "Ops",
+          "formula": null
+        },
+        "C8": {
+          "value2": 70.0,
+          "text": "70",
+          "formula": null
+        },
+        "D8": {
+          "value2": "g",
+          "text": "g",
+          "formula": null
+        },
+        "A9": {
+          "value2": "Hal",
+          "text": "Hal",
+          "formula": null
+        },
+        "B9": {
+          "value2": "Dev",
+          "text": "Dev",
+          "formula": null
+        },
+        "C9": {
+          "value2": 60.0,
+          "text": "60",
+          "formula": null
+        },
+        "D9": {
+          "value2": "h",
+          "text": "h",
+          "formula": null
+        }
+      }
+    },
+    {
+      "name": "left-to-right",
+      "visible": -1,
+      "usedRange": "A1:E3",
+      "truncatedAt2000": false,
+      "cells": {
+        "A1": {
+          "value2": "k",
+          "text": "k",
+          "formula": null
+        },
+        "B1": {
+          "value2": "b",
+          "text": "b",
+          "formula": null
+        },
+        "C1": {
+          "value2": "a",
+          "text": "a",
+          "formula": null
+        },
+        "D1": {
+          "value2": "c",
+          "text": "c",
+          "formula": null
+        },
+        "E1": {
+          "value2": "B",
+          "text": "B",
+          "formula": null
+        },
+        "A2": {
+          "value2": 1.0,
+          "text": "1",
+          "formula": null
+        },
+        "B2": {
+          "value2": 2.0,
+          "text": "2",
+          "formula": null
+        },
+        "C2": {
+          "value2": 3.0,
+          "text": "3",
+          "formula": null
+        },
+        "D2": {
+          "value2": 4.0,
+          "text": "4",
+          "formula": null
+        },
+        "E2": {
+          "value2": 5.0,
+          "text": "5",
+          "formula": null
+        },
+        "A3": {
+          "value2": "x",
+          "text": "x",
+          "formula": null
+        },
+        "B3": {
+          "value2": "y",
+          "text": "y",
+          "formula": null
+        },
+        "C3": {
+          "value2": "z",
+          "text": "z",
+          "formula": null
+        },
+        "D3": {
+          "value2": "w",
+          "text": "w",
+          "formula": null
+        },
+        "E3": {
+          "value2": "v",
+          "text": "v",
+          "formula": null
+        }
+      }
+    },
+    {
+      "name": "left-to-right-header",
+      "visible": -1,
+      "usedRange": "A1:E3",
+      "truncatedAt2000": false,
+      "cells": {
+        "A1": {
+          "value2": "k",
+          "text": "k",
+          "formula": null
+        },
+        "B1": {
+          "value2": "b",
+          "text": "b",
+          "formula": null
+        },
+        "C1": {
+          "value2": "a",
+          "text": "a",
+          "formula": null
+        },
+        "D1": {
+          "value2": "c",
+          "text": "c",
+          "formula": null
+        },
+        "E1": {
+          "value2": "B",
+          "text": "B",
+          "formula": null
+        },
+        "A2": {
+          "value2": 1.0,
+          "text": "1",
+          "formula": null
+        },
+        "B2": {
+          "value2": 2.0,
+          "text": "2",
+          "formula": null
+        },
+        "C2": {
+          "value2": 3.0,
+          "text": "3",
+          "formula": null
+        },
+        "D2": {
+          "value2": 4.0,
+          "text": "4",
+          "formula": null
+        },
+        "E2": {
+          "value2": 5.0,
+          "text": "5",
+          "formula": null
+        },
+        "A3": {
+          "value2": "x",
+          "text": "x",
+          "formula": null
+        },
+        "B3": {
+          "value2": "y",
+          "text": "y",
+          "formula": null
+        },
+        "C3": {
+          "value2": "z",
+          "text": "z",
+          "formula": null
+        },
+        "D3": {
+          "value2": "w",
+          "text": "w",
+          "formula": null
+        },
+        "E3": {
+          "value2": "v",
+          "text": "v",
+          "formula": null
+        }
+      }
+    },
+    {
+      "name": "custom-list",
+      "visible": -1,
+      "usedRange": "A1:A11",
+      "truncatedAt2000": false,
+      "cells": {
+        "A1": {
+          "value2": "Priority",
+          "text": "Priority",
+          "formula": null
+        },
+        "A2": {
+          "value2": "Low",
+          "text": "Low",
+          "formula": null
+        },
+        "A3": {
+          "value2": "High",
+          "text": "High",
+          "formula": null
+        },
+        "A4": {
+          "value2": "Medium",
+          "text": "Medium",
+          "formula": null
+        },
+        "A5": {
+          "value2": "high",
+          "text": "high",
+          "formula": null
+        },
+        "A6": {
+          "value2": "Urgent",
+          "text": "Urgent",
+          "formula": null
+        },
+        "A7": {
+          "value2": "LOW",
+          "text": "LOW",
+          "formula": null
+        },
+        "A8": {
+          "value2": "Medium",
+          "text": "Medium",
+          "formula": null
+        },
+        "A9": {
+          "value2": "None",
+          "text": "None",
+          "formula": null
+        },
+        "A11": {
+          "value2": "High",
+          "text": "High",
+          "formula": null
+        }
+      }
+    },
+    {
+      "name": "custom-list-desc",
+      "visible": -1,
+      "usedRange": "A1:A11",
+      "truncatedAt2000": false,
+      "cells": {
+        "A1": {
+          "value2": "Priority",
+          "text": "Priority",
+          "formula": null
+        },
+        "A2": {
+          "value2": "Low",
+          "text": "Low",
+          "formula": null
+        },
+        "A3": {
+          "value2": "High",
+          "text": "High",
+          "formula": null
+        },
+        "A4": {
+          "value2": "Medium",
+          "text": "Medium",
+          "formula": null
+        },
+        "A5": {
+          "value2": "high",
+          "text": "high",
+          "formula": null
+        },
+        "A6": {
+          "value2": "Urgent",
+          "text": "Urgent",
+          "formula": null
+        },
+        "A7": {
+          "value2": "LOW",
+          "text": "LOW",
+          "formula": null
+        },
+        "A8": {
+          "value2": "Medium",
+          "text": "Medium",
+          "formula": null
+        },
+        "A9": {
+          "value2": "None",
+          "text": "None",
+          "formula": null
+        },
+        "A11": {
+          "value2": "High",
+          "text": "High",
+          "formula": null
+        }
+      }
+    },
+    {
+      "name": "custom-list-days",
+      "visible": -1,
+      "usedRange": "A1:A10",
+      "truncatedAt2000": false,
+      "cells": {
+        "A1": {
+          "value2": "Day",
+          "text": "Day",
+          "formula": null
+        },
+        "A2": {
+          "value2": "Wed",
+          "text": "Wed",
+          "formula": null
+        },
+        "A3": {
+          "value2": "mon",
+          "text": "mon",
+          "formula": null
+        },
+        "A4": {
+          "value2": "Sun",
+          "text": "Sun",
+          "formula": null
+        },
+        "A5": {
+          "value2": "Fri",
+          "text": "Fri",
+          "formula": null
+        },
+        "A6": {
+          "value2": "Tue",
+          "text": "Tue",
+          "formula": null
+        },
+        "A7": {
+          "value2": "Sat",
+          "text": "Sat",
+          "formula": null
+        },
+        "A8": {
+          "value2": "Thu",
+          "text": "Thu",
+          "formula": null
+        },
+        "A9": {
+          "value2": "Mon",
+          "text": "Mon",
+          "formula": null
+        },
+        "A10": {
+          "value2": "Funday",
+          "text": "Funday",
+          "formula": null
+        }
+      }
+    },
+    {
+      "name": "cell-color-top",
+      "visible": -1,
+      "usedRange": "A1:B9",
+      "truncatedAt2000": false,
+      "cells": {
+        "A1": {
+          "value2": "Item",
+          "text": "Item",
+          "formula": null
+        },
+        "B1": {
+          "value2": "Val",
+          "text": "Val",
+          "formula": null
+        },
+        "A2": {
+          "value2": "a",
+          "text": "a",
+          "formula": null
+        },
+        "B2": {
+          "value2": 5.0,
+          "text": "5",
+          "formula": null
+        },
+        "A3": {
+          "value2": "b",
+          "text": "b",
+          "formula": null
+        },
+        "B3": {
+          "value2": 4.0,
+          "text": "4",
+          "formula": null
+        },
+        "A4": {
+          "value2": "c",
+          "text": "c",
+          "formula": null
+        },
+        "B4": {
+          "value2": 3.0,
+          "text": "3",
+          "formula": null
+        },
+        "A5": {
+          "value2": "d",
+          "text": "d",
+          "formula": null
+        },
+        "B5": {
+          "value2": 2.0,
+          "text": "2",
+          "formula": null
+        },
+        "A6": {
+          "value2": "e",
+          "text": "e",
+          "formula": null
+        },
+        "B6": {
+          "value2": 1.0,
+          "text": "1",
+          "formula": null
+        },
+        "A7": {
+          "value2": "f",
+          "text": "f",
+          "formula": null
+        },
+        "B7": {
+          "value2": 9.0,
+          "text": "9",
+          "formula": null
+        },
+        "A8": {
+          "value2": "g",
+          "text": "g",
+          "formula": null
+        },
+        "B8": {
+          "value2": 8.0,
+          "text": "8",
+          "formula": null
+        },
+        "A9": {
+          "value2": "h",
+          "text": "h",
+          "formula": null
+        },
+        "B9": {
+          "value2": 7.0,
+          "text": "7",
+          "formula": null
+        }
+      }
+    },
+    {
+      "name": "cell-color-bottom",
+      "visible": -1,
+      "usedRange": "A1:B9",
+      "truncatedAt2000": false,
+      "cells": {
+        "A1": {
+          "value2": "Item",
+          "text": "Item",
+          "formula": null
+        },
+        "B1": {
+          "value2": "Val",
+          "text": "Val",
+          "formula": null
+        },
+        "A2": {
+          "value2": "a",
+          "text": "a",
+          "formula": null
+        },
+        "B2": {
+          "value2": 5.0,
+          "text": "5",
+          "formula": null
+        },
+        "A3": {
+          "value2": "b",
+          "text": "b",
+          "formula": null
+        },
+        "B3": {
+          "value2": 4.0,
+          "text": "4",
+          "formula": null
+        },
+        "A4": {
+          "value2": "c",
+          "text": "c",
+          "formula": null
+        },
+        "B4": {
+          "value2": 3.0,
+          "text": "3",
+          "formula": null
+        },
+        "A5": {
+          "value2": "d",
+          "text": "d",
+          "formula": null
+        },
+        "B5": {
+          "value2": 2.0,
+          "text": "2",
+          "formula": null
+        },
+        "A6": {
+          "value2": "e",
+          "text": "e",
+          "formula": null
+        },
+        "B6": {
+          "value2": 1.0,
+          "text": "1",
+          "formula": null
+        },
+        "A7": {
+          "value2": "f",
+          "text": "f",
+          "formula": null
+        },
+        "B7": {
+          "value2": 9.0,
+          "text": "9",
+          "formula": null
+        },
+        "A8": {
+          "value2": "g",
+          "text": "g",
+          "formula": null
+        },
+        "B8": {
+          "value2": 8.0,
+          "text": "8",
+          "formula": null
+        },
+        "A9": {
+          "value2": "h",
+          "text": "h",
+          "formula": null
+        },
+        "B9": {
+          "value2": 7.0,
+          "text": "7",
+          "formula": null
+        }
+      }
+    },
+    {
+      "name": "cell-color-then-value",
+      "visible": -1,
+      "usedRange": "A1:B9",
+      "truncatedAt2000": false,
+      "cells": {
+        "A1": {
+          "value2": "Item",
+          "text": "Item",
+          "formula": null
+        },
+        "B1": {
+          "value2": "Val",
+          "text": "Val",
+          "formula": null
+        },
+        "A2": {
+          "value2": "a",
+          "text": "a",
+          "formula": null
+        },
+        "B2": {
+          "value2": 5.0,
+          "text": "5",
+          "formula": null
+        },
+        "A3": {
+          "value2": "b",
+          "text": "b",
+          "formula": null
+        },
+        "B3": {
+          "value2": 4.0,
+          "text": "4",
+          "formula": null
+        },
+        "A4": {
+          "value2": "c",
+          "text": "c",
+          "formula": null
+        },
+        "B4": {
+          "value2": 3.0,
+          "text": "3",
+          "formula": null
+        },
+        "A5": {
+          "value2": "d",
+          "text": "d",
+          "formula": null
+        },
+        "B5": {
+          "value2": 2.0,
+          "text": "2",
+          "formula": null
+        },
+        "A6": {
+          "value2": "e",
+          "text": "e",
+          "formula": null
+        },
+        "B6": {
+          "value2": 1.0,
+          "text": "1",
+          "formula": null
+        },
+        "A7": {
+          "value2": "f",
+          "text": "f",
+          "formula": null
+        },
+        "B7": {
+          "value2": 9.0,
+          "text": "9",
+          "formula": null
+        },
+        "A8": {
+          "value2": "g",
+          "text": "g",
+          "formula": null
+        },
+        "B8": {
+          "value2": 8.0,
+          "text": "8",
+          "formula": null
+        },
+        "A9": {
+          "value2": "h",
+          "text": "h",
+          "formula": null
+        },
+        "B9": {
+          "value2": 7.0,
+          "text": "7",
+          "formula": null
+        }
+      }
+    },
+    {
+      "name": "cell-color-two-levels",
+      "visible": -1,
+      "usedRange": "A1:B9",
+      "truncatedAt2000": false,
+      "cells": {
+        "A1": {
+          "value2": "Item",
+          "text": "Item",
+          "formula": null
+        },
+        "B1": {
+          "value2": "Val",
+          "text": "Val",
+          "formula": null
+        },
+        "A2": {
+          "value2": "a",
+          "text": "a",
+          "formula": null
+        },
+        "B2": {
+          "value2": 5.0,
+          "text": "5",
+          "formula": null
+        },
+        "A3": {
+          "value2": "b",
+          "text": "b",
+          "formula": null
+        },
+        "B3": {
+          "value2": 4.0,
+          "text": "4",
+          "formula": null
+        },
+        "A4": {
+          "value2": "c",
+          "text": "c",
+          "formula": null
+        },
+        "B4": {
+          "value2": 3.0,
+          "text": "3",
+          "formula": null
+        },
+        "A5": {
+          "value2": "d",
+          "text": "d",
+          "formula": null
+        },
+        "B5": {
+          "value2": 2.0,
+          "text": "2",
+          "formula": null
+        },
+        "A6": {
+          "value2": "e",
+          "text": "e",
+          "formula": null
+        },
+        "B6": {
+          "value2": 1.0,
+          "text": "1",
+          "formula": null
+        },
+        "A7": {
+          "value2": "f",
+          "text": "f",
+          "formula": null
+        },
+        "B7": {
+          "value2": 9.0,
+          "text": "9",
+          "formula": null
+        },
+        "A8": {
+          "value2": "g",
+          "text": "g",
+          "formula": null
+        },
+        "B8": {
+          "value2": 8.0,
+          "text": "8",
+          "formula": null
+        },
+        "A9": {
+          "value2": "h",
+          "text": "h",
+          "formula": null
+        },
+        "B9": {
+          "value2": 7.0,
+          "text": "7",
+          "formula": null
+        }
+      }
+    },
+    {
+      "name": "font-color-top",
+      "visible": -1,
+      "usedRange": "A1:B7",
+      "truncatedAt2000": false,
+      "cells": {
+        "A1": {
+          "value2": "Item",
+          "text": "Item",
+          "formula": null
+        },
+        "B1": {
+          "value2": "Val",
+          "text": "Val",
+          "formula": null
+        },
+        "A2": {
+          "value2": "a",
+          "text": "a",
+          "formula": null
+        },
+        "B2": {
+          "value2": 5.0,
+          "text": "5",
+          "formula": null
+        },
+        "A3": {
+          "value2": "b",
+          "text": "b",
+          "formula": null
+        },
+        "B3": {
+          "value2": 4.0,
+          "text": "4",
+          "formula": null
+        },
+        "A4": {
+          "value2": "c",
+          "text": "c",
+          "formula": null
+        },
+        "B4": {
+          "value2": 3.0,
+          "text": "3",
+          "formula": null
+        },
+        "A5": {
+          "value2": "d",
+          "text": "d",
+          "formula": null
+        },
+        "B5": {
+          "value2": 2.0,
+          "text": "2",
+          "formula": null
+        },
+        "A6": {
+          "value2": "e",
+          "text": "e",
+          "formula": null
+        },
+        "B6": {
+          "value2": 1.0,
+          "text": "1",
+          "formula": null
+        },
+        "A7": {
+          "value2": "f",
+          "text": "f",
+          "formula": null
+        },
+        "B7": {
+          "value2": 9.0,
+          "text": "9",
+          "formula": null
+        }
+      }
+    },
+    {
+      "name": "font-color-bottom",
+      "visible": -1,
+      "usedRange": "A1:B7",
+      "truncatedAt2000": false,
+      "cells": {
+        "A1": {
+          "value2": "Item",
+          "text": "Item",
+          "formula": null
+        },
+        "B1": {
+          "value2": "Val",
+          "text": "Val",
+          "formula": null
+        },
+        "A2": {
+          "value2": "a",
+          "text": "a",
+          "formula": null
+        },
+        "B2": {
+          "value2": 5.0,
+          "text": "5",
+          "formula": null
+        },
+        "A3": {
+          "value2": "b",
+          "text": "b",
+          "formula": null
+        },
+        "B3": {
+          "value2": 4.0,
+          "text": "4",
+          "formula": null
+        },
+        "A4": {
+          "value2": "c",
+          "text": "c",
+          "formula": null
+        },
+        "B4": {
+          "value2": 3.0,
+          "text": "3",
+          "formula": null
+        },
+        "A5": {
+          "value2": "d",
+          "text": "d",
+          "formula": null
+        },
+        "B5": {
+          "value2": 2.0,
+          "text": "2",
+          "formula": null
+        },
+        "A6": {
+          "value2": "e",
+          "text": "e",
+          "formula": null
+        },
+        "B6": {
+          "value2": 1.0,
+          "text": "1",
+          "formula": null
+        },
+        "A7": {
+          "value2": "f",
+          "text": "f",
+          "formula": null
+        },
+        "B7": {
+          "value2": 9.0,
+          "text": "9",
+          "formula": null
+        }
+      }
+    },
+    {
+      "name": "formulas-move",
+      "visible": -1,
+      "usedRange": "A1:D4",
+      "truncatedAt2000": false,
+      "cells": {
+        "A1": {
+          "value2": "n",
+          "text": "n",
+          "formula": null
+        },
+        "B1": {
+          "value2": "double",
+          "text": "double",
+          "formula": null
+        },
+        "C1": {
+          "value2": "prev",
+          "text": "prev",
+          "formula": null
+        },
+        "D1": {
+          "value2": "abs",
+          "text": "abs",
+          "formula": null
+        },
+        "A2": {
+          "value2": 3.0,
+          "text": "3",
+          "formula": null
+        },
+        "B2": {
+          "value2": 6.0,
+          "text": "6",
+          "formula": "=A2*2"
+        },
+        "C2": {
+          "value2": "n",
+          "text": "n",
+          "formula": "=A1"
+        },
+        "D2": {
+          "value2": 3.0,
+          "text": "3",
+          "formula": "=$A$2"
+        },
+        "A3": {
+          "value2": 1.0,
+          "text": "1",
+          "formula": null
+        },
+        "B3": {
+          "value2": 2.0,
+          "text": "2",
+          "formula": "=A3*2"
+        },
+        "C3": {
+          "value2": 3.0,
+          "text": "3",
+          "formula": "=A2"
+        },
+        "D3": {
+          "value2": 3.0,
+          "text": "3",
+          "formula": "=$A$2"
+        },
+        "A4": {
+          "value2": 2.0,
+          "text": "2",
+          "formula": null
+        },
+        "B4": {
+          "value2": 4.0,
+          "text": "4",
+          "formula": "=A4*2"
+        },
+        "C4": {
+          "value2": 1.0,
+          "text": "1",
+          "formula": "=A3"
+        },
+        "D4": {
+          "value2": 3.0,
+          "text": "3",
+          "formula": "=$A$2"
+        }
+      }
+    },
+    {
+      "name": "blank-keys-asc",
+      "visible": -1,
+      "usedRange": "A1:B6",
+      "truncatedAt2000": false,
+      "cells": {
+        "A1": {
+          "value2": "k",
+          "text": "k",
+          "formula": null
+        },
+        "B1": {
+          "value2": "v",
+          "text": "v",
+          "formula": null
+        },
+        "A2": {
+          "value2": 3.0,
+          "text": "3",
+          "formula": null
+        },
+        "B2": {
+          "value2": "c",
+          "text": "c",
+          "formula": null
+        },
+        "B3": {
+          "value2": "blank1",
+          "text": "blank1",
+          "formula": null
+        },
+        "A4": {
+          "value2": 1.0,
+          "text": "1",
+          "formula": null
+        },
+        "B4": {
+          "value2": "a",
+          "text": "a",
+          "formula": null
+        },
+        "B5": {
+          "value2": "blank2",
+          "text": "blank2",
+          "formula": null
+        },
+        "A6": {
+          "value2": 2.0,
+          "text": "2",
+          "formula": null
+        },
+        "B6": {
+          "value2": "b",
+          "text": "b",
+          "formula": null
+        }
+      }
+    },
+    {
+      "name": "blank-keys-desc",
+      "visible": -1,
+      "usedRange": "A1:B6",
+      "truncatedAt2000": false,
+      "cells": {
+        "A1": {
+          "value2": "k",
+          "text": "k",
+          "formula": null
+        },
+        "B1": {
+          "value2": "v",
+          "text": "v",
+          "formula": null
+        },
+        "A2": {
+          "value2": 3.0,
+          "text": "3",
+          "formula": null
+        },
+        "B2": {
+          "value2": "c",
+          "text": "c",
+          "formula": null
+        },
+        "B3": {
+          "value2": "blank1",
+          "text": "blank1",
+          "formula": null
+        },
+        "A4": {
+          "value2": 1.0,
+          "text": "1",
+          "formula": null
+        },
+        "B4": {
+          "value2": "a",
+          "text": "a",
+          "formula": null
+        },
+        "B5": {
+          "value2": "blank2",
+          "text": "blank2",
+          "formula": null
+        },
+        "A6": {
+          "value2": 2.0,
+          "text": "2",
+          "formula": null
+        },
+        "B6": {
+          "value2": "b",
+          "text": "b",
+          "formula": null
+        }
+      }
+    },
+    {
+      "name": "dates-numbers",
+      "visible": -1,
+      "usedRange": "A1:A7",
+      "truncatedAt2000": false,
+      "cells": {
+        "A1": {
+          "value2": 45000.0,
+          "text": "########",
+          "formula": null
+        },
+        "A2": {
+          "value2": 44000.0,
+          "text": "########",
+          "formula": null
+        },
+        "A3": {
+          "value2": 45500.5,
+          "text": "########",
+          "formula": null
+        },
+        "A4": {
+          "value2": 45000.25,
+          "text": "45000.25",
+          "formula": null
+        },
+        "A5": {
+          "value2": "text",
+          "text": "text",
+          "formula": null
+        },
+        "A6": {
+          "value2": 2958465.0,
+          "text": "2958465",
+          "formula": null
+        },
+        "A7": {
+          "value2": 0.0,
+          "text": "0",
+          "formula": null
+        }
+      }
+    },
+    {
+      "name": "unicode-en",
+      "visible": -1,
+      "usedRange": "A1:A25",
+      "truncatedAt2000": false,
+      "cells": {
+        "A1": {
+          "value2": "zebra",
+          "text": "zebra",
+          "formula": null
+        },
+        "A2": {
+          "value2": "Äpfel",
+          "text": "Äpfel",
+          "formula": null
+        },
+        "A3": {
+          "value2": "apfel",
+          "text": "apfel",
+          "formula": null
+        },
+        "A4": {
+          "value2": "Zebra",
+          "text": "Zebra",
+          "formula": null
+        },
+        "A5": {
+          "value2": "åsa",
+          "text": "åsa",
+          "formula": null
+        },
+        "A6": {
+          "value2": "ärlig",
+          "text": "ärlig",
+          "formula": null
+        },
+        "A7": {
+          "value2": "ölig",
+          "text": "ölig",
+          "formula": null
+        },
+        "A8": {
+          "value2": "öl",
+          "text": "öl",
+          "formula": null
+        },
+        "A9": {
+          "value2": "ove",
+          "text": "ove",
+          "formula": null
+        },
+        "A10": {
+          "value2": "Ωmega",
+          "text": "Ωmega",
+          "formula": null
+        },
+        "A11": {
+          "value2": "alpha",
+          "text": "alpha",
+          "formula": null
+        },
+        "A12": {
+          "value2": "Привет",
+          "text": "Привет",
+          "formula": null
+        },
+        "A13": {
+          "value2": "абв",
+          "text": "абв",
+          "formula": null
+        },
+        "A14": {
+          "value2": "Бэ",
+          "text": "Бэ",
+          "formula": null
+        },
+        "A15": {
+          "value2": "日本",
+          "text": "日本",
+          "formula": null
+        },
+        "A16": {
+          "value2": "ñandú",
+          "text": "ñandú",
+          "formula": null
+        },
+        "A17": {
+          "value2": "nube",
+          "text": "nube",
+          "formula": null
+        },
+        "A18": {
+          "value2": "ch",
+          "text": "ch",
+          "formula": null
+        },
+        "A19": {
+          "value2": "cz",
+          "text": "cz",
+          "formula": null
+        },
+        "A20": {
+          "value2": "d",
+          "text": "d",
+          "formula": null
+        },
+        "A21": {
+          "value2": "ll",
+          "text": "ll",
+          "formula": null
+        },
+        "A22": {
+          "value2": "lz",
+          "text": "lz",
+          "formula": null
+        },
+        "A23": {
+          "value2": "i",
+          "text": "i",
+          "formula": null
+        },
+        "A24": {
+          "value2": "ı",
+          "text": "ı",
+          "formula": null
+        },
+        "A25": {
+          "value2": "İ",
+          "text": "İ",
+          "formula": null
+        }
+      }
+    },
+    {
+      "name": "custom-list-mixed",
+      "visible": -1,
+      "usedRange": "A1:A12",
+      "truncatedAt2000": false,
+      "cells": {
+        "A1": {
+          "value2": "h",
+          "text": "h",
+          "formula": null
+        },
+        "A2": {
+          "value2": "Low",
+          "text": "Low",
+          "formula": null
+        },
+        "A3": {
+          "value2": 5.0,
+          "text": "5",
+          "formula": null
+        },
+        "A4": {
+          "value2": true,
+          "text": "TRUE",
+          "formula": null
+        },
+        "A5": {
+          "value2": "High",
+          "text": "High",
+          "formula": null
+        },
+        "A6": {
+          "value2": "zzz",
+          "text": "zzz",
+          "formula": null
+        },
+        "A7": {
+          "value2": -2146826246,
+          "text": "#N/A",
+          "formula": "=NA()"
+        },
+        "A9": {
+          "value2": "Medium",
+          "text": "Medium",
+          "formula": null
+        },
+        "A10": {
+          "value2": -1.0,
+          "text": "-1",
+          "formula": null
+        },
+        "A11": {
+          "value2": "aaa",
+          "text": "aaa",
+          "formula": null
+        },
+        "A12": {
+          "value2": false,
+          "text": "FALSE",
+          "formula": null
+        }
+      }
+    },
+    {
+      "name": "custom-list-mixed-desc",
+      "visible": -1,
+      "usedRange": "A1:A12",
+      "truncatedAt2000": false,
+      "cells": {
+        "A1": {
+          "value2": "h",
+          "text": "h",
+          "formula": null
+        },
+        "A2": {
+          "value2": "Low",
+          "text": "Low",
+          "formula": null
+        },
+        "A3": {
+          "value2": 5.0,
+          "text": "5",
+          "formula": null
+        },
+        "A4": {
+          "value2": true,
+          "text": "TRUE",
+          "formula": null
+        },
+        "A5": {
+          "value2": "High",
+          "text": "High",
+          "formula": null
+        },
+        "A6": {
+          "value2": "zzz",
+          "text": "zzz",
+          "formula": null
+        },
+        "A7": {
+          "value2": -2146826246,
+          "text": "#N/A",
+          "formula": "=NA()"
+        },
+        "A9": {
+          "value2": "Medium",
+          "text": "Medium",
+          "formula": null
+        },
+        "A10": {
+          "value2": -1.0,
+          "text": "-1",
+          "formula": null
+        },
+        "A11": {
+          "value2": "aaa",
+          "text": "aaa",
+          "formula": null
+        },
+        "A12": {
+          "value2": false,
+          "text": "FALSE",
+          "formula": null
+        }
+      }
+    },
+    {
+      "name": "float-fuzz",
+      "visible": -1,
+      "usedRange": "A1:A5",
+      "truncatedAt2000": false,
+      "cells": {
+        "A1": {
+          "value2": 0.30000000000000004,
+          "text": "0.3",
+          "formula": "=0.1+0.2"
+        },
+        "A2": {
+          "value2": 0.3,
+          "text": "0.3",
+          "formula": null
+        },
+        "A3": {
+          "value2": 0.300000000000001,
+          "text": "0.3",
+          "formula": "=0.3+0.000000000000001"
+        },
+        "A4": {
+          "value2": 0.2999999999999999,
+          "text": "0.3",
+          "formula": "=0.3-0.0000000000000001"
+        },
+        "A5": {
+          "value2": 0.3000000000000001,
+          "text": "0.3",
+          "formula": null
+        }
+      }
+    },
+    {
+      "name": "float-fuzz-2",
+      "visible": -1,
+      "usedRange": "A1:A5",
+      "truncatedAt2000": false,
+      "cells": {
+        "A1": {
+          "value2": 0.3000000000000001,
+          "text": "0.3",
+          "formula": null
+        },
+        "A2": {
+          "value2": 0.30000000000000004,
+          "text": "0.3",
+          "formula": "=0.1+0.2"
+        },
+        "A3": {
+          "value2": 0.3,
+          "text": "0.3",
+          "formula": null
+        },
+        "A4": {
+          "value2": 0.2999999999999999,
+          "text": "0.3",
+          "formula": "=0.3-0.0000000000000001"
+        },
+        "A5": {
+          "value2": 0.300000000000001,
+          "text": "0.3",
+          "formula": "=0.3+0.000000000000001"
+        }
+      }
+    },
+    {
+      "name": "g-text-numbers",
+      "visible": -1,
+      "usedRange": "A1:B4",
+      "truncatedAt2000": false,
+      "cells": {
+        "A1": {
+          "value2": "Item",
+          "text": "Item",
+          "formula": null
+        },
+        "B1": {
+          "value2": "Qty",
+          "text": "Qty",
+          "formula": null
+        },
+        "A2": {
+          "value2": "pear",
+          "text": "pear",
+          "formula": null
+        },
+        "B2": {
+          "value2": 3.0,
+          "text": "3",
+          "formula": null
+        },
+        "A3": {
+          "value2": "fig",
+          "text": "fig",
+          "formula": null
+        },
+        "B3": {
+          "value2": 1.0,
+          "text": "1",
+          "formula": null
+        },
+        "A4": {
+          "value2": "kiwi",
+          "text": "kiwi",
+          "formula": null
+        },
+        "B4": {
+          "value2": 2.0,
+          "text": "2",
+          "formula": null
+        }
+      }
+    },
+    {
+      "name": "g-all-text",
+      "visible": -1,
+      "usedRange": "A1:A4",
+      "truncatedAt2000": false,
+      "cells": {
+        "A1": {
+          "value2": "zz",
+          "text": "zz",
+          "formula": null
+        },
+        "A2": {
+          "value2": "b",
+          "text": "b",
+          "formula": null
+        },
+        "A3": {
+          "value2": "a",
+          "text": "a",
+          "formula": null
+        },
+        "A4": {
+          "value2": "c",
+          "text": "c",
+          "formula": null
+        }
+      }
+    },
+    {
+      "name": "g-all-numbers",
+      "visible": -1,
+      "usedRange": "A1:A4",
+      "truncatedAt2000": false,
+      "cells": {
+        "A1": {
+          "value2": 9.0,
+          "text": "9",
+          "formula": null
+        },
+        "A2": {
+          "value2": 5.0,
+          "text": "5",
+          "formula": null
+        },
+        "A3": {
+          "value2": 3.0,
+          "text": "3",
+          "formula": null
+        },
+        "A4": {
+          "value2": 7.0,
+          "text": "7",
+          "formula": null
+        }
+      }
+    },
+    {
+      "name": "g-bold-text",
+      "visible": -1,
+      "usedRange": "A1:B4",
+      "truncatedAt2000": false,
+      "cells": {
+        "A1": {
+          "value2": "zzA",
+          "text": "zzA",
+          "formula": null
+        },
+        "B1": {
+          "value2": "zzB",
+          "text": "zzB",
+          "formula": null
+        },
+        "A2": {
+          "value2": "x",
+          "text": "x",
+          "formula": null
+        },
+        "B2": {
+          "value2": "q",
+          "text": "q",
+          "formula": null
+        },
+        "A3": {
+          "value2": "y",
+          "text": "y",
+          "formula": null
+        },
+        "B3": {
+          "value2": "p",
+          "text": "p",
+          "formula": null
+        },
+        "A4": {
+          "value2": "w",
+          "text": "w",
+          "formula": null
+        },
+        "B4": {
+          "value2": "r",
+          "text": "r",
+          "formula": null
+        }
+      }
+    },
+    {
+      "name": "g-text-num-same",
+      "visible": -1,
+      "usedRange": "A1:B4",
+      "truncatedAt2000": false,
+      "cells": {
+        "A1": {
+          "value2": "zzA",
+          "text": "zzA",
+          "formula": null
+        },
+        "B1": {
+          "value2": 9.0,
+          "text": "9",
+          "formula": null
+        },
+        "A2": {
+          "value2": "x",
+          "text": "x",
+          "formula": null
+        },
+        "B2": {
+          "value2": 3.0,
+          "text": "3",
+          "formula": null
+        },
+        "A3": {
+          "value2": "y",
+          "text": "y",
+          "formula": null
+        },
+        "B3": {
+          "value2": 1.0,
+          "text": "1",
+          "formula": null
+        },
+        "A4": {
+          "value2": "w",
+          "text": "w",
+          "formula": null
+        },
+        "B4": {
+          "value2": 2.0,
+          "text": "2",
+          "formula": null
+        }
+      }
+    },
+    {
+      "name": "g-blank-second-row",
+      "visible": -1,
+      "usedRange": "A1:B4",
+      "truncatedAt2000": false,
+      "cells": {
+        "A1": {
+          "value2": "zzA",
+          "text": "zzA",
+          "formula": null
+        },
+        "B1": {
+          "value2": "zzB",
+          "text": "zzB",
+          "formula": null
+        },
+        "A2": {
+          "value2": "x",
+          "text": "x",
+          "formula": null
+        },
+        "A3": {
+          "value2": "y",
+          "text": "y",
+          "formula": null
+        },
+        "B3": {
+          "value2": 1.0,
+          "text": "1",
+          "formula": null
+        },
+        "A4": {
+          "value2": "w",
+          "text": "w",
+          "formula": null
+        },
+        "B4": {
+          "value2": 2.0,
+          "text": "2",
+          "formula": null
+        }
+      }
+    },
+    {
+      "name": "g-bool",
+      "visible": -1,
+      "usedRange": "A1:B4",
+      "truncatedAt2000": false,
+      "cells": {
+        "A1": {
+          "value2": "zzA",
+          "text": "zzA",
+          "formula": null
+        },
+        "B1": {
+          "value2": "zzB",
+          "text": "zzB",
+          "formula": null
+        },
+        "A2": {
+          "value2": true,
+          "text": "TRUE",
+          "formula": null
+        },
+        "B2": {
+          "value2": false,
+          "text": "FALSE",
+          "formula": null
+        },
+        "A3": {
+          "value2": false,
+          "text": "FALSE",
+          "formula": null
+        },
+        "B3": {
+          "value2": true,
+          "text": "TRUE",
+          "formula": null
+        },
+        "A4": {
+          "value2": true,
+          "text": "TRUE",
+          "formula": null
+        },
+        "B4": {
+          "value2": true,
+          "text": "TRUE",
+          "formula": null
+        }
+      }
+    },
+    {
+      "name": "g-numfmt-differs",
+      "visible": -1,
+      "usedRange": "A1:B4",
+      "truncatedAt2000": false,
+      "cells": {
+        "A1": {
+          "value2": "zzA",
+          "text": "zzA",
+          "formula": null
+        },
+        "B1": {
+          "value2": "zzB",
+          "text": "zzB",
+          "formula": null
+        },
+        "A2": {
+          "value2": "x",
+          "text": "x",
+          "formula": null
+        },
+        "B2": {
+          "value2": "q",
+          "text": "q",
+          "formula": null
+        },
+        "A3": {
+          "value2": "y",
+          "text": "y",
+          "formula": null
+        },
+        "B3": {
+          "value2": "p",
+          "text": "p",
+          "formula": null
+        },
+        "A4": {
+          "value2": "w",
+          "text": "w",
+          "formula": null
+        },
+        "B4": {
+          "value2": "r",
+          "text": "r",
+          "formula": null
+        }
+      }
+    },
+    {
+      "name": "g-numeric-text-first-row",
+      "visible": -1,
+      "usedRange": "A1:B3",
+      "truncatedAt2000": false,
+      "cells": {
+        "A1": {
+          "value2": "5",
+          "text": "5",
+          "formula": null
+        },
+        "B1": {
+          "value2": "6",
+          "text": "6",
+          "formula": null
+        },
+        "A2": {
+          "value2": 1.0,
+          "text": "1",
+          "formula": null
+        },
+        "B2": {
+          "value2": 2.0,
+          "text": "2",
+          "formula": null
+        },
+        "A3": {
+          "value2": 3.0,
+          "text": "3",
+          "formula": null
+        },
+        "B3": {
+          "value2": 4.0,
+          "text": "4",
+          "formula": null
+        }
+      }
+    },
+    {
+      "name": "g-text-over-numeric-text",
+      "visible": -1,
+      "usedRange": "A1:A4",
+      "truncatedAt2000": false,
+      "cells": {
+        "A1": {
+          "value2": "zzA",
+          "text": "zzA",
+          "formula": null
+        },
+        "A2": {
+          "value2": "1",
+          "text": "1",
+          "formula": null
+        },
+        "A3": {
+          "value2": "3",
+          "text": "3",
+          "formula": null
+        },
+        "A4": {
+          "value2": "2",
+          "text": "2",
+          "formula": null
+        }
+      }
+    },
+    {
+      "name": "g-two-keys",
+      "visible": -1,
+      "usedRange": "A1:C5",
+      "truncatedAt2000": false,
+      "cells": {
+        "A1": {
+          "value2": "Name",
+          "text": "Name",
+          "formula": null
+        },
+        "B1": {
+          "value2": "Dept",
+          "text": "Dept",
+          "formula": null
+        },
+        "C1": {
+          "value2": "Score",
+          "text": "Score",
+          "formula": null
+        },
+        "A2": {
+          "value2": "Ann",
+          "text": "Ann",
+          "formula": null
+        },
+        "B2": {
+          "value2": "Ops",
+          "text": "Ops",
+          "formula": null
+        },
+        "C2": {
+          "value2": 70.0,
+          "text": "70",
+          "formula": null
+        },
+        "A3": {
+          "value2": "Bob",
+          "text": "Bob",
+          "formula": null
+        },
+        "B3": {
+          "value2": "Dev",
+          "text": "Dev",
+          "formula": null
+        },
+        "C3": {
+          "value2": 85.0,
+          "text": "85",
+          "formula": null
+        },
+        "A4": {
+          "value2": "Cy",
+          "text": "Cy",
+          "formula": null
+        },
+        "B4": {
+          "value2": "Ops",
+          "text": "Ops",
+          "formula": null
+        },
+        "C4": {
+          "value2": 85.0,
+          "text": "85",
+          "formula": null
+        },
+        "A5": {
+          "value2": "Di",
+          "text": "Di",
+          "formula": null
+        },
+        "B5": {
+          "value2": "Dev",
+          "text": "Dev",
+          "formula": null
+        },
+        "C5": {
+          "value2": 70.0,
+          "text": "70",
+          "formula": null
+        }
+      }
+    },
+    {
+      "name": "g-yes-range-api",
+      "visible": -1,
+      "usedRange": "A1:B4",
+      "truncatedAt2000": false,
+      "cells": {
+        "A1": {
+          "value2": "zzA",
+          "text": "zzA",
+          "formula": null
+        },
+        "B1": {
+          "value2": "zzB",
+          "text": "zzB",
+          "formula": null
+        },
+        "A2": {
+          "value2": "x",
+          "text": "x",
+          "formula": null
+        },
+        "B2": {
+          "value2": "q",
+          "text": "q",
+          "formula": null
+        },
+        "A3": {
+          "value2": "y",
+          "text": "y",
+          "formula": null
+        },
+        "B3": {
+          "value2": "p",
+          "text": "p",
+          "formula": null
+        },
+        "A4": {
+          "value2": "w",
+          "text": "w",
+          "formula": null
+        },
+        "B4": {
+          "value2": "r",
+          "text": "r",
+          "formula": null
+        }
+      }
+    }
+  ]
+}

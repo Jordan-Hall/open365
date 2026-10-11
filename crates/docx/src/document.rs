@@ -195,6 +195,29 @@ impl Document {
         self.styles.as_ref()
     }
 
+    /// Replaces the styles part with `bytes` (a serialised `w:styles` document built from
+    /// [`Styles::serialize`] plus new definitions) and re-reads it. Returns false, leaving
+    /// the part as it was, when there is no styles part or the new bytes do not parse.
+    pub(crate) fn styles_mut(&mut self, bytes: Vec<u8>) -> bool {
+        let Some(old) = &self.styles else {
+            return false;
+        };
+        let name = old.part_name().clone();
+        let before = old.serialize();
+        self.package.set_part(name.clone(), bytes);
+        match load_styles(&self.package, &self.main_part) {
+            Some(fresh) => {
+                self.styles = Some(fresh);
+                self.edited();
+                true
+            }
+            None => {
+                self.package.set_part(name, before);
+                false
+            }
+        }
+    }
+
     /// The document's numbering definitions, when it has a numbering part.
     pub fn numbering(&self) -> Option<&Numbering> {
         self.numbering.as_ref()

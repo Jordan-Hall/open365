@@ -531,11 +531,17 @@ fn snap_cell(c: CellBox) -> CellBox {
     let snap = |v: f64| ((v / BASELINE_GRID) + 1e-9).round() * BASELINE_GRID;
     let (left, right) = (snap(c.x), snap(c.x + c.width));
     let (top, bottom) = (snap(c.y), snap(c.y + c.height));
+    // Word snaps the clip rectangle (the box inset by the padding), not the padding: a 2 pt
+    // padding is no multiple of 0.24 pt (`layout-trh-asym`).
+    let clip_top = snap(c.y + c.pad_top);
+    let clip_bottom = snap(c.y + c.height - c.pad_bottom);
     CellBox {
         x: left,
         width: right - left,
         y: top,
         height: bottom - top,
+        pad_top: clip_top - top,
+        pad_bottom: bottom - clip_bottom,
         ..c
     }
 }
@@ -1213,7 +1219,12 @@ impl<'a> Paginator<'a> {
             if Self::splittable(table, r, &active) {
                 let parts = Self::row_parts(table, r, &active);
                 let zero: Vec<usize> = parts.iter().map(|p| p.first).collect();
-                let (to, h, finished) = Self::split_fragment(&parts, &zero, avail);
+                let (to, mut h, finished) = Self::split_fragment(&parts, &zero, avail);
+                if at_top && finished && !row.exact {
+                    // Measured (layout-trh-tall): a row taller than the page whose content fits
+                    // is clamped to the page, not split.
+                    h = h.max(row.height.min(avail));
+                }
                 if h > 0.0 || (at_top && finished) {
                     self.emit_fragment(table, &parts, &mut active, y, &zero, &to, h, false);
                     y += h;
@@ -1566,7 +1577,7 @@ impl<'a> Paginator<'a> {
             let first_segment = from_atom == 0;
             // Spacing above the first line of this paragraph.
             let gap = |pg: &PageBuild| -> f64 {
-                if !first_segment {
+                if !first_segment || para.section_mark {
                     return 0.0;
                 }
                 let mut after = pg.pending_after;
@@ -1817,9 +1828,11 @@ impl<'a> Paginator<'a> {
                 }
             }
         }
-        self.page.pending_after = f64::from(para.props.space_after_pt);
-        self.page.prev_style = Some(para.style_id.clone());
-        self.page.prev_contextual = para.flow.contextual_spacing;
+        if !para.section_mark {
+            self.page.pending_after = f64::from(para.props.space_after_pt);
+            self.page.prev_style = Some(para.style_id.clone());
+            self.page.prev_contextual = para.flow.contextual_spacing;
+        }
     }
 }
 

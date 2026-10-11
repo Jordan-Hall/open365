@@ -1,0 +1,3060 @@
+{
+  "intl": {
+    "excel": "16.0",
+    "culture": "en-GB",
+    "decimal": ".",
+    "list": ",",
+    "country": 1.0,
+    "dateOrder": 1.0
+  },
+  "scenarios": [
+    {
+      "id": "whole-between",
+      "range": "A1",
+      "data_validations": "<dataValidations count=\"1\"><dataValidation type=\"whole\" allowBlank=\"1\" showInputMessage=\"1\" showErrorMessage=\"1\" sqref=\"A1\" xr:uid=\"{EC0F5051-EB72-4E18-9C44-556F76C5539A}\"><formula1>5</formula1><formula2>10</formula2></dataValidation></dataValidations>",
+      "candidates": [
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 0,
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 1,
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 5,
+          "valid": true
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 10,
+          "valid": true
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 11,
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 5.5,
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": "-3",
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 10.0000000001,
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 4.9999999999999,
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "s",
+          "value": "abc",
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "s",
+          "value": "5",
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "b",
+          "value": true,
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "z",
+          "value": null,
+          "valid": true
+        }
+      ]
+    },
+    {
+      "id": "decimal-between",
+      "range": "A1",
+      "data_validations": "<dataValidations count=\"1\"><dataValidation type=\"decimal\" allowBlank=\"1\" showInputMessage=\"1\" showErrorMessage=\"1\" sqref=\"A1\" xr:uid=\"{16C639EF-AA61-4934-A815-D581A20F4E07}\"><formula1>5</formula1><formula2>10</formula2></dataValidation></dataValidations>",
+      "candidates": [
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 0,
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 1,
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 5,
+          "valid": true
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 10,
+          "valid": true
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 11,
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 5.5,
+          "valid": true
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": "-3",
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 10.0000000001,
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 4.9999999999999,
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "s",
+          "value": "abc",
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "s",
+          "value": "5",
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "b",
+          "value": true,
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "z",
+          "value": null,
+          "valid": true
+        }
+      ]
+    },
+    {
+      "id": "whole-notBetween",
+      "range": "A1",
+      "data_validations": "<dataValidations count=\"1\"><dataValidation type=\"whole\" operator=\"notBetween\" allowBlank=\"1\" showInputMessage=\"1\" showErrorMessage=\"1\" sqref=\"A1\" xr:uid=\"{EDC24D76-6D3C-4C01-A109-DA97AAA06B1C}\"><formula1>5</formula1><formula2>10</formula2></dataValidation></dataValidations>",
+      "candidates": [
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 0,
+          "valid": true
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 1,
+          "valid": true
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 5,
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 10,
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 11,
+          "valid": true
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 5.5,
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": "-3",
+          "valid": true
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 10.0000000001,
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 4.9999999999999,
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "s",
+          "value": "abc",
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "s",
+          "value": "5",
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "b",
+          "value": true,
+          "valid": true
+        },
+        {
+          "cell": "A1",
+          "type": "z",
+          "value": null,
+          "valid": true
+        }
+      ]
+    },
+    {
+      "id": "decimal-notBetween",
+      "range": "A1",
+      "data_validations": "<dataValidations count=\"1\"><dataValidation type=\"decimal\" operator=\"notBetween\" allowBlank=\"1\" showInputMessage=\"1\" showErrorMessage=\"1\" sqref=\"A1\" xr:uid=\"{163440AE-9E5D-48AF-89AB-90E79D712481}\"><formula1>5</formula1><formula2>10</formula2></dataValidation></dataValidations>",
+      "candidates": [
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 0,
+          "valid": true
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 1,
+          "valid": true
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 5,
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 10,
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 11,
+          "valid": true
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 5.5,
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": "-3",
+          "valid": true
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 10.0000000001,
+          "valid": true
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 4.9999999999999,
+          "valid": true
+        },
+        {
+          "cell": "A1",
+          "type": "s",
+          "value": "abc",
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "s",
+          "value": "5",
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "b",
+          "value": true,
+          "valid": true
+        },
+        {
+          "cell": "A1",
+          "type": "z",
+          "value": null,
+          "valid": true
+        }
+      ]
+    },
+    {
+      "id": "whole-equal",
+      "range": "A1",
+      "data_validations": "<dataValidations count=\"1\"><dataValidation type=\"whole\" operator=\"equal\" allowBlank=\"1\" showInputMessage=\"1\" showErrorMessage=\"1\" sqref=\"A1\" xr:uid=\"{43F685BA-BFDF-4807-A657-6D1973FAC298}\"><formula1>5</formula1></dataValidation></dataValidations>",
+      "candidates": [
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 0,
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 1,
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 5,
+          "valid": true
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 10,
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 11,
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 5.5,
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": "-3",
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 10.0000000001,
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 4.9999999999999,
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "s",
+          "value": "abc",
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "s",
+          "value": "5",
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "b",
+          "value": true,
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "z",
+          "value": null,
+          "valid": true
+        }
+      ]
+    },
+    {
+      "id": "decimal-equal",
+      "range": "A1",
+      "data_validations": "<dataValidations count=\"1\"><dataValidation type=\"decimal\" operator=\"equal\" allowBlank=\"1\" showInputMessage=\"1\" showErrorMessage=\"1\" sqref=\"A1\" xr:uid=\"{EC18DFF3-082C-4421-8A96-D5549701398B}\"><formula1>5</formula1></dataValidation></dataValidations>",
+      "candidates": [
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 0,
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 1,
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 5,
+          "valid": true
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 10,
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 11,
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 5.5,
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": "-3",
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 10.0000000001,
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 4.9999999999999,
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "s",
+          "value": "abc",
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "s",
+          "value": "5",
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "b",
+          "value": true,
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "z",
+          "value": null,
+          "valid": true
+        }
+      ]
+    },
+    {
+      "id": "whole-notEqual",
+      "range": "A1",
+      "data_validations": "<dataValidations count=\"1\"><dataValidation type=\"whole\" operator=\"notEqual\" allowBlank=\"1\" showInputMessage=\"1\" showErrorMessage=\"1\" sqref=\"A1\" xr:uid=\"{5EB1E629-37F0-453C-A423-4189D70D36DB}\"><formula1>5</formula1></dataValidation></dataValidations>",
+      "candidates": [
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 0,
+          "valid": true
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 1,
+          "valid": true
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 5,
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 10,
+          "valid": true
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 11,
+          "valid": true
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 5.5,
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": "-3",
+          "valid": true
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 10.0000000001,
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 4.9999999999999,
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "s",
+          "value": "abc",
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "s",
+          "value": "5",
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "b",
+          "value": true,
+          "valid": true
+        },
+        {
+          "cell": "A1",
+          "type": "z",
+          "value": null,
+          "valid": true
+        }
+      ]
+    },
+    {
+      "id": "decimal-notEqual",
+      "range": "A1",
+      "data_validations": "<dataValidations count=\"1\"><dataValidation type=\"decimal\" operator=\"notEqual\" allowBlank=\"1\" showInputMessage=\"1\" showErrorMessage=\"1\" sqref=\"A1\" xr:uid=\"{AA84C3BE-A1FC-4C4A-9ED1-99A95C77A48F}\"><formula1>5</formula1></dataValidation></dataValidations>",
+      "candidates": [
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 0,
+          "valid": true
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 1,
+          "valid": true
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 5,
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 10,
+          "valid": true
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 11,
+          "valid": true
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 5.5,
+          "valid": true
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": "-3",
+          "valid": true
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 10.0000000001,
+          "valid": true
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 4.9999999999999,
+          "valid": true
+        },
+        {
+          "cell": "A1",
+          "type": "s",
+          "value": "abc",
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "s",
+          "value": "5",
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "b",
+          "value": true,
+          "valid": true
+        },
+        {
+          "cell": "A1",
+          "type": "z",
+          "value": null,
+          "valid": true
+        }
+      ]
+    },
+    {
+      "id": "whole-greaterThan",
+      "range": "A1",
+      "data_validations": "<dataValidations count=\"1\"><dataValidation type=\"whole\" operator=\"greaterThan\" allowBlank=\"1\" showInputMessage=\"1\" showErrorMessage=\"1\" sqref=\"A1\" xr:uid=\"{C3298E9C-D789-4193-8ADB-D18BFF9822FB}\"><formula1>5</formula1></dataValidation></dataValidations>",
+      "candidates": [
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 0,
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 1,
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 5,
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 10,
+          "valid": true
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 11,
+          "valid": true
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 5.5,
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": "-3",
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 10.0000000001,
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 4.9999999999999,
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "s",
+          "value": "abc",
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "s",
+          "value": "5",
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "b",
+          "value": true,
+          "valid": true
+        },
+        {
+          "cell": "A1",
+          "type": "z",
+          "value": null,
+          "valid": true
+        }
+      ]
+    },
+    {
+      "id": "decimal-greaterThan",
+      "range": "A1",
+      "data_validations": "<dataValidations count=\"1\"><dataValidation type=\"decimal\" operator=\"greaterThan\" allowBlank=\"1\" showInputMessage=\"1\" showErrorMessage=\"1\" sqref=\"A1\" xr:uid=\"{CDB9218D-71DC-415A-B68C-2B47F448FA6D}\"><formula1>5</formula1></dataValidation></dataValidations>",
+      "candidates": [
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 0,
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 1,
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 5,
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 10,
+          "valid": true
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 11,
+          "valid": true
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 5.5,
+          "valid": true
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": "-3",
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 10.0000000001,
+          "valid": true
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 4.9999999999999,
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "s",
+          "value": "abc",
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "s",
+          "value": "5",
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "b",
+          "value": true,
+          "valid": true
+        },
+        {
+          "cell": "A1",
+          "type": "z",
+          "value": null,
+          "valid": true
+        }
+      ]
+    },
+    {
+      "id": "whole-lessThan",
+      "range": "A1",
+      "data_validations": "<dataValidations count=\"1\"><dataValidation type=\"whole\" operator=\"lessThan\" allowBlank=\"1\" showInputMessage=\"1\" showErrorMessage=\"1\" sqref=\"A1\" xr:uid=\"{69A25DBC-5CF1-4F02-8AA0-347C81C03609}\"><formula1>5</formula1></dataValidation></dataValidations>",
+      "candidates": [
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 0,
+          "valid": true
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 1,
+          "valid": true
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 5,
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 10,
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 11,
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 5.5,
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": "-3",
+          "valid": true
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 10.0000000001,
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 4.9999999999999,
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "s",
+          "value": "abc",
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "s",
+          "value": "5",
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "b",
+          "value": true,
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "z",
+          "value": null,
+          "valid": true
+        }
+      ]
+    },
+    {
+      "id": "decimal-lessThan",
+      "range": "A1",
+      "data_validations": "<dataValidations count=\"1\"><dataValidation type=\"decimal\" operator=\"lessThan\" allowBlank=\"1\" showInputMessage=\"1\" showErrorMessage=\"1\" sqref=\"A1\" xr:uid=\"{4A2FD3A9-4111-45F1-97EC-F726C8C5466B}\"><formula1>5</formula1></dataValidation></dataValidations>",
+      "candidates": [
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 0,
+          "valid": true
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 1,
+          "valid": true
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 5,
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 10,
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 11,
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 5.5,
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": "-3",
+          "valid": true
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 10.0000000001,
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 4.9999999999999,
+          "valid": true
+        },
+        {
+          "cell": "A1",
+          "type": "s",
+          "value": "abc",
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "s",
+          "value": "5",
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "b",
+          "value": true,
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "z",
+          "value": null,
+          "valid": true
+        }
+      ]
+    },
+    {
+      "id": "whole-greaterThanOrEqual",
+      "range": "A1",
+      "data_validations": "<dataValidations count=\"1\"><dataValidation type=\"whole\" operator=\"greaterThanOrEqual\" allowBlank=\"1\" showInputMessage=\"1\" showErrorMessage=\"1\" sqref=\"A1\" xr:uid=\"{6FC34346-D5BA-45BA-8A28-AA7750B1E2D9}\"><formula1>5</formula1></dataValidation></dataValidations>",
+      "candidates": [
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 0,
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 1,
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 5,
+          "valid": true
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 10,
+          "valid": true
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 11,
+          "valid": true
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 5.5,
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": "-3",
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 10.0000000001,
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 4.9999999999999,
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "s",
+          "value": "abc",
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "s",
+          "value": "5",
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "b",
+          "value": true,
+          "valid": true
+        },
+        {
+          "cell": "A1",
+          "type": "z",
+          "value": null,
+          "valid": true
+        }
+      ]
+    },
+    {
+      "id": "decimal-greaterThanOrEqual",
+      "range": "A1",
+      "data_validations": "<dataValidations count=\"1\"><dataValidation type=\"decimal\" operator=\"greaterThanOrEqual\" allowBlank=\"1\" showInputMessage=\"1\" showErrorMessage=\"1\" sqref=\"A1\" xr:uid=\"{04FEEAD3-EFD2-4833-A5C2-D459B0FF696F}\"><formula1>5</formula1></dataValidation></dataValidations>",
+      "candidates": [
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 0,
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 1,
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 5,
+          "valid": true
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 10,
+          "valid": true
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 11,
+          "valid": true
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 5.5,
+          "valid": true
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": "-3",
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 10.0000000001,
+          "valid": true
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 4.9999999999999,
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "s",
+          "value": "abc",
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "s",
+          "value": "5",
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "b",
+          "value": true,
+          "valid": true
+        },
+        {
+          "cell": "A1",
+          "type": "z",
+          "value": null,
+          "valid": true
+        }
+      ]
+    },
+    {
+      "id": "whole-lessThanOrEqual",
+      "range": "A1",
+      "data_validations": "<dataValidations count=\"1\"><dataValidation type=\"whole\" operator=\"lessThanOrEqual\" allowBlank=\"1\" showInputMessage=\"1\" showErrorMessage=\"1\" sqref=\"A1\" xr:uid=\"{1FE4E246-817F-4F78-9806-76C338BA5080}\"><formula1>5</formula1></dataValidation></dataValidations>",
+      "candidates": [
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 0,
+          "valid": true
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 1,
+          "valid": true
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 5,
+          "valid": true
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 10,
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 11,
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 5.5,
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": "-3",
+          "valid": true
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 10.0000000001,
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 4.9999999999999,
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "s",
+          "value": "abc",
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "s",
+          "value": "5",
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "b",
+          "value": true,
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "z",
+          "value": null,
+          "valid": true
+        }
+      ]
+    },
+    {
+      "id": "decimal-lessThanOrEqual",
+      "range": "A1",
+      "data_validations": "<dataValidations count=\"1\"><dataValidation type=\"decimal\" operator=\"lessThanOrEqual\" allowBlank=\"1\" showInputMessage=\"1\" showErrorMessage=\"1\" sqref=\"A1\" xr:uid=\"{8372A4C2-967B-4264-859A-3A22FB62CED5}\"><formula1>5</formula1></dataValidation></dataValidations>",
+      "candidates": [
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 0,
+          "valid": true
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 1,
+          "valid": true
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 5,
+          "valid": true
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 10,
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 11,
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 5.5,
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": "-3",
+          "valid": true
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 10.0000000001,
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 4.9999999999999,
+          "valid": true
+        },
+        {
+          "cell": "A1",
+          "type": "s",
+          "value": "abc",
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "s",
+          "value": "5",
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "b",
+          "value": true,
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "z",
+          "value": null,
+          "valid": true
+        }
+      ]
+    },
+    {
+      "id": "whole-noblank",
+      "range": "A1",
+      "data_validations": "<dataValidations count=\"1\"><dataValidation type=\"whole\" showInputMessage=\"1\" showErrorMessage=\"1\" sqref=\"A1\" xr:uid=\"{E13CB2A0-9D61-45EA-987D-46550F115130}\"><formula1>1</formula1><formula2>10</formula2></dataValidation></dataValidations>",
+      "candidates": [
+        {
+          "cell": "A1",
+          "type": "z",
+          "value": null,
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 5,
+          "valid": true
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 20,
+          "valid": false
+        }
+      ]
+    },
+    {
+      "id": "whole-blank-ok",
+      "range": "A1",
+      "data_validations": "<dataValidations count=\"1\"><dataValidation type=\"whole\" allowBlank=\"1\" showInputMessage=\"1\" showErrorMessage=\"1\" sqref=\"A1\" xr:uid=\"{C265E01D-3E1E-43B5-A572-F37D1600FB5F}\"><formula1>1</formula1><formula2>10</formula2></dataValidation></dataValidations>",
+      "candidates": [
+        {
+          "cell": "A1",
+          "type": "z",
+          "value": null,
+          "valid": true
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 5,
+          "valid": true
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 20,
+          "valid": false
+        }
+      ]
+    },
+    {
+      "id": "whole-cellref-bounds",
+      "range": "A1",
+      "data_validations": "<dataValidations count=\"1\"><dataValidation type=\"whole\" allowBlank=\"1\" showInputMessage=\"1\" showErrorMessage=\"1\" sqref=\"A1\" xr:uid=\"{53659E2B-2BBA-4A40-937B-CDC2E3D395A3}\"><formula1>$C$1</formula1><formula2>$C$2</formula2></dataValidation></dataValidations>",
+      "candidates": [
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 1,
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 2,
+          "valid": true
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 3,
+          "valid": true
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 4,
+          "valid": true
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 5,
+          "valid": false
+        }
+      ]
+    },
+    {
+      "id": "whole-formula-bound",
+      "range": "A1",
+      "data_validations": "<dataValidations count=\"1\"><dataValidation type=\"whole\" operator=\"greaterThan\" allowBlank=\"1\" showInputMessage=\"1\" showErrorMessage=\"1\" sqref=\"A1\" xr:uid=\"{40705498-A587-40C4-A8E5-8E467B1E9A97}\"><formula1>SUM($C$1:$C$2)</formula1></dataValidation></dataValidations>",
+      "candidates": [
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 5,
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 6,
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 7,
+          "valid": true
+        }
+      ]
+    },
+    {
+      "id": "date-between",
+      "range": "A1",
+      "data_validations": "<dataValidations count=\"1\"><dataValidation type=\"date\" allowBlank=\"1\" showInputMessage=\"1\" showErrorMessage=\"1\" sqref=\"A1\" xr:uid=\"{8A5D5BDE-6546-46BE-9F81-4A2EBBDD9510}\"><formula1>45000</formula1><formula2>45030</formula2></dataValidation></dataValidations>",
+      "candidates": [
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 44999,
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 45000,
+          "valid": true
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 45015,
+          "valid": true
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 45015.5,
+          "valid": true
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 45030,
+          "valid": true
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 45031,
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "s",
+          "value": "x",
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "z",
+          "value": null,
+          "valid": true
+        }
+      ]
+    },
+    {
+      "id": "date-greater",
+      "range": "A1",
+      "data_validations": "<dataValidations count=\"1\"><dataValidation type=\"date\" operator=\"greaterThan\" allowBlank=\"1\" showInputMessage=\"1\" showErrorMessage=\"1\" sqref=\"A1\" xr:uid=\"{A58931BC-2DB8-45E2-AD9C-6602E0479947}\"><formula1>45000</formula1></dataValidation></dataValidations>",
+      "candidates": [
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 45000,
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 45000.5,
+          "valid": true
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 45001,
+          "valid": true
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": "-1",
+          "valid": false
+        }
+      ]
+    },
+    {
+      "id": "date-date-fn",
+      "range": "A1",
+      "data_validations": "<dataValidations count=\"1\"><dataValidation type=\"date\" operator=\"greaterThanOrEqual\" allowBlank=\"1\" showInputMessage=\"1\" showErrorMessage=\"1\" sqref=\"A1\" xr:uid=\"{F41AC51E-34FE-478D-AB61-8826A51C4072}\"><formula1>DATE(2023,3,15)</formula1></dataValidation></dataValidations>",
+      "candidates": [
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 45000,
+          "valid": true
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 45001,
+          "valid": true
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 44999,
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 45000.9,
+          "valid": true
+        }
+      ]
+    },
+    {
+      "id": "time-between",
+      "range": "A1",
+      "data_validations": "<dataValidations count=\"1\"><dataValidation type=\"time\" allowBlank=\"1\" showInputMessage=\"1\" showErrorMessage=\"1\" sqref=\"A1\" xr:uid=\"{CF41774C-9AFB-4874-AA1A-4AD84DA85E02}\"><formula1>0.25</formula1><formula2>0.75</formula2></dataValidation></dataValidations>",
+      "candidates": [
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 0.2,
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 0.25,
+          "valid": true
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 0.5,
+          "valid": true
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 0.75,
+          "valid": true
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 0.8,
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 1.5,
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 3.5,
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "s",
+          "value": "x",
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "z",
+          "value": null,
+          "valid": true
+        }
+      ]
+    },
+    {
+      "id": "time-less",
+      "range": "A1",
+      "data_validations": "<dataValidations count=\"1\"><dataValidation type=\"time\" operator=\"lessThan\" allowBlank=\"1\" showInputMessage=\"1\" showErrorMessage=\"1\" sqref=\"A1\" xr:uid=\"{2BAE03EB-64B8-4B47-A98F-FC54DA9C6627}\"><formula1>0.5</formula1></dataValidation></dataValidations>",
+      "candidates": [
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 0.25,
+          "valid": true
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 0.5,
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 0.75,
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 1.25,
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 1.75,
+          "valid": false
+        }
+      ]
+    },
+    {
+      "id": "textlength-between",
+      "range": "A1",
+      "data_validations": "<dataValidations count=\"1\"><dataValidation type=\"textLength\" allowBlank=\"1\" showInputMessage=\"1\" showErrorMessage=\"1\" sqref=\"A1\" xr:uid=\"{C614670A-72AA-47B5-B6A8-D1085561AE92}\"><formula1>3</formula1><formula2>5</formula2></dataValidation></dataValidations>",
+      "candidates": [
+        {
+          "cell": "A1",
+          "type": "s",
+          "value": "",
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "s",
+          "value": "a",
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "s",
+          "value": "abc",
+          "valid": true
+        },
+        {
+          "cell": "A1",
+          "type": "s",
+          "value": "abcde",
+          "valid": true
+        },
+        {
+          "cell": "A1",
+          "type": "s",
+          "value": "abcdef",
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 12345,
+          "valid": true
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 123456,
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 1.5,
+          "valid": true
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 0,
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "b",
+          "value": true,
+          "valid": true
+        },
+        {
+          "cell": "A1",
+          "type": "s",
+          "value": "é€",
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "s",
+          "value": "line1\nline2",
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "z",
+          "value": null,
+          "valid": true
+        }
+      ]
+    },
+    {
+      "id": "textlength-notBetween",
+      "range": "A1",
+      "data_validations": "<dataValidations count=\"1\"><dataValidation type=\"textLength\" operator=\"notBetween\" allowBlank=\"1\" showInputMessage=\"1\" showErrorMessage=\"1\" sqref=\"A1\" xr:uid=\"{33D70D99-5848-4DAB-A15C-11C4AEC88B9B}\"><formula1>3</formula1><formula2>5</formula2></dataValidation></dataValidations>",
+      "candidates": [
+        {
+          "cell": "A1",
+          "type": "s",
+          "value": "",
+          "valid": true
+        },
+        {
+          "cell": "A1",
+          "type": "s",
+          "value": "a",
+          "valid": true
+        },
+        {
+          "cell": "A1",
+          "type": "s",
+          "value": "abc",
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "s",
+          "value": "abcde",
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "s",
+          "value": "abcdef",
+          "valid": true
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 12345,
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 123456,
+          "valid": true
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 1.5,
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 0,
+          "valid": true
+        },
+        {
+          "cell": "A1",
+          "type": "b",
+          "value": true,
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "s",
+          "value": "é€",
+          "valid": true
+        },
+        {
+          "cell": "A1",
+          "type": "s",
+          "value": "line1\nline2",
+          "valid": true
+        },
+        {
+          "cell": "A1",
+          "type": "z",
+          "value": null,
+          "valid": true
+        }
+      ]
+    },
+    {
+      "id": "textlength-equal",
+      "range": "A1",
+      "data_validations": "<dataValidations count=\"1\"><dataValidation type=\"textLength\" operator=\"equal\" allowBlank=\"1\" showInputMessage=\"1\" showErrorMessage=\"1\" sqref=\"A1\" xr:uid=\"{22E78884-66D3-4E26-8CFC-08BFFF620C0B}\"><formula1>3</formula1></dataValidation></dataValidations>",
+      "candidates": [
+        {
+          "cell": "A1",
+          "type": "s",
+          "value": "",
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "s",
+          "value": "a",
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "s",
+          "value": "abc",
+          "valid": true
+        },
+        {
+          "cell": "A1",
+          "type": "s",
+          "value": "abcde",
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "s",
+          "value": "abcdef",
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 12345,
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 123456,
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 1.5,
+          "valid": true
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 0,
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "b",
+          "value": true,
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "s",
+          "value": "é€",
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "s",
+          "value": "line1\nline2",
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "z",
+          "value": null,
+          "valid": true
+        }
+      ]
+    },
+    {
+      "id": "textlength-notEqual",
+      "range": "A1",
+      "data_validations": "<dataValidations count=\"1\"><dataValidation type=\"textLength\" operator=\"notEqual\" allowBlank=\"1\" showInputMessage=\"1\" showErrorMessage=\"1\" sqref=\"A1\" xr:uid=\"{870698AE-2E77-4B8B-8148-FFF41CF41B6C}\"><formula1>3</formula1></dataValidation></dataValidations>",
+      "candidates": [
+        {
+          "cell": "A1",
+          "type": "s",
+          "value": "",
+          "valid": true
+        },
+        {
+          "cell": "A1",
+          "type": "s",
+          "value": "a",
+          "valid": true
+        },
+        {
+          "cell": "A1",
+          "type": "s",
+          "value": "abc",
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "s",
+          "value": "abcde",
+          "valid": true
+        },
+        {
+          "cell": "A1",
+          "type": "s",
+          "value": "abcdef",
+          "valid": true
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 12345,
+          "valid": true
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 123456,
+          "valid": true
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 1.5,
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 0,
+          "valid": true
+        },
+        {
+          "cell": "A1",
+          "type": "b",
+          "value": true,
+          "valid": true
+        },
+        {
+          "cell": "A1",
+          "type": "s",
+          "value": "é€",
+          "valid": true
+        },
+        {
+          "cell": "A1",
+          "type": "s",
+          "value": "line1\nline2",
+          "valid": true
+        },
+        {
+          "cell": "A1",
+          "type": "z",
+          "value": null,
+          "valid": true
+        }
+      ]
+    },
+    {
+      "id": "textlength-greaterThan",
+      "range": "A1",
+      "data_validations": "<dataValidations count=\"1\"><dataValidation type=\"textLength\" operator=\"greaterThan\" allowBlank=\"1\" showInputMessage=\"1\" showErrorMessage=\"1\" sqref=\"A1\" xr:uid=\"{7B0A3E7D-2B35-4821-8DB7-C1012ADDD0F9}\"><formula1>3</formula1></dataValidation></dataValidations>",
+      "candidates": [
+        {
+          "cell": "A1",
+          "type": "s",
+          "value": "",
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "s",
+          "value": "a",
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "s",
+          "value": "abc",
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "s",
+          "value": "abcde",
+          "valid": true
+        },
+        {
+          "cell": "A1",
+          "type": "s",
+          "value": "abcdef",
+          "valid": true
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 12345,
+          "valid": true
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 123456,
+          "valid": true
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 1.5,
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 0,
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "b",
+          "value": true,
+          "valid": true
+        },
+        {
+          "cell": "A1",
+          "type": "s",
+          "value": "é€",
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "s",
+          "value": "line1\nline2",
+          "valid": true
+        },
+        {
+          "cell": "A1",
+          "type": "z",
+          "value": null,
+          "valid": true
+        }
+      ]
+    },
+    {
+      "id": "textlength-lessThan",
+      "range": "A1",
+      "data_validations": "<dataValidations count=\"1\"><dataValidation type=\"textLength\" operator=\"lessThan\" allowBlank=\"1\" showInputMessage=\"1\" showErrorMessage=\"1\" sqref=\"A1\" xr:uid=\"{CA812DAC-05C0-4D45-B861-9342899E904A}\"><formula1>3</formula1></dataValidation></dataValidations>",
+      "candidates": [
+        {
+          "cell": "A1",
+          "type": "s",
+          "value": "",
+          "valid": true
+        },
+        {
+          "cell": "A1",
+          "type": "s",
+          "value": "a",
+          "valid": true
+        },
+        {
+          "cell": "A1",
+          "type": "s",
+          "value": "abc",
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "s",
+          "value": "abcde",
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "s",
+          "value": "abcdef",
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 12345,
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 123456,
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 1.5,
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 0,
+          "valid": true
+        },
+        {
+          "cell": "A1",
+          "type": "b",
+          "value": true,
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "s",
+          "value": "é€",
+          "valid": true
+        },
+        {
+          "cell": "A1",
+          "type": "s",
+          "value": "line1\nline2",
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "z",
+          "value": null,
+          "valid": true
+        }
+      ]
+    },
+    {
+      "id": "textlength-greaterThanOrEqual",
+      "range": "A1",
+      "data_validations": "<dataValidations count=\"1\"><dataValidation type=\"textLength\" operator=\"greaterThanOrEqual\" allowBlank=\"1\" showInputMessage=\"1\" showErrorMessage=\"1\" sqref=\"A1\" xr:uid=\"{009F92F1-F3F2-4C52-A455-FE26903C388F}\"><formula1>3</formula1></dataValidation></dataValidations>",
+      "candidates": [
+        {
+          "cell": "A1",
+          "type": "s",
+          "value": "",
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "s",
+          "value": "a",
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "s",
+          "value": "abc",
+          "valid": true
+        },
+        {
+          "cell": "A1",
+          "type": "s",
+          "value": "abcde",
+          "valid": true
+        },
+        {
+          "cell": "A1",
+          "type": "s",
+          "value": "abcdef",
+          "valid": true
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 12345,
+          "valid": true
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 123456,
+          "valid": true
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 1.5,
+          "valid": true
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 0,
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "b",
+          "value": true,
+          "valid": true
+        },
+        {
+          "cell": "A1",
+          "type": "s",
+          "value": "é€",
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "s",
+          "value": "line1\nline2",
+          "valid": true
+        },
+        {
+          "cell": "A1",
+          "type": "z",
+          "value": null,
+          "valid": true
+        }
+      ]
+    },
+    {
+      "id": "textlength-lessThanOrEqual",
+      "range": "A1",
+      "data_validations": "<dataValidations count=\"1\"><dataValidation type=\"textLength\" operator=\"lessThanOrEqual\" allowBlank=\"1\" showInputMessage=\"1\" showErrorMessage=\"1\" sqref=\"A1\" xr:uid=\"{0AC59866-93DA-41FB-8016-E6792DC0F7BB}\"><formula1>3</formula1></dataValidation></dataValidations>",
+      "candidates": [
+        {
+          "cell": "A1",
+          "type": "s",
+          "value": "",
+          "valid": true
+        },
+        {
+          "cell": "A1",
+          "type": "s",
+          "value": "a",
+          "valid": true
+        },
+        {
+          "cell": "A1",
+          "type": "s",
+          "value": "abc",
+          "valid": true
+        },
+        {
+          "cell": "A1",
+          "type": "s",
+          "value": "abcde",
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "s",
+          "value": "abcdef",
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 12345,
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 123456,
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 1.5,
+          "valid": true
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 0,
+          "valid": true
+        },
+        {
+          "cell": "A1",
+          "type": "b",
+          "value": true,
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "s",
+          "value": "é€",
+          "valid": true
+        },
+        {
+          "cell": "A1",
+          "type": "s",
+          "value": "line1\nline2",
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "z",
+          "value": null,
+          "valid": true
+        }
+      ]
+    },
+    {
+      "id": "list-literal",
+      "range": "A1",
+      "data_validations": "<dataValidations count=\"1\"><dataValidation type=\"list\" allowBlank=\"1\" showInputMessage=\"1\" showErrorMessage=\"1\" sqref=\"A1\" xr:uid=\"{B57A3D3E-F552-4140-A6CC-2AB1DCD41CDF}\"><formula1>\"Low,Medium,High\"</formula1></dataValidation></dataValidations>",
+      "candidates": [
+        {
+          "cell": "A1",
+          "type": "s",
+          "value": "Low",
+          "valid": true
+        },
+        {
+          "cell": "A1",
+          "type": "s",
+          "value": "low",
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "s",
+          "value": "MEDIUM",
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "s",
+          "value": "High",
+          "valid": true
+        },
+        {
+          "cell": "A1",
+          "type": "s",
+          "value": "Highest",
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "s",
+          "value": " High",
+          "valid": true
+        },
+        {
+          "cell": "A1",
+          "type": "s",
+          "value": "",
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 5,
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "z",
+          "value": null,
+          "valid": true
+        }
+      ]
+    },
+    {
+      "id": "list-literal-numbers",
+      "range": "A1",
+      "data_validations": "<dataValidations count=\"1\"><dataValidation type=\"list\" allowBlank=\"1\" showInputMessage=\"1\" showErrorMessage=\"1\" sqref=\"A1\" xr:uid=\"{205869C5-F80B-49A3-983C-DB89BB276C41}\"><formula1>\"1,2,3.5,-4\"</formula1></dataValidation></dataValidations>",
+      "candidates": [
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 1,
+          "valid": true
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 3.5,
+          "valid": true
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": "-4",
+          "valid": true
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 4,
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "s",
+          "value": "1",
+          "valid": true
+        },
+        {
+          "cell": "A1",
+          "type": "s",
+          "value": "3.5",
+          "valid": true
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 2,
+          "valid": true
+        },
+        {
+          "cell": "A1",
+          "type": "z",
+          "value": null,
+          "valid": true
+        }
+      ]
+    },
+    {
+      "id": "list-range",
+      "range": "A1",
+      "data_validations": "<dataValidations count=\"1\"><dataValidation type=\"list\" allowBlank=\"1\" showInputMessage=\"1\" showErrorMessage=\"1\" sqref=\"A1\" xr:uid=\"{CB0DE8C3-839A-456A-A6C4-630D24F5F8E4}\"><formula1>$C$1:$C$4</formula1></dataValidation></dataValidations>",
+      "candidates": [
+        {
+          "cell": "A1",
+          "type": "s",
+          "value": "Red",
+          "valid": true
+        },
+        {
+          "cell": "A1",
+          "type": "s",
+          "value": "red",
+          "valid": true
+        },
+        {
+          "cell": "A1",
+          "type": "s",
+          "value": "GREEN",
+          "valid": true
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 7,
+          "valid": true
+        },
+        {
+          "cell": "A1",
+          "type": "s",
+          "value": "7",
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "s",
+          "value": "blue",
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "z",
+          "value": null,
+          "valid": true
+        }
+      ]
+    },
+    {
+      "id": "list-range-noblank",
+      "range": "A1",
+      "data_validations": "<dataValidations count=\"1\"><dataValidation type=\"list\" showInputMessage=\"1\" showErrorMessage=\"1\" sqref=\"A1\" xr:uid=\"{5DB9282F-B271-42AD-9592-0314001DED81}\"><formula1>$C$1:$C$3</formula1></dataValidation></dataValidations>",
+      "candidates": [
+        {
+          "cell": "A1",
+          "type": "z",
+          "value": null,
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "s",
+          "value": "Red",
+          "valid": true
+        }
+      ]
+    },
+    {
+      "id": "list-range-with-blank-cell",
+      "range": "A1",
+      "data_validations": "<dataValidations count=\"1\"><dataValidation type=\"list\" allowBlank=\"1\" showInputMessage=\"1\" showErrorMessage=\"1\" sqref=\"A1\" xr:uid=\"{77038C60-EB82-4B8D-B135-6F109B796562}\"><formula1>$C$1:$C$3</formula1></dataValidation></dataValidations>",
+      "candidates": [
+        {
+          "cell": "A1",
+          "type": "z",
+          "value": null,
+          "valid": true
+        },
+        {
+          "cell": "A1",
+          "type": "s",
+          "value": "Red",
+          "valid": true
+        },
+        {
+          "cell": "A1",
+          "type": "s",
+          "value": "x",
+          "valid": true
+        },
+        {
+          "cell": "A1",
+          "type": "s",
+          "value": "y",
+          "valid": false
+        }
+      ]
+    },
+    {
+      "id": "list-row-range",
+      "range": "A1",
+      "data_validations": "<dataValidations count=\"1\"><dataValidation type=\"list\" allowBlank=\"1\" showInputMessage=\"1\" showErrorMessage=\"1\" sqref=\"A1\" xr:uid=\"{BA05A456-6CB3-40C3-8D5F-7197EC2269FE}\"><formula1>$C$1:$E$1</formula1></dataValidation></dataValidations>",
+      "candidates": [
+        {
+          "cell": "A1",
+          "type": "s",
+          "value": "a",
+          "valid": true
+        },
+        {
+          "cell": "A1",
+          "type": "s",
+          "value": "c",
+          "valid": true
+        },
+        {
+          "cell": "A1",
+          "type": "s",
+          "value": "d",
+          "valid": false
+        }
+      ]
+    },
+    {
+      "id": "list-formula-offset",
+      "range": "A1",
+      "data_validations": "<dataValidations count=\"1\"><dataValidation type=\"list\" allowBlank=\"1\" showInputMessage=\"1\" showErrorMessage=\"1\" sqref=\"A1\" xr:uid=\"{F976F67C-3DC9-462F-B723-2D9FF4BCC593}\"><formula1>OFFSET($C$1,0,0,2,1)</formula1></dataValidation></dataValidations>",
+      "candidates": [
+        {
+          "cell": "A1",
+          "type": "s",
+          "value": "p",
+          "valid": true
+        },
+        {
+          "cell": "A1",
+          "type": "s",
+          "value": "q",
+          "valid": true
+        },
+        {
+          "cell": "A1",
+          "type": "s",
+          "value": "r",
+          "valid": false
+        }
+      ]
+    },
+    {
+      "id": "list-dates",
+      "range": "A1",
+      "data_validations": "<dataValidations count=\"1\"><dataValidation type=\"list\" allowBlank=\"1\" showInputMessage=\"1\" showErrorMessage=\"1\" sqref=\"A1\" xr:uid=\"{92315786-EDDA-4306-8150-F34320A571FC}\"><formula1>$C$1:$C$2</formula1></dataValidation></dataValidations>",
+      "candidates": [
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 45000,
+          "valid": true
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 45001,
+          "valid": true
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 45002,
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "s",
+          "value": "45000",
+          "valid": false
+        }
+      ]
+    },
+    {
+      "id": "custom-gt-other",
+      "range": "B2:B5",
+      "data_validations": "<dataValidations count=\"1\"><dataValidation type=\"custom\" allowBlank=\"1\" showInputMessage=\"1\" showErrorMessage=\"1\" sqref=\"B2:B5\" xr:uid=\"{17048E8D-1E26-4118-9831-11A006BE1E8D}\"><formula1>B2&gt;A2</formula1></dataValidation></dataValidations>",
+      "candidates": [
+        {
+          "cell": "B2",
+          "type": "n",
+          "value": 2,
+          "valid": false
+        },
+        {
+          "cell": "B2",
+          "type": "n",
+          "value": 1,
+          "valid": false
+        },
+        {
+          "cell": "B3",
+          "type": "n",
+          "value": 6,
+          "valid": true
+        },
+        {
+          "cell": "B3",
+          "type": "n",
+          "value": 3,
+          "valid": false
+        },
+        {
+          "cell": "B4",
+          "type": "n",
+          "value": 4,
+          "valid": false
+        },
+        {
+          "cell": "B4",
+          "type": "n",
+          "value": 2,
+          "valid": false
+        },
+        {
+          "cell": "B5",
+          "type": "n",
+          "value": 10,
+          "valid": true
+        },
+        {
+          "cell": "B5",
+          "type": "n",
+          "value": 9,
+          "valid": true
+        },
+        {
+          "cell": "B5",
+          "type": "s",
+          "value": "zz",
+          "valid": true
+        }
+      ]
+    },
+    {
+      "id": "custom-isnumber",
+      "range": "A1",
+      "data_validations": "<dataValidations count=\"1\"><dataValidation type=\"custom\" allowBlank=\"1\" showInputMessage=\"1\" showErrorMessage=\"1\" sqref=\"A1\" xr:uid=\"{581334EA-00BE-481E-9542-181E024EA028}\"><formula1>ISNUMBER(A1)</formula1></dataValidation></dataValidations>",
+      "candidates": [
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 5,
+          "valid": true
+        },
+        {
+          "cell": "A1",
+          "type": "s",
+          "value": "x",
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "b",
+          "value": true,
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "z",
+          "value": null,
+          "valid": true
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 0,
+          "valid": true
+        }
+      ]
+    },
+    {
+      "id": "custom-and-or",
+      "range": "A1",
+      "data_validations": "<dataValidations count=\"1\"><dataValidation type=\"custom\" allowBlank=\"1\" showInputMessage=\"1\" showErrorMessage=\"1\" sqref=\"A1\" xr:uid=\"{1468B8F0-535F-4C1E-9BD4-4A93CA228549}\"><formula1>AND(A1&gt;=1,A1&lt;=10,MOD(A1,2)=0)</formula1></dataValidation></dataValidations>",
+      "candidates": [
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 2,
+          "valid": true
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 3,
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 10,
+          "valid": true
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 12,
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 0,
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "s",
+          "value": "x",
+          "valid": false
+        }
+      ]
+    },
+    {
+      "id": "custom-number-result",
+      "range": "A1",
+      "data_validations": "<dataValidations count=\"1\"><dataValidation type=\"custom\" allowBlank=\"1\" showInputMessage=\"1\" showErrorMessage=\"1\" sqref=\"A1\" xr:uid=\"{A62C6CBC-58C4-43F9-AE42-28F59CA80ED9}\"><formula1>A1-5</formula1></dataValidation></dataValidations>",
+      "candidates": [
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 5,
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 6,
+          "valid": true
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 4,
+          "valid": true
+        },
+        {
+          "cell": "A1",
+          "type": "s",
+          "value": "x",
+          "valid": false
+        }
+      ]
+    },
+    {
+      "id": "custom-text-result",
+      "range": "A1",
+      "data_validations": "<dataValidations count=\"1\"><dataValidation type=\"custom\" allowBlank=\"1\" showInputMessage=\"1\" showErrorMessage=\"1\" sqref=\"A1\" xr:uid=\"{FF254BBA-8E7F-453E-9EB2-E98CB77A2029}\"><formula1>LEFT(A1,1)</formula1></dataValidation></dataValidations>",
+      "candidates": [
+        {
+          "cell": "A1",
+          "type": "s",
+          "value": "abc",
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "s",
+          "value": "1x",
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 12,
+          "valid": false
+        }
+      ]
+    },
+    {
+      "id": "custom-error-result",
+      "range": "A1",
+      "data_validations": "<dataValidations count=\"1\"><dataValidation type=\"custom\" allowBlank=\"1\" showInputMessage=\"1\" showErrorMessage=\"1\" sqref=\"A1\" xr:uid=\"{AFE753FC-39BD-4299-AA45-233F93C931D1}\"><formula1>1/(A1-3)</formula1></dataValidation></dataValidations>",
+      "candidates": [
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 3,
+          "valid": false
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 4,
+          "valid": true
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 0,
+          "valid": true
+        }
+      ]
+    },
+    {
+      "id": "custom-countif-unique",
+      "range": "B1:B5",
+      "data_validations": "<dataValidations count=\"1\"><dataValidation type=\"custom\" allowBlank=\"1\" showInputMessage=\"1\" showErrorMessage=\"1\" sqref=\"B1:B5\" xr:uid=\"{4FA5006D-139E-4038-9DBA-7E130B871E86}\"><formula1>COUNTIF($B$1:$B$5,B1)=1</formula1></dataValidation></dataValidations>",
+      "candidates": [
+        {
+          "cell": "B1",
+          "type": "s",
+          "value": "a",
+          "valid": false
+        },
+        {
+          "cell": "B2",
+          "type": "s",
+          "value": "b",
+          "valid": true
+        },
+        {
+          "cell": "B4",
+          "type": "s",
+          "value": "c",
+          "valid": true
+        },
+        {
+          "cell": "B5",
+          "type": "s",
+          "value": "a",
+          "valid": false
+        }
+      ]
+    },
+    {
+      "id": "input-only",
+      "range": "A1",
+      "data_validations": "<dataValidations count=\"1\"><dataValidation allowBlank=\"1\" showInputMessage=\"1\" showErrorMessage=\"1\" promptTitle=\"Enter\" prompt=\"Type a number\" sqref=\"A1\" xr:uid=\"{1BDB647B-F665-4E52-BB83-82806F1F146F}\"/></dataValidations>",
+      "candidates": [
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 5,
+          "valid": true
+        },
+        {
+          "cell": "A1",
+          "type": "s",
+          "value": "x",
+          "valid": true
+        },
+        {
+          "cell": "A1",
+          "type": "z",
+          "value": null,
+          "valid": true
+        }
+      ]
+    },
+    {
+      "id": "messages-stop",
+      "range": "A1",
+      "data_validations": "<dataValidations count=\"1\"><dataValidation type=\"whole\" allowBlank=\"1\" showInputMessage=\"1\" showErrorMessage=\"1\" errorTitle=\"Title err\" error=\"Msg err &amp; &lt;more&gt;\" promptTitle=\"Title in\" prompt=\"Msg in\" sqref=\"A1\" xr:uid=\"{633ECDFB-5552-4FDA-8773-B04C35000994}\"><formula1>1</formula1><formula2>10</formula2></dataValidation></dataValidations>",
+      "candidates": [
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 5,
+          "valid": true
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 50,
+          "valid": false
+        }
+      ]
+    },
+    {
+      "id": "messages-warning",
+      "range": "A1",
+      "data_validations": "<dataValidations count=\"1\"><dataValidation type=\"decimal\" errorStyle=\"warning\" operator=\"greaterThan\" allowBlank=\"1\" showErrorMessage=\"1\" errorTitle=\"Warn\" error=\"Careful\" sqref=\"A1\" xr:uid=\"{B0CBE8AC-7267-48B0-901B-DFA868897A14}\"><formula1>0</formula1></dataValidation></dataValidations>",
+      "candidates": [
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 5,
+          "valid": true
+        },
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": "-5",
+          "valid": false
+        }
+      ]
+    },
+    {
+      "id": "messages-info",
+      "range": "A1",
+      "data_validations": "<dataValidations count=\"1\"><dataValidation type=\"textLength\" errorStyle=\"information\" operator=\"lessThanOrEqual\" allowBlank=\"1\" showDropDown=\"1\" showInputMessage=\"1\" sqref=\"A1\" xr:uid=\"{53D84922-53BD-4401-970A-6F68AA99E1E6}\"><formula1>3</formula1></dataValidation></dataValidations>",
+      "candidates": [
+        {
+          "cell": "A1",
+          "type": "s",
+          "value": "ab",
+          "valid": true
+        },
+        {
+          "cell": "A1",
+          "type": "s",
+          "value": "abcd",
+          "valid": false
+        }
+      ]
+    },
+    {
+      "id": "list-no-dropdown",
+      "range": "A1",
+      "data_validations": "<dataValidations count=\"1\"><dataValidation type=\"list\" allowBlank=\"1\" showDropDown=\"1\" showInputMessage=\"1\" showErrorMessage=\"1\" sqref=\"A1\" xr:uid=\"{F2A88254-E00A-40A5-B0A0-D3F50FA5D975}\"><formula1>\"x,y\"</formula1></dataValidation></dataValidations>",
+      "candidates": [
+        {
+          "cell": "A1",
+          "type": "s",
+          "value": "x",
+          "valid": true
+        },
+        {
+          "cell": "A1",
+          "type": "s",
+          "value": "z",
+          "valid": false
+        }
+      ]
+    },
+    {
+      "id": "multi-area",
+      "range": "A1:A3,C1:C3",
+      "data_validations": "<dataValidations count=\"1\"><dataValidation type=\"whole\" allowBlank=\"1\" showInputMessage=\"1\" showErrorMessage=\"1\" sqref=\"A1:A3 C1:C3\" xr:uid=\"{3B748D8F-682D-441F-BF6F-53C5E9A81563}\"><formula1>1</formula1><formula2>3</formula2></dataValidation></dataValidations>",
+      "candidates": [
+        {
+          "cell": "A1",
+          "type": "n",
+          "value": 2,
+          "valid": true
+        },
+        {
+          "cell": "A3",
+          "type": "n",
+          "value": 4,
+          "valid": false
+        },
+        {
+          "cell": "C2",
+          "type": "n",
+          "value": 2,
+          "valid": true
+        },
+        {
+          "cell": "C3",
+          "type": "n",
+          "value": 9,
+          "valid": false
+        }
+      ]
+    }
+  ]
+}

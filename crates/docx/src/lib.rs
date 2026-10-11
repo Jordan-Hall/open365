@@ -13,6 +13,20 @@ mod document;
 mod drawing;
 mod edit;
 mod error;
+mod fields;
+mod fields_date;
+mod fields_eval;
+mod fields_formula;
+mod fields_locale;
+mod fields_locale_data;
+mod fields_number;
+mod fields_props;
+mod fields_refs;
+mod fields_scan;
+mod fields_snap;
+mod fields_toc;
+mod fields_toc_styles;
+mod fields_update;
 mod flatten;
 mod layout_props;
 mod model;
@@ -39,6 +53,14 @@ pub use drawing::{
     TextBoxAnchor, VerticalRelativeFrom, WrapSide, WrapType,
 };
 pub use error::DocxError;
+pub use fields::{
+    Arg, DateNames, Field, FieldContext, FieldKind, FieldUpdateReport, GeneralFormat, Instruction,
+    MergeData, NoPages, PageInfo, PageProvider, SkipReason, SkippedField, Switch,
+};
+pub use fields_date::{CivilDateTime, format_date_picture};
+pub use fields_formula::{FormulaEnv, Num as FormulaNum, evaluate as evaluate_formula};
+pub use fields_locale::LocaleNames;
+pub use fields_number::{NumberSymbols, format_picture as format_number_picture};
 pub use flatten::{FlatBlocks, SDT_END, SDT_START, flatten_content_controls, is_sdt_marker};
 pub use layout_props::{
     Ligatures, ParagraphBorders, ParagraphMark, ParagraphProps, RunLayoutProps, TabKind, TabLeader,

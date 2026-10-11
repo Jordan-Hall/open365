@@ -1,0 +1,26 @@
+[package]
+name = "open365-writer"
+description = "Open365 Writer: word processor application (egui/eframe shell)."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[[bin]]
+name = "open365-writer"
+path = "src/main.rs"
+
+[dependencies]
+arboard = { version = "3.6.1", default-features = false }
+eframe.workspace = true
+egui.workspace = true
+open365-commands.workspace = true
+open365-pdf.workspace = true
+open365-ui-egui.workspace = true
+open365-ui-shell.workspace = true
+rfd.workspace = true
+zip = { version = "9.0.1", default-features = false, features = ["deflate"] }
+
+[lints]
+workspace = true

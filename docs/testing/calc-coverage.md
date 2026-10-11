@@ -8,7 +8,7 @@ That page has 514 table rows naming 521 distinct functions (seven rows pair a fu
 earlier, recalled list: `COPILOT` is not on the page (removed); `CALL`, `DETECTLANGUAGE`, `EUROCONVERT`, `JIS`, `REGISTER.ID` and
 `TRANSLATE` are on it (added under "Web, cube, other"). No registered function is missing from the page. In the table below a name that is
 also in another category counts in both (the legacy names repeat), so the category total is larger than 521. Distinct names: 521 on the page,
-316 registered, 205 missing. Before the previous changes: 236, then 301, then 312 registered.
+367 registered before the seventh batch, 451 after, 70 missing (after the seventh batch; the sixth batch had 154 missing; the table below is the earlier count). Before the previous changes: 236, then 301, then 312, then 316 registered.
 
 | Category | Excel | Registered | Missing |
 |---|---:|---:|---:|
@@ -26,13 +26,73 @@ also in another category counts in both (the legacy names repeat), so the catego
 | Web, cube, other | 25 | 0 | 25 |
 | **Total** | 524 | 318 | 206 |
 
+## Sixth batch (statistics and securities): 51 functions
+
+Added and checked against Excel (2,409 cases, groups `avedev` ... `yieldmat`, plus argument-handling cases `*.e_*`): AVEDEV, DEVSQ,
+GEOMEAN, HARMEAN, SKEW, SKEW.P, KURT, TRIMMEAN, STDEVA, STDEVPA, VARA, VARPA, CORREL, PEARSON, RSQ, SLOPE, INTERCEPT, STEYX, COVAR,
+COVARIANCE.P, COVARIANCE.S, FORECAST, FORECAST.LINEAR; COUPDAYBS, COUPDAYS, COUPDAYSNC, COUPNCD, COUPNUM, COUPPCD, PRICE, YIELD,
+DURATION, MDURATION, DISC, PRICEDISC, YIELDDISC, INTRATE, RECEIVED, PRICEMAT, YIELDMAT, TBILLPRICE, TBILLYIELD, TBILLEQ, ACCRINT,
+ACCRINTM, AMORLINC, AMORDEGRC, PDURATION, RRI, ISPMT, FVSCHEDULE.
+
+Findings (the algorithms were fitted to Excel's last digits on random data sets):
+
+* `CORREL` is `(Sxy/n) / (sqrt(Sxx/n) * sqrt(Syy/n))`, `SLOPE` is `Sxy/Sxx`, `INTERCEPT` is `mean_y - slope * mean_x`, `STEYX` is
+  `sqrt((Syy - Sxy*Sxy/Sxx) / (n-2))`, `FORECAST` is `(mean_y - b*mean_x) + b*x`, with means as `sum/n` and deviations from the mean.
+  Pairs with a non-number on either side are skipped, different lengths are `#N/A`, errors propagate by position.
+* `VARA`/`VARPA`/`STDEV*A` use `(Σx² - (Σx)²/n)/(n-1)` and `(nΣx² - (Σx)²)/n²` with a two-pass fallback (not the `VAR` form);
+  array constants contribute only their numbers there, ranges count text as 0 and booleans as 1/0.
+* `HARMEAN` is `1/(Σ(1/x)/n)`; `GEOMEAN` carries the log sum in more than double precision (Open365 uses double-double and rounds once:
+  33 of 40 random sets match, the rest differ by 1 ulp).
+* `YIELD` solves with `DSC = E - A` for every basis (not the actual day count of `COUPDAYSNC` for bases 2 and 3); Excel then stops
+  its iteration at a loose tolerance (result 1e-16 to 1e-10 from the exact root). Open365 iterates to convergence, so multi-coupon
+  `YIELD` differs in the last digits (six sample cases listed). `PRICEMAT`/`YIELDMAT` take the year length from issue to settlement,
+  `DISC` is `(1 - pr/red) * (B/DSM)`.
+* Coupon dates follow the maturity backwards in `12/frequency` month steps, with the end-of-month rule when the maturity is a month end
+  (all 240 `COUP*` cases match).
+
+Not done: the distribution functions (NORM/T/CHISQ/F/BETA/GAMMA/BINOM/POISSON families and their legacy names), CONFIDENCE.*, Z.TEST,
+T.TEST, F.TEST, CHISQ.TEST, LINEST/LOGEST/TREND/GROWTH, PERCENTRANK, MODE.MULT, FREQUENCY, PROB, STANDARDIZE, FISHER, FORECAST.ETS.*,
+the `ODDF*`/`ODDL*` bond functions and the exact `ACCRINT`/`AMOR*` rounding rules. `crates/calc/src/functions/distribdd.rs` holds the
+double-double arithmetic (exp, ln) the gamma/beta work will need.
+
+## Seventh batch (distributions, tests and array statistics): 84 functions
+
+Added (groups `norm_dist` ... `growth` in the corpus, about 14,200 cases including argument-handling cases `*.e*`): NORM.DIST/INV,
+NORM.S.DIST/INV, PHI, GAUSS, STANDARDIZE, LOGNORM.DIST/INV, T.DIST(.RT/.2T), T.INV(.2T), CHISQ.DIST(.RT)/INV(.RT), F.DIST(.RT)/INV(.RT),
+BETA.DIST/INV, GAMMA.DIST/INV, GAMMA, GAMMALN(.PRECISE), WEIBULL.DIST, EXPON.DIST, BINOM.DIST(.RANGE)/INV, POISSON.DIST,
+NEGBINOM.DIST, HYPGEOM.DIST, CONFIDENCE.NORM/T, Z.TEST, T.TEST, F.TEST, CHISQ.TEST, FISHER, FISHERINV, PERMUTATIONA, FREQUENCY,
+MODE.MULT, PROB, PERCENTRANK(.INC/.EXC), LINEST, LOGEST, TREND, GROWTH, and every legacy name (NORMDIST, TDIST, CRITBINOM, ...).
+
+Method: probabilities are evaluated in double-double (`distribdd.rs`: erfc, ln-gamma, incomplete gamma and beta, Newton/false-position
+inverses) and rounded once, so Open365 returns the exact value. Excel does not: its results are typically 1 to a few ulp off the exact value
+(for the normal tail the error grows like z^2 * 1e-16, e.g. `NORM.S.DIST(-10)` is 6.7e-15 low), so about 40% of the new cases differ in
+the last digits and are listed in `fixtures/calc/known-differences.toml` with the measured ulp distance. The cases where the difference is
+large (extreme parameters, huge degrees of freedom, `T.DIST` at |t| > 1e8) and those where Excel and Open365 disagree on a domain boundary
+are listed with their own reason; they have not been analysed one by one.
+
+Excel hangs (does not return) on `BETA.DIST`/`BETADIST` with a 1E+300 shape parameter and `NEGBINOM.DIST` with 1E+300 arguments; those six
+cases were removed from the corpus. Open365 caps its series and fraction loops and returns `#NUM!` instead.
+
+Follow-up (domain and limit rules measured against Excel, 83 known differences removed, 6191 to 6108): degrees of freedom up to 1E10 inclusive
+for T/F/CHISQ (`T.DIST(...,FALSE)` and `CHISQ.INV.RT` have no upper limit; the T density gives #DIV/0! for df 0), T functions give #NUM! when
+t*t overflows (|t| > 1.34E154), continuous results below 2.2250738585072014E-308 are 0 (the discrete ones keep subnormals), the BETA density
+at an end point is #NUM! for exponent <= 1 and 0 above, `GAMMA.DIST` density at 0 is #NUM! for shape <= 1, `WEIBULL.DIST` density at 0 is 0,
+`BETA.INV(1,...)` is #NUM!, `GAMMA.INV(0,...)` is 0. Findings on the normal CDF: it is `0.5*erfc(-z*0.7071067811865476)` (central region
+`0.5+0.5*erf`) with an unsplit `exp(-x*x)`, which explains the z^2*1e-16 tail error; Cephes `ndtr` has that shape but is not bit-identical
+(about 18% of tail points equal), West/Hart and Numerical Recipes `erfccheb` do not match, so the exact coefficients are not identified.
+Excel's EXP and LN are correctly rounded; BINOM.DIST is `exp` of a sum of logarithms (`exp(log(p))` reproduces `BINOM.DIST(1,1,0.01,FALSE)` =
+0.010000000000000004) but the log-binomial-coefficient term is not identified. T tail below `df + t^2 == df` returns the t=0 value.
+
+Not done: reproducing Excel's own approximation of the normal CDF/quantile (the largest single source of residue), the multi-variable
+`LINEST` pivoting rules for collinear columns, `FORECAST.ETS.*`, and per-case analysis of the large differences.
+
 ## Missing by category
 
 **Math and trigonometry** (13): CEILING.PRECISE, COMBINA, FLOOR.PRECISE, ISO.CEILING, MDETERM, MINVERSE, MMULT, MULTINOMIAL, MUNIT, RANDARRAY, SUMX2MY2, SUMX2PY2, SUMXMY2
 
-**Statistical** (81): AVEDEV, BETA.DIST, BETA.INV, BINOM.DIST, BINOM.DIST.RANGE, BINOM.INV, CHISQ.DIST, CHISQ.DIST.RT, CHISQ.INV, CHISQ.INV.RT, CHISQ.TEST, CONFIDENCE.NORM, CONFIDENCE.T, CORREL, COVARIANCE.P, COVARIANCE.S, DEVSQ, EXPON.DIST, F.DIST, F.DIST.RT, F.INV, F.INV.RT, F.TEST, FISHER, FISHERINV, FORECAST, FORECAST.ETS, FORECAST.ETS.CONFINT, FORECAST.ETS.SEASONALITY, FORECAST.ETS.STAT, FORECAST.LINEAR, FREQUENCY, GAMMA, GAMMA.DIST, GAMMA.INV, GAMMALN, GAMMALN.PRECISE, GAUSS, GEOMEAN, GROWTH, HARMEAN, HYPGEOM.DIST, INTERCEPT, KURT, LINEST, LOGEST, LOGNORM.DIST, LOGNORM.INV, MODE.MULT, NEGBINOM.DIST, NORM.DIST, NORM.INV, NORM.S.DIST, NORM.S.INV, PEARSON, PERCENTRANK.EXC, PERCENTRANK.INC, PERMUTATIONA, PHI, POISSON.DIST, PROB, RSQ, SKEW, SKEW.P, SLOPE, STANDARDIZE, STDEVA, STDEVPA, STEYX, T.DIST, T.DIST.2T, T.DIST.RT, T.INV, T.INV.2T, T.TEST, TREND, TRIMMEAN, VARA, VARPA, WEIBULL.DIST, Z.TEST
+**Statistical** (4): FORECAST.ETS, FORECAST.ETS.CONFINT, FORECAST.ETS.SEASONALITY, FORECAST.ETS.STAT
 
-**Financial** (32): ACCRINT, ACCRINTM, AMORDEGRC, AMORLINC, COUPDAYBS, COUPDAYS, COUPDAYSNC, COUPNCD, COUPNUM, COUPPCD, DISC, DURATION, FVSCHEDULE, INTRATE, ISPMT, MDURATION, ODDFPRICE, ODDFYIELD, ODDLPRICE, ODDLYIELD, PDURATION, PRICE, PRICEDISC, PRICEMAT, RECEIVED, RRI, TBILLEQ, TBILLPRICE, TBILLYIELD, YIELD, YIELDDISC, YIELDMAT
+**Financial** (4): ODDFPRICE, ODDFYIELD, ODDLPRICE, ODDLYIELD
 
 **Date and time** (0): none
 
@@ -48,7 +108,7 @@ also in another category counts in both (the legacy names repeat), so the catego
 
 **Database** (0): none
 
-**Compatibility (legacy names)** (31): BETADIST, BETAINV, BINOMDIST, CHIDIST, CHIINV, CHITEST, CONFIDENCE, COVAR, CRITBINOM, EXPONDIST, FDIST, FINV, FORECAST, FTEST, GAMMADIST, GAMMAINV, HYPGEOMDIST, LOGINV, LOGNORMDIST, NEGBINOMDIST, NORMDIST, NORMINV, NORMSDIST, NORMSINV, PERCENTRANK, POISSON, TDIST, TINV, TTEST, WEIBULL, ZTEST
+**Compatibility (legacy names)** (0): 
 
 **Web, cube, other** (25): FILTERXML, WEBSERVICE, CUBEKPIMEMBER, CUBEMEMBER, CUBEMEMBERPROPERTY, CUBERANKEDMEMBER, CUBESET, CUBESETCOUNT, CUBEVALUE, IMAGE, STOCKHISTORY, TRIMRANGE, GROUPBY, PIVOTBY, PERCENTOF, CALL, DETECTLANGUAGE, EUROCONVERT, JIS, REGISTER.ID, TRANSLATE
 

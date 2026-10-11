@@ -11,3 +11,6 @@
 
 # Office lock files
 ~$*
+
+# Python bytecode
+__pycache__/

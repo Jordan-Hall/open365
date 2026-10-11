@@ -296,9 +296,10 @@ pub fn score_doc(
             .find(|(pn, i, b)| {
                 !used.contains(&(*pn, *i))
                     && (b.x - c.x / PDF_SCALE_X).abs() <= CELL_TOLERANCE_X
-                    && (b.y - c.y / PDF_SCALE).abs() <= CELL_TOLERANCE_Y
+                    && (b.y + b.pad_top - c.y / PDF_SCALE).abs() <= CELL_TOLERANCE_Y
                     && (b.width - c.w / PDF_SCALE_X).abs() <= CELL_TOLERANCE_X
-                    && (b.height - c.h / PDF_SCALE).abs() <= CELL_TOLERANCE_Y
+                    && (b.height - b.pad_top - b.pad_bottom - c.h / PDF_SCALE).abs()
+                        <= CELL_TOLERANCE_Y
             });
         if let Some((pn, i, _)) = hit {
             used.push((pn, i));
@@ -333,6 +334,26 @@ pub fn score_doc(
                     b.x, b.y, b.width, b.height
                 )),
             );
+        }
+    }
+    if detail && std::env::var_os("PARITY_CELLS").is_some() {
+        for p in &layout.pages {
+            for b in &p.cells {
+                let _ = writeln!(
+                    report,
+                    "engine cell p{} t{} r{} c{} x {:>7.2} y {:>7.2} w {:>7.2} h {:>7.2} pad {:.2}/{:.2}",
+                    p.number,
+                    b.table,
+                    b.row,
+                    b.col,
+                    b.x,
+                    b.y,
+                    b.width,
+                    b.height,
+                    b.pad_top,
+                    b.pad_bottom
+                );
+            }
         }
     }
     // Pictures: each reference rectangle needs an unused engine picture that agrees.

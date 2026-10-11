@@ -1,0 +1,20 @@
+{
+  "source": "fixtures/docx/layout-sect-space.docx",
+  "oracle": "Microsoft Word 16.0 (16.0.20430), Print Layout, tools/office/word-layout-oracle.ps1",
+  "units": "points; page and top/left/baseline measured from the page top-left corner; start/end are UTF-16 offsets in the main story",
+  "precision": "top/left/lastX are screen-quantised (+-0.3 pt); baseline/inkLeft and cell rectangles come from the 600 dpi PDF and are exact",
+  "pageCount": 3,
+  "lines": [
+    {"page": 1, "start": 0, "end": 3, "top": 75.0, "left": 72.0, "lastX": 82.8, "baseline": 85.7, "inkLeft": 72.024, "text": "a1\u000d"},
+    {"page": 1, "start": 3, "end": 7, "top": 96.6, "left": 72.0, "lastX": 89.4, "baseline": 107.06, "inkLeft": 72.024, "text": "a2\u000d\u000c"},
+    {"page": 1, "start": 7, "end": 10, "top": 117.6, "left": 72.0, "lastX": 83.4, "baseline": 128.45, "inkLeft": 72.024, "text": "b1\u000d"},
+    {"page": 1, "start": 10, "end": 14, "top": 139.2, "left": 72.0, "lastX": 90.0, "baseline": 149.81, "inkLeft": 72.024, "text": "b2\u000d\u000c"},
+    {"page": 1, "start": 14, "end": 18, "top": 160.8, "left": 72.0, "lastX": 88.8, "baseline": 171.41, "inkLeft": 72.024, "text": "c1\u000d\u000c"},
+    {"page": 2, "start": 18, "end": 21, "top": 72.0, "left": 72.0, "lastX": 83.4, "baseline": 82.58, "inkLeft": 72.024, "text": "d1\u000d"},
+    {"page": 2, "start": 21, "end": 25, "top": 93.6, "left": 72.0, "lastX": 90.0, "baseline": 103.94, "inkLeft": 72.024, "text": "d2\u000d\u000c"},
+    {"page": 2, "start": 25, "end": 28, "top": 114.6, "left": 72.0, "lastX": 82.8, "baseline": 125.57, "inkLeft": 72.024, "text": "e1\u000d"},
+    {"page": 2, "start": 28, "end": 32, "top": 136.2, "left": 72.0, "lastX": 89.4, "baseline": 146.93, "inkLeft": 72.024, "text": "e2\u000d\u000c"},
+    {"page": 3, "start": 32, "end": 35, "top": 72.0, "left": 72.0, "lastX": 81.0, "baseline": 82.58, "inkLeft": 72.024, "text": "f1\u000d"},
+    {"page": 3, "start": 35, "end": 36, "top": 93.6, "left": 72.0, "lastX": 72.0, "baseline": 103.94, "inkLeft": 72.024, "text": "\u000d"}
+  ]
+}

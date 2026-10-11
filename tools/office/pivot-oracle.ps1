@@ -252,6 +252,7 @@ function New-Pivot($wb, $pc, [string]$sheetName, [string]$ptName, $c) {
     $dfs += $df
   }
   if ($c.ContainsKey('dataOnRows') -and $c.dataOnRows) { $pt.DataPivotField.Orientation = 1 }
+  if ($c.ContainsKey('valuesPos')) { $pt.DataPivotField.Position = [int]$c.valuesPos }
   Apply-FieldOptions $pt $c.rows
   Apply-FieldOptions $pt $c.cols
   Apply-FieldOptions $pt $c.pages
@@ -305,7 +306,7 @@ function Dump-Pivot($pt, [string]$desc) {
     ',"range":' + (Json-Str $range) + ',"location":' + (Json-Str $loc) + ",`n     `"cells`":[`n      " + ($cells -join ",`n      ") + "`n     ]}"
 }
 
-function Write-Set($setName, $notes, [int]$rows, [long]$seed, $cases) {
+function Write-Set($setName, $notes, [int]$rows, [long]$seed, $cases, [switch]$perCache) {
   if ($Only -and $setName -notmatch $Only) { return }
   $path = Join-Path $fixtureDir "pivot-$setName.xlsx"
   if (Test-Path $path) { Remove-Item $path -Force }
@@ -318,7 +319,9 @@ function Write-Set($setName, $notes, [int]$rows, [long]$seed, $cases) {
     foreach ($c in $cases) {
       $k++
       try {
-        $pt = New-Pivot $wb $pc ("P$k") ("PT$k") $c
+        $pcUse = $pc
+        if ($perCache) { $pcUse = $wb.PivotCaches().Create(1, "Data!R1C1:R$($rows + 1)C10") }
+        $pt = New-Pivot $wb $pcUse ("P$k") ("PT$k") $c
         [void]$outs.Add((Dump-Pivot $pt $c.desc))
         Write-Host "pivot-$setName P$k $($c.desc)"
       } catch {
@@ -432,6 +435,67 @@ $cases += @{ desc = 'show pctparent of Region'; rows = @('Region', 'Product'); c
   return $cases
 }
 
+function Values-Cases {
+  $cases = @()
+  $two = @((D 'Revenue'), (D 'Units' 'max'))
+  $three = @((D 'Revenue'), (D 'Units' 'max'), (D 'Score' 'average'))
+  foreach ($lay in 'compact', 'outline', 'tabular') {
+    $cases += @{ desc = "$lay, values on rows, two row fields"; layout = $lay; rows = @('Region', 'Product'); dataOnRows = $true; data = $two }
+    $cases += @{ desc = "$lay, values on rows, cols"; layout = $lay; rows = @('Region'); cols = @('Channel'); dataOnRows = $true; data = $two }
+    $cases += @{ desc = "$lay, values first on rows"; layout = $lay; rows = @('Region', 'Product'); dataOnRows = $true; valuesPos = 1; data = $two }
+    $cases += @{ desc = "$lay, values between row fields"; layout = $lay; rows = @('Region', 'Product', 'Tier'); dataOnRows = $true; valuesPos = 2; data = $two }
+    $cases += @{ desc = "$lay, values on rows no col grand"; layout = $lay; rows = @('Region'); cols = @('Channel'); dataOnRows = $true; rowGrand = $false; data = $two }
+    $cases += @{ desc = "$lay, values on rows no row grand"; layout = $lay; rows = @('Region'); dataOnRows = $true; colGrand = $false; data = $two }
+    $cases += @{ desc = "$lay, values on rows three fields"; layout = $lay; rows = @('Region'); dataOnRows = $true; data = $three }
+    $cases += @{ desc = "$lay, values on rows with subtotals none"; layout = $lay; rows = @(@{ f = 'Region'; sub = 'none' }, 'Product'); dataOnRows = $true; data = $two }
+    $cases += @{ desc = "$lay, values on rows blank line"; layout = $lay; rows = @(@{ f = 'Region'; blank = $true }, 'Product'); dataOnRows = $true; data = $two }
+    $cases += @{ desc = "$lay, no row fields values on rows"; layout = $lay; cols = @('Channel'); dataOnRows = $true; data = $two }
+    $cases += @{ desc = "$lay, values first on columns"; layout = $lay; rows = @('Region'); cols = @('Channel', 'Tier'); valuesPos = 1; data = $two }
+    $cases += @{ desc = "$lay, values between column fields"; layout = $lay; rows = @('Region'); cols = @('Channel', 'Tier'); valuesPos = 2; data = $two }
+    $cases += @{ desc = "$lay, values last column fields"; layout = $lay; rows = @('Region'); cols = @('Channel', 'Tier'); data = $two }
+    $cases += @{ desc = "$lay, three fields on columns"; layout = $lay; rows = @('Region', 'Product'); cols = @('Channel'); data = $three }
+    $cases += @{ desc = "$lay, values only on columns"; layout = $lay; data = $two }
+    $cases += @{ desc = "$lay, values only on rows"; layout = $lay; dataOnRows = $true; data = $two }
+  }
+  return $cases
+}
+
+function ShowAs-Holdout-Cases([long]$seed, [int]$count) {
+  $rng = New-Object System.Random ([int]$seed)
+  $pool = 'Region', 'Product', 'Channel', 'Tier', 'Size'
+  $named = @{ Region = 'East'; Product = 'Banana'; Channel = 'Online'; Tier = 'Gold'; Size = 'S' }
+  $modes = 'pcttotal', 'pctrow', 'pctcol', 'index', 'pctparentrow', 'pctparentcol', 'pctparent', 'running', 'pctrunning', 'diff', 'pctof', 'pctdiff', 'rankasc', 'rankdesc'
+  $needBase = 'pctparent', 'running', 'pctrunning', 'diff', 'pctof', 'pctdiff', 'rankasc', 'rankdesc'
+  $layouts = 'compact', 'outline', 'tabular'
+  $cases = @()
+  for ($i = 0; $i -lt $count; $i++) {
+    $p = @($pool | Sort-Object { $rng.Next() })
+    $nr = $rng.Next(1, 4); $nc = $rng.Next(0, 3)
+    $rows = @($p[0..($nr - 1)]); $cols = @(); if ($nc -gt 0) { $cols = @($p[$nr..($nr + $nc - 1)]) }
+    $mode = $modes[$rng.Next(0, $modes.Count)]
+    $d = @{ f = @('Units', 'Revenue', 'Score')[$rng.Next(0, 3)]; fn = @('sum', 'sum', 'count', 'average')[$rng.Next(0, 4)]; show = $mode }
+    $desc = "showas $i $mode"
+    if ($needBase -contains $mode) {
+      $all = @($rows + $cols)
+      $b = $all[$rng.Next(0, $all.Count)]
+      $d.base = $b
+      $desc += " base=$b"
+      if ($mode -in 'diff', 'pctof', 'pctdiff') {
+        $k = $rng.Next(0, 3)
+        if ($k -eq 0) { $d.item = '(previous)' } elseif ($k -eq 1) { $d.item = '(next)' } else { $d.item = $named[$b] }
+        $desc += " item=$($d.item)"
+      }
+    }
+    $c = @{ rows = $rows; data = @($d); layout = $layouts[$rng.Next(0, 3)] }
+    if ($cols.Count) { $c.cols = $cols }
+    if ($rng.Next(0, 5) -eq 0) { $c.rowGrand = $false }
+    if ($rng.Next(0, 5) -eq 0) { $c.colGrand = $false }
+    $c.desc = "$desc layout=$($c.layout) rows=$($rows -join '/') cols=$($cols -join '/') data=$($d.f):$($d.fn)"
+    $cases += $c
+  }
+  return $cases
+}
+
 function Grouping-Cases {
   $cases = @()
   $cases += @{ desc = 'date by months'; rows = @('Date'); group = @(@{ f = 'Date'; kind = 'date'; by = @('months') }); data = @(D 'Revenue') }
@@ -443,6 +507,13 @@ function Grouping-Cases {
   $cases += @{ desc = 'date months on columns'; rows = @('Region'); cols = @('Date'); group = @(@{ f = 'Date'; kind = 'date'; by = @('months') }); data = @(D 'Units') }
   $cases += @{ desc = 'number group by 20'; rows = @('Score'); group = @(@{ f = 'Score'; kind = 'number'; start = 0; end = 100; step = 20 }); data = @(D 'Units') }
   $cases += @{ desc = 'number group by 25 auto bounds'; rows = @('Score'); cols = @('Channel'); group = @(@{ f = 'Score'; kind = 'number'; start = 0; end = 100; step = 25 }); data = @(D 'Revenue') }
+  $cases += @{ desc = 'date by months and quarters columns'; rows = @('Region'); cols = @('Date'); group = @(@{ f = 'Date'; kind = 'date'; by = @('quarters', 'months') }); data = @(D 'Units') }
+  $cases += @{ desc = 'date by days step 7 compact'; rows = @('Date'); group = @(@{ f = 'Date'; kind = 'date'; by = @('days'); step = 7 }); data = @(D 'Revenue') }
+  $cases += @{ desc = 'date months explicit bounds'; rows = @('Date'); group = @(@{ f = 'Date'; kind = 'date'; by = @('months'); start = 45400; end = 45900 }); data = @(D 'Units') }
+  $cases += @{ desc = 'date years with region'; rows = @('Date', 'Region'); group = @(@{ f = 'Date'; kind = 'date'; by = @('years') }); data = @(D 'Units') }
+  $cases += @{ desc = 'number group by 20 columns average'; rows = @('Region'); cols = @('Score'); group = @(@{ f = 'Score'; kind = 'number'; start = 0; end = 100; step = 20 }); data = @(D 'Revenue' 'average') }
+  $cases += @{ desc = 'number group by 5 price'; layout = 'tabular'; rows = @('Score'); group = @(@{ f = 'Score'; kind = 'number'; start = 10; end = 90; step = 5 }); data = @(D 'Units' 'count') }
+  $cases += @{ desc = 'number group by 20 percent of total'; rows = @('Score'); group = @(@{ f = 'Score'; kind = 'number'; start = 0; end = 100; step = 20 }); data = @(D 'Units' 'sum' @{ show = 'pcttotal' }) }
   $cases += @{ desc = 'number group by 10 on units'; layout = 'tabular'; rows = @('Units'); group = @(@{ f = 'Units'; kind = 'number'; start = 1; end = 50; step = 10 }); data = @(D 'Score' 'average') }
   return $cases
 }
@@ -491,8 +562,10 @@ try {
   Write-Set 'layouts' 'PivotTable layouts: compact, outline and tabular over rows, columns, pages and data fields' 80 1 (Layout-Cases)
   Write-Set 'aggregates' 'PivotTable aggregation functions, captions and number formats' 80 2 (Aggregate-Cases)
   Write-Set 'subtotals' 'PivotTable subtotals, grand totals, sorting, filters, blank rows and repeated labels' 80 3 (Subtotal-Cases)
+  Write-Set 'values' 'PivotTable Values field on rows and columns, several data fields' 80 6 (Values-Cases)
   Write-Set 'showas' 'PivotTable Show Values As calculations' 80 4 (ShowAs-Cases)
-  Write-Set 'grouping' 'PivotTable date and number grouping' 120 5 (Grouping-Cases)
+  Write-Set 'holdout-showas' 'hold-out: random PivotTable Show Values As calculations' 90 7003 (ShowAs-Holdout-Cases 7003 40)
+  Write-Set 'grouping' 'PivotTable date and number grouping' 120 5 (Grouping-Cases) -perCache
   Write-Set 'holdout-a' 'hold-out: random PivotTable layouts over different source data' 70 7001 (Holdout-Cases 7001 14)
   Write-Set 'holdout-b' 'hold-out: random PivotTable layouts over different source data' 90 7002 (Holdout-Cases 7002 14)
 } finally {

@@ -1,0 +1,2728 @@
+{
+  "intl": {
+    "excel": "16.0",
+    "culture": "en-GB",
+    "decimal": ".",
+    "list": ",",
+    "country": 1.0,
+    "dateOrder": 1.0
+  },
+  "today": 46306.0,
+  "dxfs": "<dxfs count=\"6\"><dxf><fill><patternFill patternType=\"solid\"><fgColor auto=\"1\"/><bgColor indexed=\"65\"/></patternFill></fill></dxf><dxf><fill><patternFill patternType=\"solid\"><fgColor rgb=\"FF000000\"/><bgColor rgb=\"FFFFFFFF\"/></patternFill></fill></dxf><dxf><fill><patternFill patternType=\"solid\"><fgColor rgb=\"FF0000FF\"/><bgColor rgb=\"FFFFFFFF\"/></patternFill></fill></dxf><dxf><fill><patternFill patternType=\"none\"><fgColor indexed=\"64\"/><bgColor indexed=\"65\"/></patternFill></fill></dxf><dxf><fill><patternFill patternType=\"solid\"><fgColor rgb=\"FF0000FF\"/><bgColor rgb=\"FFFFFFFF\"/></patternFill></fill></dxf><dxf><fill><patternFill patternType=\"solid\"><fgColor rgb=\"FFFF0000\"/><bgColor rgb=\"FFFFFFFF\"/></patternFill></fill></dxf></dxfs>",
+  "scenarios": [
+    {
+      "id": "values-text",
+      "range": "A1:E21",
+      "today": 46306.0,
+      "fields": [
+        {
+          "values": [
+            "Ann",
+            "Cy",
+            "Zed"
+          ],
+          "field": 1
+        }
+      ],
+      "hidden_rows": [
+        3,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        17,
+        18,
+        19,
+        20,
+        21
+      ],
+      "auto_filter": "<autoFilter ref=\"A1:E21\" xr:uid=\"{6065EF40-A30A-4C31-B6CB-FA0E29DF1596}\"><filterColumn colId=\"0\"><filters><filter val=\"Ann\"/><filter val=\"Cy\"/><filter val=\"Zed\"/></filters></filterColumn></autoFilter>"
+    },
+    {
+      "id": "values-text-case",
+      "range": "A1:E21",
+      "today": 46306.0,
+      "fields": [
+        {
+          "values": [
+            "ann"
+          ],
+          "field": 1
+        }
+      ],
+      "hidden_rows": [
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        16,
+        17,
+        18,
+        19,
+        20,
+        21
+      ],
+      "auto_filter": "<autoFilter ref=\"A1:E21\" xr:uid=\"{EC606BC4-16B0-42D0-885F-EE88EA0F5DD1}\"><filterColumn colId=\"0\"><filters><filter val=\"ann\"/></filters></filterColumn></autoFilter>"
+    },
+    {
+      "id": "values-blank",
+      "range": "A1:E21",
+      "today": 46306.0,
+      "fields": [
+        {
+          "values": [
+            "Ann",
+            ""
+          ],
+          "field": 1
+        }
+      ],
+      "hidden_rows": [
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        16,
+        18,
+        19,
+        20,
+        21
+      ],
+      "auto_filter": "<autoFilter ref=\"A1:E21\" xr:uid=\"{61DC3717-9070-4940-8301-113C2F423B36}\"><filterColumn colId=\"0\"><filters blank=\"1\"><filter val=\"Ann\"/></filters></filterColumn></autoFilter>"
+    },
+    {
+      "id": "values-number-display",
+      "range": "A1:E21",
+      "today": 46306.0,
+      "fields": [
+        {
+          "values": [
+            "10.00",
+            "20.00",
+            "12.50"
+          ],
+          "field": 2
+        }
+      ],
+      "hidden_rows": [
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        19,
+        20,
+        21
+      ],
+      "auto_filter": "<autoFilter ref=\"A1:E21\" xr:uid=\"{2A386977-8BA9-44A6-A8E6-F5F199A5FBCA}\"><filterColumn colId=\"1\"><filters><filter val=\"10.00\"/><filter val=\"12.50\"/><filter val=\"20.00\"/></filters></filterColumn></autoFilter>"
+    },
+    {
+      "id": "values-category",
+      "range": "A1:E21",
+      "today": 46306.0,
+      "fields": [
+        {
+          "values": [
+            "red"
+          ],
+          "field": 4
+        }
+      ],
+      "hidden_rows": [
+        3,
+        5,
+        6,
+        8,
+        9,
+        11,
+        12,
+        14,
+        15,
+        17,
+        18,
+        19,
+        21
+      ],
+      "auto_filter": "<autoFilter ref=\"A1:E21\" xr:uid=\"{DD5C410F-0974-48EC-8984-C949CC0CCF2C}\"><filterColumn colId=\"3\"><filters><filter val=\"red\"/></filters></filterColumn></autoFilter>"
+    },
+    {
+      "id": "values-bool",
+      "range": "A1:E21",
+      "today": 46306.0,
+      "fields": [
+        {
+          "values": [
+            "TRUE"
+          ],
+          "field": 5
+        }
+      ],
+      "hidden_rows": [
+        3,
+        4,
+        6,
+        7,
+        9,
+        10,
+        12,
+        13,
+        15,
+        16,
+        18,
+        19,
+        21
+      ],
+      "auto_filter": "<autoFilter ref=\"A1:E21\" xr:uid=\"{85AA7B11-A7E3-4F7D-9D36-28BFBED6F565}\"><filterColumn colId=\"4\"><filters><filter val=\"TRUE\"/></filters></filterColumn></autoFilter>"
+    },
+    {
+      "id": "custom-gt",
+      "range": "A1:E21",
+      "today": 46306.0,
+      "fields": [
+        {
+          "field": 2,
+          "c1": ">20",
+          "op": "custom"
+        }
+      ],
+      "hidden_rows": [
+        2,
+        3,
+        4,
+        5,
+        6,
+        11,
+        14,
+        15,
+        16,
+        18,
+        19,
+        21
+      ],
+      "auto_filter": "<autoFilter ref=\"A1:E21\" xr:uid=\"{D3D0E97D-4BB7-4694-9521-2A6BD3BAED00}\"><filterColumn colId=\"1\"><customFilters><customFilter operator=\"greaterThan\" val=\"20\"/></customFilters></filterColumn></autoFilter>"
+    },
+    {
+      "id": "custom-ge",
+      "range": "A1:E21",
+      "today": 46306.0,
+      "fields": [
+        {
+          "field": 2,
+          "c1": ">=20",
+          "op": "custom"
+        }
+      ],
+      "hidden_rows": [
+        2,
+        5,
+        6,
+        11,
+        14,
+        15,
+        16,
+        18,
+        19,
+        21
+      ],
+      "auto_filter": "<autoFilter ref=\"A1:E21\" xr:uid=\"{55A7C99C-48DA-424D-8A10-0EE146165E35}\"><filterColumn colId=\"1\"><customFilters><customFilter operator=\"greaterThanOrEqual\" val=\"20\"/></customFilters></filterColumn></autoFilter>"
+    },
+    {
+      "id": "custom-lt",
+      "range": "A1:E21",
+      "today": 46306.0,
+      "fields": [
+        {
+          "field": 2,
+          "c1": "<10",
+          "op": "custom"
+        }
+      ],
+      "hidden_rows": [
+        2,
+        3,
+        4,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        16,
+        17,
+        18,
+        20
+      ],
+      "auto_filter": "<autoFilter ref=\"A1:E21\" xr:uid=\"{35CA8763-7C5B-4C78-9319-A995F2670ED1}\"><filterColumn colId=\"1\"><customFilters><customFilter operator=\"lessThan\" val=\"10\"/></customFilters></filterColumn></autoFilter>"
+    },
+    {
+      "id": "custom-le",
+      "range": "A1:E21",
+      "today": 46306.0,
+      "fields": [
+        {
+          "field": 2,
+          "c1": "<=10",
+          "op": "custom"
+        }
+      ],
+      "hidden_rows": [
+        3,
+        4,
+        6,
+        7,
+        8,
+        9,
+        10,
+        12,
+        13,
+        16,
+        17,
+        18,
+        20
+      ],
+      "auto_filter": "<autoFilter ref=\"A1:E21\" xr:uid=\"{BDE31CEC-6688-4E8E-B8C9-AF0368CED02D}\"><filterColumn colId=\"1\"><customFilters><customFilter operator=\"lessThanOrEqual\" val=\"10\"/></customFilters></filterColumn></autoFilter>"
+    },
+    {
+      "id": "custom-eq",
+      "range": "A1:E21",
+      "today": 46306.0,
+      "fields": [
+        {
+          "field": 2,
+          "c1": "=20",
+          "op": "custom"
+        }
+      ],
+      "hidden_rows": [
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20,
+        21
+      ],
+      "auto_filter": "<autoFilter ref=\"A1:E21\" xr:uid=\"{3AF1582B-FCF3-4C97-96D0-39259ACBCF20}\"><filterColumn colId=\"1\"><filters><filter val=\"20\"/></filters></filterColumn></autoFilter>"
+    },
+    {
+      "id": "custom-ne",
+      "range": "A1:E21",
+      "today": 46306.0,
+      "fields": [
+        {
+          "field": 2,
+          "c1": "<>20",
+          "op": "custom"
+        }
+      ],
+      "hidden_rows": [
+        3,
+        4
+      ],
+      "auto_filter": "<autoFilter ref=\"A1:E21\" xr:uid=\"{FA8A1ABF-4BEF-4DE0-8661-94422E753586}\"><filterColumn colId=\"1\"><customFilters><customFilter operator=\"notEqual\" val=\"20\"/></customFilters></filterColumn></autoFilter>"
+    },
+    {
+      "id": "custom-and-between",
+      "range": "A1:E21",
+      "today": 46306.0,
+      "fields": [
+        {
+          "field": 2,
+          "c1": ">=10",
+          "logic": "and",
+          "c2": "<=30",
+          "op": "custom"
+        }
+      ],
+      "hidden_rows": [
+        5,
+        9,
+        10,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        19,
+        20,
+        21
+      ],
+      "auto_filter": "<autoFilter ref=\"A1:E21\" xr:uid=\"{3A5442F0-4CD6-49FC-943B-B80B64A1CDA7}\"><filterColumn colId=\"1\"><customFilters and=\"1\"><customFilter operator=\"greaterThanOrEqual\" val=\"10\"/><customFilter operator=\"lessThanOrEqual\" val=\"30\"/></customFilters></filterColumn></autoFilter>"
+    },
+    {
+      "id": "custom-or",
+      "range": "A1:E21",
+      "today": 46306.0,
+      "fields": [
+        {
+          "field": 2,
+          "c1": "<5",
+          "logic": "or",
+          "c2": ">50",
+          "op": "custom"
+        }
+      ],
+      "hidden_rows": [
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        16,
+        18,
+        19
+      ],
+      "auto_filter": "<autoFilter ref=\"A1:E21\" xr:uid=\"{FFB99353-8ECA-4EC3-BF1E-4EA38B21DFD6}\"><filterColumn colId=\"1\"><customFilters><customFilter operator=\"lessThan\" val=\"5\"/><customFilter operator=\"greaterThan\" val=\"50\"/></customFilters></filterColumn></autoFilter>"
+    },
+    {
+      "id": "custom-text-begins",
+      "range": "A1:E21",
+      "today": 46306.0,
+      "fields": [
+        {
+          "field": 1,
+          "c1": "a*",
+          "op": "custom"
+        }
+      ],
+      "hidden_rows": [
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        16,
+        17,
+        18,
+        19
+      ],
+      "auto_filter": "<autoFilter ref=\"A1:E21\" xr:uid=\"{2F7D8D40-ECF9-4CD5-A01F-9CD2FEA72B78}\"><filterColumn colId=\"0\"><customFilters><customFilter val=\"a*\"/></customFilters></filterColumn></autoFilter>"
+    },
+    {
+      "id": "custom-text-ends",
+      "range": "A1:E21",
+      "today": 46306.0,
+      "fields": [
+        {
+          "field": 1,
+          "c1": "*e",
+          "op": "custom"
+        }
+      ],
+      "hidden_rows": [
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        21
+      ],
+      "auto_filter": "<autoFilter ref=\"A1:E21\" xr:uid=\"{C9C4EE5E-2275-49E0-AF15-45DBD3DDC6B3}\"><filterColumn colId=\"0\"><customFilters><customFilter val=\"*e\"/></customFilters></filterColumn></autoFilter>"
+    },
+    {
+      "id": "custom-text-contains",
+      "range": "A1:E21",
+      "today": 46306.0,
+      "fields": [
+        {
+          "field": 1,
+          "c1": "*e*",
+          "op": "custom"
+        }
+      ],
+      "hidden_rows": [
+        2,
+        3,
+        4,
+        5,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        14,
+        15,
+        17,
+        21
+      ],
+      "auto_filter": "<autoFilter ref=\"A1:E21\" xr:uid=\"{D77C1869-0DD5-4523-9341-99970FB5643E}\"><filterColumn colId=\"0\"><customFilters><customFilter val=\"*e*\"/></customFilters></filterColumn></autoFilter>"
+    },
+    {
+      "id": "custom-text-not-contains",
+      "range": "A1:E21",
+      "today": 46306.0,
+      "fields": [
+        {
+          "field": 1,
+          "c1": "<>*e*",
+          "op": "custom"
+        }
+      ],
+      "hidden_rows": [
+        6,
+        13,
+        16,
+        18,
+        19,
+        20
+      ],
+      "auto_filter": "<autoFilter ref=\"A1:E21\" xr:uid=\"{6CC4F79C-8D65-40C6-A605-DAF073CB643D}\"><filterColumn colId=\"0\"><customFilters><customFilter operator=\"notEqual\" val=\"*e*\"/></customFilters></filterColumn></autoFilter>"
+    },
+    {
+      "id": "custom-text-qmark",
+      "range": "A1:E21",
+      "today": 46306.0,
+      "fields": [
+        {
+          "field": 1,
+          "c1": "???",
+          "op": "custom"
+        }
+      ],
+      "hidden_rows": [
+        4,
+        5,
+        6,
+        11,
+        17
+      ],
+      "auto_filter": "<autoFilter ref=\"A1:E21\" xr:uid=\"{7EEA12EB-C675-49E3-A8CA-4BA89F0E979D}\"><filterColumn colId=\"0\"><customFilters><customFilter val=\"???\"/></customFilters></filterColumn></autoFilter>"
+    },
+    {
+      "id": "custom-text-tilde",
+      "range": "A1:E21",
+      "today": 46306.0,
+      "fields": [
+        {
+          "field": 1,
+          "c1": "A~*c",
+          "op": "custom"
+        }
+      ],
+      "hidden_rows": [
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20
+      ],
+      "auto_filter": "<autoFilter ref=\"A1:E21\" xr:uid=\"{0A3E6943-6BFF-44C2-982B-799E696AD310}\"><filterColumn colId=\"0\"><filters><filter val=\"A*c\"/></filters></filterColumn></autoFilter>"
+    },
+    {
+      "id": "custom-text-gt",
+      "range": "A1:E21",
+      "today": 46306.0,
+      "fields": [
+        {
+          "field": 1,
+          "c1": ">Cy",
+          "op": "custom"
+        }
+      ],
+      "hidden_rows": [
+        2,
+        3,
+        4,
+        15,
+        17,
+        18,
+        19,
+        20,
+        21
+      ],
+      "auto_filter": "<autoFilter ref=\"A1:E21\" xr:uid=\"{B9A21176-DAD9-40B8-B41D-5DB73FBC27CE}\"><filterColumn colId=\"0\"><customFilters><customFilter operator=\"greaterThan\" val=\"Cy\"/></customFilters></filterColumn></autoFilter>"
+    },
+    {
+      "id": "custom-text-eq-ci",
+      "range": "A1:E21",
+      "today": 46306.0,
+      "fields": [
+        {
+          "field": 1,
+          "c1": "=ANN",
+          "op": "custom"
+        }
+      ],
+      "hidden_rows": [
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        16,
+        17,
+        18,
+        19,
+        20,
+        21
+      ],
+      "auto_filter": "<autoFilter ref=\"A1:E21\" xr:uid=\"{4E54670F-92A9-4169-979F-AC06C65BCE40}\"><filterColumn colId=\"0\"><filters><filter val=\"ANN\"/></filters></filterColumn></autoFilter>"
+    },
+    {
+      "id": "custom-eq-blank",
+      "range": "A1:E21",
+      "today": 46306.0,
+      "fields": [
+        {
+          "field": 1,
+          "c1": "=",
+          "op": "custom"
+        }
+      ],
+      "hidden_rows": [
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        18,
+        19,
+        20,
+        21
+      ],
+      "auto_filter": "<autoFilter ref=\"A1:E21\" xr:uid=\"{4475DD7A-23D0-4632-A5AB-AD16AE2270CD}\"><filterColumn colId=\"0\"><filters blank=\"1\"/></filterColumn></autoFilter>"
+    },
+    {
+      "id": "custom-ne-blank",
+      "range": "A1:E21",
+      "today": 46306.0,
+      "fields": [
+        {
+          "field": 1,
+          "c1": "<>",
+          "op": "custom"
+        }
+      ],
+      "hidden_rows": [
+        17
+      ],
+      "auto_filter": "<autoFilter ref=\"A1:E21\" xr:uid=\"{27B6B68D-FDFC-485A-8DDA-E7FE7333B01D}\"><filterColumn colId=\"0\"><customFilters><customFilter operator=\"notEqual\" val=\" \"/></customFilters></filterColumn></autoFilter>"
+    },
+    {
+      "id": "custom-ne-text",
+      "range": "A1:E21",
+      "today": 46306.0,
+      "fields": [
+        {
+          "field": 1,
+          "c1": "<>Ann",
+          "op": "custom"
+        }
+      ],
+      "hidden_rows": [
+        2,
+        15
+      ],
+      "auto_filter": "<autoFilter ref=\"A1:E21\" xr:uid=\"{7814F32E-F953-4459-ACAC-5672E0019382}\"><filterColumn colId=\"0\"><customFilters><customFilter operator=\"notEqual\" val=\"Ann\"/></customFilters></filterColumn></autoFilter>"
+    },
+    {
+      "id": "custom-number-on-text-col",
+      "range": "A1:E21",
+      "today": 46306.0,
+      "fields": [
+        {
+          "field": 1,
+          "c1": ">5",
+          "op": "custom"
+        }
+      ],
+      "hidden_rows": [
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20,
+        21
+      ],
+      "auto_filter": "<autoFilter ref=\"A1:E21\" xr:uid=\"{C7336662-9BB8-4E54-B995-AEEBAD193E42}\"><filterColumn colId=\"0\"><customFilters><customFilter operator=\"greaterThan\" val=\"5\"/></customFilters></filterColumn></autoFilter>"
+    },
+    {
+      "id": "custom-bool",
+      "range": "A1:E21",
+      "today": 46306.0,
+      "fields": [
+        {
+          "field": 5,
+          "c1": "=TRUE",
+          "op": "custom"
+        }
+      ],
+      "hidden_rows": [
+        3,
+        4,
+        6,
+        7,
+        9,
+        10,
+        12,
+        13,
+        15,
+        16,
+        18,
+        19,
+        21
+      ],
+      "auto_filter": "<autoFilter ref=\"A1:E21\" xr:uid=\"{D7CFCC79-3A0B-4400-845E-3BA656DB6892}\"><filterColumn colId=\"4\"><filters><filter val=\"TRUE\"/></filters></filterColumn></autoFilter>"
+    },
+    {
+      "id": "top10-items",
+      "range": "A1:E21",
+      "today": 46306.0,
+      "fields": [
+        {
+          "field": 2,
+          "c1": 3,
+          "op": "top10items"
+        }
+      ],
+      "hidden_rows": [
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        13,
+        14,
+        15,
+        16,
+        18,
+        19,
+        21
+      ],
+      "auto_filter": "<autoFilter ref=\"A1:E21\" xr:uid=\"{CAA3B506-659A-4067-AB6E-451460E19E05}\"><filterColumn colId=\"1\"><top10 val=\"3\" filterVal=\"50\"/></filterColumn></autoFilter>"
+    },
+    {
+      "id": "top10-items-ties",
+      "range": "A1:E21",
+      "today": 46306.0,
+      "fields": [
+        {
+          "field": 2,
+          "c1": 6,
+          "op": "top10items"
+        }
+      ],
+      "hidden_rows": [
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        11,
+        14,
+        15,
+        16,
+        18,
+        19,
+        21
+      ],
+      "auto_filter": "<autoFilter ref=\"A1:E21\" xr:uid=\"{F9975143-50B6-4E47-A540-B09FEB0D8EAA}\"><filterColumn colId=\"1\"><top10 val=\"6\" filterVal=\"35\"/></filterColumn></autoFilter>"
+    },
+    {
+      "id": "bottom10-items",
+      "range": "A1:E21",
+      "today": 46306.0,
+      "fields": [
+        {
+          "field": 2,
+          "c1": 4,
+          "op": "bottom10items"
+        }
+      ],
+      "hidden_rows": [
+        2,
+        3,
+        4,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        16,
+        17,
+        18,
+        19,
+        20
+      ],
+      "auto_filter": "<autoFilter ref=\"A1:E21\" xr:uid=\"{44692D2B-2041-4098-9979-26D77A5FE1C9}\"><filterColumn colId=\"1\"><top10 top=\"0\" val=\"4\" filterVal=\"5\"/></filterColumn></autoFilter>"
+    },
+    {
+      "id": "top10-percent",
+      "range": "A1:E21",
+      "today": 46306.0,
+      "fields": [
+        {
+          "field": 2,
+          "c1": 25,
+          "op": "top10percent"
+        }
+      ],
+      "hidden_rows": [
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        14,
+        15,
+        16,
+        18,
+        19,
+        21
+      ],
+      "auto_filter": "<autoFilter ref=\"A1:E21\" xr:uid=\"{D9797DA8-9721-4B4F-81D3-033E1E3897F0}\"><filterColumn colId=\"1\"><top10 percent=\"1\" val=\"25\" filterVal=\"45\"/></filterColumn></autoFilter>"
+    },
+    {
+      "id": "top10-percent-10",
+      "range": "A1:E21",
+      "today": 46306.0,
+      "fields": [
+        {
+          "field": 2,
+          "c1": 10,
+          "op": "top10percent"
+        }
+      ],
+      "hidden_rows": [
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        21
+      ],
+      "auto_filter": "<autoFilter ref=\"A1:E21\" xr:uid=\"{5DE7EC0C-B872-40F3-8644-B7FAFA15356E}\"><filterColumn colId=\"1\"><top10 percent=\"1\" val=\"10\" filterVal=\"100\"/></filterColumn></autoFilter>"
+    },
+    {
+      "id": "bottom10-percent",
+      "range": "A1:E21",
+      "today": 46306.0,
+      "fields": [
+        {
+          "field": 2,
+          "c1": 20,
+          "op": "bottom10percent"
+        }
+      ],
+      "hidden_rows": [
+        2,
+        3,
+        4,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        16,
+        17,
+        18,
+        19,
+        20
+      ],
+      "auto_filter": "<autoFilter ref=\"A1:E21\" xr:uid=\"{10CFBF43-3EBF-40F6-9D6B-57E4D4E2C385}\"><filterColumn colId=\"1\"><top10 top=\"0\" percent=\"1\" val=\"20\" filterVal=\"5\"/></filterColumn></autoFilter>"
+    },
+    {
+      "id": "top10-items-1",
+      "range": "A1:E21",
+      "today": 46306.0,
+      "fields": [
+        {
+          "field": 2,
+          "c1": 1,
+          "op": "top10items"
+        }
+      ],
+      "hidden_rows": [
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        21
+      ],
+      "auto_filter": "<autoFilter ref=\"A1:E21\" xr:uid=\"{4B7F16D7-3602-4C97-8DF6-B6D298671A26}\"><filterColumn colId=\"1\"><top10 val=\"1\" filterVal=\"100\"/></filterColumn></autoFilter>"
+    },
+    {
+      "id": "above-average",
+      "range": "A1:E21",
+      "today": 46306.0,
+      "fields": [
+        {
+          "field": 2,
+          "c1": "aboveAverage",
+          "op": "dynamic"
+        }
+      ],
+      "hidden_rows": [
+        2,
+        3,
+        4,
+        5,
+        6,
+        8,
+        11,
+        14,
+        15,
+        16,
+        18,
+        19,
+        21
+      ],
+      "auto_filter": "<autoFilter ref=\"A1:E21\" xr:uid=\"{7E85F9CA-86C2-4258-832C-F94EDAE41F7F}\"><filterColumn colId=\"1\"><dynamicFilter type=\"aboveAverage\" val=\"25.973684210526315\"/></filterColumn></autoFilter>"
+    },
+    {
+      "id": "below-average",
+      "range": "A1:E21",
+      "today": 46306.0,
+      "fields": [
+        {
+          "field": 2,
+          "c1": "belowAverage",
+          "op": "dynamic"
+        }
+      ],
+      "hidden_rows": [
+        7,
+        9,
+        10,
+        12,
+        13,
+        16,
+        17,
+        20
+      ],
+      "auto_filter": "<autoFilter ref=\"A1:E21\" xr:uid=\"{CA80F547-BFAA-46E9-B0B3-68C590416DEC}\"><filterColumn colId=\"1\"><dynamicFilter type=\"belowAverage\" val=\"25.973684210526315\"/></filterColumn></autoFilter>"
+    },
+    {
+      "id": "dynamic-today",
+      "range": "A1:E21",
+      "today": 46306.0,
+      "fields": [
+        {
+          "field": 3,
+          "c1": "today",
+          "op": "dynamic"
+        }
+      ],
+      "hidden_rows": [
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20,
+        21
+      ],
+      "auto_filter": "<autoFilter ref=\"A1:E21\" xr:uid=\"{94EF55EC-3437-4B01-9D18-C7DDE7CF7D5A}\"><filterColumn colId=\"2\"><dynamicFilter type=\"today\" val=\"46306\" maxVal=\"46307\"/></filterColumn></autoFilter>"
+    },
+    {
+      "id": "dynamic-yesterday",
+      "range": "A1:E21",
+      "today": 46306.0,
+      "fields": [
+        {
+          "field": 3,
+          "c1": "yesterday",
+          "op": "dynamic"
+        }
+      ],
+      "hidden_rows": [
+        2,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20,
+        21
+      ],
+      "auto_filter": "<autoFilter ref=\"A1:E21\" xr:uid=\"{3F7917AD-BED4-4762-95CB-5B8B71776628}\"><filterColumn colId=\"2\"><dynamicFilter type=\"yesterday\" val=\"46305\" maxVal=\"46306\"/></filterColumn></autoFilter>"
+    },
+    {
+      "id": "dynamic-tomorrow",
+      "range": "A1:E21",
+      "today": 46306.0,
+      "fields": [
+        {
+          "field": 3,
+          "c1": "tomorrow",
+          "op": "dynamic"
+        }
+      ],
+      "hidden_rows": [
+        2,
+        3,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20,
+        21
+      ],
+      "auto_filter": "<autoFilter ref=\"A1:E21\" xr:uid=\"{92F12AD5-8052-4020-B269-3E18043264DB}\"><filterColumn colId=\"2\"><dynamicFilter type=\"tomorrow\" val=\"46307\" maxVal=\"46308\"/></filterColumn></autoFilter>"
+    },
+    {
+      "id": "dynamic-thisWeek",
+      "range": "A1:E21",
+      "today": 46306.0,
+      "fields": [
+        {
+          "field": 3,
+          "c1": "thisWeek",
+          "op": "dynamic"
+        }
+      ],
+      "hidden_rows": [
+        3,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20,
+        21
+      ],
+      "auto_filter": "<autoFilter ref=\"A1:E21\" xr:uid=\"{8620BAB5-B771-4337-872E-CC56EDEF7B00}\"><filterColumn colId=\"2\"><dynamicFilter type=\"thisWeek\" val=\"46306\" maxVal=\"46313\"/></filterColumn></autoFilter>"
+    },
+    {
+      "id": "dynamic-lastWeek",
+      "range": "A1:E21",
+      "today": 46306.0,
+      "fields": [
+        {
+          "field": 3,
+          "c1": "lastWeek",
+          "op": "dynamic"
+        }
+      ],
+      "hidden_rows": [
+        2,
+        4,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20,
+        21
+      ],
+      "auto_filter": "<autoFilter ref=\"A1:E21\" xr:uid=\"{5992997D-FAE5-4ED9-9B5C-5933268377C7}\"><filterColumn colId=\"2\"><dynamicFilter type=\"lastWeek\" val=\"46299\" maxVal=\"46306\"/></filterColumn></autoFilter>"
+    },
+    {
+      "id": "dynamic-nextWeek",
+      "range": "A1:E21",
+      "today": 46306.0,
+      "fields": [
+        {
+          "field": 3,
+          "c1": "nextWeek",
+          "op": "dynamic"
+        }
+      ],
+      "hidden_rows": [
+        2,
+        3,
+        4,
+        5,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20,
+        21
+      ],
+      "auto_filter": "<autoFilter ref=\"A1:E21\" xr:uid=\"{921B04FE-326F-4683-874E-147F0413F688}\"><filterColumn colId=\"2\"><dynamicFilter type=\"nextWeek\" val=\"46313\" maxVal=\"46320\"/></filterColumn></autoFilter>"
+    },
+    {
+      "id": "dynamic-thisMonth",
+      "range": "A1:E21",
+      "today": 46306.0,
+      "fields": [
+        {
+          "field": 3,
+          "c1": "thisMonth",
+          "op": "dynamic"
+        }
+      ],
+      "hidden_rows": [
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        15,
+        16,
+        17,
+        19,
+        20,
+        21
+      ],
+      "auto_filter": "<autoFilter ref=\"A1:E21\" xr:uid=\"{CA77A874-E0D5-463E-BC95-4C7FCD239179}\"><filterColumn colId=\"2\"><dynamicFilter type=\"thisMonth\" val=\"46296\" maxVal=\"46327\"/></filterColumn></autoFilter>"
+    },
+    {
+      "id": "dynamic-lastMonth",
+      "range": "A1:E21",
+      "today": 46306.0,
+      "fields": [
+        {
+          "field": 3,
+          "c1": "lastMonth",
+          "op": "dynamic"
+        }
+      ],
+      "hidden_rows": [
+        2,
+        3,
+        4,
+        5,
+        6,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        20,
+        21
+      ],
+      "auto_filter": "<autoFilter ref=\"A1:E21\" xr:uid=\"{77707603-09AE-4F6E-BC20-F962D025B9CF}\"><filterColumn colId=\"2\"><dynamicFilter type=\"lastMonth\" val=\"46266\" maxVal=\"46296\"/></filterColumn></autoFilter>"
+    },
+    {
+      "id": "dynamic-nextMonth",
+      "range": "A1:E21",
+      "today": 46306.0,
+      "fields": [
+        {
+          "field": 3,
+          "c1": "nextMonth",
+          "op": "dynamic"
+        }
+      ],
+      "hidden_rows": [
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20,
+        21
+      ],
+      "auto_filter": "<autoFilter ref=\"A1:E21\" xr:uid=\"{A3E7D6D0-5E63-486A-814C-08EFBD047037}\"><filterColumn colId=\"2\"><dynamicFilter type=\"nextMonth\" val=\"46327\" maxVal=\"46357\"/></filterColumn></autoFilter>"
+    },
+    {
+      "id": "dynamic-thisQuarter",
+      "range": "A1:E21",
+      "today": 46306.0,
+      "fields": [
+        {
+          "field": 3,
+          "c1": "thisQuarter",
+          "op": "dynamic"
+        }
+      ],
+      "hidden_rows": [
+        7,
+        9,
+        10,
+        11,
+        12,
+        15,
+        16,
+        17,
+        19,
+        21
+      ],
+      "auto_filter": "<autoFilter ref=\"A1:E21\" xr:uid=\"{AB6DE547-E083-4721-B218-319E7F9F0B71}\"><filterColumn colId=\"2\"><dynamicFilter type=\"thisQuarter\" val=\"46296\" maxVal=\"46388\"/></filterColumn></autoFilter>"
+    },
+    {
+      "id": "dynamic-lastQuarter",
+      "range": "A1:E21",
+      "today": 46306.0,
+      "fields": [
+        {
+          "field": 3,
+          "c1": "lastQuarter",
+          "op": "dynamic"
+        }
+      ],
+      "hidden_rows": [
+        2,
+        3,
+        4,
+        5,
+        6,
+        8,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        20
+      ],
+      "auto_filter": "<autoFilter ref=\"A1:E21\" xr:uid=\"{C2158FD4-1809-4539-B573-BD554648DBB3}\"><filterColumn colId=\"2\"><dynamicFilter type=\"lastQuarter\" val=\"46204\" maxVal=\"46296\"/></filterColumn></autoFilter>"
+    },
+    {
+      "id": "dynamic-nextQuarter",
+      "range": "A1:E21",
+      "today": 46306.0,
+      "fields": [
+        {
+          "field": 3,
+          "c1": "nextQuarter",
+          "op": "dynamic"
+        }
+      ],
+      "hidden_rows": [
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20,
+        21
+      ],
+      "auto_filter": "<autoFilter ref=\"A1:E21\" xr:uid=\"{4FB56082-AACB-46C1-8E1D-EC41F7F178B9}\"><filterColumn colId=\"2\"><dynamicFilter type=\"nextQuarter\" val=\"46388\" maxVal=\"46478\"/></filterColumn></autoFilter>"
+    },
+    {
+      "id": "dynamic-thisYear",
+      "range": "A1:E21",
+      "today": 46306.0,
+      "fields": [
+        {
+          "field": 3,
+          "c1": "thisYear",
+          "op": "dynamic"
+        }
+      ],
+      "hidden_rows": [
+        10,
+        11,
+        12,
+        15,
+        16,
+        17
+      ],
+      "auto_filter": "<autoFilter ref=\"A1:E21\" xr:uid=\"{39B7CBDB-9ED6-4133-9400-44CF3A78D357}\"><filterColumn colId=\"2\"><dynamicFilter type=\"thisYear\" val=\"46023\" maxVal=\"46388\"/></filterColumn></autoFilter>"
+    },
+    {
+      "id": "dynamic-lastYear",
+      "range": "A1:E21",
+      "today": 46306.0,
+      "fields": [
+        {
+          "field": 3,
+          "c1": "lastYear",
+          "op": "dynamic"
+        }
+      ],
+      "hidden_rows": [
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        12,
+        13,
+        14,
+        16,
+        17,
+        18,
+        19,
+        20,
+        21
+      ],
+      "auto_filter": "<autoFilter ref=\"A1:E21\" xr:uid=\"{8FF2A382-3140-48C4-ADEA-C11BE4A6651C}\"><filterColumn colId=\"2\"><dynamicFilter type=\"lastYear\" val=\"45658\" maxVal=\"46023\"/></filterColumn></autoFilter>"
+    },
+    {
+      "id": "dynamic-nextYear",
+      "range": "A1:E21",
+      "today": 46306.0,
+      "fields": [
+        {
+          "field": 3,
+          "c1": "nextYear",
+          "op": "dynamic"
+        }
+      ],
+      "hidden_rows": [
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        11,
+        13,
+        14,
+        15,
+        17,
+        18,
+        19,
+        20,
+        21
+      ],
+      "auto_filter": "<autoFilter ref=\"A1:E21\" xr:uid=\"{14951B51-1639-4FCF-983C-285E78D28105}\"><filterColumn colId=\"2\"><dynamicFilter type=\"nextYear\" val=\"46388\" maxVal=\"46753\"/></filterColumn></autoFilter>"
+    },
+    {
+      "id": "dynamic-yearToDate",
+      "range": "A1:E21",
+      "today": 46306.0,
+      "fields": [
+        {
+          "field": 3,
+          "c1": "yearToDate",
+          "op": "dynamic"
+        }
+      ],
+      "hidden_rows": [
+        4,
+        6,
+        8,
+        10,
+        11,
+        12,
+        13,
+        15,
+        16,
+        17,
+        18,
+        20
+      ],
+      "auto_filter": "<autoFilter ref=\"A1:E21\" xr:uid=\"{962432E2-8B2A-48B8-B42E-7D16AD1D5078}\"><filterColumn colId=\"2\"><dynamicFilter type=\"yearToDate\" val=\"46023\" maxVal=\"46307\"/></filterColumn></autoFilter>"
+    },
+    {
+      "id": "dynamic-Q1",
+      "range": "A1:E21",
+      "today": 46306.0,
+      "fields": [
+        {
+          "field": 3,
+          "c1": "Q1",
+          "op": "dynamic"
+        }
+      ],
+      "hidden_rows": [
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20,
+        21
+      ],
+      "auto_filter": "<autoFilter ref=\"A1:E21\" xr:uid=\"{9BDB7861-ED73-416F-BD1A-053F2A765DAE}\"><filterColumn colId=\"2\"><dynamicFilter type=\"Q1\"/></filterColumn></autoFilter>"
+    },
+    {
+      "id": "dynamic-Q2",
+      "range": "A1:E21",
+      "today": 46306.0,
+      "fields": [
+        {
+          "field": 3,
+          "c1": "Q2",
+          "op": "dynamic"
+        }
+      ],
+      "hidden_rows": [
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20,
+        21
+      ],
+      "auto_filter": "<autoFilter ref=\"A1:E21\" xr:uid=\"{8825C187-A517-4DAB-9DA4-33B6269C2B87}\"><filterColumn colId=\"2\"><dynamicFilter type=\"Q2\"/></filterColumn></autoFilter>"
+    },
+    {
+      "id": "dynamic-Q3",
+      "range": "A1:E21",
+      "today": 46306.0,
+      "fields": [
+        {
+          "field": 3,
+          "c1": "Q3",
+          "op": "dynamic"
+        }
+      ],
+      "hidden_rows": [
+        2,
+        3,
+        4,
+        5,
+        6,
+        8,
+        10,
+        11,
+        12,
+        13,
+        14,
+        16,
+        17,
+        18,
+        20
+      ],
+      "auto_filter": "<autoFilter ref=\"A1:E21\" xr:uid=\"{C45E7AAF-81E2-4A44-BCCF-F32B6FDC1936}\"><filterColumn colId=\"2\"><dynamicFilter type=\"Q3\"/></filterColumn></autoFilter>"
+    },
+    {
+      "id": "dynamic-Q4",
+      "range": "A1:E21",
+      "today": 46306.0,
+      "fields": [
+        {
+          "field": 3,
+          "c1": "Q4",
+          "op": "dynamic"
+        }
+      ],
+      "hidden_rows": [
+        7,
+        9,
+        10,
+        15,
+        17,
+        19,
+        21
+      ],
+      "auto_filter": "<autoFilter ref=\"A1:E21\" xr:uid=\"{C71E1CE8-0228-40D9-B6DA-D24A739145F1}\"><filterColumn colId=\"2\"><dynamicFilter type=\"Q4\"/></filterColumn></autoFilter>"
+    },
+    {
+      "id": "dynamic-M1",
+      "range": "A1:E21",
+      "today": 46306.0,
+      "fields": [
+        {
+          "field": 3,
+          "c1": "M1",
+          "op": "dynamic"
+        }
+      ],
+      "hidden_rows": [
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20,
+        21
+      ],
+      "auto_filter": "<autoFilter ref=\"A1:E21\" xr:uid=\"{F7D24F8B-2E5C-4BAC-99B3-0B6B9DC59465}\"><filterColumn colId=\"2\"><dynamicFilter type=\"M1\"/></filterColumn></autoFilter>"
+    },
+    {
+      "id": "dynamic-M3",
+      "range": "A1:E21",
+      "today": 46306.0,
+      "fields": [
+        {
+          "field": 3,
+          "c1": "M3",
+          "op": "dynamic"
+        }
+      ],
+      "hidden_rows": [
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20,
+        21
+      ],
+      "auto_filter": "<autoFilter ref=\"A1:E21\" xr:uid=\"{5AE5AF5B-05BF-4C26-81CD-B2A3283A5DCE}\"><filterColumn colId=\"2\"><dynamicFilter type=\"M3\"/></filterColumn></autoFilter>"
+    },
+    {
+      "id": "dynamic-M6",
+      "range": "A1:E21",
+      "today": 46306.0,
+      "fields": [
+        {
+          "field": 3,
+          "c1": "M6",
+          "op": "dynamic"
+        }
+      ],
+      "hidden_rows": [
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20,
+        21
+      ],
+      "auto_filter": "<autoFilter ref=\"A1:E21\" xr:uid=\"{36BF2265-5830-4D7C-A8F8-74F21C1D0749}\"><filterColumn colId=\"2\"><dynamicFilter type=\"M6\"/></filterColumn></autoFilter>"
+    },
+    {
+      "id": "dynamic-M12",
+      "range": "A1:E21",
+      "today": 46306.0,
+      "fields": [
+        {
+          "field": 3,
+          "c1": "M12",
+          "op": "dynamic"
+        }
+      ],
+      "hidden_rows": [
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        21
+      ],
+      "auto_filter": "<autoFilter ref=\"A1:E21\" xr:uid=\"{2AB3B6D2-FE5C-469C-9B45-3D9DCF6ECCF3}\"><filterColumn colId=\"2\"><dynamicFilter type=\"M12\"/></filterColumn></autoFilter>"
+    },
+    {
+      "id": "cell-color-red",
+      "range": "A1:E21",
+      "today": 46306.0,
+      "fields": [
+        {
+          "field": 4,
+          "c1": "FF0000",
+          "op": "cellcolor"
+        }
+      ],
+      "hidden_rows": [
+        3,
+        5,
+        6,
+        8,
+        9,
+        11,
+        12,
+        14,
+        15,
+        17,
+        18,
+        19,
+        21
+      ],
+      "auto_filter": "<autoFilter ref=\"A1:E21\" xr:uid=\"{8F9C612E-22F1-42D9-B3FF-19B54710B86D}\"><filterColumn colId=\"3\"><colorFilter dxfId=\"5\"/></filterColumn></autoFilter>"
+    },
+    {
+      "id": "cell-color-blue",
+      "range": "A1:E21",
+      "today": 46306.0,
+      "fields": [
+        {
+          "field": 4,
+          "c1": "0000FF",
+          "op": "cellcolor"
+        }
+      ],
+      "hidden_rows": [
+        2,
+        4,
+        5,
+        7,
+        8,
+        10,
+        11,
+        13,
+        14,
+        16,
+        17,
+        18,
+        19,
+        20
+      ],
+      "auto_filter": "<autoFilter ref=\"A1:E21\" xr:uid=\"{AF80DF90-C24A-43C3-824C-F0F89155DD90}\"><filterColumn colId=\"3\"><colorFilter dxfId=\"4\"/></filterColumn></autoFilter>"
+    },
+    {
+      "id": "cell-color-none",
+      "range": "A1:E21",
+      "today": 46306.0,
+      "fields": [
+        {
+          "field": 4,
+          "c1": "none",
+          "op": "cellcolor"
+        }
+      ],
+      "hidden_rows": [
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        20,
+        21
+      ],
+      "auto_filter": "<autoFilter ref=\"A1:E21\" xr:uid=\"{A264C5E3-9AA6-4578-B70B-E54B02D3CDE8}\"><filterColumn colId=\"3\"><colorFilter dxfId=\"3\"/></filterColumn></autoFilter>"
+    },
+    {
+      "id": "font-color-blue",
+      "range": "A1:E21",
+      "today": 46306.0,
+      "fields": [
+        {
+          "field": 4,
+          "c1": "0000FF",
+          "op": "fontcolor"
+        }
+      ],
+      "hidden_rows": [
+        3,
+        5,
+        6,
+        8,
+        9,
+        11,
+        12,
+        14,
+        15,
+        17,
+        18,
+        19,
+        21
+      ],
+      "auto_filter": "<autoFilter ref=\"A1:E21\" xr:uid=\"{B51CA1DE-10E7-4EB0-8DAD-EB50D9BED4F7}\"><filterColumn colId=\"3\"><colorFilter dxfId=\"2\" cellColor=\"0\"/></filterColumn></autoFilter>"
+    },
+    {
+      "id": "font-color-black",
+      "range": "A1:E21",
+      "today": 46306.0,
+      "fields": [
+        {
+          "field": 4,
+          "c1": "000000",
+          "op": "fontcolor"
+        }
+      ],
+      "hidden_rows": [
+        2,
+        3,
+        4,
+        6,
+        7,
+        9,
+        10,
+        12,
+        13,
+        15,
+        16,
+        18,
+        19,
+        20,
+        21
+      ],
+      "auto_filter": "<autoFilter ref=\"A1:E21\" xr:uid=\"{5F254C72-C2B1-402A-8CEE-15B28F1F065A}\"><filterColumn colId=\"3\"><colorFilter dxfId=\"1\" cellColor=\"0\"/></filterColumn></autoFilter>"
+    },
+    {
+      "id": "font-color-auto",
+      "range": "A1:E21",
+      "today": 46306.0,
+      "fields": [
+        {
+          "field": 4,
+          "c1": "none",
+          "op": "fontcolor"
+        }
+      ],
+      "hidden_rows": [
+        2,
+        4,
+        5,
+        7,
+        8,
+        10,
+        11,
+        13,
+        14,
+        16,
+        17,
+        20
+      ],
+      "auto_filter": "<autoFilter ref=\"A1:E21\" xr:uid=\"{FA01461E-1332-45C8-944B-38F079DA76B5}\"><filterColumn colId=\"3\"><colorFilter dxfId=\"0\" cellColor=\"0\"/></filterColumn></autoFilter>"
+    },
+    {
+      "id": "multi-column",
+      "range": "A1:E21",
+      "today": 46306.0,
+      "fields": [
+        {
+          "values": [
+            "red",
+            "blue"
+          ],
+          "field": 4
+        },
+        {
+          "field": 2,
+          "c1": ">=10",
+          "op": "custom"
+        }
+      ],
+      "hidden_rows": [
+        5,
+        8,
+        11,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        21
+      ],
+      "auto_filter": "<autoFilter ref=\"A1:E21\" xr:uid=\"{368229D7-A0BD-4656-80B7-4046AF43FC16}\"><filterColumn colId=\"1\"><customFilters><customFilter operator=\"greaterThanOrEqual\" val=\"10\"/></customFilters></filterColumn><filterColumn colId=\"3\"><filters><filter val=\"blue\"/><filter val=\"red\"/></filters></filterColumn></autoFilter>"
+    },
+    {
+      "id": "multi-three",
+      "range": "A1:E21",
+      "today": 46306.0,
+      "fields": [
+        {
+          "values": [
+            "red",
+            "blue",
+            "green"
+          ],
+          "field": 4
+        },
+        {
+          "field": 2,
+          "c1": ">=10",
+          "op": "custom"
+        },
+        {
+          "field": 1,
+          "c1": "*a*",
+          "op": "custom"
+        }
+      ],
+      "hidden_rows": [
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        21
+      ],
+      "auto_filter": "<autoFilter ref=\"A1:E21\" xr:uid=\"{9D59AE63-262E-4FD3-B204-3BEEE3DCD2DB}\"><filterColumn colId=\"0\"><customFilters><customFilter val=\"*a*\"/></customFilters></filterColumn><filterColumn colId=\"1\"><customFilters><customFilter operator=\"greaterThanOrEqual\" val=\"10\"/></customFilters></filterColumn><filterColumn colId=\"3\"><filters><filter val=\"blue\"/><filter val=\"green\"/><filter val=\"red\"/></filters></filterColumn></autoFilter>"
+    },
+    {
+      "id": "date-custom-after",
+      "range": "A1:E21",
+      "today": 46306.0,
+      "fields": [
+        {
+          "field": 3,
+          "c1": ">46301",
+          "op": "custom"
+        }
+      ],
+      "hidden_rows": [
+        5,
+        7,
+        9,
+        11,
+        15,
+        17,
+        19,
+        21
+      ],
+      "auto_filter": "<autoFilter ref=\"A1:E21\" xr:uid=\"{11E4F8B5-31A5-4A27-AC0B-3C268D36D737}\"><filterColumn colId=\"2\"><customFilters><customFilter operator=\"greaterThan\" val=\"46301\"/></customFilters></filterColumn></autoFilter>"
+    },
+    {
+      "id": "custom-eq-display",
+      "range": "A1:E21",
+      "today": 46306.0,
+      "fields": [
+        {
+          "field": 2,
+          "c1": "=20.00",
+          "op": "custom"
+        }
+      ],
+      "hidden_rows": [
+        2,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20,
+        21
+      ],
+      "auto_filter": "<autoFilter ref=\"A1:E21\" xr:uid=\"{49BECEB7-551E-4DD2-ABDF-875A59280740}\"><filterColumn colId=\"1\"><filters><filter val=\"20.00\"/></filters></filterColumn></autoFilter>"
+    },
+    {
+      "id": "custom-text-ge",
+      "range": "A1:E21",
+      "today": 46306.0,
+      "fields": [
+        {
+          "field": 1,
+          "c1": ">=Di",
+          "op": "custom"
+        }
+      ],
+      "hidden_rows": [
+        2,
+        3,
+        4,
+        15,
+        17,
+        18,
+        19,
+        20,
+        21
+      ],
+      "auto_filter": "<autoFilter ref=\"A1:E21\" xr:uid=\"{32A72CA3-D0C4-4F28-8ECA-BC6ED27EEF81}\"><filterColumn colId=\"0\"><customFilters><customFilter operator=\"greaterThanOrEqual\" val=\"Di\"/></customFilters></filterColumn></autoFilter>"
+    },
+    {
+      "id": "custom-text-lt-or-blank",
+      "range": "A1:E21",
+      "today": 46306.0,
+      "fields": [
+        {
+          "field": 1,
+          "c1": "<b",
+          "logic": "or",
+          "c2": "=",
+          "op": "custom"
+        }
+      ],
+      "hidden_rows": [
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        16,
+        18,
+        19
+      ],
+      "auto_filter": "<autoFilter ref=\"A1:E21\" xr:uid=\"{242E61E5-CBC8-4BB0-B347-E6F6C1E0FA07}\"><filterColumn colId=\"0\"><customFilters><customFilter operator=\"lessThan\" val=\"b\"/><customFilter val=\"\"/></customFilters></filterColumn></autoFilter>"
+    },
+    {
+      "id": "custom-ne-and-ne",
+      "range": "A1:E21",
+      "today": 46306.0,
+      "fields": [
+        {
+          "field": 1,
+          "c1": "<>Ann",
+          "logic": "and",
+          "c2": "<>Cy",
+          "op": "custom"
+        }
+      ],
+      "hidden_rows": [
+        2,
+        4,
+        15
+      ],
+      "auto_filter": "<autoFilter ref=\"A1:E21\" xr:uid=\"{203F2A13-AC52-4A00-86E9-C6E12825DA14}\"><filterColumn colId=\"0\"><customFilters and=\"1\"><customFilter operator=\"notEqual\" val=\"Ann\"/><customFilter operator=\"notEqual\" val=\"Cy\"/></customFilters></filterColumn></autoFilter>"
+    },
+    {
+      "id": "values-star-literal",
+      "range": "A1:E21",
+      "today": 46306.0,
+      "fields": [
+        {
+          "values": [
+            "A*c"
+          ],
+          "field": 1
+        }
+      ],
+      "hidden_rows": [
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20
+      ],
+      "auto_filter": "<autoFilter ref=\"A1:E21\" xr:uid=\"{4C1CA0F3-2472-452B-9780-B83A358E0920}\"><filterColumn colId=\"0\"><customFilters><customFilter val=\"A*c\"/></customFilters></filterColumn></autoFilter>"
+    },
+    {
+      "id": "dategroup-day",
+      "range": "A1:A11",
+      "today": 46306.0,
+      "fields": [
+        {
+          "field": 1,
+          "groups": [
+            2,
+            "15/03/2023"
+          ],
+          "op": "dategroups"
+        }
+      ],
+      "hidden_rows": [
+        3,
+        4,
+        5,
+        6,
+        10
+      ],
+      "auto_filter": "<autoFilter ref=\"A1:A10\" xr:uid=\"{56BA2C64-23DD-487B-8D8E-3F91FF8A500C}\"><filterColumn colId=\"0\"><extLst><ext uri=\"{1AD28BCE-077C-4C59-8B6E-1921CE8616D4}\" xmlns:xlrd2=\"http://schemas.microsoft.com/office/spreadsheetml/2017/richdata2\"><xlrd2:filterColumn><xlrd2:filters><xlrd2:dateGroupItem year=\"2023\" month=\"3\" day=\"15\" dateTimeGrouping=\"day\"/></xlrd2:filters></xlrd2:filterColumn></ext></extLst></filterColumn></autoFilter>"
+    },
+    {
+      "id": "dategroup-month",
+      "range": "A1:A11",
+      "today": 46306.0,
+      "fields": [
+        {
+          "field": 1,
+          "groups": [
+            1,
+            "01/03/2023"
+          ],
+          "op": "dategroups"
+        }
+      ],
+      "hidden_rows": [
+        4,
+        5,
+        6,
+        10
+      ],
+      "auto_filter": "<autoFilter ref=\"A1:A10\" xr:uid=\"{84F603B5-8E09-40ED-8E89-C8DE58071999}\"><filterColumn colId=\"0\"><extLst><ext uri=\"{1AD28BCE-077C-4C59-8B6E-1921CE8616D4}\" xmlns:xlrd2=\"http://schemas.microsoft.com/office/spreadsheetml/2017/richdata2\"><xlrd2:filterColumn><xlrd2:filters><xlrd2:dateGroupItem year=\"2023\" month=\"3\" dateTimeGrouping=\"month\"/></xlrd2:filters></xlrd2:filterColumn></ext></extLst></filterColumn></autoFilter>"
+    },
+    {
+      "id": "dategroup-year",
+      "range": "A1:A11",
+      "today": 46306.0,
+      "fields": [
+        {
+          "field": 1,
+          "groups": [
+            0,
+            "01/01/2024"
+          ],
+          "op": "dategroups"
+        }
+      ],
+      "hidden_rows": [
+        2,
+        3,
+        4,
+        7,
+        8,
+        9,
+        10
+      ],
+      "auto_filter": "<autoFilter ref=\"A1:A10\" xr:uid=\"{0197176B-D146-4208-B84A-D0A4061F050E}\"><filterColumn colId=\"0\"><extLst><ext uri=\"{1AD28BCE-077C-4C59-8B6E-1921CE8616D4}\" xmlns:xlrd2=\"http://schemas.microsoft.com/office/spreadsheetml/2017/richdata2\"><xlrd2:filterColumn><xlrd2:filters><xlrd2:dateGroupItem year=\"2024\" dateTimeGrouping=\"year\"/></xlrd2:filters></xlrd2:filterColumn></ext></extLst></filterColumn></autoFilter>"
+    },
+    {
+      "id": "dategroup-multi",
+      "range": "A1:A11",
+      "today": 46306.0,
+      "fields": [
+        {
+          "field": 1,
+          "groups": [
+            2,
+            "15/03/2023",
+            2,
+            "16/03/2023",
+            1,
+            "01/04/2023"
+          ],
+          "op": "dategroups"
+        }
+      ],
+      "hidden_rows": [
+        5,
+        6,
+        10
+      ],
+      "auto_filter": "<autoFilter ref=\"A1:A10\" xr:uid=\"{F7C70293-B1BC-4137-8A35-4FF125AF19F1}\"><filterColumn colId=\"0\"><extLst><ext uri=\"{1AD28BCE-077C-4C59-8B6E-1921CE8616D4}\" xmlns:xlrd2=\"http://schemas.microsoft.com/office/spreadsheetml/2017/richdata2\"><xlrd2:filterColumn><xlrd2:filters><xlrd2:dateGroupItem year=\"2023\" month=\"3\" day=\"15\" dateTimeGrouping=\"day\"/><xlrd2:dateGroupItem year=\"2023\" month=\"3\" day=\"16\" dateTimeGrouping=\"day\"/><xlrd2:dateGroupItem year=\"2023\" month=\"4\" dateTimeGrouping=\"month\"/></xlrd2:filters></xlrd2:filterColumn></ext></extLst></filterColumn></autoFilter>"
+    },
+    {
+      "id": "dategroup-hour",
+      "range": "A1:A11",
+      "today": 46306.0,
+      "fields": [
+        {
+          "field": 1,
+          "groups": [
+            3,
+            "15/03/2023 12:00:00"
+          ],
+          "op": "dategroups"
+        }
+      ],
+      "hidden_rows": [
+        2,
+        3,
+        4,
+        5,
+        6,
+        8,
+        10
+      ],
+      "auto_filter": "<autoFilter ref=\"A1:A10\" xr:uid=\"{FEFED89D-86AB-46FB-B35A-F36FA758A5B3}\"><filterColumn colId=\"0\"><extLst><ext uri=\"{1AD28BCE-077C-4C59-8B6E-1921CE8616D4}\" xmlns:xlrd2=\"http://schemas.microsoft.com/office/spreadsheetml/2017/richdata2\"><xlrd2:filterColumn><xlrd2:filters><xlrd2:dateGroupItem year=\"2023\" month=\"3\" day=\"15\" hour=\"12\" dateTimeGrouping=\"hour\"/></xlrd2:filters></xlrd2:filterColumn></ext></extLst></filterColumn></autoFilter>"
+    },
+    {
+      "id": "dategroup-minute",
+      "range": "A1:A11",
+      "today": 46306.0,
+      "fields": [
+        {
+          "field": 1,
+          "groups": [
+            4,
+            "15/03/2023 12:00:00"
+          ],
+          "op": "dategroups"
+        }
+      ],
+      "hidden_rows": [
+        2,
+        3,
+        4,
+        5,
+        6,
+        8,
+        10
+      ],
+      "auto_filter": "<autoFilter ref=\"A1:A10\" xr:uid=\"{F74488E2-4238-45AC-B546-2471814B6C2A}\"><filterColumn colId=\"0\"><extLst><ext uri=\"{1AD28BCE-077C-4C59-8B6E-1921CE8616D4}\" xmlns:xlrd2=\"http://schemas.microsoft.com/office/spreadsheetml/2017/richdata2\"><xlrd2:filterColumn><xlrd2:filters><xlrd2:dateGroupItem year=\"2023\" month=\"3\" day=\"15\" hour=\"12\" minute=\"0\" dateTimeGrouping=\"minute\"/></xlrd2:filters></xlrd2:filterColumn></ext></extLst></filterColumn></autoFilter>"
+    },
+    {
+      "id": "custom-eq-or",
+      "range": "A1:E21",
+      "today": 46306.0,
+      "fields": [
+        {
+          "field": 2,
+          "c1": "=20",
+          "logic": "or",
+          "c2": "=30",
+          "op": "custom"
+        }
+      ],
+      "hidden_rows": [
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20,
+        21
+      ],
+      "auto_filter": "<autoFilter ref=\"A1:E21\" xr:uid=\"{099F1C72-163D-42C9-8EAC-4EE87DF1D827}\"><filterColumn colId=\"1\"><filters><filter val=\"20\"/><filter val=\"30\"/></filters></filterColumn></autoFilter>"
+    },
+    {
+      "id": "custom-ne-number-on-text",
+      "range": "A1:E21",
+      "today": 46306.0,
+      "fields": [
+        {
+          "field": 1,
+          "c1": "<>20",
+          "op": "custom"
+        }
+      ],
+      "hidden_rows": [],
+      "auto_filter": "<autoFilter ref=\"A1:E21\" xr:uid=\"{5859F8D2-A3E8-4268-9AE3-666BFBDFADE8}\"><filterColumn colId=\"0\"><customFilters><customFilter operator=\"notEqual\" val=\"20\"/></customFilters></filterColumn></autoFilter>"
+    },
+    {
+      "id": "blankkinds-values-blank",
+      "range": "A1:A9",
+      "today": 46306.0,
+      "fields": [
+        {
+          "values": [
+            ""
+          ],
+          "field": 1
+        }
+      ],
+      "hidden_rows": [
+        2,
+        7
+      ],
+      "auto_filter": "<autoFilter ref=\"A1:A7\" xr:uid=\"{8B6547DB-A98E-4CF8-B7B5-0587F65F0BBB}\"><filterColumn colId=\"0\"><filters blank=\"1\"/></filterColumn></autoFilter>"
+    },
+    {
+      "id": "blankkinds-eq-empty",
+      "range": "A1:A9",
+      "today": 46306.0,
+      "fields": [
+        {
+          "field": 1,
+          "c1": "=",
+          "op": "custom"
+        }
+      ],
+      "hidden_rows": [
+        2,
+        7
+      ],
+      "auto_filter": "<autoFilter ref=\"A1:A7\" xr:uid=\"{D8C5F348-84CD-4D59-A81F-B7D9C98DE89B}\"><filterColumn colId=\"0\"><filters blank=\"1\"/></filterColumn></autoFilter>"
+    },
+    {
+      "id": "blankkinds-ne-empty",
+      "range": "A1:A9",
+      "today": 46306.0,
+      "fields": [
+        {
+          "field": 1,
+          "c1": "<>",
+          "op": "custom"
+        }
+      ],
+      "hidden_rows": [
+        3,
+        4,
+        5,
+        6
+      ],
+      "auto_filter": "<autoFilter ref=\"A1:A7\" xr:uid=\"{A653A06B-4F0A-428F-828C-B19950725BA3}\"><filterColumn colId=\"0\"><customFilters><customFilter operator=\"notEqual\" val=\" \"/></customFilters></filterColumn></autoFilter>"
+    },
+    {
+      "id": "blankkinds-eq-star",
+      "range": "A1:A9",
+      "today": 46306.0,
+      "fields": [
+        {
+          "field": 1,
+          "c1": "=*",
+          "op": "custom"
+        }
+      ],
+      "hidden_rows": [
+        3,
+        4,
+        5,
+        6
+      ],
+      "auto_filter": "<autoFilter ref=\"A1:A7\" xr:uid=\"{48795E1F-0CD9-4DBB-829D-10534DB268E3}\"><filterColumn colId=\"0\"><customFilters><customFilter val=\"*\"/></customFilters></filterColumn></autoFilter>"
+    },
+    {
+      "id": "blankkinds-ne-star",
+      "range": "A1:A9",
+      "today": 46306.0,
+      "fields": [
+        {
+          "field": 1,
+          "c1": "<>*",
+          "op": "custom"
+        }
+      ],
+      "hidden_rows": [
+        2,
+        7
+      ],
+      "auto_filter": "<autoFilter ref=\"A1:A7\" xr:uid=\"{1FBE2676-052C-4F6F-BF57-B86913769582}\"><filterColumn colId=\"0\"><customFilters><customFilter operator=\"notEqual\" val=\"*\"/></customFilters></filterColumn></autoFilter>"
+    },
+    {
+      "id": "blankkinds-values-x",
+      "range": "A1:A9",
+      "today": 46306.0,
+      "fields": [
+        {
+          "values": [
+            "x"
+          ],
+          "field": 1
+        }
+      ],
+      "hidden_rows": [
+        3,
+        4,
+        5,
+        6,
+        7
+      ],
+      "auto_filter": "<autoFilter ref=\"A1:A7\" xr:uid=\"{AD8ACE0A-77F8-4FFD-9F2C-881F5865A20E}\"><filterColumn colId=\"0\"><filters><filter val=\"x\"/></filters></filterColumn></autoFilter>"
+    },
+    {
+      "id": "blankkinds-values-space",
+      "range": "A1:A9",
+      "today": 46306.0,
+      "fields": [
+        {
+          "values": [
+            " "
+          ],
+          "field": 1
+        }
+      ],
+      "hidden_rows": [
+        2,
+        7
+      ],
+      "auto_filter": "<autoFilter ref=\"A1:A7\" xr:uid=\"{01D31073-EB7E-465A-A05F-0DDCDEB41BE0}\"><filterColumn colId=\"0\"><filters blank=\"1\"/></filterColumn></autoFilter>"
+    },
+    {
+      "id": "mixed-ge5",
+      "range": "A1:A10",
+      "today": 46306.0,
+      "fields": [
+        {
+          "field": 1,
+          "c1": ">=5",
+          "op": "custom"
+        }
+      ],
+      "hidden_rows": [
+        3,
+        5,
+        6,
+        7,
+        8
+      ],
+      "auto_filter": "<autoFilter ref=\"A1:A9\" xr:uid=\"{C5A6408A-DB7D-4E34-BAB3-09367E47B304}\"><filterColumn colId=\"0\"><customFilters><customFilter operator=\"greaterThanOrEqual\" val=\"5\"/></customFilters></filterColumn></autoFilter>"
+    },
+    {
+      "id": "mixed-eq5",
+      "range": "A1:A10",
+      "today": 46306.0,
+      "fields": [
+        {
+          "field": 1,
+          "c1": "=5",
+          "op": "custom"
+        }
+      ],
+      "hidden_rows": [
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9
+      ],
+      "auto_filter": "<autoFilter ref=\"A1:A9\" xr:uid=\"{F06DEFDA-5173-4990-955A-74475CA90BCB}\"><filterColumn colId=\"0\"><filters><filter val=\"5\"/></filters></filterColumn></autoFilter>"
+    },
+    {
+      "id": "mixed-ne5",
+      "range": "A1:A10",
+      "today": 46306.0,
+      "fields": [
+        {
+          "field": 1,
+          "c1": "<>5",
+          "op": "custom"
+        }
+      ],
+      "hidden_rows": [
+        2
+      ],
+      "auto_filter": "<autoFilter ref=\"A1:A9\" xr:uid=\"{AF31ED6A-CAE6-4C8A-BAA4-93817AFF6A9B}\"><filterColumn colId=\"0\"><customFilters><customFilter operator=\"notEqual\" val=\"5\"/></customFilters></filterColumn></autoFilter>"
+    },
+    {
+      "id": "mixed-lt-abd",
+      "range": "A1:A10",
+      "today": 46306.0,
+      "fields": [
+        {
+          "field": 1,
+          "c1": "<abd",
+          "op": "custom"
+        }
+      ],
+      "hidden_rows": [
+        2,
+        3,
+        4,
+        5,
+        7,
+        8,
+        9
+      ],
+      "auto_filter": "<autoFilter ref=\"A1:A9\" xr:uid=\"{48D9F728-0D5A-46F8-BFE2-58160C188742}\"><filterColumn colId=\"0\"><customFilters><customFilter operator=\"lessThan\" val=\"abd\"/></customFilters></filterColumn></autoFilter>"
+    },
+    {
+      "id": "mixed-values-5",
+      "range": "A1:A10",
+      "today": 46306.0,
+      "fields": [
+        {
+          "values": [
+            "5"
+          ],
+          "field": 1
+        }
+      ],
+      "hidden_rows": [
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9
+      ],
+      "auto_filter": "<autoFilter ref=\"A1:A9\" xr:uid=\"{74C518E3-6A76-439A-B0DD-620524360A0A}\"><filterColumn colId=\"0\"><filters><filter val=\"5\"/></filters></filterColumn></autoFilter>"
+    },
+    {
+      "id": "mixed-values-err",
+      "range": "A1:A10",
+      "today": 46306.0,
+      "fields": [
+        {
+          "values": [
+            "#DIV/0!"
+          ],
+          "field": 1
+        }
+      ],
+      "hidden_rows": [
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9
+      ],
+      "auto_filter": "<autoFilter ref=\"A1:A9\" xr:uid=\"{1520149B-E024-479E-8E80-8B6B61FF4332}\"><filterColumn colId=\"0\"><filters><filter val=\"#DIV/0!\"/></filters></filterColumn></autoFilter>"
+    },
+    {
+      "id": "mixed-top3",
+      "range": "A1:A10",
+      "today": 46306.0,
+      "fields": [
+        {
+          "field": 1,
+          "c1": 3,
+          "op": "top10items"
+        }
+      ],
+      "hidden_rows": [
+        3,
+        5,
+        6,
+        7,
+        8
+      ],
+      "auto_filter": "<autoFilter ref=\"A1:A9\" xr:uid=\"{9A1929E6-7FE1-41E3-8BFB-8EA3867DDB0C}\"><filterColumn colId=\"0\"><top10 val=\"3\" filterVal=\"5\"/></filterColumn></autoFilter>"
+    },
+    {
+      "id": "mixed-above-avg",
+      "range": "A1:A10",
+      "today": 46306.0,
+      "fields": [
+        {
+          "field": 1,
+          "c1": "aboveAverage",
+          "op": "dynamic"
+        }
+      ],
+      "hidden_rows": [
+        2,
+        3,
+        5,
+        6,
+        7,
+        8,
+        9
+      ],
+      "auto_filter": "<autoFilter ref=\"A1:A9\" xr:uid=\"{4FBCD9B4-205B-4DE5-A4DF-00ABDE245426}\"><filterColumn colId=\"0\"><dynamicFilter type=\"aboveAverage\" val=\"6.833333333333333\"/></filterColumn></autoFilter>"
+    }
+  ]
+}

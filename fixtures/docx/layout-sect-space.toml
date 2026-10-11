@@ -1,0 +1,5 @@
+feature = "layout-trh"
+made_with = "Microsoft Word 16.0.20430 (Windows)"
+author = "project member"
+expect_dropped = []
+notes = "like layout-sect-empty with 3 pt before and 8 pt after in Normal (and a 14 pt break paragraph): whether the space of an empty section break paragraph counts"

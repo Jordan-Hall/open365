@@ -18,11 +18,11 @@ mod parts;
 
 use std::path::PathBuf;
 
-pub use app::{App, print_command};
+pub use app::{App, print_command, write_private_temp};
 pub use clipboard::{ClipboardBackend, ClipboardContents, ClipboardState, MemoryClipboard};
 pub use doc_view::{DocPos, DocView, Toggle};
 pub use find::{FindAction, FindDialog};
-pub use grid_view::{GridView, PaintedCell, Resize};
+pub use grid_view::{GridColors, GridView, PaintedCell, Resize};
 
 /// Opens the main window and runs until it closes. `initial` is a file to open at start-up.
 pub fn run(initial: Option<PathBuf>) -> eframe::Result {

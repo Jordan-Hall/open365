@@ -51,8 +51,14 @@ pub use refs::{
     shift_formula,
 };
 pub use sheet::{
-    ArrayFormula, ArrayRole, Cell, CellError, CellValue, ColumnsSnapshot, Formula, FormulaKind,
-    MAX_COLUMN_WIDTH, MAX_ROW_HEIGHT, Rect, Row, RowHeightsSnapshot, SharedFormulaRef, Worksheet,
+    ArrayFormula, ArrayRole, AutoFilter, Cell, CellError, CellValue, ColorFilter, ColorKey,
+    ColumnsSnapshot, CustomFilter, CustomFilters, DataValidation, DataValidations, DateGroup,
+    DateTimeGrouping, DynamicFilter, DynamicKind, ErrorStyle, FilterColumn, FilterContext,
+    FilterCriteria, FilterOperator, FilterOutcome, Formula, FormulaKind, HeaderMode, IconFilter,
+    MAX_COLUMN_WIDTH, MAX_ROW_HEIGHT, MAX_SORT_KEYS, Rect, Row, RowHeightsSnapshot,
+    SharedFormulaRef, SortBy, SortCondition, SortKey, SortMethod, SortOn, SortOrientation,
+    SortOutcome, SortSpec, SortState, TextKey, TextOrder, Top10, ValidationContext,
+    ValidationOperator, ValidationType, Validity, ValuesFilter, WorkbookCells, Worksheet,
     format_number,
 };
 pub use sst::{SharedStrings, decode_xstring, encode_xstring};

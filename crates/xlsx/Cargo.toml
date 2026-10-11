@@ -8,6 +8,8 @@ license.workspace = true
 publish.workspace = true
 
 [dependencies]
+open365-calc.workspace = true
+open365-locale.workspace = true
 open365-opc.workspace = true
 quick-xml = "0.42.0"
 thiserror = "2.0.21"

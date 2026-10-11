@@ -1,0 +1,543 @@
+{
+  "source": "fixtures/xlsx/sortfilter-validation.xlsx",
+  "sheets": [
+    {
+      "name": "whole-between",
+      "visible": -1,
+      "usedRange": "A1",
+      "truncatedAt2000": false,
+      "cells": {}
+    },
+    {
+      "name": "decimal-between",
+      "visible": -1,
+      "usedRange": "A1",
+      "truncatedAt2000": false,
+      "cells": {}
+    },
+    {
+      "name": "whole-notBetween",
+      "visible": -1,
+      "usedRange": "A1",
+      "truncatedAt2000": false,
+      "cells": {}
+    },
+    {
+      "name": "decimal-notBetween",
+      "visible": -1,
+      "usedRange": "A1",
+      "truncatedAt2000": false,
+      "cells": {}
+    },
+    {
+      "name": "whole-equal",
+      "visible": -1,
+      "usedRange": "A1",
+      "truncatedAt2000": false,
+      "cells": {}
+    },
+    {
+      "name": "decimal-equal",
+      "visible": -1,
+      "usedRange": "A1",
+      "truncatedAt2000": false,
+      "cells": {}
+    },
+    {
+      "name": "whole-notEqual",
+      "visible": -1,
+      "usedRange": "A1",
+      "truncatedAt2000": false,
+      "cells": {}
+    },
+    {
+      "name": "decimal-notEqual",
+      "visible": -1,
+      "usedRange": "A1",
+      "truncatedAt2000": false,
+      "cells": {}
+    },
+    {
+      "name": "whole-greaterThan",
+      "visible": -1,
+      "usedRange": "A1",
+      "truncatedAt2000": false,
+      "cells": {}
+    },
+    {
+      "name": "decimal-greaterThan",
+      "visible": -1,
+      "usedRange": "A1",
+      "truncatedAt2000": false,
+      "cells": {}
+    },
+    {
+      "name": "whole-lessThan",
+      "visible": -1,
+      "usedRange": "A1",
+      "truncatedAt2000": false,
+      "cells": {}
+    },
+    {
+      "name": "decimal-lessThan",
+      "visible": -1,
+      "usedRange": "A1",
+      "truncatedAt2000": false,
+      "cells": {}
+    },
+    {
+      "name": "whole-greaterThanOrEqual",
+      "visible": -1,
+      "usedRange": "A1",
+      "truncatedAt2000": false,
+      "cells": {}
+    },
+    {
+      "name": "decimal-greaterThanOrEqual",
+      "visible": -1,
+      "usedRange": "A1",
+      "truncatedAt2000": false,
+      "cells": {}
+    },
+    {
+      "name": "whole-lessThanOrEqual",
+      "visible": -1,
+      "usedRange": "A1",
+      "truncatedAt2000": false,
+      "cells": {}
+    },
+    {
+      "name": "decimal-lessThanOrEqual",
+      "visible": -1,
+      "usedRange": "A1",
+      "truncatedAt2000": false,
+      "cells": {}
+    },
+    {
+      "name": "whole-noblank",
+      "visible": -1,
+      "usedRange": "A1",
+      "truncatedAt2000": false,
+      "cells": {}
+    },
+    {
+      "name": "whole-blank-ok",
+      "visible": -1,
+      "usedRange": "A1",
+      "truncatedAt2000": false,
+      "cells": {}
+    },
+    {
+      "name": "whole-cellref-bounds",
+      "visible": -1,
+      "usedRange": "C1:C2",
+      "truncatedAt2000": false,
+      "cells": {
+        "C1": {
+          "value2": 2.0,
+          "text": "2",
+          "formula": null
+        },
+        "C2": {
+          "value2": 4.0,
+          "text": "4",
+          "formula": null
+        }
+      }
+    },
+    {
+      "name": "whole-formula-bound",
+      "visible": -1,
+      "usedRange": "C1:C2",
+      "truncatedAt2000": false,
+      "cells": {
+        "C1": {
+          "value2": 2.0,
+          "text": "2",
+          "formula": null
+        },
+        "C2": {
+          "value2": 4.0,
+          "text": "4",
+          "formula": null
+        }
+      }
+    },
+    {
+      "name": "date-between",
+      "visible": -1,
+      "usedRange": "A1",
+      "truncatedAt2000": false,
+      "cells": {}
+    },
+    {
+      "name": "date-greater",
+      "visible": -1,
+      "usedRange": "A1",
+      "truncatedAt2000": false,
+      "cells": {}
+    },
+    {
+      "name": "date-date-fn",
+      "visible": -1,
+      "usedRange": "A1",
+      "truncatedAt2000": false,
+      "cells": {}
+    },
+    {
+      "name": "time-between",
+      "visible": -1,
+      "usedRange": "A1",
+      "truncatedAt2000": false,
+      "cells": {}
+    },
+    {
+      "name": "time-less",
+      "visible": -1,
+      "usedRange": "A1",
+      "truncatedAt2000": false,
+      "cells": {}
+    },
+    {
+      "name": "textlength-between",
+      "visible": -1,
+      "usedRange": "A1",
+      "truncatedAt2000": false,
+      "cells": {}
+    },
+    {
+      "name": "textlength-notBetween",
+      "visible": -1,
+      "usedRange": "A1",
+      "truncatedAt2000": false,
+      "cells": {}
+    },
+    {
+      "name": "textlength-equal",
+      "visible": -1,
+      "usedRange": "A1",
+      "truncatedAt2000": false,
+      "cells": {}
+    },
+    {
+      "name": "textlength-notEqual",
+      "visible": -1,
+      "usedRange": "A1",
+      "truncatedAt2000": false,
+      "cells": {}
+    },
+    {
+      "name": "textlength-greaterThan",
+      "visible": -1,
+      "usedRange": "A1",
+      "truncatedAt2000": false,
+      "cells": {}
+    },
+    {
+      "name": "textlength-lessThan",
+      "visible": -1,
+      "usedRange": "A1",
+      "truncatedAt2000": false,
+      "cells": {}
+    },
+    {
+      "name": "textlength-greaterThanOrEqual",
+      "visible": -1,
+      "usedRange": "A1",
+      "truncatedAt2000": false,
+      "cells": {}
+    },
+    {
+      "name": "textlength-lessThanOrEqual",
+      "visible": -1,
+      "usedRange": "A1",
+      "truncatedAt2000": false,
+      "cells": {}
+    },
+    {
+      "name": "list-literal",
+      "visible": -1,
+      "usedRange": "A1",
+      "truncatedAt2000": false,
+      "cells": {}
+    },
+    {
+      "name": "list-literal-numbers",
+      "visible": -1,
+      "usedRange": "A1",
+      "truncatedAt2000": false,
+      "cells": {}
+    },
+    {
+      "name": "list-range",
+      "visible": -1,
+      "usedRange": "C1:C3",
+      "truncatedAt2000": false,
+      "cells": {
+        "C1": {
+          "value2": "Red",
+          "text": "Red",
+          "formula": null
+        },
+        "C2": {
+          "value2": "green",
+          "text": "green",
+          "formula": null
+        },
+        "C3": {
+          "value2": 7.0,
+          "text": "7",
+          "formula": null
+        }
+      }
+    },
+    {
+      "name": "list-range-noblank",
+      "visible": -1,
+      "usedRange": "C1:C3",
+      "truncatedAt2000": false,
+      "cells": {
+        "C1": {
+          "value2": "Red",
+          "text": "Red",
+          "formula": null
+        },
+        "C2": {
+          "value2": "green",
+          "text": "green",
+          "formula": null
+        },
+        "C3": {
+          "value2": 7.0,
+          "text": "7",
+          "formula": null
+        }
+      }
+    },
+    {
+      "name": "list-range-with-blank-cell",
+      "visible": -1,
+      "usedRange": "C1:C3",
+      "truncatedAt2000": false,
+      "cells": {
+        "C1": {
+          "value2": "Red",
+          "text": "Red",
+          "formula": null
+        },
+        "C3": {
+          "value2": "x",
+          "text": "x",
+          "formula": null
+        }
+      }
+    },
+    {
+      "name": "list-row-range",
+      "visible": -1,
+      "usedRange": "C1:E1",
+      "truncatedAt2000": false,
+      "cells": {
+        "C1": {
+          "value2": "a",
+          "text": "a",
+          "formula": null
+        },
+        "D1": {
+          "value2": "b",
+          "text": "b",
+          "formula": null
+        },
+        "E1": {
+          "value2": "c",
+          "text": "c",
+          "formula": null
+        }
+      }
+    },
+    {
+      "name": "list-formula-offset",
+      "visible": -1,
+      "usedRange": "C1:C3",
+      "truncatedAt2000": false,
+      "cells": {
+        "C1": {
+          "value2": "p",
+          "text": "p",
+          "formula": null
+        },
+        "C2": {
+          "value2": "q",
+          "text": "q",
+          "formula": null
+        },
+        "C3": {
+          "value2": "r",
+          "text": "r",
+          "formula": null
+        }
+      }
+    },
+    {
+      "name": "list-dates",
+      "visible": -1,
+      "usedRange": "C1:C2",
+      "truncatedAt2000": false,
+      "cells": {
+        "C1": {
+          "value2": 45000.0,
+          "text": "########",
+          "formula": null
+        },
+        "C2": {
+          "value2": 45001.0,
+          "text": "########",
+          "formula": null
+        }
+      }
+    },
+    {
+      "name": "custom-gt-other",
+      "visible": -1,
+      "usedRange": "A1:A5",
+      "truncatedAt2000": false,
+      "cells": {
+        "A1": {
+          "value2": 1.0,
+          "text": "1",
+          "formula": null
+        },
+        "A2": {
+          "value2": 5.0,
+          "text": "5",
+          "formula": null
+        },
+        "A3": {
+          "value2": 3.0,
+          "text": "3",
+          "formula": null
+        },
+        "A4": {
+          "value2": 9.0,
+          "text": "9",
+          "formula": null
+        },
+        "A5": {
+          "value2": 2.0,
+          "text": "2",
+          "formula": null
+        }
+      }
+    },
+    {
+      "name": "custom-isnumber",
+      "visible": -1,
+      "usedRange": "A1",
+      "truncatedAt2000": false,
+      "cells": {}
+    },
+    {
+      "name": "custom-and-or",
+      "visible": -1,
+      "usedRange": "A1",
+      "truncatedAt2000": false,
+      "cells": {}
+    },
+    {
+      "name": "custom-number-result",
+      "visible": -1,
+      "usedRange": "A1",
+      "truncatedAt2000": false,
+      "cells": {}
+    },
+    {
+      "name": "custom-text-result",
+      "visible": -1,
+      "usedRange": "A1",
+      "truncatedAt2000": false,
+      "cells": {}
+    },
+    {
+      "name": "custom-error-result",
+      "visible": -1,
+      "usedRange": "A1",
+      "truncatedAt2000": false,
+      "cells": {}
+    },
+    {
+      "name": "custom-countif-unique",
+      "visible": -1,
+      "usedRange": "B1:B5",
+      "truncatedAt2000": false,
+      "cells": {
+        "B1": {
+          "value2": "a",
+          "text": "a",
+          "formula": null
+        },
+        "B2": {
+          "value2": "b",
+          "text": "b",
+          "formula": null
+        },
+        "B3": {
+          "value2": "a",
+          "text": "a",
+          "formula": null
+        },
+        "B4": {
+          "value2": "c",
+          "text": "c",
+          "formula": null
+        },
+        "B5": {
+          "value2": "d",
+          "text": "d",
+          "formula": null
+        }
+      }
+    },
+    {
+      "name": "input-only",
+      "visible": -1,
+      "usedRange": "A1",
+      "truncatedAt2000": false,
+      "cells": {}
+    },
+    {
+      "name": "messages-stop",
+      "visible": -1,
+      "usedRange": "A1",
+      "truncatedAt2000": false,
+      "cells": {}
+    },
+    {
+      "name": "messages-warning",
+      "visible": -1,
+      "usedRange": "A1",
+      "truncatedAt2000": false,
+      "cells": {}
+    },
+    {
+      "name": "messages-info",
+      "visible": -1,
+      "usedRange": "A1",
+      "truncatedAt2000": false,
+      "cells": {}
+    },
+    {
+      "name": "list-no-dropdown",
+      "visible": -1,
+      "usedRange": "A1",
+      "truncatedAt2000": false,
+      "cells": {}
+    },
+    {
+      "name": "multi-area",
+      "visible": -1,
+      "usedRange": "A1",
+      "truncatedAt2000": false,
+      "cells": {}
+    }
+  ]
+}

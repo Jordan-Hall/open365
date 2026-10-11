@@ -16,9 +16,12 @@ members = [
     "crates/commands",
     "crates/mcp",
     "crates/ui-egui",
+    "crates/ui-shell",
     "crates/testkit",
     "apps/cli",
     "apps/desktop",
+    "apps/writer",
+    "apps/sheets",
     "xtask",
 ]
 
@@ -44,6 +47,7 @@ open365-pdf = { path = "crates/pdf" }
 open365-commands = { path = "crates/commands" }
 open365-mcp = { path = "crates/mcp" }
 open365-ui-egui = { path = "crates/ui-egui" }
+open365-ui-shell = { path = "crates/ui-shell" }
 open365-testkit = { path = "crates/testkit" }
 eframe = { version = "0.36", default-features = false, features = ["accesskit", "wgpu", "wayland", "x11"] }
 egui = { version = "0.36", default-features = false }

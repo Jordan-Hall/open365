@@ -1,0 +1,28 @@
+{
+  "source": "fixtures/docx/layout-frame-dropcap.docx",
+  "oracle": "Microsoft Word 16.0 (16.0.20430), Print Layout, tools/office/word-layout-oracle.ps1",
+  "units": "points; page and top/left/baseline measured from the page top-left corner; start/end are UTF-16 offsets in the main story",
+  "precision": "top/left/lastX are screen-quantised (+-0.3 pt); baseline/inkLeft and cell rectangles come from the 600 dpi PDF and are exact",
+  "pageCount": 1,
+  "cells": [
+    {"page": 1, "x": 72.024, "y": 72.02, "w": 23.064, "h": 40.32},
+    {"page": 1, "x": 72.024, "y": 125.81, "w": 14.4, "h": 26.88}
+  ],
+  "lines": [
+    {"page": 1, "start": 0, "end": 2, "top": 72.0, "left": 72.0, "lastX": 95.4, "baseline": null, "inkLeft": null, "text": "L\u000d"},
+    {"page": 1, "start": 2, "end": 97, "top": 72.0, "left": 95.4, "lastX": 523.8, "baseline": null, "inkLeft": null, "text": "1 The harbour road climbs past the old salt warehouses before it bends toward the quiet market "},
+    {"page": 1, "start": 97, "end": 133, "top": 85.2, "left": 95.4, "lastX": 250.2, "baseline": null, "inkLeft": null, "text": "square where the stalls open early.\u000d"},
+    {"page": 1, "start": 133, "end": 230, "top": 99.0, "left": 95.4, "lastX": 512.4, "baseline": null, "inkLeft": null, "text": "L2 Children carry baskets of bread while the bakers stack trays of rolls beside the fountain and "},
+    {"page": 1, "start": 230, "end": 263, "top": 112.2, "left": 72.0, "lastX": 219.6, "baseline": null, "inkLeft": null, "text": "count the morning takings aloud.\u000d"},
+    {"page": 1, "start": 263, "end": 265, "top": 126.0, "left": 72.0, "lastX": 86.4, "baseline": null, "inkLeft": null, "text": "L\u000d"},
+    {"page": 1, "start": 265, "end": 361, "top": 126.0, "left": 86.4, "lastX": 515.4, "baseline": null, "inkLeft": null, "text": "3 A narrow bridge crosses the stream behind the chapel, and travellers pause there to watch the "},
+    {"page": 1, "start": 361, "end": 395, "top": 139.2, "left": 86.4, "lastX": 245.4, "baseline": null, "inkLeft": null, "text": "water turn the slow wooden wheel.\u000d"},
+    {"page": 1, "start": 395, "end": 504, "top": 152.4, "left": 72.0, "lastX": 534.0, "baseline": null, "inkLeft": null, "text": "L4 By noon the square fills with voices, and the clock above the arcade strikes the hour a little later than "},
+    {"page": 1, "start": 504, "end": 526, "top": 165.6, "left": 72.0, "lastX": 165.0, "baseline": null, "inkLeft": null, "text": "the church bell does.\u000d"},
+    {"page": 1, "start": 526, "end": 629, "top": 179.4, "left": 72.0, "lastX": 538.2, "baseline": null, "inkLeft": null, "text": "L5 The harbour road climbs past the old salt warehouses before it bends toward the quiet market square "},
+    {"page": 1, "start": 629, "end": 658, "top": 192.6, "left": 72.0, "lastX": 194.4, "baseline": null, "inkLeft": null, "text": "where the stalls open early.\u000d"},
+    {"page": 1, "start": 658, "end": 765, "top": 206.4, "left": 72.0, "lastX": 534.6, "baseline": null, "inkLeft": null, "text": "L6 Children carry baskets of bread while the bakers stack trays of rolls beside the fountain and count the "},
+    {"page": 1, "start": 765, "end": 788, "top": 219.6, "left": 72.0, "lastX": 174.0, "baseline": null, "inkLeft": null, "text": "morning takings aloud.\u000d"},
+    {"page": 1, "start": 788, "end": 789, "top": 233.4, "left": 72.0, "lastX": 72.0, "baseline": null, "inkLeft": null, "text": "\u000d"}
+  ]
+}

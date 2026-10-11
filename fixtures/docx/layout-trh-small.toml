@@ -1,0 +1,5 @@
+feature = "layout-trh"
+made_with = "Microsoft Word 16.0.20430 (Windows)"
+author = "project member"
+expect_dropped = []
+notes = "tables whose exact rows (4 to 24 pt) sit between auto rows, with cell padding 12/2, 2/12, 12/12 and 6/6 pt above and below: how high an exact row is when its height does not exceed the padding"

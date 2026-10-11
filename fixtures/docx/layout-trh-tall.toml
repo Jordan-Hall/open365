@@ -1,0 +1,5 @@
+feature = "layout-trh"
+made_with = "Microsoft Word 16.0.20430 (Windows)"
+author = "project member"
+expect_dropped = []
+notes = "one row per page, at least 540..700 pt high with 0, 36 and 72 pt padding, followed by a paragraph: what Word does when the height and the padding together exceed the page"

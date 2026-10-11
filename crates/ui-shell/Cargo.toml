@@ -1,0 +1,20 @@
+[package]
+name = "open365-ui-shell"
+description = "Office-style application chrome in egui: title bar, ribbon, backstage, status bar, formula bar and sheet tabs."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+egui.workspace = true
+resvg = { version = "0.48", default-features = false }
+serde.workspace = true
+serde_json.workspace = true
+
+[dev-dependencies]
+egui_kittest.workspace = true
+
+[lints]
+workspace = true

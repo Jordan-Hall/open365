@@ -128,7 +128,11 @@ impl Flattener {
                 RowChild::Cell(cell) => children.push(RowChild::Cell(self.cell(cell, in_sdt))),
                 RowChild::Raw(raw) if is_sdt(raw) => {
                     // A row-level control wraps cells.
+                    // Word counts its start and end as story characters (`layout-sdt`): the start
+                    // goes on the first paragraph of the first wrapped cell, the end on the last
+                    // paragraph of the last one.
                     let wrapped = Block::Raw(raw.clone());
+                    let from = children.len();
                     for child in wrapped.sdt_content_raw().unwrap_or_default() {
                         match child {
                             RawXml::Element(e) if e.head.is_w("tc") => {
@@ -138,6 +142,21 @@ impl Flattener {
                                 }
                             }
                             other => children.push(RowChild::Raw(other)),
+                        }
+                    }
+                    let cells: Vec<usize> = (from..children.len())
+                        .filter(|i| matches!(children[*i], RowChild::Cell(_)))
+                        .collect();
+                    if let (Some(first), Some(last)) = (cells.first(), cells.last()) {
+                        if let RowChild::Cell(cell) = &mut children[*first]
+                            && let Some(p) = cell.blocks.iter_mut().find_map(paragraph_mut)
+                        {
+                            add_marker(p, SDT_START, true);
+                        }
+                        if let RowChild::Cell(cell) = &mut children[*last]
+                            && let Some(p) = cell.blocks.iter_mut().rev().find_map(paragraph_mut)
+                        {
+                            add_marker(p, SDT_END, false);
                         }
                     }
                 }
@@ -157,6 +176,13 @@ impl Flattener {
             head: c.head.clone(),
             blocks,
         }
+    }
+}
+
+fn paragraph_mut(block: &mut Block) -> Option<&mut Paragraph> {
+    match block {
+        Block::Paragraph(p) => Some(p),
+        _ => None,
     }
 }
 

@@ -1,5 +1,7 @@
 use std::sync::Arc;
 
+use open365_calc::{Clock, FormatLocale, Value};
+use open365_locale::Locale;
 use open365_opc::{
     ContentTypes, Limits, Package, PartName, Relationships, TargetMode, rels_part_name,
     resolve_target,
@@ -10,8 +12,9 @@ use crate::geometry::{BASE_DPI, GridMetrics};
 use crate::parts::{self, HygieneAction};
 use crate::refs::{MAX_COL, MAX_ROW};
 use crate::sheet::{
-    Cell, CellValue, ColumnsSnapshot, Formula, MAX_COLUMN_WIDTH, MAX_ROW_HEIGHT,
-    RowHeightsSnapshot, Worksheet,
+    AutoFilter, Cell, CellValue, ColumnsSnapshot, DataValidations, FilterContext, FilterOutcome,
+    Formula, MAX_COLUMN_WIDTH, MAX_ROW_HEIGHT, RowHeightsSnapshot, SortOutcome, SortSpec,
+    SortState, ValidationContext, Validity, WorkbookCells, Worksheet,
 };
 use crate::sst::SharedStrings;
 use crate::styles::Styles;
@@ -753,6 +756,115 @@ impl Workbook {
         self.worksheet_mut(sheet)?.restore_row_heights(snapshot);
         self.sheets[sheet].dirty = true;
         Ok(())
+    }
+
+    // ---- sort, auto filter, data validation ---------------------------------------------------
+
+    fn sheet_pair(
+        &mut self,
+        sheet: usize,
+    ) -> Result<(&mut Worksheet, &mut bool, &Styles, bool), XlsxError> {
+        let count = self.sheets.len();
+        let entry = self
+            .sheets
+            .get_mut(sheet)
+            .ok_or(XlsxError::SheetOutOfRange {
+                index: sheet,
+                count,
+            })?;
+        let ws = entry.data.as_mut().ok_or(XlsxError::NotAWorksheet(sheet))?;
+        Ok((ws, &mut entry.dirty, &self.styles, self.date1904))
+    }
+
+    /// Sorts a range as Excel's Sort does (see [`Worksheet::sort_range`]). Formulas that moved are shifted and
+    /// ask the application to recalculate on load.
+    pub fn sort_range(
+        &mut self,
+        sheet: usize,
+        spec: &SortSpec,
+        locale: &Locale,
+    ) -> Result<SortOutcome, XlsxError> {
+        let (ws, dirty, styles, _) = self.sheet_pair(sheet)?;
+        let outcome = ws.sort_range(spec, styles, locale)?;
+        *dirty = true;
+        self.edited()?;
+        Ok(outcome)
+    }
+
+    /// Sets the worksheet-level `sortState` (the record of the last sort), or removes it.
+    pub fn set_sort_state(
+        &mut self,
+        sheet: usize,
+        state: Option<&SortState>,
+    ) -> Result<(), XlsxError> {
+        let (ws, dirty, _, _) = self.sheet_pair(sheet)?;
+        ws.set_sort_state(state);
+        *dirty = true;
+        Ok(())
+    }
+
+    /// Sets the worksheet-level `autoFilter` without changing which rows are hidden, or removes it.
+    pub fn set_auto_filter(
+        &mut self,
+        sheet: usize,
+        filter: Option<&AutoFilter>,
+    ) -> Result<(), XlsxError> {
+        let (ws, dirty, _, _) = self.sheet_pair(sheet)?;
+        ws.set_auto_filter(filter);
+        *dirty = true;
+        Ok(())
+    }
+
+    /// Hides the rows the sheet's `autoFilter` rejects and shows the rest (Excel's Reapply). `today` is the
+    /// date serial the date filters use.
+    pub fn apply_auto_filter(
+        &mut self,
+        sheet: usize,
+        today: f64,
+        locale: &Locale,
+    ) -> Result<FilterOutcome, XlsxError> {
+        let (ws, dirty, styles, date1904) = self.sheet_pair(sheet)?;
+        let filter = ws
+            .auto_filter()
+            .ok_or_else(|| XlsxError::UnsupportedEdit("the sheet has no autoFilter".to_owned()))?;
+        let mut ctx = FilterContext::new(styles, locale, today);
+        ctx.date1904 = date1904;
+        let outcome = ws.apply_auto_filter(&filter, &ctx)?;
+        *dirty = true;
+        self.edited()?;
+        Ok(outcome)
+    }
+
+    /// Replaces the sheet's `dataValidations` (the extension list is kept), or removes them.
+    pub fn set_data_validations(
+        &mut self,
+        sheet: usize,
+        validations: Option<&DataValidations>,
+    ) -> Result<(), XlsxError> {
+        let (ws, dirty, _, _) = self.sheet_pair(sheet)?;
+        ws.set_data_validations(validations);
+        *dirty = true;
+        Ok(())
+    }
+
+    /// Checks `candidate` against the rule that covers the cell. `None` when no rule covers it.
+    pub fn validate_cell(
+        &self,
+        sheet: usize,
+        row: u32,
+        col: u32,
+        candidate: &Value,
+        locale: &Arc<FormatLocale>,
+        clock: &dyn Clock,
+    ) -> Option<Validity> {
+        let ws = self.sheet(sheet)?;
+        let validations = ws.data_validations()?;
+        let rule = validations.at(row, col)?;
+        let cells = WorkbookCells(self);
+        let mut ctx = ValidationContext::new(&cells, &self.infos.get(sheet)?.name, locale);
+        ctx.date1904 = self.date1904;
+        ctx.clock = clock;
+        Some(rule.check(row, col, candidate, &ctx))
     }
 
     /// Sets a cell to a constant. Text becomes a shared string (reusing an identical

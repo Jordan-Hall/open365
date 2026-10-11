@@ -1,0 +1,5 @@
+feature = "layout-frame"
+made_with = "Microsoft Word 16.0.20430 (Windows)"
+author = "project member"
+expect_dropped = []
+notes = "a table positioned 150 pt from the left page edge and 300 pt from the page top (anchor in paragraph 2), and a second centred one in paragraph 8 at 40 pt from the paragraph top"

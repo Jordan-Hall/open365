@@ -1,0 +1,5 @@
+feature = "layout-frame"
+made_with = "Microsoft Word 16.0.20430 (Windows)"
+author = "project member"
+expect_dropped = []
+notes = "a framed paragraph 150 pt wide, left of the column, top aligned with paragraph 3, text wrapping beside it; and a second frame on the right margin in paragraph 9"
