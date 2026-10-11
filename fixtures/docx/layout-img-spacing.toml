@@ -1,0 +1,5 @@
+feature = "layout-img-spacing"
+made_with = "Microsoft Word 16.0.20430 (Windows)"
+author = "project member"
+expect_dropped = []
+notes = "line spacing rules with an inline picture: multiple (above and below one), at least and exactly, against picture height and run font"

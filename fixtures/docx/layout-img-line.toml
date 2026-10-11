@@ -1,0 +1,5 @@
+feature = "layout-img-line"
+made_with = "Microsoft Word 16.0.20430 (Windows)"
+author = "project member"
+expect_dropped = []
+notes = "line height with an inline picture in a run of another size or face: picture height against the run font height, single spacing"

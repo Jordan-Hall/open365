@@ -1,0 +1,5 @@
+feature = "layout-img-face"
+made_with = "Microsoft Word 16.0.20430 (Windows)"
+author = "project member"
+expect_dropped = []
+notes = "line height of 24 pt text and of an inline picture in a 24 pt run, in Cambria, Arial, Times New Roman and Courier New"

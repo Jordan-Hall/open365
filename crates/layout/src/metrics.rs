@@ -18,24 +18,44 @@ impl LineMetricModel {
     pub fn ascent_descent(self, m: &FaceMetrics, size: f64) -> (f64, f64) {
         let upem = f64::from(m.units_per_em);
         let (a, d) = match self {
-            Self::Win => (m.win_ascent, m.win_descent),
+            Self::Win => {
+                // GDI's external leading: the part of the hhea line gap that the Windows
+                // metrics do not already cover goes above the line (Arial and Times New
+                // Roman gain 67 and 87 units, Calibri and Cambria none). Measured with
+                // layout-img-line text and picture runs in six faces.
+                let covered = (m.win_ascent + m.win_descent) - (m.hhea_ascent + m.hhea_descent);
+                let external = (m.hhea_line_gap - covered).max(0);
+                (m.win_ascent + external, m.win_descent)
+            }
             Self::Hhea => (m.hhea_ascent + m.hhea_line_gap, m.hhea_descent),
         };
         (f64::from(a) * size / upem, f64::from(d) * size / upem)
     }
 }
 
-/// What an inline picture does to a line: its height above the baseline (zero when there is
-/// none) and the ascent and height of the text on the line.
+/// What the inline pictures on a line do to it.
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct PictureLine {
+    /// Tallest inline picture (its height above the baseline); zero when there is none.
     pub height: f64,
+    /// Tallest font height (ascent plus descent) among the runs that hold a picture.
+    pub run_h: f64,
+    /// Ascent and height of the text on the line.
     pub text_asc: f64,
     pub text_h: f64,
 }
 
-/// Line height and baseline offset (from the line top) for the natural `asc`/`desc` under
-/// a spacing rule.
+/// Line height and baseline offset (from the line top) for the natural `asc`/`desc` of the
+/// text under a spacing rule. Measured against Word (layout-img-line, layout-img-spacing):
+///
+/// * A picture's run sizes the line like a text run, except that the picture has no descent:
+///   the line grows to the run's full font height by raising the baseline
+///   (`run_h - desc`), the descent staying the text's. The run counts only for automatic
+///   (multiple) spacing; "at least" and "exactly" ignore it.
+/// * A multiple above one adds `(m - 1)` times the tallest font height below the baseline; a
+///   multiple below one scales the ascent and the descent.
+/// * "At least" puts the extra space above the baseline.
+/// * "Exactly" puts the baseline at 80 % of the line, whatever the fonts and pictures.
 pub(crate) fn line_height(
     asc: f64,
     desc: f64,
@@ -43,32 +63,30 @@ pub(crate) fn line_height(
     _model: LineMetricModel,
     pic: PictureLine,
 ) -> (f64, f64) {
-    let single = asc + desc;
-    let taller = pic.height > pic.text_asc;
     match rule {
-        LineSpacing::Multiple(m) if taller => {
-            // Measured (layout-img-inline): a picture is not stretched by the multiple, only
-            // the text's own height is: the extra leading goes below the baseline.
-            (single + (f64::from(m) - 1.0) * pic.text_h, asc)
-        }
         LineSpacing::Multiple(m) => {
-            // Extra leading goes below the baseline (measured: a 1.079 multiple leaves the
-            // first baseline where single spacing puts it).
-            let h = single * f64::from(m);
-            (h, asc)
-        }
-        LineSpacing::Exactly(x) if taller => {
-            // Measured (layout-img-inline, one point): the baseline sits at 80 % of the line.
-            let h = f64::from(x);
-            (h, 0.8 * h)
+            let m = f64::from(m);
+            let asc = asc.max(pic.height).max(pic.run_h - desc);
+            let tallest = pic.text_h.max(pic.run_h);
+            if m >= 1.0 {
+                (asc + desc + (m - 1.0) * tallest, asc)
+            } else {
+                // A picture taller than the text keeps its height: only the text's own
+                // ascent shrinks.
+                let base = pic.text_asc.max(pic.run_h - desc);
+                let asc = asc - (1.0 - m) * base;
+                (asc + m * desc, asc)
+            }
         }
         LineSpacing::AtLeast(x) => {
+            let asc = asc.max(pic.height);
+            let single = asc + desc;
             let h = single.max(f64::from(x));
             (h, asc + (h - single))
         }
         LineSpacing::Exactly(x) => {
             let h = f64::from(x);
-            (h, asc + (h - single))
+            (h, 0.8 * h)
         }
     }
 }

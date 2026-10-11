@@ -412,56 +412,35 @@ pub(crate) fn layout_table(b: &mut Builder<'_>, table: &Table, avail: f64) -> Ta
                 .unwrap_or_default();
             let content_w = (cell_w - pad.left - pad.right).max(1.0);
             let (lines, boxes, content_h) = layout_cell(b, c.cell, content_w, &fmt);
-            // Borders: the cell's own, then its table style's, then the table's.
+            // Borders: the cell's own, then its table style's, then the table's. A style's
+            // cell borders name its region's outer edges (`left`, `right`) and the edges between
+            // its cells (`insideV`): a header row that states `insideV` nil has no vertical
+            // borders between its cells (layout-table-flow). Top and bottom apply to every
+            // cell of a row region.
             let last_col = c.col + c.span >= grid.len();
             let last_row = r + c.row_span.max(1) >= nrows;
             let (own, sty, tb) = (&c.props.borders, &fmt.cell.borders, &props.borders);
+            let (sty_top, sty_bottom) = (&sty.top, &sty.bottom);
+            let sty_left = if c.col == 0 { &sty.left } else { &sty.inside_v };
+            let sty_right = if last_col { &sty.right } else { &sty.inside_v };
+            let t_top = if r == 0 { &tb.top } else { &tb.inside_h };
+            let t_bottom = if last_row { &tb.bottom } else { &tb.inside_h };
+            let t_left = if c.col == 0 { &tb.left } else { &tb.inside_v };
+            let t_right = if last_col { &tb.right } else { &tb.inside_v };
             let pick = |a: &Option<Border>, b: &Option<Border>, t: &Option<Border>| {
                 border_width(a)
                     .or_else(|| border_width(b))
                     .or_else(|| border_width(t))
                     .unwrap_or(0.0)
             };
-            let border_top = pick(
-                &own.top,
-                &sty.top,
-                if r == 0 { &tb.top } else { &tb.inside_h },
-            );
-            let border_bottom = pick(
-                &own.bottom,
-                &sty.bottom,
-                if last_row { &tb.bottom } else { &tb.inside_h },
-            );
-            let border_left = pick(
-                &own.left,
-                &sty.left,
-                if c.col == 0 { &tb.left } else { &tb.inside_v },
-            );
-            let border_right = pick(
-                &own.right,
-                &sty.right,
-                if last_col { &tb.right } else { &tb.inside_v },
-            );
-            let top = resolve_border(
-                &own.top,
-                &sty.top,
-                if r == 0 { &tb.top } else { &tb.inside_h },
-            );
-            let bottom = resolve_border(
-                &own.bottom,
-                &sty.bottom,
-                if last_row { &tb.bottom } else { &tb.inside_h },
-            );
-            let left = resolve_border(
-                &own.left,
-                &sty.left,
-                if c.col == 0 { &tb.left } else { &tb.inside_v },
-            );
-            let right = resolve_border(
-                &own.right,
-                &sty.right,
-                if last_col { &tb.right } else { &tb.inside_v },
-            );
+            let border_top = pick(&own.top, sty_top, t_top);
+            let border_bottom = pick(&own.bottom, sty_bottom, t_bottom);
+            let border_left = pick(&own.left, sty_left, t_left);
+            let border_right = pick(&own.right, sty_right, t_right);
+            let top = resolve_border(&own.top, sty_top, t_top);
+            let bottom = resolve_border(&own.bottom, sty_bottom, t_bottom);
+            let left = resolve_border(&own.left, sty_left, t_left);
+            let right = resolve_border(&own.right, sty_right, t_right);
             let fill = c
                 .props
                 .shading
@@ -542,9 +521,18 @@ pub(crate) fn layout_table(b: &mut Builder<'_>, table: &Table, avail: f64) -> Ta
     for (r, row) in rows.iter_mut().enumerate() {
         row.above = if r == 0 { hlines[0] } else { 0.0 };
         row.below = hlines[r + 1];
+        // A cell is drawn between the borders of its own row: the grid line carries the wider
+        // of the borders that meet there in this row (layout-table-flow: a header row without
+        // vertical borders between its cells has no inset there, the rows below do).
+        let mut row_lines = vec![0.0f64; vlines.len()];
+        for (cv, cell) in view.rows[r].cells.iter().zip(&row.cells) {
+            let (a, e) = (cv.col.min(last_line), (cv.col + cv.span).min(last_line));
+            row_lines[a] = row_lines[a].max(cell.border_left);
+            row_lines[e] = row_lines[e].max(cell.border_right);
+        }
         for (cv, cell) in view.rows[r].cells.iter().zip(row.cells.iter_mut()) {
-            cell.inset_l = vlines[cv.col.min(last_line)] / 2.0;
-            cell.inset_r = vlines[(cv.col + cv.span).min(last_line)] / 2.0;
+            cell.inset_l = row_lines[cv.col.min(last_line)] / 2.0;
+            cell.inset_r = row_lines[(cv.col + cv.span).min(last_line)] / 2.0;
         }
     }
     let x = x + vlines[0] / 2.0;

@@ -1208,18 +1208,21 @@ impl LineBuilder<'_> {
             asc = asc.max(ca);
             desc = desc.max(cd);
         }
-        // An inline picture stands on the baseline.
+        // An inline picture stands on the baseline. Its run's font also sizes the line (see
+        // `line_height`), so keep the tallest such run.
         let text_asc = asc;
         let text_h = asc + desc;
         let mut pic = 0.0f64;
+        let mut run_h = 0.0f64;
         for a in &self.atoms[a0..end] {
             if let Some(o) = a.object.and_then(|o| self.objects.get(o))
                 && o.inline()
             {
                 pic = pic.max(o.height);
+                let (ca, cd) = self.fd.metrics[a.style];
+                run_h = run_h.max(ca + cd);
             }
         }
-        asc = asc.max(pic);
         if first && let Some(ls) = self.fd.label_style {
             // Measured (layout-lists-suff): a 20 pt label raises the first baseline but its
             // descent does not deepen the line.
@@ -1233,6 +1236,7 @@ impl LineBuilder<'_> {
             self.fd.model,
             PictureLine {
                 height: pic,
+                run_h,
                 text_asc,
                 text_h,
             },

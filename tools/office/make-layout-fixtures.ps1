@@ -834,6 +834,55 @@ try {
     Type-Text 'Large run '; Add-Inline $PNG_RED 12 8 { param($i) $i.Range.Font.Size = 24 }; Type-Text ' small picture in a 24 pt run.'
   }
 
+  # Line height of a line holding an inline picture whose run has its own font (size, face): `ab <pic> cd` in 11 pt Calibri
+  # with the picture's run at $size pt in $font. A marker paragraph before and after each case lets the oracle's baselines
+  # give the case line's ascent and descent. Measured rule: crates/layout/src/metrics.rs, docs/architecture/word-layout.md.
+  function Marker() { Type-Text 'M'; End-Para }
+  # Case paragraph: `ab <picture> cd`, the picture $w x $h pt in a run of $size pt $font ($size 0: the paragraph's own), under
+  # the line spacing $rule/$val (WdLineSpacing; $rule -1: single).
+  function Pic-Case($font, $size, $h, $rule = -1, $val = 0, $text = $true) {
+    Marker
+    if ($text) { Type-Text 'ab' }
+    Add-Inline $PNG_RED 24 $h { param($i) if ($size -gt 0) { $i.Range.Font.Size = $size }; $i.Range.Font.Name = $font }
+    if ($text) { Type-Text 'cd' }
+    if ($rule -ge 0) { $p = Last-Format; $p.LineSpacingRule = $rule; $p.LineSpacing = $val }
+    End-Para
+  }
+  L-Fixture 'layout-img-line' 'layout-img-line' 'line height with an inline picture in a run of another size or face: picture height against the run font height, single spacing' {
+    Init-Doc 0
+    foreach ($sz in 11, 24, 36) { foreach ($h in 4, 8, 16, 30) { Pic-Case 'Calibri' $sz $h } }
+    Pic-Case 'Calibri' 11 8 -1 0 $false
+    Pic-Case 'Calibri' 24 8 -1 0 $false
+    Marker
+  }
+
+  # Faces whose hhea line gap is not covered by the Windows metrics (Arial, Times New Roman) next to ones that are (Cambria, Courier New;
+  # the bundled Caladea has other vertical metrics than Cambria, so Cambria cannot go in a bundled-font fixture):
+  # 24 pt text, a picture alone in a 24 pt run, and a picture in a 24 pt run among 11 pt Calibri text. System fonts only.
+  L-Fixture 'layout-img-face' 'layout-img-face' 'line height of 24 pt text and of an inline picture in a 24 pt run, in Cambria, Arial, Times New Roman and Courier New' {
+    Init-Doc 0
+    foreach ($f in 'Cambria', 'Arial', 'Times New Roman', 'Courier New') {
+      Marker
+      $s = $script:word.Selection; [void]$s.EndKey(6); $s.Font.Name = $f; $s.Font.Size = 24; $s.TypeText('abcd'); End-Para
+      Pic-Case $f 24 8 -1 0 $false
+      Pic-Case $f 24 8
+    }
+    Marker
+  }
+
+  L-Fixture 'layout-img-spacing' 'layout-img-spacing' 'line spacing rules with an inline picture: multiple (above and below one), at least and exactly, against picture height and run font' {
+    Init-Doc 0
+    foreach ($spec in @(@(5, 18), @(5, 24), @(5, 9.6), @(3, 20), @(3, 8), @(4, 30), @(4, 10))) {
+      $rule = [int]$spec[0]; $val = [single]$spec[1]
+      Marker; Type-Text 'abcd'; $p = Last-Format; $p.LineSpacingRule = $rule; $p.LineSpacing = $val; End-Para
+      Pic-Case 'Calibri' 11 40 $rule $val
+      Pic-Case 'Calibri' 24 8 $rule $val
+      Pic-Case 'Calibri' 24 30 $rule $val
+      Pic-Case 'Calibri' 11 8 $rule $val $false
+    }
+    Marker
+  }
+
   $LONG1 = 'The harbour wall keeps the swell away from the moored boats, and the old lamps along the quay come on one by one as the light fades behind the hills. A few walkers stop to read the notice boards, and a dog sleeps in the doorway of the chandler.'
   $LONG2 = 'Careful typesetting never relies on luck: every paragraph is measured, every break is chosen, and the space around an illustration is set by rules that can be written down. A reader notices only when those rules are broken, and then the page feels wrong.'
 

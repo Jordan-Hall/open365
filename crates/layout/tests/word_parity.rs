@@ -423,7 +423,7 @@ total = {total}
 }
 
 /// Families the system mode loads from the machine.
-const SYSTEM_FAMILIES: [&str; 10] = [
+const SYSTEM_FAMILIES: [&str; 11] = [
     "Calibri",
     "Calibri Light",
     "Cambria",
@@ -432,6 +432,7 @@ const SYSTEM_FAMILIES: [&str; 10] = [
     "Aptos Narrow",
     "Arial",
     "Times New Roman",
+    "Courier New",
     "Segoe UI",
     "Symbol",
 ];
