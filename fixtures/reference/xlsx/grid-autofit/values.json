@@ -1,0 +1,351 @@
+{
+  "source": "fixtures/xlsx/grid-autofit.xlsx",
+  "sheets": [
+    {
+      "name": "Cols",
+      "visible": -1,
+      "usedRange": "A1:AM3",
+      "truncatedAt2000": false,
+      "cells": {
+        "A1": {
+          "value2": "Hello",
+          "text": "Hello",
+          "formula": null
+        },
+        "B1": {
+          "value2": "The quick brown fox jumps over the lazy dog",
+          "text": "The quick brown fox jumps over the lazy dog",
+          "formula": null
+        },
+        "C1": {
+          "value2": "Bold text",
+          "text": "Bold text",
+          "formula": null
+        },
+        "D1": {
+          "value2": "Italic text sample",
+          "text": "Italic text sample",
+          "formula": null
+        },
+        "E1": {
+          "value2": "Cambria fourteen",
+          "text": "Cambria fourteen",
+          "formula": null
+        },
+        "F1": {
+          "value2": 1234567.891,
+          "text": "1234568",
+          "formula": null
+        },
+        "G1": {
+          "value2": 1234567.891,
+          "text": "1,234,567.89",
+          "formula": null
+        },
+        "H1": {
+          "value2": 45366.0,
+          "text": "2024-03-15",
+          "formula": null
+        },
+        "I1": {
+          "value2": -1234.5,
+          "text": "($1,234.50)",
+          "formula": null
+        },
+        "J1": {
+          "value2": "wrapped text that is long enough to need several lines",
+          "text": "wrapped text that is long enough to need several lines",
+          "formula": null
+        },
+        "K1": {
+          "value2": "a",
+          "text": "a",
+          "formula": null
+        },
+        "M1": {
+          "value2": "merged text that is rather long",
+          "text": "merged text that is rather long",
+          "formula": null
+        },
+        "O1": {
+          "value2": 3.0,
+          "text": "3",
+          "formula": "=SUM(1,2)"
+        },
+        "P1": {
+          "value2": "Indented",
+          "text": "Indented",
+          "formula": null
+        },
+        "Q1": {
+          "value2": "Cambria eleven text",
+          "text": "Cambria eleven text",
+          "formula": null
+        },
+        "R1": {
+          "value2": "Small nine",
+          "text": "Small nine",
+          "formula": null
+        },
+        "S1": {
+          "value2": "Big",
+          "text": "Big",
+          "formula": null
+        },
+        "T1": {
+          "value2": true,
+          "text": "TRUE",
+          "formula": null
+        },
+        "U1": {
+          "value2": "Bold fourteen",
+          "text": "Bold fourteen",
+          "formula": null
+        },
+        "V1": {
+          "value2": 0.000123456789,
+          "text": "0.000123",
+          "formula": null
+        },
+        "W1": {
+          "value2": 0.256,
+          "text": "25.6%",
+          "formula": null
+        },
+        "X1": {
+          "value2": "00123",
+          "text": "00123",
+          "formula": null
+        },
+        "Y1": {
+          "value2": "   leading",
+          "text": "   leading",
+          "formula": null
+        },
+        "Z1": {
+          "value2": "Rotated text",
+          "text": "Rotated text",
+          "formula": null
+        },
+        "AA1": {
+          "value2": "Shrink me please",
+          "text": "Shrink me please",
+          "formula": null
+        },
+        "AB1": {
+          "value2": 12345.0,
+          "text": "12345",
+          "formula": null
+        },
+        "AC1": {
+          "value2": "Unicode accents eaiou",
+          "text": "Unicode accents eaiou",
+          "formula": null
+        },
+        "AD1": {
+          "value2": "WWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWW",
+          "text": "WWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWW",
+          "formula": null
+        },
+        "AE1": {
+          "value2": 123456789012.0,
+          "text": "1.23E+11",
+          "formula": null
+        },
+        "AF1": {
+          "value2": 0.30000000000000004,
+          "text": "0.3",
+          "formula": "=0.1+0.2"
+        },
+        "AG1": {
+          "value2": 0.3333333333333333,
+          "text": "0.333333",
+          "formula": "=1/3"
+        },
+        "AH1": {
+          "value2": -5.5,
+          "text": "-5.5",
+          "formula": null
+        },
+        "AI1": {
+          "value2": "line one\nline two longer",
+          "text": "line one\nline two longer",
+          "formula": null
+        },
+        "AJ1": {
+          "value2": 8.0,
+          "text": "8",
+          "formula": null
+        },
+        "AK1": {
+          "value2": "Italic ten point text",
+          "text": "Italic ten point text",
+          "formula": null
+        },
+        "AL1": {
+          "value2": "Bold italic text",
+          "text": "Bold italic text",
+          "formula": null
+        },
+        "AM1": {
+          "value2": "Underlined text",
+          "text": "Underlined text",
+          "formula": null
+        },
+        "H2": {
+          "value2": 45367.0,
+          "text": "45367",
+          "formula": null
+        },
+        "K2": {
+          "value2": "medium length text",
+          "text": "medium length text",
+          "formula": null
+        },
+        "M2": {
+          "value2": "x",
+          "text": "x",
+          "formula": null
+        },
+        "O2": {
+          "value2": "a long formula result text",
+          "text": "a long formula result text",
+          "formula": "=\"a long formula result text\""
+        },
+        "T2": {
+          "value2": -2146826281,
+          "text": "#DIV/0!",
+          "formula": "=1/0"
+        },
+        "AJ2": {
+          "value2": 88.0,
+          "text": "88",
+          "formula": null
+        },
+        "K3": {
+          "value2": "tiny",
+          "text": "tiny",
+          "formula": null
+        },
+        "AJ3": {
+          "value2": 888.0,
+          "text": "888",
+          "formula": null
+        }
+      }
+    },
+    {
+      "name": "Rows",
+      "visible": -1,
+      "usedRange": "A1:A22",
+      "truncatedAt2000": false,
+      "cells": {
+        "A1": {
+          "value2": "x",
+          "text": "x",
+          "formula": null
+        },
+        "A2": {
+          "value2": "x",
+          "text": "x",
+          "formula": null
+        },
+        "A3": {
+          "value2": "x",
+          "text": "x",
+          "formula": null
+        },
+        "A4": {
+          "value2": "x",
+          "text": "x",
+          "formula": null
+        },
+        "A5": {
+          "value2": "x",
+          "text": "x",
+          "formula": null
+        },
+        "A6": {
+          "value2": "x",
+          "text": "x",
+          "formula": null
+        },
+        "A7": {
+          "value2": "alpha beta gamma delta epsilon zeta eta theta",
+          "text": "alpha beta gamma delta epsilon zeta eta theta",
+          "formula": null
+        },
+        "A8": {
+          "value2": "alpha beta gamma delta epsilon",
+          "text": "alpha beta gamma delta epsilon",
+          "formula": null
+        },
+        "A10": {
+          "value2": "x",
+          "text": "x",
+          "formula": null
+        },
+        "A11": {
+          "value2": "x",
+          "text": "x",
+          "formula": null
+        },
+        "A12": {
+          "value2": "one\ntwo",
+          "text": "one\ntwo",
+          "formula": null
+        },
+        "A13": {
+          "value2": "x",
+          "text": "x",
+          "formula": null
+        },
+        "A14": {
+          "value2": "x",
+          "text": "x",
+          "formula": null
+        },
+        "A15": {
+          "value2": "x",
+          "text": "x",
+          "formula": null
+        },
+        "A16": {
+          "value2": "x",
+          "text": "x",
+          "formula": null
+        },
+        "A17": {
+          "value2": "x",
+          "text": "x",
+          "formula": null
+        },
+        "A18": {
+          "value2": "x",
+          "text": "x",
+          "formula": null
+        },
+        "A19": {
+          "value2": "x",
+          "text": "x",
+          "formula": null
+        },
+        "A20": {
+          "value2": "x",
+          "text": "x",
+          "formula": null
+        },
+        "A21": {
+          "value2": "x",
+          "text": "x",
+          "formula": null
+        },
+        "A22": {
+          "value2": "x",
+          "text": "x",
+          "formula": null
+        }
+      }
+    }
+  ]
+}

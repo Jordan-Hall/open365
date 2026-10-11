@@ -42,7 +42,8 @@ pub use refs::{
     shift_formula,
 };
 pub use sheet::{
-    Cell, CellError, CellValue, Formula, FormulaKind, Rect, Row, Worksheet, format_number,
+    Cell, CellError, CellValue, ColumnsSnapshot, Formula, FormulaKind, MAX_COLUMN_WIDTH,
+    MAX_ROW_HEIGHT, Rect, Row, RowHeightsSnapshot, Worksheet, format_number,
 };
 pub use sst::{SharedStrings, decode_xstring, encode_xstring};
 pub use styles::{Styles, builtin_number_format};

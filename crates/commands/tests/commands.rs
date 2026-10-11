@@ -762,3 +762,199 @@ fn export_pdf_honours_cancellation_and_the_size_limit() {
     assert!(matches!(err, CommandError::TooLarge { limit: 10 }), "{err}");
     assert!(!out.exists());
 }
+
+fn width_of(t: &Target, col: u32) -> Option<f64> {
+    t.xlsx()
+        .and_then(|w| w.sheet(0))
+        .and_then(|s| {
+            s.columns()
+                .into_iter()
+                .find(|c| (c.min..=c.max).contains(&col))
+        })
+        .and_then(|c| c.width)
+}
+
+fn height_of(t: &Target, row: u32) -> Option<f64> {
+    t.xlsx().and_then(|w| w.sheet(0)).and_then(|s| {
+        s.rows()
+            .iter()
+            .find(|r| r.r == row)
+            .and_then(|r| r.height())
+    })
+}
+
+#[test]
+fn resize_commands_are_edits_and_set_the_stored_sizes() {
+    let mut t = basic();
+    let width = Command::SetColumnWidth {
+        sheet: 0,
+        first: 2,
+        last: 3,
+        width: 22.5,
+    };
+    let height = Command::SetRowHeight {
+        sheet: 0,
+        first: 2,
+        last: 2,
+        points: 36.0,
+    };
+    assert_eq!(width.effect(None), EffectClass::Edit);
+    assert_eq!(height.effect(None), EffectClass::Edit);
+    assert_eq!(width.name(), "set_column_width");
+    assert_eq!(height.name(), "set_row_height");
+    assert_eq!(
+        apply(&mut t, width).expect("width").effect,
+        EffectClass::Edit
+    );
+    apply(&mut t, height).expect("height");
+    assert_eq!(width_of(&t, 2), Some(22.5));
+    assert_eq!(width_of(&t, 3), Some(22.5));
+    assert_eq!(height_of(&t, 2), Some(36.0));
+    assert!(t.is_dirty());
+}
+
+#[test]
+fn resize_undo_restores_the_previous_width_and_height_and_redo_reapplies() {
+    let mut t = basic();
+    let (w0, h0) = (width_of(&t, 2), height_of(&t, 2));
+    apply(
+        &mut t,
+        Command::SetColumnWidth {
+            sheet: 0,
+            first: 2,
+            last: 2,
+            width: 40.0,
+        },
+    )
+    .expect("width");
+    apply(
+        &mut t,
+        Command::SetRowHeight {
+            sheet: 0,
+            first: 2,
+            last: 2,
+            points: 50.0,
+        },
+    )
+    .expect("height");
+    t.undo().expect("undo height");
+    assert_eq!(height_of(&t, 2), h0);
+    assert_eq!(width_of(&t, 2), Some(40.0));
+    t.undo().expect("undo width");
+    assert_eq!(width_of(&t, 2), w0);
+    assert!(!t.is_dirty());
+    t.redo().expect("redo width");
+    t.redo().expect("redo height");
+    assert_eq!(width_of(&t, 2), Some(40.0));
+    assert_eq!(height_of(&t, 2), Some(50.0));
+}
+
+#[test]
+fn resize_limits_follow_excel_and_a_refused_command_changes_nothing() {
+    let mut t = basic();
+    let before = t.audit_log().commands().len();
+    for width in [-1.0, 255.5, f64::NAN] {
+        let c = Command::SetColumnWidth {
+            sheet: 0,
+            first: 1,
+            last: 1,
+            width,
+        };
+        assert!(
+            matches!(apply(&mut t, c), Err(CommandError::Xlsx(_))),
+            "{width}"
+        );
+    }
+    for points in [-1.0, 409.5] {
+        let c = Command::SetRowHeight {
+            sheet: 0,
+            first: 1,
+            last: 1,
+            points,
+        };
+        assert!(apply(&mut t, c).is_err(), "{points}");
+    }
+    assert_eq!(t.audit_log().commands().len(), before);
+    assert!(!t.is_dirty());
+    assert!(!t.can_undo());
+    for (width, points) in [(0.0, 0.0), (255.0, 409.0)] {
+        apply(
+            &mut t,
+            Command::SetColumnWidth {
+                sheet: 0,
+                first: 1,
+                last: 1,
+                width,
+            },
+        )
+        .expect("limit width");
+        apply(
+            &mut t,
+            Command::SetRowHeight {
+                sheet: 0,
+                first: 1,
+                last: 1,
+                points,
+            },
+        )
+        .expect("limit height");
+    }
+}
+
+#[test]
+fn resize_commands_do_not_apply_to_documents_and_round_trip_through_json() {
+    let mut d = plain();
+    let c = Command::SetColumnWidth {
+        sheet: 0,
+        first: 1,
+        last: 1,
+        width: 10.0,
+    };
+    assert!(matches!(
+        apply(&mut d, c.clone()),
+        Err(CommandError::WrongTarget { .. })
+    ));
+    let log = CommandLog(vec![
+        c,
+        Command::SetRowHeight {
+            sheet: 0,
+            first: 3,
+            last: 5,
+            points: 21.0,
+        },
+    ]);
+    let json = log.to_json().expect("json");
+    assert!(json.contains("\"set_column_width\"") && json.contains("\"set_row_height\""));
+    assert_eq!(CommandLog::from_json(&json).expect("parse"), log);
+}
+
+#[test]
+fn resized_workbook_saves_and_reopens_with_the_sizes() {
+    let mut t = basic();
+    apply(
+        &mut t,
+        Command::SetColumnWidth {
+            sheet: 0,
+            first: 5,
+            last: 6,
+            width: 18.0,
+        },
+    )
+    .expect("width");
+    apply(
+        &mut t,
+        Command::SetRowHeight {
+            sheet: 0,
+            first: 4,
+            last: 4,
+            points: 27.0,
+        },
+    )
+    .expect("height");
+    let path = scratch("resized.xlsx");
+    apply(&mut t, Command::Save { path: path.clone() }).expect("save");
+    let r = Target::open_path(&path).expect("reopen");
+    assert_eq!(width_of(&r, 5), Some(18.0));
+    assert_eq!(width_of(&r, 6), Some(18.0));
+    assert_eq!(height_of(&r, 4), Some(27.0));
+}

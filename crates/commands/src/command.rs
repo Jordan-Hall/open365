@@ -115,6 +115,21 @@ pub enum Command {
         col: u32,
         formula: String,
     },
+    /// Sets the stored width of columns `first..=last` (1-based, inclusive) in characters of
+    /// the default font, cell padding included: 0..=255, as Excel allows.
+    SetColumnWidth {
+        sheet: usize,
+        first: u32,
+        last: u32,
+        width: f64,
+    },
+    /// Sets the height of rows `first..=last` (1-based, inclusive) in points: 0..=409.
+    SetRowHeight {
+        sheet: usize,
+        first: u32,
+        last: u32,
+        points: f64,
+    },
     Save {
         path: PathBuf,
     },
@@ -163,6 +178,8 @@ impl Command {
             Self::DocxReplaceRange { .. } => "docx_replace_range",
             Self::XlsxSetCellValue { .. } => "xlsx_set_cell_value",
             Self::XlsxSetCellFormula { .. } => "xlsx_set_cell_formula",
+            Self::SetColumnWidth { .. } => "set_column_width",
+            Self::SetRowHeight { .. } => "set_row_height",
             Self::Save { .. } => "save",
             Self::ExportPdf { .. } => "export_pdf",
         }

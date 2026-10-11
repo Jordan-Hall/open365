@@ -15,6 +15,9 @@ use crate::xml::{
     write_attrs, write_head, xml_err,
 };
 
+mod resize;
+pub use resize::{ColumnsSnapshot, MAX_COLUMN_WIDTH, MAX_ROW_HEIGHT, RowHeightsSnapshot};
+
 /// A cell error value.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum CellError {

@@ -221,6 +221,57 @@ fn apply_edits_an_xlsx_formula() {
 }
 
 #[test]
+fn apply_resizes_columns_and_rows_as_edits() {
+    let scratch = Scratch::new("apply-resize");
+    let cmds = scratch.write(
+        "c.json",
+        r#"[{"command":"set_column_width","sheet":0,"first":2,"last":3,"width":24.5},
+            {"command":"set_row_height","sheet":0,"first":2,"last":2,"points":40}]"#,
+    );
+    let out = scratch.path("out.xlsx");
+    let input = fixture("xlsx/formulas-basic.xlsx");
+    let o = run(&[s("apply"), &cmds, &input, s("-o"), &out]);
+    assert!(o.status.success(), "{}", stderr(&o));
+    let lines = audit_lines(&o);
+    assert_eq!(lines.len(), 3, "{}", stderr(&o));
+    for (line, name) in lines.iter().zip(["set_column_width", "set_row_height"]) {
+        assert_eq!(line["command"], name);
+        assert_eq!(line["effect"], "edit");
+        assert_eq!(line["status"], "applied");
+    }
+    let check = run(&[s("roundtrip"), s("--check"), &out]);
+    assert!(check.status.success(), "{}", stdout(&check));
+    let bytes = std::fs::read(&out).expect("output");
+    let wb = open365_xlsx::Workbook::open(&bytes, &open365_opc::Limits::default()).expect("opens");
+    let sheet = wb.sheet(0).expect("sheet");
+    let cols = sheet.columns();
+    assert!(
+        cols.iter()
+            .any(|c| c.min == 2 && c.max == 3 && c.width == Some(24.5) && c.custom_width),
+        "{cols:?}"
+    );
+    let row = sheet.rows().iter().find(|r| r.r == 2).expect("row 2");
+    assert_eq!(row.height(), Some(40.0));
+    assert!(row.custom_height());
+}
+
+#[test]
+fn apply_refuses_sizes_beyond_the_excel_limits() {
+    let scratch = Scratch::new("apply-resize-limits");
+    let input = fixture("xlsx/formulas-basic.xlsx");
+    for body in [
+        r#"[{"command":"set_column_width","sheet":0,"first":1,"last":1,"width":256}]"#,
+        r#"[{"command":"set_row_height","sheet":0,"first":1,"last":1,"points":410}]"#,
+    ] {
+        let cmds = scratch.write("c.json", body);
+        let out = scratch.path("out.xlsx");
+        let o = run(&[s("apply"), &cmds, &input, s("-o"), &out]);
+        assert!(!o.status.success(), "{body}");
+        assert!(!out.exists(), "a failed run must not write output");
+    }
+}
+
+#[test]
 fn destructive_commands_are_refused_without_the_flag() {
     let scratch = Scratch::new("destructive");
     let cmds = scratch.write("c.json", &format!("[{INSERT},{DELETE}]"));

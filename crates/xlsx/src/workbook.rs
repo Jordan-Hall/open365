@@ -8,7 +8,10 @@ use open365_opc::{
 use crate::XlsxError;
 use crate::parts::{self, HygieneAction};
 use crate::refs::{MAX_COL, MAX_ROW};
-use crate::sheet::{Cell, CellValue, Formula, Worksheet};
+use crate::sheet::{
+    Cell, CellValue, ColumnsSnapshot, Formula, MAX_COLUMN_WIDTH, MAX_ROW_HEIGHT,
+    RowHeightsSnapshot, Worksheet,
+};
 use crate::sst::SharedStrings;
 use crate::styles::Styles;
 use crate::xml::{self, Attr, RawXml, XmlElement};
@@ -504,6 +507,91 @@ impl Workbook {
         }
         ws.check_editable(row, col)?;
         Ok(ws)
+    }
+
+    fn worksheet_mut(&mut self, sheet: usize) -> Result<&mut Worksheet, XlsxError> {
+        let count = self.sheets.len();
+        let entry = self
+            .sheets
+            .get_mut(sheet)
+            .ok_or(XlsxError::SheetOutOfRange {
+                index: sheet,
+                count,
+            })?;
+        entry.data.as_mut().ok_or(XlsxError::NotAWorksheet(sheet))
+    }
+
+    /// Sets the stored width (characters, padding included; 0..=255) of columns
+    /// `first..=last` and returns the previous `cols` state for [`Self::restore_columns`].
+    /// Only that sheet's part changes.
+    pub fn set_column_width(
+        &mut self,
+        sheet: usize,
+        first: u32,
+        last: u32,
+        width: f64,
+    ) -> Result<ColumnsSnapshot, XlsxError> {
+        if !width.is_finite() || !(0.0..=MAX_COLUMN_WIDTH).contains(&width) {
+            return Err(XlsxError::UnsupportedEdit(format!(
+                "column width {width} is outside 0..={MAX_COLUMN_WIDTH}"
+            )));
+        }
+        let ws = self.worksheet_mut(sheet)?;
+        let before = ws.columns_snapshot();
+        if let Err(e) = ws.set_column_width(first, last, width) {
+            ws.restore_columns(&before);
+            return Err(e);
+        }
+        self.sheets[sheet].dirty = true;
+        Ok(before)
+    }
+
+    /// Puts the `cols` element back as a [`Self::set_column_width`] snapshot had it.
+    pub fn restore_columns(
+        &mut self,
+        sheet: usize,
+        snapshot: &ColumnsSnapshot,
+    ) -> Result<(), XlsxError> {
+        self.worksheet_mut(sheet)?.restore_columns(snapshot);
+        self.sheets[sheet].dirty = true;
+        Ok(())
+    }
+
+    /// Sets the height in points (0..=409) of rows `first..=last` and returns the previous
+    /// state for [`Self::restore_row_heights`]. Only that sheet's part changes.
+    pub fn set_row_height(
+        &mut self,
+        sheet: usize,
+        first: u32,
+        last: u32,
+        points: f64,
+    ) -> Result<RowHeightsSnapshot, XlsxError> {
+        if !points.is_finite() || !(0.0..=MAX_ROW_HEIGHT).contains(&points) {
+            return Err(XlsxError::UnsupportedEdit(format!(
+                "row height {points} is outside 0..={MAX_ROW_HEIGHT}"
+            )));
+        }
+        let ws = self.worksheet_mut(sheet)?;
+        if first < 1 || last < first || last > MAX_ROW {
+            return Err(XlsxError::UnsupportedEdit(format!(
+                "row range {first}..={last} is outside 1..={MAX_ROW}"
+            )));
+        }
+        let before = ws.row_heights_snapshot(first, last.min(first.saturating_add(16_384)));
+        ws.set_row_height(first, last, points)?;
+        self.sheets[sheet].dirty = true;
+        Ok(before)
+    }
+
+    /// Puts row heights back as a [`Self::set_row_height`] snapshot had them.
+    pub fn restore_row_heights(
+        &mut self,
+        sheet: usize,
+        snapshot: &RowHeightsSnapshot,
+    ) -> Result<(), XlsxError> {
+        self.worksheet_mut(sheet)?.restore_row_heights(snapshot);
+        self.sheets[sheet].dirty = true;
+        Ok(())
     }
 
     /// Sets a cell to a constant. Text becomes a shared string (reusing an identical

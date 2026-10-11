@@ -1,0 +1,501 @@
+{
+  "source": "fixtures/xlsx/grid-nav.xlsx",
+  "sheets": [
+    {
+      "name": "Nav",
+      "visible": -1,
+      "usedRange": "A1:M60",
+      "truncatedAt2000": false,
+      "cells": {
+        "A1": {
+          "value2": 101.0,
+          "text": "101",
+          "formula": null
+        },
+        "E1": {
+          "value2": 105.0,
+          "text": "105",
+          "formula": null
+        },
+        "A2": {
+          "value2": 201.0,
+          "text": "201",
+          "formula": null
+        },
+        "B2": {
+          "value2": 202.0,
+          "text": "202",
+          "formula": null
+        },
+        "C2": {
+          "value2": 203.0,
+          "text": "203",
+          "formula": null
+        },
+        "D2": {
+          "value2": 204.0,
+          "text": "204",
+          "formula": null
+        },
+        "G2": {
+          "value2": 207.0,
+          "text": "207",
+          "formula": null
+        },
+        "I2": {
+          "value2": 209.0,
+          "text": "209",
+          "formula": null
+        },
+        "J2": {
+          "value2": 210.0,
+          "text": "210",
+          "formula": null
+        },
+        "K2": {
+          "value2": 211.0,
+          "text": "#",
+          "formula": null
+        },
+        "L2": {
+          "value2": 212.0,
+          "text": "212",
+          "formula": null
+        },
+        "A3": {
+          "value2": 301.0,
+          "text": "301",
+          "formula": null
+        },
+        "C5": {
+          "value2": 503.0,
+          "text": "503",
+          "formula": null
+        },
+        "A6": {
+          "value2": 601.0,
+          "text": "601",
+          "formula": null
+        },
+        "C6": {
+          "value2": 603.0,
+          "text": "603",
+          "formula": null
+        },
+        "A7": {
+          "value2": 701.0,
+          "text": "701",
+          "formula": null
+        },
+        "C7": {
+          "value2": 703.0,
+          "text": "703",
+          "formula": null
+        },
+        "A8": {
+          "value2": 801.0,
+          "text": "801",
+          "formula": null
+        },
+        "A10": {
+          "value2": 1001.0,
+          "text": "1001",
+          "formula": null
+        },
+        "A12": {
+          "value2": 1201.0,
+          "text": "1201",
+          "formula": null
+        },
+        "A13": {
+          "value2": 1301.0,
+          "text": "1301",
+          "formula": null
+        },
+        "A14": {
+          "value2": 1401.0,
+          "text": "1401",
+          "formula": null
+        },
+        "A15": {
+          "value2": 1501.0,
+          "text": "1501",
+          "formula": null
+        },
+        "A16": {
+          "value2": 1601.0,
+          "text": "1601",
+          "formula": null
+        },
+        "A18": {
+          "value2": 1801.0,
+          "text": "1801",
+          "formula": null
+        },
+        "A20": {
+          "value2": 2001.0,
+          "text": "2001",
+          "formula": null
+        },
+        "A21": {
+          "value2": 2101.0,
+          "text": "2101",
+          "formula": null
+        },
+        "A22": {
+          "value2": 2201.0,
+          "text": "2201",
+          "formula": null
+        },
+        "A25": {
+          "value2": 2501.0,
+          "text": "2501",
+          "formula": null
+        },
+        "A30": {
+          "value2": "merged",
+          "text": "merged",
+          "formula": null
+        },
+        "C30": {
+          "value2": 3003.0,
+          "text": "3003",
+          "formula": null
+        },
+        "A33": {
+          "value2": 3301.0,
+          "text": "3301",
+          "formula": null
+        },
+        "A41": {
+          "value2": 4101.0,
+          "text": "4101",
+          "formula": null
+        },
+        "A52": {
+          "value2": 5201.0,
+          "text": "5201",
+          "formula": null
+        },
+        "E59": {
+          "value2": 5905.0,
+          "text": "5905",
+          "formula": null
+        },
+        "M60": {
+          "value2": 6013.0,
+          "text": "6013",
+          "formula": null
+        }
+      }
+    },
+    {
+      "name": "Frozen",
+      "visible": -1,
+      "usedRange": "A1:F10",
+      "truncatedAt2000": false,
+      "cells": {
+        "A1": {
+          "value2": 11.0,
+          "text": "11",
+          "formula": null
+        },
+        "B1": {
+          "value2": 12.0,
+          "text": "12",
+          "formula": null
+        },
+        "C1": {
+          "value2": 13.0,
+          "text": "13",
+          "formula": null
+        },
+        "D1": {
+          "value2": 14.0,
+          "text": "14",
+          "formula": null
+        },
+        "E1": {
+          "value2": 15.0,
+          "text": "15",
+          "formula": null
+        },
+        "F1": {
+          "value2": 16.0,
+          "text": "16",
+          "formula": null
+        },
+        "A2": {
+          "value2": 21.0,
+          "text": "21",
+          "formula": null
+        },
+        "B2": {
+          "value2": 22.0,
+          "text": "22",
+          "formula": null
+        },
+        "C2": {
+          "value2": 23.0,
+          "text": "23",
+          "formula": null
+        },
+        "D2": {
+          "value2": 24.0,
+          "text": "24",
+          "formula": null
+        },
+        "E2": {
+          "value2": 25.0,
+          "text": "25",
+          "formula": null
+        },
+        "F2": {
+          "value2": 26.0,
+          "text": "26",
+          "formula": null
+        },
+        "A3": {
+          "value2": 31.0,
+          "text": "31",
+          "formula": null
+        },
+        "B3": {
+          "value2": 32.0,
+          "text": "32",
+          "formula": null
+        },
+        "C3": {
+          "value2": 33.0,
+          "text": "33",
+          "formula": null
+        },
+        "D3": {
+          "value2": 34.0,
+          "text": "34",
+          "formula": null
+        },
+        "E3": {
+          "value2": 35.0,
+          "text": "35",
+          "formula": null
+        },
+        "F3": {
+          "value2": 36.0,
+          "text": "36",
+          "formula": null
+        },
+        "A4": {
+          "value2": 41.0,
+          "text": "41",
+          "formula": null
+        },
+        "B4": {
+          "value2": 42.0,
+          "text": "42",
+          "formula": null
+        },
+        "C4": {
+          "value2": 43.0,
+          "text": "43",
+          "formula": null
+        },
+        "D4": {
+          "value2": 44.0,
+          "text": "44",
+          "formula": null
+        },
+        "E4": {
+          "value2": 45.0,
+          "text": "45",
+          "formula": null
+        },
+        "F4": {
+          "value2": 46.0,
+          "text": "46",
+          "formula": null
+        },
+        "A5": {
+          "value2": 51.0,
+          "text": "51",
+          "formula": null
+        },
+        "B5": {
+          "value2": 52.0,
+          "text": "52",
+          "formula": null
+        },
+        "C5": {
+          "value2": 53.0,
+          "text": "53",
+          "formula": null
+        },
+        "D5": {
+          "value2": 54.0,
+          "text": "54",
+          "formula": null
+        },
+        "E5": {
+          "value2": 55.0,
+          "text": "55",
+          "formula": null
+        },
+        "F5": {
+          "value2": 56.0,
+          "text": "56",
+          "formula": null
+        },
+        "A6": {
+          "value2": 61.0,
+          "text": "61",
+          "formula": null
+        },
+        "B6": {
+          "value2": 62.0,
+          "text": "62",
+          "formula": null
+        },
+        "C6": {
+          "value2": 63.0,
+          "text": "63",
+          "formula": null
+        },
+        "D6": {
+          "value2": 64.0,
+          "text": "64",
+          "formula": null
+        },
+        "E6": {
+          "value2": 65.0,
+          "text": "65",
+          "formula": null
+        },
+        "F6": {
+          "value2": 66.0,
+          "text": "66",
+          "formula": null
+        },
+        "A7": {
+          "value2": 71.0,
+          "text": "71",
+          "formula": null
+        },
+        "B7": {
+          "value2": 72.0,
+          "text": "72",
+          "formula": null
+        },
+        "C7": {
+          "value2": 73.0,
+          "text": "73",
+          "formula": null
+        },
+        "D7": {
+          "value2": 74.0,
+          "text": "74",
+          "formula": null
+        },
+        "E7": {
+          "value2": 75.0,
+          "text": "75",
+          "formula": null
+        },
+        "F7": {
+          "value2": 76.0,
+          "text": "76",
+          "formula": null
+        },
+        "A8": {
+          "value2": 81.0,
+          "text": "81",
+          "formula": null
+        },
+        "B8": {
+          "value2": 82.0,
+          "text": "82",
+          "formula": null
+        },
+        "C8": {
+          "value2": 83.0,
+          "text": "83",
+          "formula": null
+        },
+        "D8": {
+          "value2": 84.0,
+          "text": "84",
+          "formula": null
+        },
+        "E8": {
+          "value2": 85.0,
+          "text": "85",
+          "formula": null
+        },
+        "F8": {
+          "value2": 86.0,
+          "text": "86",
+          "formula": null
+        },
+        "A9": {
+          "value2": 91.0,
+          "text": "91",
+          "formula": null
+        },
+        "B9": {
+          "value2": 92.0,
+          "text": "92",
+          "formula": null
+        },
+        "C9": {
+          "value2": 93.0,
+          "text": "93",
+          "formula": null
+        },
+        "D9": {
+          "value2": 94.0,
+          "text": "94",
+          "formula": null
+        },
+        "E9": {
+          "value2": 95.0,
+          "text": "95",
+          "formula": null
+        },
+        "F9": {
+          "value2": 96.0,
+          "text": "96",
+          "formula": null
+        },
+        "A10": {
+          "value2": 101.0,
+          "text": "101",
+          "formula": null
+        },
+        "B10": {
+          "value2": 102.0,
+          "text": "102",
+          "formula": null
+        },
+        "C10": {
+          "value2": 103.0,
+          "text": "103",
+          "formula": null
+        },
+        "D10": {
+          "value2": 104.0,
+          "text": "104",
+          "formula": null
+        },
+        "E10": {
+          "value2": 105.0,
+          "text": "105",
+          "formula": null
+        },
+        "F10": {
+          "value2": 106.0,
+          "text": "106",
+          "formula": null
+        }
+      }
+    }
+  ]
+}

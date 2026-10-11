@@ -13,7 +13,7 @@ use open365_pdf::PdfMetadata;
 
 use crate::doc_view::{DocView, Toggle};
 use crate::fonts::FontBook;
-use crate::grid_view::GridView;
+use crate::grid_view::{GridView, Resize};
 
 const OPEN: KeyboardShortcut = KeyboardShortcut::new(Modifiers::COMMAND, Key::O);
 const SAVE: KeyboardShortcut = KeyboardShortcut::new(Modifiers::COMMAND, Key::S);
@@ -112,6 +112,23 @@ pub fn print_command(pdf: &Path) -> std::process::Command {
         let mut cmd = std::process::Command::new("lp");
         cmd.arg("--").arg(pdf);
         cmd
+    }
+}
+
+fn columns_label(first: u32, last: u32) -> String {
+    let a = open365_xlsx::col_letters(first);
+    if first == last {
+        format!("column {a}")
+    } else {
+        format!("columns {a}:{}", open365_xlsx::col_letters(last))
+    }
+}
+
+fn rows_label(first: u32, last: u32) -> String {
+    if first == last {
+        format!("row {first}")
+    } else {
+        format!("rows {first}:{last}")
     }
 }
 
@@ -348,7 +365,9 @@ impl App {
         let Some(target) = &mut self.target else {
             return;
         };
-        match self.doc.undo(target) {
+        let result = self.doc.undo(target);
+        self.grid.invalidate_layout();
+        match result {
             Ok(_) => {
                 self.status = "Undid last change".to_owned();
             }
@@ -360,11 +379,67 @@ impl App {
         let Some(target) = &mut self.target else {
             return;
         };
-        match self.doc.redo(target) {
+        let result = self.doc.redo(target);
+        self.grid.invalidate_layout();
+        match result {
             Ok(_) => {
                 self.status = "Redid change".to_owned();
             }
             Err(e) => self.status = e.to_string(),
+        }
+    }
+
+    /// Applies the column widths and row heights the grid queued, each through its command.
+    /// The status line reports the last one (or the first failure).
+    pub fn apply_resizes(&mut self) {
+        let resizes = self.grid.take_resizes();
+        let Some(target) = &mut self.target else {
+            return;
+        };
+        for resize in resizes {
+            let (command, what) = match resize {
+                Resize::ColumnWidth {
+                    sheet,
+                    first,
+                    last,
+                    width,
+                } => (
+                    Command::SetColumnWidth {
+                        sheet,
+                        first,
+                        last,
+                        width,
+                    },
+                    format!("Width of {} set to {width:.2}", columns_label(first, last)),
+                ),
+                Resize::RowHeight {
+                    sheet,
+                    first,
+                    last,
+                    points,
+                } => (
+                    Command::SetRowHeight {
+                        sheet,
+                        first,
+                        last,
+                        points,
+                    },
+                    format!(
+                        "Height of {} set to {points:.2} pt",
+                        rows_label(first, last)
+                    ),
+                ),
+            };
+            match target.apply(command) {
+                Ok(_) => {
+                    self.grid.invalidate_layout();
+                    self.status = what;
+                }
+                Err(e) => {
+                    self.status = format!("Resize failed: {e}");
+                    break;
+                }
+            }
         }
     }
 
@@ -753,6 +828,7 @@ impl App {
         if let Some(s) = self.doc.status.take().or_else(|| self.grid.status.take()) {
             self.status = s;
         }
+        self.apply_resizes();
         if repaint {
             ctx.request_repaint();
         }

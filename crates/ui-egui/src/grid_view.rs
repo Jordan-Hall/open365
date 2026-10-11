@@ -694,6 +694,12 @@ impl GridView {
         std::mem::take(&mut self.resizes)
     }
 
+    /// Drops the cached sheet geometry; call after anything that changes column widths or row
+    /// heights (a resize command, undo, redo).
+    pub fn invalidate_layout(&mut self) {
+        self.layout = None;
+    }
+
     pub fn is_editing(&self) -> bool {
         self.editing
     }

@@ -93,7 +93,13 @@ fn cached_values_match_excel_for_every_fixture() {
             if !truncated {
                 // Everything we read as non-empty must be something Excel reported.
                 for (row, col, cell) in wb.iter_cells(i) {
-                    if !matches!(cell.value, CellValue::Empty) {
+                    // Excel's list leaves out empty strings (a formula returning "").
+                    let blank = match &cell.value {
+                        CellValue::Empty => true,
+                        CellValue::Str(t) => t.is_empty(),
+                        _ => false,
+                    };
+                    if !blank {
                         let key = cell_ref_string(row, col);
                         assert!(
                             cells.contains_key(&key),

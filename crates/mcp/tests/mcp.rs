@@ -1332,6 +1332,60 @@ fn the_formula_engine_is_cached_per_workbook_and_rebuilt_when_things_change() {
 }
 
 #[test]
+fn resizing_is_an_edit_tier_command() {
+    let scratch = Scratch::new("resize");
+    let xlsx = scratch.put("xlsx/formulas-basic.xlsx");
+    let resize = json!([
+        {"command": "set_column_width", "sheet": 0, "first": 1, "last": 2, "width": 30.0},
+        {"command": "set_row_height", "sheet": 0, "first": 1, "last": 1, "points": 45.0}
+    ]);
+    // Read-only: refused, with the edit flag named.
+    let mut r = rig(&scratch, false, false, false);
+    let id = r.open(&xlsx);
+    let why = r.refused(
+        "apply_commands",
+        json!({"document": id, "commands": resize}),
+    );
+    assert!(why.contains("--allow-edit"), "{why}");
+    let (v, err) = r.call(
+        "apply_commands",
+        json!({"document": id, "dry_run": true, "commands": resize}),
+    );
+    assert!(!err, "{v}");
+    assert_eq!(v["results"][0]["effect"], "edit");
+    assert_eq!(v["results"][0]["permitted"], false);
+
+    // The edit tier is enough; the destructive flag is not needed.
+    let mut r = rig(&scratch, true, false, false);
+    let id = r.open(&xlsx);
+    let (v, err) = r.call(
+        "apply_commands",
+        json!({"document": id, "commands": resize}),
+    );
+    assert!(!err, "{v}");
+    assert_eq!(v["results"][0]["effect"], "edit");
+    assert_eq!(v["results"][1]["effect"], "edit");
+    let out = scratch.root().join("resized.xlsx");
+    let (v, err) = r.call("save_as", json!({"document": id, "path": s(&out)}));
+    assert!(!err, "{v}");
+    let saved = open365_commands::Target::open_path(&out).expect("reopens");
+    let sheet = saved.xlsx().and_then(|w| w.sheet(0)).expect("sheet");
+    assert!(
+        sheet
+            .columns()
+            .iter()
+            .any(|c| (c.min, c.max, c.width) == (1, 2, Some(30.0)))
+    );
+    assert_eq!(sheet.rows()[0].height(), Some(45.0));
+
+    // Out-of-range sizes are errors.
+    let bad =
+        json!([{"command": "set_column_width", "sheet": 0, "first": 1, "last": 1, "width": 300.0}]);
+    let (v, err) = r.call("apply_commands", json!({"document": id, "commands": bad}));
+    assert!(err, "{v}");
+}
+
+#[test]
 fn apply_commands_cannot_smuggle_an_export() {
     let scratch = Scratch::new("smuggle");
     let docx = scratch.put("docx/plain-paragraphs.docx");

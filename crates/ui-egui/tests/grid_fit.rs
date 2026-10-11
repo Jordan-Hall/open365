@@ -6,6 +6,7 @@ use std::path::PathBuf;
 use egui::{Event, Modifiers, PointerButton, pos2, vec2};
 use egui_kittest::Harness;
 use egui_kittest::kittest::{NodeT, Queryable};
+use open365_commands::Command;
 use open365_ui_egui::{App, Resize};
 use open365_xlsx::{GridMetrics, MAX_COL, MAX_ROW};
 
@@ -58,6 +59,47 @@ fn double_click(h: &mut Harness<'_, App>, pos: egui::Pos2) {
     h.run();
 }
 
+/// The resizes the app has applied (and not undone), read back from the command log.
+fn resizes(h: &Harness<'_, App>) -> Vec<Resize> {
+    let target = h.state().target().expect("target");
+    target
+        .applied_log()
+        .commands()
+        .iter()
+        .filter_map(|c| match *c {
+            Command::SetColumnWidth {
+                sheet,
+                first,
+                last,
+                width,
+            } => Some(Resize::ColumnWidth {
+                sheet,
+                first,
+                last,
+                width,
+            }),
+            Command::SetRowHeight {
+                sheet,
+                first,
+                last,
+                points,
+            } => Some(Resize::RowHeight {
+                sheet,
+                first,
+                last,
+                points,
+            }),
+            _ => None,
+        })
+        .collect()
+}
+
+/// Undoes the applied resize so the next measurement sees the original geometry.
+fn undo_resize(h: &mut Harness<'_, App>) {
+    h.state_mut().undo();
+    h.run();
+}
+
 /// The pixel width a column request stands for at `dpi`.
 fn width_px(h: &Harness<'_, App>, dpi: u32, r: &Resize) -> u32 {
     let wb = h.state().target().and_then(|t| t.xlsx()).expect("workbook");
@@ -101,7 +143,8 @@ fn column_auto_fit_matches_excel() {
         let r = cell_rect(&h, 1, 1);
         let x = r.min.x + geo.col_x(col + 1) as f32 / 1.25;
         double_click(&mut h, pos2(x, r.min.y - 12.0));
-        let got = h.state_mut().grid.take_resizes();
+        let got = resizes(&h);
+        undo_resize(&mut h);
         assert_eq!(got.len(), 1, "column {col}: {got:?}");
         let diff = i64::from(width_px(&h, dpi, &got[0])) - want;
         total += 1;
@@ -141,7 +184,8 @@ fn row_auto_fit_matches_excel() {
         let want = (c["height_pt"].as_f64().unwrap() * f64::from(dpi) / 72.0).round() as i64;
         let r = cell_rect(&h, row, 1);
         double_click(&mut h, pos2(r.min.x - 20.0, r.max.y));
-        let got = h.state_mut().grid.take_resizes();
+        let got = resizes(&h);
+        undo_resize(&mut h);
         assert_eq!(got.len(), 1, "row {row}: {got:?}");
         let Resize::RowHeight { points, .. } = got[0] else {
             panic!("not a row request")
@@ -172,7 +216,7 @@ fn dragging_a_column_border_requests_the_new_width() {
     press(&mut h, to, false);
     h.step();
     h.run();
-    let got = h.state_mut().grid.take_resizes();
+    let got = resizes(&h);
     let [
         Resize::ColumnWidth {
             first, last, width, ..
@@ -205,7 +249,7 @@ fn dragging_a_row_border_requests_the_new_height() {
     press(&mut h, to, false);
     h.step();
     h.run();
-    let got = h.state_mut().grid.take_resizes();
+    let got = resizes(&h);
     let [
         Resize::RowHeight {
             first,
@@ -242,7 +286,7 @@ fn resizing_inside_a_column_selection_resizes_the_selection() {
     press(&mut h, to, false);
     h.step();
     h.run();
-    let got = h.state_mut().grid.take_resizes();
+    let got = resizes(&h);
     assert!(
         matches!(
             got[..],

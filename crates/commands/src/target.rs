@@ -2,7 +2,7 @@ use std::path::{Path, PathBuf};
 
 use open365_docx::{DocPos, Document, Snapshot};
 use open365_opc::Limits;
-use open365_xlsx::Workbook;
+use open365_xlsx::{ColumnsSnapshot, RowHeightsSnapshot, Workbook};
 
 use crate::command::{CellRef, Command, CommandLog, EffectClass, Outcome};
 use crate::error::CommandError;
@@ -36,6 +36,16 @@ enum Inverse {
         row: u32,
         col: u32,
         before: Option<CellSnapshot>,
+    },
+    /// Undo by putting the previous `cols` element back.
+    Columns {
+        sheet: usize,
+        before: ColumnsSnapshot,
+    },
+    /// Undo by putting the previous row heights back.
+    RowHeights {
+        sheet: usize,
+        before: RowHeightsSnapshot,
     },
 }
 
@@ -262,6 +272,20 @@ impl Target {
                 };
                 x.restore(*sheet, *row, *col, before)?
             }
+            Inverse::Columns { sheet, before } => {
+                let Content::Xlsx(x) = &mut self.content else {
+                    return Err(CommandError::NotUndoable);
+                };
+                x.workbook.restore_columns(*sheet, before)?;
+                Vec::new()
+            }
+            Inverse::RowHeights { sheet, before } => {
+                let Content::Xlsx(x) = &mut self.content else {
+                    return Err(CommandError::NotUndoable);
+                };
+                x.workbook.restore_row_heights(*sheet, before)?;
+                Vec::new()
+            }
         };
         if let Some(entry) = self.undo.pop() {
             self.state = entry.state_before;
@@ -342,6 +366,42 @@ impl Target {
                         before,
                     },
                     changed,
+                ))
+            }
+            (
+                Content::Xlsx(x),
+                Command::SetColumnWidth {
+                    sheet,
+                    first,
+                    last,
+                    width,
+                },
+            ) => {
+                let before = x.workbook.set_column_width(*sheet, *first, *last, *width)?;
+                Ok((
+                    Inverse::Columns {
+                        sheet: *sheet,
+                        before,
+                    },
+                    Vec::new(),
+                ))
+            }
+            (
+                Content::Xlsx(x),
+                Command::SetRowHeight {
+                    sheet,
+                    first,
+                    last,
+                    points,
+                },
+            ) => {
+                let before = x.workbook.set_row_height(*sheet, *first, *last, *points)?;
+                Ok((
+                    Inverse::RowHeights {
+                        sheet: *sheet,
+                        before,
+                    },
+                    Vec::new(),
                 ))
             }
             (content, command) => Err(CommandError::WrongTarget {
