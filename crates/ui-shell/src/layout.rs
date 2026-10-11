@@ -6,6 +6,7 @@
 //! reference scale the result equals the reference; at other scales every edge is `round(u *
 //! scale / 1.25)`, so adjacent controls keep abutting.
 
+use crate::chrome;
 use crate::spec::{
     AppSpec, Chrome, Control, Group, Kind, REF_SCALE, Rect4, Scale, Size, StateRef, Tab,
 };
@@ -111,6 +112,19 @@ pub struct PlacedGroup<'a> {
 pub struct PlacedChrome<'a> {
     pub chrome: &'a Chrome,
     pub rect: PxRect,
+    /// The icon-only form of a button that gave up its label (Comments, Editing, Share).
+    pub compact: bool,
+    /// Behind the tab row's scroll button (Office reports such items as off screen).
+    pub offscreen: bool,
+}
+
+/// The scroll button of an overflowing ribbon and how far the groups can scroll.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RibbonScroll {
+    /// The "Column right" button at the right end of the ribbon body.
+    pub button: PxRect,
+    /// How far the groups can move left, in `u`.
+    pub max: i32,
 }
 
 /// Everything placed for one frame.
@@ -124,8 +138,16 @@ pub struct Layout<'a> {
     pub title_text: Option<PlacedChrome<'a>>,
     pub search: Option<PlacedChrome<'a>>,
     pub file_tab: Option<PlacedChrome<'a>>,
+    /// The search box is its 58 u button form.
+    pub search_button: bool,
     pub tab_rects: Vec<PxRect>,
+    /// Tabs behind the tab row's scroll button.
+    pub tab_offscreen: Vec<bool>,
+    /// The scroll button of the tab row (shown when the tabs and buttons do not fit).
+    pub tab_scroll: Option<PxRect>,
     pub tab_row_right: Vec<PlacedChrome<'a>>,
+    /// Set when the groups do not fit the ribbon body even in their narrowest states.
+    pub ribbon_scroll: Option<RibbonScroll>,
     /// The ribbon body (empty when the ribbon is collapsed).
     pub lower: PxRect,
     /// The painted ribbon card: the body widened to the card's right margin.
@@ -183,11 +205,17 @@ fn anchored(c: &Chrome, pane_w_u: i32) -> i32 {
     }
 }
 
-fn place<'a>(conv: &Conv, c: &'a Chrome, pane_w_u: i32, dy: i32) -> PlacedChrome<'a> {
+fn placed(c: &Chrome, rect: PxRect) -> PlacedChrome<'_> {
     PlacedChrome {
         chrome: c,
-        rect: conv.rect(anchored(c, pane_w_u), c.y + dy, c.w, c.h),
+        rect,
+        compact: false,
+        offscreen: false,
     }
+}
+
+fn place<'a>(conv: &Conv, c: &'a Chrome, pane_w_u: i32, dy: i32) -> PlacedChrome<'a> {
+    placed(c, conv.rect(anchored(c, pane_w_u), c.y + dy, c.w, c.h))
 }
 
 /// Walks the controls of one state left to right from `start_x`, calling `f(control, x, y, h)`
@@ -295,6 +323,9 @@ pub struct GroupFit {
     pub w: i32,
 }
 
+/// Width of the ribbon's scroll button (in `u`); the groups end where it begins.
+pub const SCROLL_BUTTON_U: i32 = 30;
+
 /// Room Office keeps free at the right end of the ribbon (in `u`).
 pub const RIBBON_SPARE_U: i32 = 2;
 
@@ -377,9 +408,137 @@ fn split_parts(conv: &Conv, it: &Control, x: i32, y: i32, h: i32) -> (PxRect, Px
     }
 }
 
+/// The title row and tab row with the responsive rules of the reference applications.
+fn place_top_rows<'a>(
+    spec: &'a AppSpec,
+    rules: &crate::spec::ChromeRules,
+    conv: &Conv,
+    cw: i32,
+    out: &mut Layout<'a>,
+) {
+    let user = spec.title.iter().find(|c| c.kind == Kind::Avatar);
+    let captions_right = spec
+        .title
+        .iter()
+        .filter(|c| c.kind == Kind::Caption)
+        .map(|c| c.right + c.w)
+        .max()
+        .unwrap_or(0);
+    let right = chrome::RightEdge {
+        user_right: user.map_or(0, |u| u.right + u.w),
+        captions_right,
+    };
+    let plan = chrome::title_plan(&rules.title, spec.qat.x, &right, cw);
+    for c in &spec.title {
+        if c.kind == Kind::Avatar && !plan.show_user {
+            continue;
+        }
+        let x = plan.anchor_w - c.right - c.w;
+        out.title.push(placed(c, conv.rect(x, c.y, c.w, c.h)));
+    }
+    let stage = &rules.title.qat[plan.qat_stage];
+    out.qat_rect = conv.rect(spec.qat.x, spec.qat.y, stage.width, spec.qat.h);
+    // The leading items, then the last item (the overflow button) in place of the rest.
+    let (more, lead) = spec.qat.items.split_last().expect("qat items");
+    let mut x = spec.qat.x + i32::from(stage.keep == 0);
+    for c in lead.iter().take(stage.keep).chain(std::iter::once(more)) {
+        out.qat.push(placed(c, conv.rect(x, c.y, c.w, c.h)));
+        x += c.w + 1;
+    }
+    let t = &spec.title_text;
+    out.title_text = Some(placed(t, conv.rect(plan.title_x, t.y, plan.title_w, t.h)));
+    if let Some(sp) = plan.search {
+        let s = &spec.search;
+        let (y, h) = if sp.button {
+            (rules.title.search.button_y, rules.title.search.button_h)
+        } else {
+            (s.y, s.h)
+        };
+        out.search = Some(placed(s, conv.rect(sp.x, y, sp.w, h)));
+        out.search_button = sp.button;
+    }
+
+    // Tab row.
+    out.file_tab = Some(place(conv, &spec.file_tab, cw, 0));
+    let natural: Vec<i32> = spec.tabs.iter().map(|t| t.w).collect();
+    let tp = chrome::tab_plan(&rules.tabs, spec.tab_strip.x, &natural, cw);
+    for &(x, w) in &tp.tabs {
+        out.tab_rects
+            .push(conv.rect(x, spec.tab_strip.y, w, spec.tab_strip.h));
+    }
+    let scroll_x = tp.scroll_x;
+    out.tab_offscreen = tp
+        .tabs
+        .iter()
+        .map(|&(x, _)| scroll_x.is_some_and(|s| x >= s))
+        .collect();
+    out.tab_scroll =
+        scroll_x.map(|x| conv.rect(x, spec.tab_strip.y, rules.tabs.scroll_w, spec.tab_strip.h));
+    let mut cluster = tp.right.iter();
+    for c in &spec.tab_row_right {
+        if c.id.contains("display-options") {
+            out.tab_row_right.push(place(conv, c, cw, 0));
+            continue;
+        }
+        if let Some(&(x, w)) = cluster.next() {
+            let mut p = placed(c, conv.rect(x, c.y, w, c.h));
+            p.compact = w < c.w;
+            p.offscreen = scroll_x.is_some_and(|s| x >= s);
+            out.tab_row_right.push(p);
+        }
+    }
+}
+
+/// The title row and tab row at their reference positions (no responsive rules).
+fn place_top_rows_fixed<'a>(spec: &'a AppSpec, conv: &Conv, cw: i32, out: &mut Layout<'a>) {
+    for c in &spec.title {
+        out.title.push(place(conv, c, cw, 0));
+    }
+    out.qat_rect = conv.rect(spec.qat.x, spec.qat.y, spec.qat.w, spec.qat.h);
+    for c in &spec.qat.items {
+        out.qat.push(place(conv, c, cw, 0));
+    }
+    out.title_text = Some(place(conv, &spec.title_text, cw, 0));
+    out.search = Some(place(conv, &spec.search, cw, 0));
+    out.file_tab = Some(place(conv, &spec.file_tab, cw, 0));
+    let mut tx = spec.tab_strip.x;
+    for t in &spec.tabs {
+        out.tab_rects
+            .push(conv.rect(tx, spec.tab_strip.y, t.w, spec.tab_strip.h));
+        out.tab_offscreen.push(false);
+        tx += t.w + 1;
+    }
+    for c in &spec.tab_row_right {
+        out.tab_row_right.push(place(conv, c, cw, 0));
+    }
+}
+
 /// Computes the layout of `spec` for `input`.
 #[must_use]
 pub fn compute<'a>(spec: &'a AppSpec, input: &LayoutInput) -> Layout<'a> {
+    compute_scrolled(spec, input, 0)
+}
+
+/// Moves a placed group `dx` physical pixels (the ribbon scrolled).
+fn shift_group(g: &mut PlacedGroup<'_>, dx: i32) {
+    g.rect.x += dx;
+    g.label.x += dx;
+    if let Some(b) = g.button.as_mut() {
+        b.x += dx;
+    }
+    if let Some(l) = g.launcher.as_mut() {
+        l.x += dx;
+    }
+    for c in &mut g.controls {
+        c.rect.x += dx;
+        c.main.x += dx;
+        c.arrow.x += dx;
+    }
+}
+
+/// [`compute`] with the ribbon groups scrolled left by `scroll` `u` (clamped to what overflows).
+#[must_use]
+pub fn compute_scrolled<'a>(spec: &'a AppSpec, input: &LayoutInput, scroll: i32) -> Layout<'a> {
     let (ww, wh) = input.window;
     let (il, it, ir, ib) = input.inset;
     let conv = Conv {
@@ -400,27 +559,10 @@ pub fn compute<'a>(spec: &'a AppSpec, input: &LayoutInput) -> Layout<'a> {
         ..Layout::default()
     };
 
-    // Title row.
-    for c in &spec.title {
-        out.title.push(place(&conv, c, pane_w_u, 0));
-    }
-    out.qat_rect = conv.rect(spec.qat.x, spec.qat.y, spec.qat.w, spec.qat.h);
-    for c in &spec.qat.items {
-        out.qat.push(place(&conv, c, pane_w_u, 0));
-    }
-    out.title_text = Some(place(&conv, &spec.title_text, pane_w_u, 0));
-    out.search = Some(place(&conv, &spec.search, pane_w_u, 0));
-
-    // Tab row.
-    out.file_tab = Some(place(&conv, &spec.file_tab, pane_w_u, 0));
-    let mut tx = spec.tab_strip.x;
-    for t in &spec.tabs {
-        out.tab_rects
-            .push(conv.rect(tx, spec.tab_strip.y, t.w, spec.tab_strip.h));
-        tx += t.w + 1;
-    }
-    for c in &spec.tab_row_right {
-        out.tab_row_right.push(place(&conv, c, pane_w_u, 0));
+    // Title row and tab row.
+    match spec.rules.as_ref() {
+        Some(rules) => place_top_rows(spec, rules, &conv, pane_w_u, &mut out),
+        None => place_top_rows_fixed(spec, &conv, pane_w_u, &mut out),
     }
 
     // Ribbon body.
@@ -450,6 +592,27 @@ pub fn compute<'a>(spec: &'a AppSpec, input: &LayoutInput) -> Layout<'a> {
                 out.groups.push(placed);
                 gx += width;
             }
+            // Groups that overflow the body scroll behind a 30 u button at its right end; what lies
+            // right of the button's left edge is off screen.
+            let body_w = lower_w - (spec.groups_x - spec.lower.x);
+            let content_w = gx - spec.groups_x;
+            if content_w > body_w {
+                let max = content_w - body_w + SCROLL_BUTTON_U;
+                let offset = scroll.clamp(0, max);
+                out.ribbon_scroll = Some(RibbonScroll {
+                    button: conv.rect(
+                        spec.lower.x + lower_w - SCROLL_BUTTON_U,
+                        spec.lower.y,
+                        SCROLL_BUTTON_U,
+                        spec.lower.h,
+                    ),
+                    max,
+                });
+                let dx = conv.px(spec.groups_x) - conv.px(spec.groups_x + offset);
+                for g in &mut out.groups {
+                    shift_group(g, dx);
+                }
+            }
         }
     }
 
@@ -466,12 +629,23 @@ pub fn compute<'a>(spec: &'a AppSpec, input: &LayoutInput) -> Layout<'a> {
         ox: il,
         oy: out.status.y,
     };
-    for c in &spec.status.items {
-        // Status items are stored relative to the bar (y is already bar-relative).
-        out.status_items.push(PlacedChrome {
-            chrome: c,
-            rect: status_conv.rect(anchored(c, pane_w_u), c.y, c.w, c.h),
-        });
+    match spec.rules.as_ref() {
+        Some(r) => {
+            for (i, x) in chrome::status_plan(&r.status, &spec.status.items, pane_w_u) {
+                let c = &spec.status.items[i];
+                out.status_items
+                    .push(placed(c, status_conv.rect(x, c.y, c.w, c.h)));
+            }
+        }
+        None => {
+            for c in &spec.status.items {
+                // Status items are stored relative to the bar (y is already bar-relative).
+                out.status_items.push(placed(
+                    c,
+                    status_conv.rect(anchored(c, pane_w_u), c.y, c.w, c.h),
+                ));
+            }
+        }
     }
 
     // Formula bar and sheet tabs (spreadsheet only).
@@ -539,10 +713,7 @@ pub fn compute<'a>(spec: &'a AppSpec, input: &LayoutInput) -> Layout<'a> {
             oy: bar.y,
         };
         for c in &s.items {
-            out.sheet_items.push(PlacedChrome {
-                chrome: c,
-                rect: sc.rect(c.x, c.y, c.w, c.h),
-            });
+            out.sheet_items.push(placed(c, sc.rect(c.x, c.y, c.w, c.h)));
         }
         content_bottom = bar.y;
     }

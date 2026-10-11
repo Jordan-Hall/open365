@@ -2922,6 +2922,7 @@ dependencies = [
  "open365-commands",
  "open365-ui-egui",
  "open365-ui-shell",
+ "open365-xlsx",
  "rfd",
  "zip",
 ]

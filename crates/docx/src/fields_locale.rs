@@ -13,6 +13,12 @@ use crate::fields_locale_data::{DATA, TAGS};
 pub struct LocaleNames {
     pub month_full: [String; 12],
     pub month_abbr: [String; 12],
+    /// Month names Word uses when the picture also holds a day number (genitive in Slavic,
+    /// Baltic and some other languages); equal to `month_full` where the language has no
+    /// separate form.
+    pub month_full_genitive: [String; 12],
+    /// Abbreviated counterpart of `month_full_genitive`.
+    pub month_abbr_genitive: [String; 12],
     /// Sunday first.
     pub day_full: [String; 7],
     pub day_abbr: [String; 7],
@@ -64,8 +70,9 @@ impl LocaleNames {
         }
     }
 
-    /// Unpacks `month_full|month_abbr|day_full|day_abbr|am|pm` records, separated by `|`
-    /// with names separated by `,`.
+    /// Unpacks `month_full|month_abbr|day_full|day_abbr|am|pm|date|time|genitive_full|genitive_abbr`
+    /// records, separated by `|` with names separated by `,`. An empty genitive list means the
+    /// language has no separate form.
     fn from_packed(packed: &str) -> Self {
         let mut parts = packed.split('|');
         let mut take = |n: usize| -> Vec<String> {
@@ -86,7 +93,18 @@ impl LocaleNames {
         let pm = take(1).remove(0);
         let date_picture = take(1).remove(0);
         let time_picture = take(1).remove(0);
+        let genitive_full = take(12);
+        let genitive_abbr = take(12);
+        let or_same = |list: Vec<String>, base: &[String]| -> Vec<String> {
+            if list.iter().all(String::is_empty) {
+                base.to_vec()
+            } else {
+                list
+            }
+        };
         Self {
+            month_full_genitive: to_array(or_same(genitive_full, &month_full)),
+            month_abbr_genitive: to_array(or_same(genitive_abbr, &month_abbr)),
             month_full: to_array(month_full),
             month_abbr: to_array(month_abbr),
             day_full: to_array(day_full),

@@ -335,9 +335,17 @@ pub fn score_doc(
                     };
                     d(a).total_cmp(&d(b))
                 });
+            let zones: Vec<String> = layout
+                .pages
+                .iter()
+                .filter(|p| p.number as u64 == c.page)
+                .flat_map(|p| p.table_wrap_zones())
+                .filter(|[x0, y0, _, _]| (x0 - c.x).abs() < 3.0 && (y0 - c.y).abs() < 3.0)
+                .map(|[x0, y0, x1, y1]| format!("[{x0:.2} {y0:.2} {:.2} {:.2}]", x1 - x0, y1 - y0))
+                .collect();
             let _ = writeln!(
                 report,
-                "{} cell p{} x {:>7.2} y {:>7.2} w {:>7.2} h {:>7.2}   engine {}",
+                "{} cell p{} x {:>7.2} y {:>7.2} w {:>7.2} h {:>7.2}   engine {} zones {}",
                 if hit.is_some() || zone {
                     "ok  "
                 } else {
@@ -352,6 +360,7 @@ pub fn score_doc(
                     "x {:.2} y {:.2} w {:.2} h {:.2}",
                     b.x, b.y, b.width, b.height
                 )),
+                zones.join(" "),
             );
         }
     }

@@ -173,15 +173,32 @@ fn run(app: &str, spec: AppSpec) -> (Tally, Tally, Tally) {
     for p in r["panes"].as_array().expect("panes") {
         walk(p, &mut status_items);
     }
-    for c in &layout.status_items {
+    // The 1 px chrome sweep shows a size box (14 px) at the right end of Word's status bar that the
+    // 1600 px reference run did not have; the spec places the right-hand group for the sweep.
+    let reference_has_size_box = status_items
+        .iter()
+        .any(|s| s["name"].as_str() == Some("Size box"));
+    let rules = spec.rules.as_ref().map(|r| &r.status);
+    let right_from = rules.and_then(|r| {
+        layout
+            .status_items
+            .iter()
+            .position(|c| c.chrome.id == r.right_from)
+    });
+    let grip = rules.map_or(0, |r| r.grip);
+    for (i, c) in layout.status_items.iter().enumerate() {
         let label = c.chrome.id.as_str();
         let want = c.chrome.ref_name.as_deref().unwrap_or_default();
+        let mut ours = c.rect;
+        if !reference_has_size_box && right_from.is_some_and(|f| i >= f) {
+            ours.x += grip;
+        }
         let best = status_items
             .iter()
             .filter(|s| s["name"].as_str() == Some(want))
-            .min_by_key(|s| rect(s).max_delta(&c.rect));
+            .min_by_key(|s| rect(s).max_delta(&ours));
         match best {
-            Some(b) => shell.check(&format!("status {label}"), c.rect, rect(b)),
+            Some(b) => shell.check(&format!("status {label}"), ours, rect(b)),
             None => {
                 shell.total += 1;
                 shell.misses.push(format!("status {label}: no reference"));

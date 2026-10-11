@@ -11,6 +11,7 @@ use egui::{
 use crate::host::{CommandState, MenuEntry, ShellHost};
 use crate::icons::Icons;
 use crate::layout::{self, Layout, LayoutInput, PlacedChrome, PlacedControl, PlacedGroup, PxRect};
+use crate::menu::{self, MenuEvent, MenuState};
 use crate::spec::{AppSpec, Chrome, Kind, REF_SCALE, Scale, Size};
 use crate::theme::{AppKind, Mode, Theme, size};
 
@@ -28,10 +29,13 @@ pub struct ShellOptions {
 /// Space between the edge of a group popup and the group inside it (points).
 const POPUP_MARGIN: f32 = 4.0;
 
-struct OpenMenu {
+/// An editable combo box (font name, size, number format) with focus: what was typed and what it replaces.
+struct ComboEdit {
     id: String,
-    pos: Pos2,
-    fresh: bool,
+    text: String,
+    /// Characters typed so far (the rest of `text` is an auto-complete suggestion).
+    typed: usize,
+    focus: bool,
 }
 
 /// The chrome of one application.
@@ -44,6 +48,10 @@ pub struct Shell {
     /// Ctrl+F1: the ribbon stays open (otherwise only the tabs show until one is clicked).
     pub pinned: bool,
     popup_tab: bool,
+    /// How far the ribbon groups are scrolled left, in `u` (narrow windows).
+    ribbon_scroll: i32,
+    /// How far the tab strip is scrolled left (points) when the tabs overflow.
+    tab_scroll: f32,
     /// Backstage page (index into the navigation list) when the File view is open.
     backstage: Option<usize>,
     icons: Icons,
@@ -57,7 +65,8 @@ pub struct Shell {
     keytip_tab: Option<usize>,
     key_run: Option<String>,
     alt_clean: bool,
-    menu: Option<OpenMenu>,
+    menu: Option<MenuState>,
+    edit: Option<ComboEdit>,
     /// Id of the collapsed group whose popup is open.
     group_popup: Option<String>,
     /// Developer aid: `OPEN365_SHOT=<file.ppm>` saves one frame after a few redraws and quits.
@@ -72,6 +81,20 @@ impl std::fmt::Debug for Shell {
             .field("pinned", &self.pinned)
             .finish_non_exhaustive()
     }
+}
+
+/// The label of entry `id` anywhere in a menu tree.
+fn label_of(entries: &[MenuEntry], id: &str) -> String {
+    for e in entries {
+        if e.id == id {
+            return e.label.clone();
+        }
+        let l = label_of(&e.children, id);
+        if !l.is_empty() {
+            return l;
+        }
+    }
+    String::new()
 }
 
 fn rect_of(origin: Pos2, ppp: f32, r: PxRect) -> Rect {
@@ -159,6 +182,8 @@ impl Shell {
             tab: 0,
             pinned: true,
             popup_tab: false,
+            ribbon_scroll: 0,
+            tab_scroll: 0.0,
             backstage: None,
             icons: Icons::default(),
             formula_expanded: true,
@@ -169,6 +194,7 @@ impl Shell {
             key_run: None,
             alt_clean: false,
             menu: None,
+            edit: None,
             group_popup: None,
             shot: std::env::var_os("OPEN365_SHOT").map(|p| (p.into(), 0)),
         }
@@ -192,6 +218,18 @@ impl Shell {
     #[must_use]
     pub fn backstage_open(&self) -> bool {
         self.backstage.is_some()
+    }
+
+    /// How far the tab strip is scrolled (points), 0 when the tabs fit.
+    #[must_use]
+    pub fn tab_scroll_offset(&self) -> f32 {
+        self.tab_scroll
+    }
+
+    /// How far the ribbon groups are scrolled (`u`), 0 when they fit.
+    #[must_use]
+    pub fn ribbon_scroll_offset(&self) -> i32 {
+        self.ribbon_scroll
     }
 
     /// Id of the collapsed group whose popup is open.
@@ -228,7 +266,7 @@ impl Shell {
         self.input(&ctx, &spec, &base);
         self.screenshot(&ctx);
         let ribbon_open = self.pinned || self.popup_tab;
-        let lay = layout::compute(
+        let lay = layout::compute_scrolled(
             &spec,
             &LayoutInput {
                 tab: self.tab,
@@ -236,6 +274,7 @@ impl Shell {
                 formula_expanded: self.formula_expanded,
                 ..base
             },
+            self.ribbon_scroll,
         );
         ctx.set_visuals(self.theme.visuals());
         let painter = ui.painter().clone();
@@ -882,7 +921,13 @@ impl Shell {
             }
         }
         // Search box.
-        if let Some(s) = &lay.search {
+        if let Some(s) = lay.search.as_ref().filter(|_| lay.search_button) {
+            let r = rect_of(origin, ppp, s.rect);
+            let resp = ui.interact(r, Id::new("search-button"), Sense::click());
+            self.button_bg(painter, r, &resp, false);
+            let ir = Rect::from_center_size(r.center(), vec2(16.0, 16.0));
+            self.icon(ui, painter, "search", ir, t.text_dim);
+        } else if let Some(s) = &lay.search {
             let r = rect_of(origin, ppp, s.rect);
             painter.rect_filled(r, 4.0, t.search_fill);
             painter.rect_stroke(
@@ -955,9 +1000,46 @@ impl Shell {
                 self.backstage = Some(1);
             }
         }
+        if lay.tab_scroll.is_none() {
+            self.tab_scroll = 0.0;
+        }
+        let step = 120.0 / REF_SCALE;
+        let strip_left = rect_of(origin, ppp, lay.tab_rects[0]).left();
+        let left_btn = (self.tab_scroll > 0.0).then(|| {
+            let r0 = rect_of(origin, ppp, lay.tab_rects[0]);
+            Rect::from_min_size(r0.min, vec2(30.0 / REF_SCALE, r0.height()))
+        });
+        let tab_clip = lay.tab_scroll.map(|b| {
+            let mut c = rect_of(origin, ppp, lay.tab_rects[0]);
+            c.set_right(rect_of(origin, ppp, b).left());
+            c.set_left(strip_left + left_btn.map_or(0.0, |l| l.width()));
+            c
+        });
+        // The furthest the strip can go: its last item meets the button.
+        let content_right = lay
+            .tab_rects
+            .last()
+            .map(|r| rect_of(origin, ppp, *r).right())
+            .into_iter()
+            .chain(
+                lay.tab_row_right
+                    .iter()
+                    .filter(|p| !p.chrome.id.contains("display-options"))
+                    .map(|p| rect_of(origin, ppp, p.rect).right()),
+            )
+            .fold(0.0_f32, f32::max);
+        let max_tab_scroll = tab_clip.map_or(0.0, |c| (content_right - c.right()).max(0.0));
+        self.tab_scroll = self.tab_scroll.min(max_tab_scroll);
+        let scroll_dx = self.tab_scroll;
+        let tab_painter = tab_clip.map_or_else(|| painter.clone(), |c| painter.with_clip_rect(c));
+        let painter = &tab_painter;
         for i in 0..self.spec.tabs.len() {
-            let r = rect_of(origin, ppp, lay.tab_rects[i]);
-            let resp = ui.interact(r, Id::new(("tab", i)), Sense::click());
+            let r = rect_of(origin, ppp, lay.tab_rects[i]).translate(vec2(-scroll_dx, 0.0));
+            if tab_clip.is_some_and(|c| !c.intersects(r)) {
+                continue;
+            }
+            let hit = tab_clip.map_or(r, |c| r.intersect(c));
+            let resp = ui.interact(hit, Id::new(("tab", i)), Sense::click());
             let sel = i == self.tab;
             if resp.hovered() && !sel {
                 painter.rect_filled(r.shrink2(vec2(0.0, 3.0)), 4.0, t.hover);
@@ -997,9 +1079,59 @@ impl Shell {
                 self.pinned = !self.pinned;
             }
         }
+        let full_painter = ui.painter().clone();
+        let strip_painter =
+            tab_clip.map_or_else(|| full_painter.clone(), |c| full_painter.with_clip_rect(c));
+        let painter = &full_painter;
+        if let Some(b) = lay.tab_scroll {
+            let r = rect_of(origin, ppp, b);
+            let resp = ui.interact(r, Id::new("tab-scroll"), Sense::click());
+            painter.rect_filled(r, 0.0, t.frame);
+            self.button_bg(painter, r, &resp, false);
+            self.icon(
+                ui,
+                painter,
+                "chevron-right",
+                Rect::from_center_size(r.center(), vec2(12.0, 12.0)),
+                t.text,
+            );
+            if resp.clicked() {
+                self.tab_scroll = (self.tab_scroll + step).min(max_tab_scroll);
+            }
+        }
+        if let Some(r) = left_btn {
+            let resp = ui.interact(r, Id::new("tab-scroll-left"), Sense::click());
+            painter.rect_filled(r, 0.0, t.frame);
+            self.button_bg(painter, r, &resp, false);
+            self.icon(
+                ui,
+                painter,
+                "chevron-left",
+                Rect::from_center_size(r.center(), vec2(12.0, 12.0)),
+                t.text,
+            );
+            if resp.clicked() {
+                self.tab_scroll = (self.tab_scroll - step).max(0.0);
+            }
+        }
         for p in &lay.tab_row_right {
-            let r = rect_of(origin, ppp, p.rect);
-            if p.chrome.id.contains("display-options") {
+            let display = p.chrome.id.contains("display-options");
+            if p.offscreen && tab_clip.is_none() {
+                continue;
+            }
+            let mut r = rect_of(origin, ppp, p.rect);
+            let painter = if display {
+                &full_painter
+            } else {
+                &strip_painter
+            };
+            if !display {
+                r = r.translate(vec2(-scroll_dx, 0.0));
+                if tab_clip.is_some_and(|c| !c.intersects(r)) {
+                    continue;
+                }
+            }
+            if display {
                 let resp = ui.interact(r, Id::new("ribbon-display"), Sense::click());
                 self.button_bg(painter, r, &resp, false);
                 let name = if self.pinned {
@@ -1035,6 +1167,16 @@ impl Shell {
                 _ => "share",
             };
             let font = FontId::proportional(size::LABEL + 1.0);
+            if p.compact {
+                self.icon(
+                    ui,
+                    painter,
+                    icon,
+                    Rect::from_center_size(r.center(), vec2(16.0, 16.0)),
+                    ink,
+                );
+                continue;
+            }
             let galley = painter.layout_no_wrap(p.chrome.label.clone(), font.clone(), ink);
             let content = 16.0 + 6.0 + galley.size().x + if id == "comments" { 0.0 } else { 14.0 };
             let x0 = r.center().x - content / 2.0;
@@ -1080,6 +1222,17 @@ impl Shell {
         let t = self.theme;
         let card = rect_of(origin, ppp, lay.card);
         painter.rect_filled(card, 8.0, t.card);
+        // Groups that overflow scroll under the "Column right" button; they are clipped where it begins.
+        let clipped = lay.ribbon_scroll.map(|sc| {
+            let mut c = card;
+            c.set_right(rect_of(origin, ppp, sc.button).left());
+            if self.ribbon_scroll > 0 {
+                c.set_left(c.left() + rect_of(origin, ppp, sc.button).width());
+            }
+            painter.with_clip_rect(c)
+        });
+        let group_painter = clipped.as_ref().unwrap_or(painter);
+        let painter = group_painter;
         for g in &lay.groups {
             let gr = rect_of(origin, ppp, g.rect);
             painter.line_segment(
@@ -1113,7 +1266,47 @@ impl Shell {
                 painter.line_segment([pos2(c.x, c.y + 3.0), pos2(c.x + 3.0, c.y + 3.0)], s);
             }
             for pc in &g.controls {
+                if let Some(sc) = lay.ribbon_scroll
+                    && pc.rect.x > sc.button.x
+                {
+                    continue;
+                }
                 self.control(ui, painter, host, pc, origin, ppp, run);
+            }
+        }
+        if let Some(sc) = lay.ribbon_scroll {
+            let step = 120;
+            let button = |this: &mut Self, rect: PxRect, icon: &str, id: &str, delta: i32| {
+                let r = rect_of(origin, ppp, rect);
+                let resp = ui.interact(r, Id::new(id), Sense::click());
+                let pt = ui.painter().clone();
+                pt.rect_filled(r, 0.0, this.theme.card);
+                this.button_bg(&pt, r, &resp, false);
+                let ink = this.theme.text;
+                this.icon(
+                    ui,
+                    &pt,
+                    icon,
+                    Rect::from_center_size(r.center(), vec2(12.0, 12.0)),
+                    ink,
+                );
+                if resp.clicked() {
+                    this.ribbon_scroll = (this.ribbon_scroll + delta).clamp(0, sc.max);
+                }
+            };
+            button(
+                self,
+                sc.button,
+                "chevron-right",
+                "ribbon-column-right",
+                step,
+            );
+            if self.ribbon_scroll > 0 {
+                let left = PxRect {
+                    x: lay.card.x,
+                    ..sc.button
+                };
+                button(self, left, "chevron-left", "ribbon-column-left", -step);
             }
         }
     }
@@ -1185,11 +1378,17 @@ impl Shell {
     }
 
     fn open_menu_for(&mut self, id: &str, at: Pos2) {
-        self.menu = Some(OpenMenu {
-            id: id.to_owned(),
-            pos: at,
-            fresh: true,
-        });
+        self.menu = Some(MenuState::new(id, at, 0.0, false));
+    }
+
+    /// Opens the list under an editable combo.
+    fn open_list_for(&mut self, id: &str, r: Rect) {
+        self.menu = Some(MenuState::new(
+            id,
+            r.left_bottom(),
+            r.width() * REF_SCALE,
+            true,
+        ));
     }
 
     fn control(
@@ -1213,6 +1412,10 @@ impl Shell {
         // Dips per reference unit (`u` = pixels at the 125 % reference scale).
         let k = 1.0 / REF_SCALE;
         match c.kind {
+            Kind::Combo if has_menu => {
+                let fallback = c.value.clone().unwrap_or_default();
+                self.combo(ui, painter, host, &c.id, r, &fallback, run);
+            }
             Kind::Combo | Kind::Edit | Kind::Spinner | Kind::Checkbox => {
                 let resp = ui.interact(r, Id::new(("ctl", &c.id)), sense);
                 if c.kind == Kind::Checkbox {
@@ -1469,6 +1672,159 @@ impl Shell {
         }
     }
 
+    /// An editable combo box: typed input with Office's inline auto-complete, Enter commits through
+    /// [`ShellHost::combo_commit`], Escape cancels, the arrow (or Up / Down) opens the list.
+    fn combo(
+        &mut self,
+        ui: &mut Ui,
+        painter: &Painter,
+        host: &mut dyn ShellHost,
+        id: &str,
+        r: Rect,
+        fallback: &str,
+        run: &mut Option<(String, Option<f64>)>,
+    ) {
+        let t = self.theme;
+        let k = 1.0 / REF_SCALE;
+        let editing = self.edit.as_ref().is_some_and(|e| e.id == id);
+        let listing = self.menu.as_ref().is_some_and(|m| m.id == id);
+        let border = if editing || listing {
+            t.accent
+        } else {
+            t.field_border
+        };
+        painter.rect_filled(r, 3.0, t.field);
+        painter.rect_stroke(r, 3.0, Stroke::new(1.0, border), StrokeKind::Inside);
+        let arrow = Rect::from_min_max(
+            pos2(r.right() - 17.0 * k, r.top() + k),
+            pos2(r.right() - k, r.bottom() - k),
+        );
+        let text_r = Rect::from_min_max(
+            pos2(r.left() + k, r.top() + 3.0 * k),
+            pos2(arrow.left(), r.bottom() - 3.0 * k),
+        );
+        let ra = ui.interact(arrow, Id::new(("combo-arrow", id)), Sense::click());
+        if ra.hovered() || listing {
+            painter.rect_filled(arrow, 2.0, t.hover);
+        }
+        self.icon(
+            ui,
+            painter,
+            "chevron-down",
+            Rect::from_center_size(arrow.center(), vec2(10.0, 10.0)),
+            t.text,
+        );
+        if ra.clicked() {
+            if listing {
+                self.menu = None;
+            } else {
+                self.open_list_for(id, r);
+            }
+        }
+        let shown = host.value(id).unwrap_or_else(|| fallback.to_owned());
+        if !editing {
+            painter.text(
+                pos2(text_r.left() + 4.0 * k, r.center().y),
+                Align2::LEFT_CENTER,
+                &shown,
+                FontId::proportional(size::LABEL),
+                t.text,
+            );
+            let rt = ui.interact(text_r, Id::new(("combo-text", id)), Sense::click());
+            if rt.clicked() {
+                self.edit = Some(ComboEdit {
+                    id: id.to_owned(),
+                    text: shown.clone(),
+                    typed: shown.chars().count(),
+                    focus: true,
+                });
+            }
+            if self.edit.as_ref().is_none_or(|e| e.id != id) {
+                return;
+            }
+        }
+        let Some(mut ed) = self.edit.take() else {
+            return;
+        };
+        let eid = Id::new(("combo-edit", id));
+        let mut text = ed.text.clone();
+        let out = ui.put(
+            text_r,
+            egui::TextEdit::singleline(&mut text)
+                .id(eid)
+                .frame(egui::Frame::NONE)
+                .margin(egui::Margin::symmetric(4, 0))
+                .font(FontId::proportional(size::LABEL))
+                .text_color(t.text)
+                .vertical_align(egui::Align::Center),
+        );
+        let n = ed.text.chars().count();
+        if ed.focus {
+            ui.memory_mut(|m| m.request_focus(eid));
+            let mut st = egui::TextEdit::load_state(ui.ctx(), eid).unwrap_or_default();
+            st.cursor.set_char_range(Some(egui::text::CCursorRange::two(
+                egui::text::CCursor::new(0),
+                egui::text::CCursor::new(n),
+            )));
+            st.store(ui.ctx(), eid);
+            ed.focus = false;
+        }
+        let list_hot = self
+            .menu
+            .as_ref()
+            .is_some_and(|m| m.id == id && m.hot.first().is_some_and(Option::is_some));
+        let (enter, esc, down, up) = ui.input(|i| {
+            (
+                i.key_pressed(Key::Enter),
+                i.key_pressed(Key::Escape),
+                i.key_pressed(Key::ArrowDown),
+                i.key_pressed(Key::ArrowUp),
+            )
+        });
+        if out.changed() {
+            let count = text.chars().count();
+            let grew = count > ed.typed;
+            ed.typed = count;
+            if grew && let Some(entries) = host.menu(id) {
+                let lower = text.to_lowercase();
+                let numeric = entries.iter().any(|e| e.label.parse::<f64>().is_ok());
+                let hit = entries.iter().find(|e| {
+                    e.kind == crate::host::EntryKind::Item
+                        && !numeric
+                        && e.label.to_lowercase().starts_with(&lower)
+                        && e.label.chars().count() > count
+                });
+                if let Some(e) = hit {
+                    text = e.label.clone();
+                    let mut st = egui::TextEdit::load_state(ui.ctx(), eid).unwrap_or_default();
+                    st.cursor.set_char_range(Some(egui::text::CCursorRange::two(
+                        egui::text::CCursor::new(count),
+                        egui::text::CCursor::new(text.chars().count()),
+                    )));
+                    st.store(ui.ctx(), eid);
+                }
+            }
+            ed.text = text.clone();
+        }
+        if (down || up) && !listing {
+            self.open_list_for(id, r);
+        }
+        if esc {
+            ui.memory_mut(|m| m.surrender_focus(eid));
+            self.menu = None;
+        } else if enter && out.has_focus() && !list_hot {
+            if let Some(cmd) = host.combo_commit(id, &text) {
+                *run = Some((cmd, None));
+            }
+            ui.memory_mut(|m| m.surrender_focus(eid));
+            self.menu = None;
+        } else if out.lost_focus() && !listing && !ra.hovered() {
+            // Clicking elsewhere abandons the edit.
+        } else {
+            self.edit = Some(ed);
+        }
+    }
+
     fn menu_popup(
         &mut self,
         ctx: &egui::Context,
@@ -1477,33 +1833,18 @@ impl Shell {
     ) {
         let Some(m) = &mut self.menu else { return };
         let entries: Vec<MenuEntry> = host.menu(&m.id).unwrap_or_default();
-        let mut chosen: Option<String> = None;
-        let resp = Area::new(Id::new("shell-menu"))
-            .order(Order::Foreground)
-            .fixed_pos(m.pos)
-            .show(ctx, |ui| {
-                egui::Frame::popup(ui.style()).show(ui, |ui| {
-                    ui.set_min_width(180.0);
-                    for e in &entries {
-                        if ui
-                            .add_enabled(e.enabled, egui::Button::new(&e.label).frame(false))
-                            .clicked()
-                        {
-                            chosen = Some(e.id.clone());
-                        }
-                    }
-                });
-            });
-        let pressed_outside =
-            ctx.input(|i| i.pointer.any_pressed()) && !resp.response.contains_pointer();
-        if let Some(id) = chosen {
-            *run = Some((id, None));
-            self.menu = None;
-            self.group_popup = None;
-        } else if pressed_outside && !m.fresh {
-            self.menu = None;
-        } else {
-            m.fresh = false;
+        let list = m.list;
+        let combo = m.id.clone();
+        match menu::show(ctx, m, &entries, &self.theme, &mut self.icons) {
+            MenuEvent::None => {}
+            MenuEvent::Run(id) => {
+                let _ = (list, &combo, label_of(&entries, &id));
+                *run = Some((id, None));
+                self.menu = None;
+                self.edit = None;
+                self.group_popup = None;
+            }
+            MenuEvent::Close => self.menu = None,
         }
     }
 

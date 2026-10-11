@@ -219,6 +219,22 @@ notes = `"$notes`"
     $d = $doc.Paragraphs.Item(4).DropCap; $d.Enable(); $d.Position = 1; $d.LinesToDrop = 2
   }
 
+  # Narrow gaps beside a frame: a borderless 60 pt frame with no distance at x = G from the column left, and a two line
+  # paragraph below it whose first word is Hi (short) or Harbour (long): from what gap on does Word start the line left of the frame?
+  C-Fixture 'layout-frame-gap' 'sixteen borderless frames at 6 to 72 pt from the column left, each in front of a two line paragraph that starts with a short or a long word' {
+    $gaps = @(@('Hi', 6), @('Hi', 9), @('Hi', 12), @('Hi', 15), @('Hi', 18), @('Hi', 21), @('Hi', 24), @('Hi', 30),
+              @('Harbour', 30), @('Harbour', 36), @('Harbour', 40), @('Harbour', 44), @('Harbour', 48), @('Harbour', 54), @('Harbour', 60), @('Harbour', 72))
+    $k = 0
+    foreach ($g in $gaps) {
+      $k++
+      P "Frame $k"
+      P ($g[0] + ' ' + $TXT[$k % 4])
+    }
+    for ($k = 1; $k -le $gaps.Count; $k++) {
+      [void](FR (2 * $k - 1) @{ w = 60; x = [single]$gaps[$k - 1][1]; hrel = 2; y = 0; vrel = 2; dist = @(0, 0); nobdr = $true })
+    }
+  }
+
 } finally {
   if ($word) {
     try { $word.UserName = $oldUser; $word.UserInitials = $oldInit; $word.Options.UseLocalUserInfo = $oldLocal } catch {}

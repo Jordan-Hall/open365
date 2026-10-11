@@ -9,6 +9,8 @@ mod datecalc;
 mod datetime;
 mod distrib;
 mod distrib_disc;
+mod distrib_erf;
+mod distrib_normq;
 mod distrib_reg;
 mod distrib_test;
 mod distribdd;
@@ -203,6 +205,10 @@ static TABLE: &[(&str, Func)] = &[
     ("NORMSINV", Func::Res(distrib::norm_s_inv)),
     ("PHI", Func::Res(distrib::phi)),
     ("GAUSS", Func::Res(distrib::gauss)),
+    ("ERF", Func::Res(distrib_erf::erf_fn)),
+    ("ERF.PRECISE", Func::Res(distrib_erf::erf_precise)),
+    ("ERFC", Func::Res(distrib_erf::erfc_fn)),
+    ("ERFC.PRECISE", Func::Res(distrib_erf::erfc_fn)),
     ("STANDARDIZE", Func::Res(distrib::standardize)),
     ("LOGNORM.DIST", Func::Res(distrib::lognorm_dist)),
     ("LOGNORMDIST", Func::Res(distrib::lognormdist)),

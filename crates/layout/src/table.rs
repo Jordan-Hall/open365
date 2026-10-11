@@ -9,9 +9,16 @@ use open365_docx::{
     TableProps, VerticalAlign,
 };
 
+use std::sync::Arc;
+
+use open365_docx::Drawing;
+
 use crate::build::Builder;
+use crate::float::{Float, Frame, dynamic_lines};
+use crate::flow::Base;
 use crate::para::AtomClass;
-use crate::{BorderLine, BorderStyle, CellBorders};
+use crate::textbox::BoxRef;
+use crate::{BorderLine, BorderStyle, CellBorders, ImagePlacement};
 
 /// The identity and look of a cell, as `CellBox` reports it. `table` counts the tables of the
 /// unit; the paginator adds the unit's first table id.
@@ -94,6 +101,37 @@ pub(crate) struct FlowLine {
     pub join_next: bool,
 }
 
+/// A floating drawing anchored in a line of a cell.
+#[derive(Debug, Clone)]
+pub(crate) struct FlowImage {
+    /// Index of the anchor's line in the cell's lines.
+    pub line: usize,
+    /// Top left corner relative to the content box (a drawing placed against the cell), or the
+    /// anchor paragraph's top in `dy` (a drawing placed against the page).
+    pub dx: f64,
+    pub dy: f64,
+    pub kind: ImageKind,
+}
+
+#[derive(Debug, Clone)]
+pub(crate) enum ImageKind {
+    /// Placed: `x` and `y` are set when the cell is drawn.
+    Cell(ImagePlacement),
+    /// `layoutInCell="0"` in a document of compatibility mode 14 or lower: positioned against the
+    /// page when the cell is drawn.
+    Page(PageDrawing),
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct PageDrawing {
+    pub drawing: Drawing,
+    pub atom: usize,
+    pub polygon: Option<Arc<[(f64, f64)]>>,
+    pub text_box: Option<BoxRef>,
+    /// Arena index of the anchor paragraph.
+    pub paragraph: usize,
+}
+
 /// A nested cell's rectangle inside the content box.
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct FlowBox {
@@ -122,6 +160,7 @@ pub(crate) struct CellLayout {
     pub pad: Pad,
     pub lines: Vec<FlowLine>,
     pub boxes: Vec<FlowBox>,
+    pub images: Vec<FlowImage>,
     /// Height of the content including the space before the first and after the last paragraph.
     pub content_h: f64,
     /// Top of the content box relative to the table's top, vertical alignment applied.
@@ -133,7 +172,7 @@ pub(crate) struct CellLayout {
     pub inset_r: f64,
     pub meta: CellMeta,
     /// Widths of the borders on the cell's four sides, as resolved for the table.
-    border_top: f64,
+    pub border_top: f64,
     border_bottom: f64,
     border_left: f64,
     border_right: f64,
@@ -285,15 +324,29 @@ struct Prev {
     style: Option<String>,
 }
 
-/// Content of a cell laid out in a box `content_w` wide.
+/// What a cell holds, relative to its content box.
+#[derive(Default)]
+pub(crate) struct CellContent {
+    pub lines: Vec<FlowLine>,
+    pub boxes: Vec<FlowBox>,
+    pub images: Vec<FlowImage>,
+    pub height: f64,
+}
+
+/// Content of a cell laid out in a box `content_w` wide, with `pad` around it.
 pub(crate) fn layout_cell(
     b: &mut Builder<'_>,
     blocks: &[Block],
     content_w: f64,
+    pad: Pad,
     fmt: &open365_docx::TableCellFormat,
-) -> (Vec<FlowLine>, Vec<FlowBox>, f64) {
+) -> CellContent {
     let mut lines: Vec<FlowLine> = Vec::new();
     let mut boxes = Vec::new();
+    let mut images: Vec<FlowImage> = Vec::new();
+    // Floats of the cell's drawings in cell coordinates (origin: the cell's outer top left).
+    let mut floats: Vec<Float> = Vec::new();
+    let frame = Frame::cell(pad.left, pad.right, content_w);
     let mut y = 0.0;
     let mut prev: Option<Prev> = None;
     // The previous paragraph of the run being stacked (arena index) and the bottom border it
@@ -337,17 +390,94 @@ pub(crate) fn layout_cell(
                 } else {
                     pl.border_top()
                 };
-                for (i, lb) in pl.lines.iter().enumerate() {
-                    lines.push(FlowLine {
-                        para: idx,
-                        line: i,
+                // Floating drawings anchored here, or still reaching down from an earlier
+                // paragraph of the cell, break the lines again (layout-float-incell).
+                let anchored = pl.objects.iter().any(|o| !o.inline() && !o.page_anchored);
+                let reached = floats.iter().any(|f| f.y1 > y + pad.top + 1e-6);
+                let mut dynamic = None;
+                if anchored || reached {
+                    let d = dynamic_lines(
+                        pl,
+                        0,
+                        y + pad.top,
+                        None,
+                        &floats,
+                        &frame,
+                        Base {
+                            para: 0,
+                            story: 0,
+                            table: 0,
+                        },
+                    );
+                    dynamic = Some(d);
+                }
+                let para_top = y;
+                let first_line = lines.len();
+                if let Some(d) = dynamic {
+                    b.arena[idx].lines = d.lines;
+                    let pl = &b.arena[idx];
+                    for (i, lb) in pl.lines.iter().enumerate() {
+                        y += lb.lead;
+                        lines.push(FlowLine {
+                            para: idx,
+                            line: i,
+                            dx: 0.0,
+                            dy: y,
+                            height: lb.height,
+                            join_prev: joined,
+                            join_next: false,
+                        });
+                        y += lb.height;
+                    }
+                    for a in d.anchors {
+                        let line = pl
+                            .lines
+                            .iter()
+                            .position(|l| l.atoms.contains(&a.atom))
+                            .map_or(first_line, |k| first_line + k);
+                        floats.extend(a.float);
+                        let mut image = a.image;
+                        image.paragraph = idx;
+                        images.push(FlowImage {
+                            line,
+                            dx: image.x - pad.left,
+                            dy: image.y - pad.top,
+                            kind: ImageKind::Cell(image),
+                        });
+                    }
+                } else {
+                    for (i, lb) in pl.lines.iter().enumerate() {
+                        lines.push(FlowLine {
+                            para: idx,
+                            line: i,
+                            dx: 0.0,
+                            dy: y,
+                            height: lb.height,
+                            join_prev: joined,
+                            join_next: false,
+                        });
+                        y += lb.height;
+                    }
+                }
+                let pl = &b.arena[idx];
+                for o in pl.objects.iter().filter(|o| o.page_anchored) {
+                    let line = pl
+                        .lines
+                        .iter()
+                        .position(|l| l.atoms.contains(&o.atom))
+                        .map_or(first_line, |k| first_line + k);
+                    images.push(FlowImage {
+                        line,
                         dx: 0.0,
-                        dy: y,
-                        height: lb.height,
-                        join_prev: joined,
-                        join_next: false,
+                        dy: para_top,
+                        kind: ImageKind::Page(PageDrawing {
+                            drawing: o.drawing.clone(),
+                            atom: o.atom,
+                            polygon: o.flags.polygon.clone(),
+                            text_box: o.text_box.clone(),
+                            paragraph: idx,
+                        }),
                     });
-                    y += lb.height;
                 }
                 if joined && let Some(q) = run_prev {
                     for l in lines.iter_mut().filter(|l| l.para == q) {
@@ -367,17 +497,27 @@ pub(crate) fn layout_cell(
                 run_prev = None;
                 y += prev.take().map_or(0.0, |p| p.after);
                 let nested = layout_table(b, t, content_w);
-                let (l, bx, h) = nested.flatten(0.0, y);
-                lines.extend(l);
-                boxes.extend(bx);
-                y += h;
+                let inner = nested.flatten(0.0, y);
+                let base = lines.len();
+                lines.extend(inner.lines);
+                boxes.extend(inner.boxes);
+                images.extend(inner.images.into_iter().map(|i| FlowImage {
+                    line: i.line + base,
+                    ..i
+                }));
+                y += inner.height;
             }
             Block::Sdt(_) | Block::Raw(_) => {}
         }
     }
     y += pending_bottom;
     y += prev.map_or(0.0, |p| p.after);
-    (lines, boxes, y)
+    CellContent {
+        lines,
+        boxes,
+        images,
+        height: y,
+    }
 }
 
 impl CellLayout {
@@ -394,9 +534,10 @@ impl CellLayout {
 
 impl TableLayout {
     /// Lines and boxes of this table as content of an enclosing cell, offset by `(dx, dy)`.
-    pub(crate) fn flatten(&self, dx: f64, dy: f64) -> (Vec<FlowLine>, Vec<FlowBox>, f64) {
-        let mut lines = Vec::new();
+    pub(crate) fn flatten(&self, dx: f64, dy: f64) -> CellContent {
+        let mut lines: Vec<FlowLine> = Vec::new();
         let mut boxes = Vec::new();
+        let mut images: Vec<FlowImage> = Vec::new();
         for row in &self.rows {
             for cell in &row.cells {
                 if cell.row_span == 0 {
@@ -417,6 +558,7 @@ impl TableLayout {
                         ..*bx
                     });
                 }
+                let first = lines.len();
                 for ln in &cell.lines {
                     lines.push(FlowLine {
                         dx: ln.dx + dx + self.x + cell.x + cell.pad.left,
@@ -424,9 +566,22 @@ impl TableLayout {
                         ..*ln
                     });
                 }
+                for im in &cell.images {
+                    images.push(FlowImage {
+                        line: im.line + first,
+                        dx: im.dx + dx + self.x + cell.x + cell.pad.left,
+                        dy: im.dy + dy + cell.content_top,
+                        kind: im.kind.clone(),
+                    });
+                }
             }
         }
-        (lines, boxes, self.height())
+        CellContent {
+            lines,
+            boxes,
+            images,
+            height: self.height(),
+        }
     }
 
     /// Height of the box `cell` (which starts in `row`) covers.
@@ -494,9 +649,18 @@ pub(crate) fn layout_table(b: &mut Builder<'_>, table: &Table, avail: f64) -> Ta
         .first()
         .and_then(|r| r.props.justification)
         .or(props.justification);
+    let left_aligned = !matches!(
+        jc,
+        Some(TableJustification::Center | TableJustification::Right)
+    );
     let x = match jc {
         Some(TableJustification::Center) => (avail - width) / 2.0,
         Some(TableJustification::Right) => avail - width,
+        // Word 2010 and earlier measure the indent to the text of the first cell: the left grid
+        // line lies one cell margin left of it (layout-float-incell-compat14).
+        _ if b.ctx.compat < 15 => {
+            props.indent.unwrap_or(0.0) - props.cell_margins.left.unwrap_or(DEFAULT_MARGIN_X)
+        }
         _ => props.indent.unwrap_or(0.0),
     };
 
@@ -544,7 +708,12 @@ pub(crate) fn layout_table(b: &mut Builder<'_>, table: &Table, avail: f64) -> Ta
                 })
                 .unwrap_or_default();
             let content_w = (cell_w - pad.left - pad.right).max(1.0);
-            let (lines, boxes, content_h) = layout_cell(b, &c.cell.blocks, content_w, &fmt);
+            let CellContent {
+                lines,
+                boxes,
+                images,
+                height: content_h,
+            } = layout_cell(b, &c.cell.blocks, content_w, pad, &fmt);
             // Borders: the cell's own, then its table style's, then the table's. A style's
             // cell borders name its region's outer edges (`left`, `right`) and the edges between
             // its cells (`insideV`): a header row that states `insideV` nil has no vertical
@@ -609,6 +778,7 @@ pub(crate) fn layout_table(b: &mut Builder<'_>, table: &Table, avail: f64) -> Ta
                 pad,
                 lines,
                 boxes,
+                images,
                 content_h,
                 content_top: 0.0,
                 valign,
@@ -686,7 +856,13 @@ pub(crate) fn layout_table(b: &mut Builder<'_>, table: &Table, avail: f64) -> Ta
             cell.inset_r = row_lines[(cv.col + cv.span).min(last_line)] / 2.0;
         }
     }
-    let x = x + vlines[0] / 2.0;
+    // Compatibility mode 15 puts the left border's outer edge on the indent; earlier modes put the
+    // grid line one cell margin left of it, whatever the border (text origin 72.0, cells 66.96).
+    let x = if left_aligned && b.ctx.compat < 15 {
+        x
+    } else {
+        x + vlines[0] / 2.0
+    };
 
     // Row heights: the tallest single-row cell, then the row height rule, then the extra
     // that vertically merged cells need goes to the last row they cover.

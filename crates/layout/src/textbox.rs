@@ -9,7 +9,7 @@ use open365_docx::{EMU_PER_POINT, TableCellFormat, TextBox, TextBoxAnchor};
 use crate::build::Builder;
 use crate::flow::{Base, build_line};
 use crate::para::{Context, ParaLayout};
-use crate::table::{FlowLine, layout_cell};
+use crate::table::{FlowLine, Pad, layout_cell};
 use crate::{FrameBox, ImagePlacement, Line, Page, StoryKind};
 
 /// Width the lines of a `wrap="none"` box are laid out at: they never break.
@@ -50,7 +50,8 @@ impl BoxRef {
         };
         let mut builder = Builder::new(*ctx, &[], 0);
         let fmt = TableCellFormat::default();
-        let (lines, _, content_h) = layout_cell(&mut builder, &tb.blocks, width, &fmt);
+        let content = layout_cell(&mut builder, &tb.blocks, width, Pad::default(), &fmt);
+        let (lines, content_h) = (content.lines, content.height);
         let text_w = lines
             .iter()
             .map(|ln| ln.dx + builder.arena[ln.para].lines[ln.line].last_x)

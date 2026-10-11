@@ -260,6 +260,9 @@ pub(crate) struct ObjectBox {
     pub atom: usize,
     /// The laid-out text of a text box shape.
     pub text_box: Option<crate::textbox::BoxRef>,
+    /// A floating drawing in a table cell that Word positions against the page, not the cell:
+    /// `layoutInCell="0"` in a document of compatibility mode 14 or lower.
+    pub page_anchored: bool,
 }
 
 impl ObjectBox {
@@ -474,6 +477,8 @@ pub(crate) struct Context<'a> {
     pub own_mark: Option<(bool, usize)>,
     /// External hyperlink targets of the main part by relationship id.
     pub links: Option<&'a HashMap<String, String>>,
+    /// `w:compatibilityMode` of the document: 15 and later ignore `layoutInCell`.
+    pub compat: u32,
 }
 
 fn fallback_run(er: Option<EffectiveRun>) -> EffectiveRun {
@@ -950,6 +955,10 @@ pub(crate) fn layout_paragraph(
                     .text_box
                     .as_ref()
                     .map(|tb| crate::textbox::BoxRef::new(ctx, tb, w)),
+                page_anchored: !inline
+                    && ctx.table.is_some()
+                    && ctx.compat < 15
+                    && !flags.layout_in_cell,
             });
             atoms.push(Atom {
                 byte_start: range.start,

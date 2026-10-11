@@ -106,6 +106,38 @@ Still open: `CHISQ.INV.RT` is #NUM! for small p depending on df (largest accepte
 `CHISQ.INV` / `CHISQ.INV.RT` accept df beyond 1E10; the T.INV stopping tolerance; the NEGBINOM.DIST cdf #NUM! region for p >= 0.9 with f = 1E+100; `HYPGEOM.DIST(500,1000,5000,10000,TRUE)`;
 centred least squares (Excel's exact zeros for constant y and its 1E-11 better accuracy for `linest.big`); the NORM.S.DIST tail algorithm (not started).
 
+Follow-up 3 (normal quantile and the erfc primitive; known differences 5971 to 5832, passing cases 65803 to 65942):
+
+* `NORM.S.INV` is Wichura's AS 241 (PPND16, Applied Statistics 37 (1988) 477-484) in both tails. Measured on 23,000 probabilities: bit-identical for `r = sqrt(-ln p) > 5` in 99.9% of
+  5,807 points and for `r <= 5` in 96% of 3,675 (the rest lies in the centre window below). The regions are `p < 0.075` and `p >= 0.9375` (not the paper's symmetric 0.425). In the centre
+  (`0.075 <= p < 0.9375`) Excel differs from AS 241 by 1 to 9 ulp, always larger in magnitude (mean +1.3E-16 relative); AS 241 gives 20% bit-identical there, and neither a Newton nor a Halley step with
+  Excel's own `NORM.S.DIST` explains it (17%), so the centre keeps the exact value. `crates/calc/src/functions/distrib_normq.rs` implements the tails; `NORM.INV`, `NORMSINV`, `NORMINV`,
+  `CONFIDENCE.NORM` inherit it (139 entries removed). All remaining `*_inv` differences are centre points. `LOGNORM.INV` as `exp(m + s*z)` with the double `z` fixes 38 cases but breaks 9 that pass today, so it keeps the double-double path.
+* `NORM.S.DIST(z)` is `0.5*ERFC(fl(-z*0.7071067811865476))` for 30,491 of 30,500 sampled points, so Excel's `ERFC(x)` (and `ERF`) are the primitive; the nine misses differ by one ulp of the `exp` argument.
+  `ERFC` can be queried at any double, which gives the oracle a clean handle: `exp(-fl(x*x))` with a correctly rounded `exp` (Excel's own `EXP` is within 1 ulp, 5% off at arguments below -300),
+  the cut-off to 0 is between 26.542 and 26.544 (Cody's XBIG 26.543), values below 2.2250738585072014E-308 flush to 0.
+* The `R(x) = erfc(x)*exp(x*x)` factor is not any published set tested. W. J. Cody 1969 (CALERF) gives 20 to 45% bit-identical results (noise of the same size, no smooth deviation), fdlibm and the split
+  `exp` are out, Boost `erf_imp` (64-bit coefficient set as in statrs 0.19, with `float` Y offsets) matches 12 to 53% per segment (best form `exp(-z*z) * ((Y + P/Q) / z)`, Horner, second-order Horner and Estrin all
+  tried) and has the same breakpoints as Excel at 0.5 and 2.25, 5.25 and 8.0. Excel's bias against the exact value is a smooth +-3E-16 wave between x = 4 and 27 and has sharp steps at about 8.75, 9.05 and 9.65, so Excel
+  uses many more segments than Boost. `ERF(x)` for x below 0.5 is `x*c` with `c` one ulp above 2/sqrt(pi) for tiny x (leading constant 1.1283791670955128) and is +0.6 ulp high on average, not Cody's or Boost's rational.
+  Not identified; the batch method (30,000 `ERFC` values in 15 s, inputs in cells so every double is exact) is the way to continue.
+* Still open from the brief: `CHISQ.INV.RT` #NUM! boundary and `CHISQ.INV` with df above 1E10, and centred least squares for `LINEST` were not started in this pass.
+
+
+Follow-up 4 (ERF/ERFC registered, black-box measurement of Excel's erfc; known differences unchanged at 5832, passing cases 65942 to 66061):
+
+* `ERF` (one or two arguments), `ERF.PRECISE`, `ERFC`, `ERFC.PRECISE` are registered (`crates/calc/src/functions/distrib_erf.rs`; Engineering missing 18 to 14). Rules measured with 119 new `erf.*` cases: a boolean argument,
+  also from a cell, is #VALUE!; text numbers convert; a blank is 0; `ERF(a, b)` is `ERF(b) - ERF(a)`; `ERFC` is 0 from 26.543. Formula literals keep 15 significant digits, so the value samples live in cells.
+* Bit-exact `ERFC`/`ERF` was NOT reached. Evidence gathered (300,000 `ERFC` values for x in 0..12, 30,000 `ERF` values below 0.6, Excel 16.0):
+  - `ERFC(x) = exp(-fl(x*x)) * R(x)`; using Excel's rounded square with the exact `R` raises bit-identical results from 0.5-4% to 17-38% for x >= 2 and keeps 99.9% within 8 ulp (before: outliers of 64, 128 and 250 ulp at x > 6). This is in the model.
+  - `R` is not a published set: UCRT `erfc`, Cody, fdlibm and Boost fail; the error against the exact `R` has sd 1.2u (x < 1.75) to 3u (x > 8) (u = 2^-53) with a +-3u wave and steps; this is more than one or two roundings, so a fitted rational cannot be bit-exact without the evaluation order.
+  - `ERF(x)` below 0.5 is a two-stage product, not `fl(x*C)` for any constant C (best real C explains 75% of 20,000 points; `x*Cody`, `x + x*k`, Boost's `1.125*x + k*x` all fail). On 24,000 consecutive doubles the error has three line frequencies, 0.1283792 (the constant, 2/sqrt(pi) - 1),
+    0.011345725 and their difference, so the first stage multiplies by a constant whose mantissa is 1.011345725 or 1.988654275 (+-1e-8); that constant was not identified. The result is RN(exact) or RN(exact)+1 ulp (53%), occasionally +2. Model: exact * (1 + 0.9 * 2^-53) (40% to 54% identical).
+  - `ERF` for |x| >= 0.5 and `ERFC` for x < 0.5 are within 1 ulp of the correctly rounded value (95% identical), `ERFC(x < 0)` is `2 - ERFC(-x)`.
+  - `crates/calc/tests/erf_samples.rs` pins the current agreement on 3,500 Excel samples (`fixtures/reference/calc/erf-samples.txt`): ERF 81% identical, worst 2 ulp; ERFC 55% identical, worst 18 ulp. Value cases that differ by an ulp were not added to the corpus (the known-differences list may not grow).
+* `NORM.S.DIST` and the other normal functions were not switched to the model (not started). `NORM.S.INV` centre (checked on 13,664 points): Excel's error against the exact quantile has sd 3.2 ulp (AS 241: 1.1), mean +0.7 ulp toward |z| for 0.2 < p < 0.8 but -0.45 ulp for p < 0.2 and p > 0.8, so it is a different, less accurate algorithm, not a refinement of AS 241.
+* Not started: the `CHISQ.INV.RT` boundary, `CHISQ.INV` with df above 1E10, centred `LINEST`.
+
 Not done: reproducing Excel's own approximation of the normal CDF/quantile (the largest single source of residue), the multi-variable
 `LINEST` pivoting rules for collinear columns, `FORECAST.ETS.*`, and per-case analysis of the large differences.
 
@@ -127,7 +159,7 @@ Not done: reproducing Excel's own approximation of the normal CDF/quantile (the 
 
 **Information** (0): none
 
-**Engineering** (18): BESSELI, BESSELJ, BESSELK, BESSELY, CONVERT, ERF, ERF.PRECISE, ERFC, ERFC.PRECISE, IMABS, IMCOT, IMCSC, IMCSCH, IMPOWER, IMSEC, IMSECH, IMSQRT, IMTAN
+**Engineering** (14): BESSELI, BESSELJ, BESSELK, BESSELY, CONVERT, IMABS, IMCOT, IMCSC, IMCSCH, IMPOWER, IMSEC, IMSECH, IMSQRT, IMTAN
 
 **Database** (0): none
 

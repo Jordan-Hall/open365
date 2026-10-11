@@ -251,6 +251,14 @@ function Walk-Table($t, $out, $seen, $tab) {
       # so a text index maps to the story offset through the marker positions (sorted).
       $marks = New-Object System.Collections.Generic.List[int]
       foreach ($cc in $rg.ContentControls) { foreach ($mk in ([int]$cc.Range.Start - 1), [int]$cc.Range.End) { if ($mk -ge $s -and $mk -lt [int]$rg.End) { $marks.Add($mk) } } }
+      # A floating shape's anchor is one story character too, and Range.Text has none for it.
+      try {
+        $nsh = [int]$rg.ShapeRange.Count
+        for ($si = 1; $si -le $nsh; $si++) {
+          $mk = [int]$rg.ShapeRange.Item($si).Anchor.Start
+          if ($mk -ge $s -and $mk -lt [int]$rg.End) { $marks.Add($mk) }
+        }
+      } catch {}
       $marks.Sort()
       $out.Add(@{ start = $s; text = (([string]$rg.Text) -replace '[\r\a]+$', ''); used = 0; lines = 0; tab = $tab; marks = $marks.ToArray() })
     }

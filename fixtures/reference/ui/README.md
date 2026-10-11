@@ -12,5 +12,7 @@ at the same scale. `tools/gen_spec.py` derives the per-group states and shrink s
 `crates/ui-shell/tests/responsive.rs` compares the layout with every recorded width.
 
 `word-chrome-responsive.json` and `excel-chrome-responsive.json` record the title row, tab row and status bar (Excel: also
-Name Box, formula bar, sheet tab control) at window widths swept by `ribbon-oracle.ps1 -ChromeWidths`; see
-`docs/architecture/app-shell.md` (narrow-window measurement). No test consumes them yet.
+Name Box, formula bar, sheet tab control) at window widths swept by `ribbon-oracle.ps1 -ChromeWidths` (schema 2, 1 px steps
+1900..407 for both). `crates/ui-shell/tests/chrome.rs` replays every width; see `docs/architecture/app-shell.md`.
+The oracle re-reads each width until two readings agree. Word still holds its title row still for client widths 718..727
+(the Quick Access Toolbar has not dropped yet); that is Word's behaviour, not a stale read (re-measured with the stable read).

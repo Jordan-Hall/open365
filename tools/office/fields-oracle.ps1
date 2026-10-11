@@ -6,7 +6,7 @@ never run in CI. CI consumes the committed output through crates/docx/tests/fiel
   fixtures/docx/fields-<set>.docx                      fixture with deliberately stale field results
   fixtures/reference/docx/fields-<set>/fields.json     what Word produced after Fields.Update / TablesOfContents.Update
 
-  pwsh -NoProfile -File tools/office/fields-oracle.ps1 [-Set format,date,props,refs,toc] [-Probe codes.txt]
+  pwsh -NoProfile -File tools/office/fields-oracle.ps1 [-Set format,date,props,refs,toc,tables] [-Probe codes.txt]
 
 Per set the script (1) builds the fixture through COM (every field is inserted with Fields.Add and then given the
 result text STALE, so the fixture needs an update), saves it as .docx and pins docProps/core.xml and custom.xml to
@@ -28,7 +28,7 @@ the Office, Windows and regional settings are never touched. Output is stable: L
 (non-ASCII is \uXXXX escaped), no absolute paths, no user data (dc:creator / lastModifiedBy are pinned).
 #>
 param(
-  [string[]]$Set = @('format', 'date', 'props', 'refs', 'toc'),
+  [string[]]$Set = @('format', 'date', 'props', 'refs', 'toc', 'tables'),
   [string]$Probe,
   [string]$LocaleTable,
   [switch]$TocStyles
@@ -169,7 +169,16 @@ function Add-FieldParagraph($doc, $case) {
   if ($case.text) { $r.InsertAfter([string]$case.text); $end = $doc.Content.End - 1; $r = $doc.Range($end, $end) }
   if ($case.lang) { }
   $f = $doc.Fields.Add($r, -1, $case.code, $false)
-  if ($case.lang) { $f.Code.LanguageID = [int]$case.lang }
+  if ($case.lang) {
+    try {
+      switch ($case.langKind) {
+        'o' { $f.Code.LanguageIDOther = [int]$case.lang }
+        'f' { $f.Code.LanguageIDFarEast = [int]$case.lang }
+        default { $f.Code.LanguageID = [int]$case.lang }
+      }
+    }
+    catch { }
+  }
   if ($case.stale -ne $false) { $f.Result.Text = 'STALE' }
   $doc.Content.InsertParagraphAfter()
   $end = $doc.Content.End - 1
@@ -594,6 +603,211 @@ function Build-Toc($doc) {
   [void](Add-Para $doc 'Appended Chapter' 'Heading 1')
 }
 
+# ---- tables set: table formulas (= SUM(ABOVE) ...) over cells with separators, signs, text and brackets ---------------------
+# One table per case; rows are separated by '/', cells by ';'. A plain case ("a/b/c") is a one-column table with an
+# empty last row holding "= SUM(ABOVE)". "@cells|code|row,col" puts any formula into any cell.
+function Get-TableCases {
+  $text = @'
+1,000/5/-2
+1,000/5
+1,000
+1000/5
+1,000/2,000
+1,000.50/1
+12,34/1
+(5)/2
+(5)
+1e2/2
+1e2
+1e2/e3
+$3/2
+2 apples/3
+1.5e1
++5/3
+5%/1
+1 000/1
+-5/3
+1,0/1
+1,000,000/1
+0.5/0.25
+1,000/x/5
+5/x/7
+5/ /7
+5,000
+999/1
+9,999
+(5)/(3)
+2/(5)
+(5)/(5)/(5)
+(5.5)
+( 5)
+(5)x
+-(5)
+1e2/3
+3/1e2
+1e2/5/7
+5/1e2/7
+$3
+$3/4
+$3/4/5
+2 apples
+1,5
+1,5/1
+1,23
+1,2345
+1,234,5
+1,2345,678
+1.000
+1.000,5
+12,345
+(1,000)
+1E2
+1e+2
+1e
+e5
+5e
+0x10
+1.
+1.5.5
+.5
+5.
++5
+- 5
+--5
+5-
+1 000
+1_000
+1'000
+$1,000
+1,000%
+50%
+50 %
+5,5
+1,000.5/2
+(5)/(5)
+(5)/5
+$3/$4
+4/$3
+2 apples/3 apples
+3/2 apples
+x/5
+5/x
+7/x
+7/1e2
+3/1e2/4
+3/1e2/e3/4
+x/1e2
+1e2/x
+1e2/1e2/5
+4/(5)/3
+(5)/(3)/4
+(5)/(3)/x/4
+-5/(3)
+(5)/-3
+5/-3
+5%/50%
+5%/4
+4/5%
+1,000/(5)
+(1,000)/(5)
+(1,000)/5
+2/(1,000)
+5/1,000
+50 %/5
+5/50 %
+1.5e1/2
+1e+2/2
+2/1e+2
++5/+3
+1.5/2.5
+.5/.5
+.5/1
+5./1
+1./1
+5./5.
+1.0/1
+1.00/1
+1.50/1
+1.50
+1,000.00/1
+1,000.00
+0.10
+100.00/1
+3/ /4
+3//4
+3/x y/4
+3/ 4/5
+ 3 / 4 
+5/ 
+5/
+5/x/x
+5/ /x
+x/x/5
+5/1,000/(5)
+(5)/3/(4)/5
+1e+2/1e+2
+1e-2/3
+1.5e+1
+1,000/1e+2
+-1,000/2
+(1,000.50)
+(2.5)/1
+100%/1
+1,000,000/(1,000)
+5/(1,000)/x/4
+@5;3;;|= SUM(LEFT)|1,3
+@1,000;(5);;|= SUM(LEFT)|1,3
+@x;4;;|= SUM(LEFT)|1,3
+@(5);2;;|= SUM(RIGHT)|1,1
+@1,000;5;;|= SUM(RIGHT)|1,1
+@5/3/|= SUM(BELOW)|1,1
+@1,000/(5)/|= SUM(BELOW)|1,1
+@1,000;5/2;2/|= SUM(A1:B2)|3,1
+@(5);2/1e2;3/|= SUM(A1:B2)|3,1
+@1,000;5/;/|= SUM(A1:B2)|3,1
+@1,000/5/|= SUM(ABOVE) \# "0.00"|3,1
+@(5)/|= SUM(ABOVE) \# "0.00"|2,1
+@1,000/5/|= SUM(ABOVE)*2|3,1
+@1,000/5/|= SUM(ABOVE)/3|3,1
+@(5)/|= SUM(ABOVE)*2|2,1
+@1,000/5/|= MAX(ABOVE)|3,1
+@(5)/(3)/|= MAX(ABOVE)|3,1
+@(5)/(3)/|= AVERAGE(ABOVE)|3,1
+@(5)/(3)/|= PRODUCT(ABOVE)|3,1
+@(5)/(3)/|= COUNT(ABOVE)|3,1
+@1,000/5/|= SUM(ABOVE) \* MERGEFORMAT|3,1
+@1,000/5/|= SUM(ABOVE) \* CardText|3,1
+'@
+  return @($text -split "`r?`n" | Where-Object { $_ -ne '' })
+}
+
+function Build-Tables($doc) {
+  $n = 0
+  foreach ($case in (Get-TableCases)) {
+    $code = '= SUM(ABOVE)'
+    $cellAt = $null
+    if ($case.StartsWith('@')) {
+      $parts = $case.Substring(1) -split '\|'
+      $case = $parts[0]; $code = $parts[1]; $cellAt = @($parts[2] -split ',' | ForEach-Object { [int]$_ })
+    }
+    $rows = @($case -split '/')
+    if ($code -eq '= SUM(ABOVE)' -and -not $cellAt) { $rows += '' }
+    $width = ($rows | ForEach-Object { @($_ -split ';').Count } | Measure-Object -Maximum).Maximum
+    $end = $doc.Content.End - 1
+    $t = $doc.Tables.Add($doc.Range($end, $end), $rows.Count, $width)
+    for ($r = 0; $r -lt $rows.Count; $r++) {
+      $cells = @($rows[$r] -split ';')
+      for ($k = 0; $k -lt $cells.Count; $k++) { $t.Cell($r + 1, $k + 1).Range.Text = $cells[$k] }
+    }
+    if (-not $cellAt) { $cellAt = @($rows.Count, 1) }
+    $rng = $t.Cell($cellAt[0], $cellAt[1]).Range; [void]$rng.MoveEnd(1, -1)
+    $f = $doc.Fields.Add($rng, -1, $code, $false)
+    $f.Result.Text = 'STALE'
+    $doc.Content.InsertParagraphAfter()
+    $n++
+  }
+}
+
 function Get-Sets {
   $sets = [ordered]@{}
   $sets['format'] = @{ cases = (Get-FormatCases) }
@@ -601,6 +815,7 @@ function Get-Sets {
   $sets['props'] = @{ build = ${function:Build-Props} }
   $sets['refs'] = @{ build = ${function:Build-Refs} }
   $sets['toc'] = @{ build = ${function:Build-Toc} }
+  $sets['tables'] = @{ build = ${function:Build-Tables} }
   return $sets
 }
 
@@ -701,9 +916,11 @@ function Run-TocStyles {
 }
 
 # ---- locale table: month/day/AM-PM names of every language Word accepts ------------------------------------------------
-# Names come from Word itself: one field per name list in a scratch document, each given a language through
-# Field.Code.LanguageID (no regional or Office setting is changed). Default date and time pictures come from the .NET
-# culture data of the same language (the Windows short-date and long-time patterns Word's DATE/TIME fields use).
+# Names come from Word itself: one block of fields (month, genitive month, day, AM/PM) in a scratch document, copied once
+# per culture with the BCP 47 tag written into the code run's w:lang (Replicate-FieldBlock), so Word never has to create
+# thousands of fields through COM and complex-script and East Asian languages are accepted. Default date and time
+# pictures come from the .NET culture data of the same language (the Windows short-date and long-time patterns Word's
+# DATE/TIME fields use).
 function Convert-NetPicture([string]$pattern, $culture) {
   $dt = $culture.DateTimeFormat
   $out = New-Object System.Text.StringBuilder
@@ -735,6 +952,29 @@ function Convert-NetPicture([string]$pattern, $culture) {
   return $out.ToString().Trim()
 }
 
+# Repeats the first $count paragraphs of the body once per entry of $tagList; the code run of every field in the n-th
+# copy gets w:lang/@w:val = $tagList[n]. Word never has to create the thousands of fields through COM.
+function Replicate-FieldBlock([string]$path, [int]$count, $tagList) {
+  Edit-ZipText $path 'word/document.xml' {
+    param($xml)
+    $bodyStart = $xml.IndexOf('<w:body>') + 8
+    $bodyEnd = $xml.IndexOf('<w:sectPr', $bodyStart)
+    $inner = $xml.Substring($bodyStart, $bodyEnd - $bodyStart)
+    $paras = [regex]::Matches($inner, '<w:p[ >](?:(?!</w:p>).)*</w:p>')
+    $block = (($paras | Select-Object -First $count | ForEach-Object { $_.Value }) -join '')
+    $sb = New-Object System.Text.StringBuilder
+    foreach ($tag in $tagList) {
+      $withLang = [regex]::Replace($block, '(<w:r(?: [^>]*)?>)(?:<w:rPr>((?:(?!</w:rPr>).)*)</w:rPr>)?<w:instrText', {
+          param($m)
+          $props = [regex]::Replace($m.Groups[2].Value, '<w:lang\b[^>]*/>', '')
+          return $m.Groups[1].Value + '<w:rPr>' + $props + '<w:lang w:val="' + $tag + '"/></w:rPr><w:instrText'
+        })
+      [void]$sb.Append($withLang)
+    }
+    return $xml.Substring(0, $bodyStart) + $sb.ToString() + $xml.Substring($bodyEnd)
+  }
+}
+
 function Run-LocaleTable([string]$outPath) {
   New-Item -ItemType Directory -Force -Path $scratch | Out-Null
   $tmp = Join-Path $scratch 'locales.docx'
@@ -754,36 +994,48 @@ function Run-LocaleTable([string]$outPath) {
   finally { Stop-Word }
   Pin-Custom $tmp $props
   Pin-Core $tmp ([ordered]@{ 'dcterms:created' = '2023-11-02T08:09:10Z'; 'dcterms:modified' = '2024-03-03T14:05:09Z' })
+  $q = [string][char]39
+  $pipeM = 'MMMM' + $q + '|' + $q + 'MMM'
+  $pipeG = 'd' + $q + '|' + $q + 'MMMM' + $q + '|' + $q + 'MMM'   # a day number in the picture: genitive month names
+  $pipeD = 'dddd' + $q + '|' + $q + 'ddd'
   $codes = New-Object System.Collections.Generic.List[string]
-  $pipeM = 'MMMM' + [char]39 + '|' + [char]39 + 'MMM'
-  $pipeD = 'dddd' + [char]39 + '|' + [char]39 + 'ddd'
-  for ($m = 1; $m -le 12; $m++) { $codes.Add(('DOCPROPERTY DM{0:00} \@ "{1}"' -f $m, $pipeM)) }
-  for ($d = 0; $d -lt 7; $d++) { $codes.Add(('DOCPROPERTY DW{0} \@ "{1}"' -f $d, $pipeD)) }
+  for ($m = 1; $m -le 12; $m++) { $codes.Add(('DOCPROPERTY DM{0:00} \@ "{1}"' -f $m, $pipeM)) }          # 0..11
+  for ($m = 1; $m -le 12; $m++) { $codes.Add(('DOCPROPERTY DM{0:00} \@ "{1}"' -f $m, $pipeG)) }          # 12..23
+  for ($d = 0; $d -lt 7; $d++) { $codes.Add(('DOCPROPERTY DW{0} \@ "{1}"' -f $d, $pipeD)) }              # 24..30
   # Custom date properties have no time of day: the morning and afternoon names come from the pinned core dates.
-  $codes.Add('CREATEDATE \@ "AM/PM"')
-  $codes.Add('SAVEDATE \@ "AM/PM"')
-  $codes.Add('DOCPROPERTY DM03 \@ "yyyy"')
+  $codes.Add('CREATEDATE \@ "AM/PM"')                                                                    # 31
+  $codes.Add('SAVEDATE \@ "AM/PM"')                                                                      # 32
+  $codes.Add('DOCPROPERTY DM03 \@ "yyyy"')                                                               # 33
   $per = $codes.Count
-  $results = New-Object System.Collections.Generic.List[object]
+  # One block of fields, saved by Word, then copied once per language with the language written into the file
+  # (LanguageID refuses complex-script and East Asian languages in the Latin slot; the file does not).
+  $block = Join-Path $scratch 'locale-block.docx'
   Start-Word
   try {
     $doc = $script:wd.Documents.Open($tmp, $false, $false)
     $script:wd.ScreenUpdating = $false
-    foreach ($cu in $cultures) {
-      foreach ($code in $codes) {
-        $end = $doc.Content.End - 1
-        $r = $doc.Range($end, $end)
-        $f = $doc.Fields.Add($r, -1, $code, $false)
-        try { $f.Code.LanguageID = [int]$cu.LCID } catch { }
-        $doc.Content.InsertParagraphAfter()
-      }
+    foreach ($code in $codes) {
+      $end = $doc.Content.End - 1
+      [void]$doc.Fields.Add($doc.Range($end, $end), -1, $code, $false)
+      $doc.Content.InsertParagraphAfter()
     }
+    $doc.SaveAs2($block, 16); $doc.Close(0)
+  }
+  finally { Stop-Word }
+  Pin-Core $block ([ordered]@{ 'dcterms:created' = '2023-11-02T08:09:10Z'; 'dcterms:modified' = '2024-03-03T14:05:09Z' })
+  Replicate-FieldBlock $block $per @($cultures | ForEach-Object { $_.Name })
+  $results = New-Object System.Collections.Generic.List[object]
+  Start-Word
+  try {
+    $doc = $script:wd.Documents.Open($block, $false, $false)
+    $script:wd.ScreenUpdating = $false
     [void]$doc.Fields.Update()
     $all = @($doc.Fields)
+    if ($all.Count -ne $per * $cultures.Count) { throw ('expected ' + ($per * $cultures.Count) + ' fields, Word has ' + $all.Count) }
     $idx = 0
     foreach ($cu in $cultures) {
-      $vals = New-Object System.Collections.Generic.List[object]
-      for ($k = 0; $k -lt $per; $k++) { $f = $all[$idx + $k]; $vals.Add(@([int]$f.Code.LanguageID, [string]$f.Result.Text)) }
+      $vals = New-Object System.Collections.Generic.List[string]
+      for ($k = 0; $k -lt $per; $k++) { $vals.Add([string]$all[$idx + $k].Result.Text) }
       $idx += $per
       $results.Add(@($cu, $vals))
     }
@@ -794,18 +1046,21 @@ function Run-LocaleTable([string]$outPath) {
   $skipped = New-Object System.Collections.Generic.List[string]
   foreach ($entry in $results) {
     $cu = $entry[0]; $vals = $entry[1]
-    $bad = @($vals | Where-Object { $_[0] -ne $cu.LCID })
-    if ($bad.Count -gt 0) { $skipped.Add($cu.Name + ' (language not accepted)'); continue }
-    if ($vals[21][1] -ne '2024') { $skipped.Add($cu.Name + ' (calendar is not Gregorian)'); continue }
-    $full = @(); $abbr = @()
-    for ($m = 0; $m -lt 12; $m++) { $p = $vals[$m][1] -split '\|'; $full += $p[0]; $abbr += $p[1] }
+    if ($vals[33] -ne '2024') { $skipped.Add($cu.Name + ' (calendar is not Gregorian: ' + $vals[33] + ')'); continue }
+    $full = @(); $abbr = @(); $gfull = @(); $gabbr = @()
+    for ($m = 0; $m -lt 12; $m++) {
+      $p = $vals[$m] -split '\|'; $full += $p[0]; $abbr += $p[1]
+      $g = $vals[12 + $m] -split '\|'; $gfull += $g[1]; $gabbr += $g[2]
+    }
     $dfull = @(); $dabbr = @()
-    for ($d = 0; $d -lt 7; $d++) { $p = $vals[12 + $d][1] -split '\|'; $dfull += $p[0]; $dabbr += $p[1] }
+    for ($d = 0; $d -lt 7; $d++) { $p = $vals[24 + $d] -split '\|'; $dfull += $p[0]; $dabbr += $p[1] }
+    if ($full[0] -eq 'January' -and $cu.TwoLetterISOLanguageName -ne 'en') { $skipped.Add($cu.Name + ' (Word falls back to English names)'); continue }
     $dtf = $cu.DateTimeFormat
     $datePic = Convert-NetPicture $dtf.ShortDatePattern $cu
     $timePic = Convert-NetPicture $dtf.LongTimePattern $cu
-    $line = (($full -join ',') + '|' + ($abbr -join ',') + '|' + ($dfull -join ',') + '|' + ($dabbr -join ',') + '|' + $vals[19][1] + '|' + $vals[20][1] + '|' + $datePic + '|' + $timePic)
-    if ($line.Contains('"') -or $line.Contains('\')) { $skipped.Add($cu.Name + ' (quote or backslash in a name)'); continue }
+    $gf = if (($gfull -join ',') -ceq ($full -join ',')) { '' } else { $gfull -join ',' }
+    $ga = if (($gabbr -join ',') -ceq ($abbr -join ',')) { '' } else { $gabbr -join ',' }
+    $line = (($full -join ',') + '|' + ($abbr -join ',') + '|' + ($dfull -join ',') + '|' + ($dabbr -join ',') + '|' + $vals[31] + '|' + $vals[32] + '|' + $datePic + '|' + $timePic + '|' + $gf + '|' + $ga)
     $rows.Add(@($cu.Name, $line))
   }
   # en-US first (LocaleNames::english reads DATA[0]).
@@ -820,38 +1075,116 @@ function Run-LocaleTable([string]$outPath) {
   $sb = New-Object System.Text.StringBuilder
   [void]$sb.AppendLine('//! Generated by `tools/office/fields-oracle.ps1 -LocaleTable`. Do not edit by hand.')
   [void]$sb.AppendLine('//!')
-  [void]$sb.AppendLine('//! Names come from Word 16 (Field.Code.LanguageID per field); default date and time pictures')
-  [void]$sb.AppendLine('//! are the Windows short-date and long-time patterns of the language. Left out (the default')
-  [void]$sb.AppendLine('//! calendar is not Gregorian, or Word did not take the language): ' + $skipped.Count + ' tags.')
+  [void]$sb.AppendLine('//! Names come from Word 16 (the language is written into the field code run as w:lang/@w:val);')
+  [void]$sb.AppendLine('//! default date and time pictures are the Windows short-date and long-time patterns of the language.')
+  [void]$sb.AppendLine('//! Left out (Word falls back to English names, or its default calendar is not Gregorian): ' + $skipped.Count + ' tags.')
   [void]$sb.AppendLine('')
   [void]$sb.AppendLine('/// `(tag, index into DATA)`.')
   [void]$sb.AppendLine('pub(crate) static TAGS: &[(&str, usize)] = &[')
   foreach ($t in $tags) { [void]$sb.AppendLine('    ' + $t + ',') }
   [void]$sb.AppendLine('];')
   [void]$sb.AppendLine('')
-  [void]$sb.AppendLine('/// `month_full|month_abbr|day_full|day_abbr|am|pm|date picture|time picture`; names separated by commas.')
+  [void]$sb.AppendLine('/// `month_full|month_abbr|day_full|day_abbr|am|pm|date picture|time picture|genitive_full|genitive_abbr`; names')
+  [void]$sb.AppendLine('/// separated by commas. The genitive lists (used when the picture has a day number) are empty when equal.')
   [void]$sb.AppendLine('pub(crate) static DATA: &[&str] = &[')
-  foreach ($d in $data) { [void]$sb.AppendLine('    "' + $d + '",') }
+  foreach ($d in $data) { [void]$sb.AppendLine('    "' + ($d.Replace('\', '\\').Replace('"', '\"')) + '",') }
   [void]$sb.AppendLine('];')
   Write-Text $outPath $sb.ToString()
+  foreach ($sk in $skipped) { Write-Host ('left out: ' + $sk) }
   Write-Host ('locale table: ' + $tags.Count + ' tags, ' + $data.Count + ' distinct records, ' + $skipped.Count + ' left out')
 }
 
+
+# Gives the n-th field's code run a w:lang/@w:val (a BCP 47 tag), whatever Word's object model accepts: LanguageID
+# refuses complex-script and East Asian languages in the Latin slot, the XML does not. $tags: field index -> tag.
+function Set-FieldLanguageTags([string]$path, $tags) {
+  Edit-ZipText $path 'word/document.xml' {
+    param($xml)
+    $script:fieldNo = 0
+    $evaluator = {
+      param($m)
+      $i = $script:fieldNo
+      $script:fieldNo = $script:fieldNo + 1
+      if (-not $tags.Contains($i)) { return $m.Value }
+      $tag = $tags[$i]
+      $head = $m.Groups[1].Value
+      $props = $m.Groups[2].Value
+      $props = [regex]::Replace($props, '<w:lang\b[^>]*/>', '')
+      return $head + '<w:rPr>' + $props + '<w:lang w:val="' + $tag + '"/></w:rPr><w:instrText'
+    }
+    # A run whose first child is (optionally w:rPr and) w:instrText.
+    return [regex]::Replace($xml, '(<w:r(?: [^>]*)?>)(?:<w:rPr>((?:(?!</w:rPr>).)*)</w:rPr>)?<w:instrText', $evaluator)
+  }
+}
+
 function Run-Probe([string]$file) {
-  $codes = Get-Content -LiteralPath $file -Encoding UTF8 | Where-Object { $_.Trim() -ne '' }
+  # Lines: "@LCID|code" (language), "#date NAME=ISO-instant" (a custom date property DOCPROPERTY NAME can read),
+  # anything else is a field code.
+  $lines = Get-Content -LiteralPath $file -Encoding UTF8 | Where-Object { $_.Trim() -ne '' }
+  $dates = [ordered]@{}
+  $codes = New-Object System.Collections.Generic.List[string]
+  foreach ($line in $lines) {
+    if ($line -match '^#date\s+(\w+)=(\S+)$') { $dates[$Matches[1]] = $Matches[2] } else { $codes.Add($line) }
+  }
+  $path = $null
+  if ($dates.Count -gt 0) {
+    New-Item -ItemType Directory -Force -Path $scratch | Out-Null
+    $path = Join-Path $scratch 'probe.docx'
+    Start-Word
+    try {
+      $doc = $script:wd.Documents.Add()
+      foreach ($k in $dates.Keys) { Add-Custom $doc $k 3 ([datetime]'2000-01-01') }
+      $doc.SaveAs2($path, 16); $doc.Close(0)
+    }
+    finally { Stop-Word }
+    Pin-Custom $path $dates
+  }
   Start-Word
   try {
-    $doc = $script:wd.Documents.Add()
+    if ($path) { $doc = $script:wd.Documents.Open($path, $false, $false) } else { $doc = $script:wd.Documents.Add() }
+    $table = $null
+    $tags = @{}
+    $fieldCount = 0
     foreach ($line in $codes) {
+      # "#table a;b/c;d" starts a table (cells separated by ';', rows by '/'); "#cell R,C|code" puts a field in a cell.
+      if ($line -match '^#table\s+(.*)$') {
+        $rows = @($Matches[1] -split '/')
+        $width = ($rows | ForEach-Object { @($_ -split ';').Count } | Measure-Object -Maximum).Maximum
+        $end = $doc.Content.End - 1
+        $table = $doc.Tables.Add($doc.Range($end, $end), $rows.Count, $width)
+        for ($r = 0; $r -lt $rows.Count; $r++) {
+          $cells = @($rows[$r] -split ';')
+          for ($k = 0; $k -lt $cells.Count; $k++) { $table.Cell($r + 1, $k + 1).Range.Text = $cells[$k] }
+        }
+        $doc.Content.InsertParagraphAfter()
+        continue
+      }
+      if ($line -match '^#cell\s+(\d+),(\d+)\|(.*)$') {
+        $rng = $table.Cell([int]$Matches[1], [int]$Matches[2]).Range; [void]$rng.MoveEnd(1, -1)
+        [void]$doc.Fields.Add($rng, -1, $Matches[3], $false)
+        $fieldCount++
+        continue
+      }
       $lang = $null
       $c = $line
-      if ($c -match '^@(\d+)\|(.*)$') { $lang = [int]$Matches[1]; $c = $Matches[2] }
-      Add-FieldParagraph $doc @{ code = $c; lang = $lang; stale = $false }
+      $kind = ''
+      if ($c -match '^@([of]?)(\d+)\|(.*)$') { $kind = $Matches[1]; $lang = [int]$Matches[2]; $c = $Matches[3] }
+      elseif ($c -match '^@([A-Za-z][A-Za-z0-9-]*)\|(.*)$') { $tags[$fieldCount] = $Matches[1]; $c = $Matches[2] }
+      Add-FieldParagraph $doc @{ code = $c; lang = $lang; langKind = $kind; stale = $false }
+      $fieldCount++
+    }
+    if ($tags.Count -gt 0) {
+      # "@tag|code": the language is a BCP 47 tag written into the file (see Set-FieldLanguageTags).
+      New-Item -ItemType Directory -Force -Path $scratch | Out-Null
+      $tagged = Join-Path $scratch 'probe-tagged.docx'
+      $doc.SaveAs2($tagged, 16); $doc.Close(0)
+      Set-FieldLanguageTags $tagged $tags
+      $doc = $script:wd.Documents.Open($tagged, $false, $false)
     }
     [void]$doc.Fields.Update()
     foreach ($f in @($doc.Fields)) {
       $res = $f.Result.Text -replace "`r", '<P>' -replace [string][char]7, '<A>' -replace [string][char]11, '<BR>' -replace "`t", '<T>'
-      '[{0}] => [{1}]' -f $f.Code.Text.Trim(), (Json-Str $res)
+      '@{0}/{1}/{2}|[{3}] => [{4}]' -f $f.Code.LanguageID, $f.Code.LanguageIDOther, $f.Code.LanguageIDFarEast, $f.Code.Text.Trim(), (Json-Str $res)
     }
     $doc.Close(0)
   }

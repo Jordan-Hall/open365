@@ -42,8 +42,11 @@ mod keys;
 
 pub use open365_docx::DocPos;
 
-/// Gap between pages, in document points.
-const PAGE_GAP_PT: f64 = 12.0;
+/// Gap between pages, in document points. Word at 100 % zoom: 18 px at 125 % scale = 14.4 dips = 10.8 pt
+/// (`fixtures/reference/ui/word-page.json`: first characters of pages 1 and 2 are 1421 px apart, a page is 1403.2 px).
+const PAGE_GAP_PT: f64 = 10.8;
+/// Space above the first page: 15 px at 125 % = 12 dips = 9 pt (page outline at y 243 under a canvas starting at 228).
+const PAGE_TOP_PT: f64 = 9.0;
 const SIDE_PAD: f32 = 16.0;
 /// Screen points per document point at 100% zoom (96 dpi).
 const POINT_SCALE: f32 = 96.0 / 72.0;
@@ -120,7 +123,7 @@ impl LayoutIndex {
         let mut refs = Vec::new();
         let mut page_first = Vec::new();
         let mut page_top = Vec::new();
-        let mut y = PAGE_GAP_PT;
+        let mut y = PAGE_TOP_PT;
         let mut max_width = 0.0f64;
         for (pi, page) in layout.pages.iter().enumerate() {
             page_first.push(refs.len());
@@ -788,7 +791,7 @@ impl DocView {
                     .page_top
                     .get(page)
                     .copied()
-                    .unwrap_or(PAGE_GAP_PT) as f32
+                    .unwrap_or(PAGE_TOP_PT) as f32
                     * self.scale,
         )
     }
@@ -2511,4 +2514,23 @@ fn parse_hex_color(v: &str) -> Option<[u8; 3]> {
     }
     let n = u32::from_str_radix(v, 16).ok()?;
     Some([(n >> 16) as u8, (n >> 8) as u8, n as u8])
+}
+
+#[cfg(test)]
+mod page_geometry {
+    use super::{PAGE_GAP_PT, PAGE_TOP_PT, POINT_SCALE};
+
+    /// Word at 100 % on the reference machine (125 % scale): the first page starts 15 px under the canvas top and
+    /// consecutive pages are 1421 px apart (A4 page 841.9 pt = 1403.2 px), within 1 px.
+    #[test]
+    fn page_top_and_pitch_match_word() {
+        let px = |pt: f64| pt * f64::from(POINT_SCALE) * 1.25;
+        assert!(
+            (px(PAGE_TOP_PT) - 15.0).abs() <= 1.0,
+            "top {}",
+            px(PAGE_TOP_PT)
+        );
+        let pitch = px(841.9 + PAGE_GAP_PT);
+        assert!((pitch - 1421.0).abs() <= 1.0, "pitch {pitch}");
+    }
 }

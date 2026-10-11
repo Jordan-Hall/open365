@@ -28,12 +28,82 @@ impl CommandState {
     }
 }
 
+/// One colour cell of a swatch grid.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Swatch {
+    /// Control id the host runs when the cell is chosen.
+    pub id: String,
+    /// Tool tip (the colour's name).
+    pub name: String,
+    pub rgb: [u8; 3],
+    pub checked: bool,
+}
+
+impl Swatch {
+    #[must_use]
+    pub fn new(id: &str, name: &str, rgb: [u8; 3]) -> Self {
+        Self {
+            id: id.to_owned(),
+            name: name.to_owned(),
+            rgb,
+            checked: false,
+        }
+    }
+}
+
+/// A text tile of a tile grid (a style gallery).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Tile {
+    pub id: String,
+    pub label: String,
+    /// Background of the tile; `None` draws the field colour.
+    pub fill: Option<[u8; 3]>,
+    /// Text colour on a filled tile.
+    pub ink: Option<[u8; 3]>,
+    pub checked: bool,
+}
+
+/// What a menu line is.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub enum EntryKind {
+    /// A command line (with a check mark when `checked`, a sub-menu when it has `children`).
+    #[default]
+    Item,
+    /// A thin rule between groups.
+    Separator,
+    /// A group name.
+    Heading,
+    /// Rows of colour cells: the theme tint grid or the standard colours. `tight` rows touch (tints).
+    Swatches { rows: Vec<Vec<Swatch>>, tight: bool },
+    /// Text tiles in `columns` columns.
+    Tiles {
+        columns: usize,
+        /// Tile width and height in `u`.
+        size: (u32, u32),
+        tiles: Vec<Tile>,
+    },
+}
+
 /// One line of a drop-down menu.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct MenuEntry {
     pub id: String,
     pub label: String,
     pub enabled: bool,
+    pub kind: EntryKind,
+    pub checked: bool,
+    /// A sub-menu opens beside the line when this is not empty.
+    pub children: Vec<MenuEntry>,
+    /// Second line under the label (a sample in the Number Format list).
+    pub detail: Option<String>,
+    /// Icon name (Tabler) drawn in the left gutter.
+    pub icon: Option<String>,
+    /// Right-aligned shortcut text.
+    pub shortcut: Option<String>,
+    /// Row height in `u` when it is not the menu default (list rows of a combo).
+    pub height: Option<u32>,
+    /// Row text is centred (the font size list).
+    pub centred: bool,
 }
 
 impl MenuEntry {
@@ -43,7 +113,71 @@ impl MenuEntry {
             id: id.to_owned(),
             label: label.to_owned(),
             enabled,
+            ..Self::default()
         }
+    }
+
+    #[must_use]
+    pub fn separator() -> Self {
+        Self {
+            kind: EntryKind::Separator,
+            ..Self::default()
+        }
+    }
+
+    #[must_use]
+    pub fn heading(label: &str) -> Self {
+        Self {
+            label: label.to_owned(),
+            kind: EntryKind::Heading,
+            ..Self::default()
+        }
+    }
+
+    #[must_use]
+    pub fn swatches(rows: Vec<Vec<Swatch>>, tight: bool) -> Self {
+        Self {
+            enabled: true,
+            kind: EntryKind::Swatches { rows, tight },
+            ..Self::default()
+        }
+    }
+
+    #[must_use]
+    pub fn tiles(columns: usize, size: (u32, u32), tiles: Vec<Tile>) -> Self {
+        Self {
+            enabled: true,
+            kind: EntryKind::Tiles {
+                columns,
+                size,
+                tiles,
+            },
+            ..Self::default()
+        }
+    }
+
+    #[must_use]
+    pub fn checked(mut self, on: bool) -> Self {
+        self.checked = on;
+        self
+    }
+
+    #[must_use]
+    pub fn submenu(mut self, children: Vec<MenuEntry>) -> Self {
+        self.children = children;
+        self
+    }
+
+    #[must_use]
+    pub fn detail(mut self, text: &str) -> Self {
+        self.detail = Some(text.to_owned());
+        self
+    }
+
+    #[must_use]
+    pub fn icon(mut self, name: &str) -> Self {
+        self.icon = Some(name.to_owned());
+        self
     }
 }
 
@@ -64,6 +198,11 @@ pub trait ShellHost {
     }
     /// The drop-down menu of control `id`, when it has one.
     fn menu(&self, _id: &str) -> Option<Vec<MenuEntry>> {
+        None
+    }
+    /// The user finished typing `text` into the editable combo `id` (Enter, or a list pick). Return the control id to
+    /// run (for instance `fmt.font-name#Arial`), or `None` to refuse the text.
+    fn combo_commit(&mut self, _id: &str, _text: &str) -> Option<String> {
         None
     }
     /// What a combo box or gallery shows for control `id`.

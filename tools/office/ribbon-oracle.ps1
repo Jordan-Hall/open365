@@ -41,7 +41,17 @@ param(
   # -ChromeWidths also accepts ranges: 1900..425:25 (from..to:step).
   [string]$ShotDir = (Join-Path ([IO.Path]::GetTempPath()) 'open365-ribbon-shots'),
   [int]$WindowWidth = 1600,
-  [int]$WindowHeight = 1000
+  [int]$WindowHeight = 1000,
+  # Directory for <app>-chrome-responsive.json (default: fixtures/reference/ui). Use a scratch directory to
+  # re-measure a few widths without replacing the committed 1 px sweep.
+  [string]$ChromeOutDir = '',
+  # Excel: open the Home tab's menus, colour pickers and combo drop-downs (and their first sub-menus) through UI
+  # Automation and record the popup windows' geometry into excel-popups.json.
+  [switch]$Popups,
+  # -Popups: only these AutomationIds (comma separated); default is the full list.
+  [string]$PopupIds = '',
+  # Word: scan a three-page document at 100 % (page edge, shadow, gap, ruler) into word-page.json.
+  [switch]$PageGeometry
 )
 $ErrorActionPreference = 'Stop'
 $ResponsiveList = @($ResponsiveWidths -split ',' | Where-Object { $_ } | ForEach-Object { [int]$_ })
@@ -54,9 +64,14 @@ $ChromeList = @($ChromeWidths -split ',' | Where-Object { $_ } | ForEach-Object 
 $root = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 $outDir = Join-Path $root 'fixtures/reference/ui'
 New-Item -ItemType Directory -Force -Path $outDir | Out-Null
+$chromeOutDir = if ($ChromeOutDir) { $ChromeOutDir } else { $outDir }
+New-Item -ItemType Directory -Force -Path $chromeOutDir | Out-Null
 New-Item -ItemType Directory -Force -Path $ShotDir | Out-Null
 
 Add-Type -AssemblyName UIAutomationClient, UIAutomationTypes, System.Drawing
+Add-Type -Namespace Native -Name Msg -MemberDefinition @'
+[System.Runtime.InteropServices.DllImport("user32.dll")] public static extern bool PostMessage(System.IntPtr h, uint m, System.IntPtr w, System.IntPtr l);
+'@
 Add-Type -Namespace Native -Name Ui -MemberDefinition @'
 [System.Runtime.InteropServices.DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(System.IntPtr h, out uint p);
 [System.Runtime.InteropServices.DllImport("user32.dll")] public static extern bool SetProcessDpiAwarenessContext(System.IntPtr c);
@@ -71,6 +86,7 @@ Add-Type -Namespace Native -Name Ui -MemberDefinition @'
 
 $UIA = [Windows.Automation.AutomationElement]
 $walker = [Windows.Automation.TreeWalker]::ControlViewWalker
+$rawWalker = [Windows.Automation.TreeWalker]::RawViewWalker
 
 function Get-TypeName($el) { $el.Current.ControlType.ProgrammaticName -replace '^ControlType\.', '' }
 
@@ -161,6 +177,21 @@ function Find-All($el, [scriptblock]$pred, [int]$maxDepth) {
   return $found
 }
 
+function Find-AllRaw($el, [scriptblock]$pred, [int]$maxDepth) {
+  $found = New-Object System.Collections.ArrayList
+  $stack = New-Object System.Collections.Stack
+  $stack.Push(@($el, 0))
+  while ($stack.Count -gt 0) {
+    $item = $stack.Pop(); $e = $item[0]; $d = $item[1]
+    if (& $pred $e) { [void]$found.Add($e) }
+    if ($d -lt $maxDepth) {
+      $ch = $rawWalker.GetFirstChild($e)
+      while ($ch) { $stack.Push(@($ch, ($d + 1))); $ch = $rawWalker.GetNextSibling($ch) }
+    }
+  }
+  return $found
+}
+
 function Save-Shot($hwnd, [string]$path, [int]$w, [int]$h) {
   $bmp = New-Object System.Drawing.Bitmap $w, $h
   $g = [System.Drawing.Graphics]::FromImage($bmp)
@@ -188,6 +219,102 @@ function Scan-Runs([string]$path, [int]$x0, [int]$y0, [int]$dx, [int]$dy, [int]$
   if ($null -ne $cur -and $runs.Count -lt $maxRuns) { [void]$runs.Add(@($start, ($n - $start), $cur)) }
   $bmp.Dispose()
   return $runs.ToArray()
+}
+
+
+# ---- popup recording (-Popups) ------------------------------------------------------------------------------------
+function Get-ProcTops([int]$procId) {
+  # Popups are "Net UI Tool Window" children of the main window; their drop shadows are top-level
+  # MSO_BORDEREFFECT_WINDOW_CLASS windows of the process.
+  $h = @{}
+  $cond = New-Object Windows.Automation.PropertyCondition ([Windows.Automation.AutomationElement]::ProcessIdProperty), $procId
+  foreach ($e in $UIA::RootElement.FindAll([Windows.Automation.TreeScope]::Children, $cond)) {
+    if ($e.Current.ClassName -eq 'MSO_BORDEREFFECT_WINDOW_CLASS' -and -not $e.Current.IsOffscreen) { $h[($e.GetRuntimeId() -join '.')] = $e }
+  }
+  if ($script:PopupHost) {
+    $ch = $rawWalker.GetFirstChild($script:PopupHost)
+    while ($ch) {
+      if ($ch.Current.ClassName -eq 'Net UI Tool Window' -and -not $ch.Current.IsOffscreen) { $h[($ch.GetRuntimeId() -join '.')] = $ch }
+      $ch = $rawWalker.GetNextSibling($ch)
+    }
+  }
+  return $h
+}
+
+# The popup windows expose no UIA children; their contents are found by hit-testing a grid of points
+# (AutomationElement.FromPoint). Rows: [type, name, id, cls, x, y, w, h, flags] with x, y relative to the popup's own
+# top-left corner, sorted top to bottom. flags: E = expandable (submenu), T = toggled/checked, S = selected.
+# $script:SampledExpandables keeps the expandable elements (top to bottom) for opening sub-menus.
+function Sample-Popup($el, [int]$stepX = 12, [int]$stepY = 8) {
+  $pr = $el.Current.BoundingRectangle
+  $seen = @{}
+  $rows = New-Object System.Collections.ArrayList
+  $script:SampledExpandables = New-Object System.Collections.ArrayList
+  for ($y = [int]$pr.Y + 2; $y -lt $pr.Bottom; $y += $stepY) {
+    for ($x = [int]$pr.X + 2; $x -lt $pr.Right; $x += $stepX) {
+      $e = $null
+      try { $e = $UIA::FromPoint((New-Object Windows.Point($x, $y))) } catch {}
+      if (-not $e) { continue }
+      $c = $e.Current; $r = $c.BoundingRectangle
+      if ([double]::IsInfinity($r.X) -or $r.IsEmpty) { continue }
+      # Only elements that lie inside the popup.
+      if ($r.X -lt $pr.X - 1 -or $r.Y -lt $pr.Y - 1 -or $r.Right -gt $pr.Right + 1 -or $r.Bottom -gt $pr.Bottom + 1) { continue }
+      $key = '{0}|{1}|{2}|{3}|{4}' -f $c.ClassName, $c.Name, $r.X, $r.Y, $c.AutomationId
+      if ($seen.ContainsKey($key)) { continue }
+      $seen[$key] = 1
+      $flags = ''
+      $o = $null
+      try { if ($e.TryGetCurrentPattern([Windows.Automation.ExpandCollapsePattern]::Pattern, [ref]$o)) { $flags += 'E'; [void]$script:SampledExpandables.Add($e) } } catch {}
+      try { if ($e.TryGetCurrentPattern([Windows.Automation.TogglePattern]::Pattern, [ref]$o)) { if ($o.Current.ToggleState -eq 'On') { $flags += 'T' } } } catch {}
+      try { if ($e.TryGetCurrentPattern([Windows.Automation.SelectionItemPattern]::Pattern, [ref]$o)) { if ($o.Current.IsSelected) { $flags += 'S' } } } catch {}
+      [void]$rows.Add(@((Get-TypeName $e), (Scrub-Text $c.Name), $c.AutomationId, $c.ClassName, [int]($r.X - $pr.X), [int]($r.Y - $pr.Y), [int]$r.Width, [int]$r.Height, $flags))
+    }
+  }
+  return ,($rows.ToArray() | Sort-Object { $_[5] }, { $_[4] })
+}
+
+# Opens a control through its ExpandCollapse pattern. Returns $false when the control has none.
+function Open-Control($el) {
+  $o = $null
+  if ($el.TryGetCurrentPattern([Windows.Automation.ExpandCollapsePattern]::Pattern, [ref]$o)) { $o.Expand(); return $true }
+  return $false
+}
+
+# One popup record: the windows that appeared since `before`, with geometry and a pixel scan of each.
+function Read-NewPopups($procId, $before, [int]$ox, [int]$oy, [string]$ShotDir, [string]$tag, [int]$budget = 700) {
+  $out = New-Object System.Collections.ArrayList
+  $now = Get-ProcTops $procId
+  $k = 0
+  foreach ($key in $now.Keys) {
+    if ($before.ContainsKey($key)) { continue }
+    $el = $now[$key]; $c = $el.Current; $r = $c.BoundingRectangle
+    if ([double]::IsInfinity($r.X) -or $r.IsEmpty) { continue }
+    $rec = [ordered]@{
+      cls = $c.ClassName; name = (Scrub-Text $c.Name)
+      rect = @([int]($r.X - $ox), [int]($r.Y - $oy), [int]$r.Width, [int]$r.Height)
+      items = $(if ($c.ClassName -eq 'Net UI Tool Window') { Sample-Popup $el } else { @() })
+    }
+    # Pixel scan of the window itself (PrintWindow renders it even when layered): a horizontal and a vertical line
+    # through the middle, a vertical line 6 px in, and the first rows. Numbers only; the image is deleted.
+    try {
+      $h = [IntPtr][int64]$c.NativeWindowHandle
+      if ($h -ne [IntPtr]::Zero -and $r.Width -gt 8 -and $r.Height -gt 8) {
+        $shot = Join-Path $ShotDir ("popup-{0}-{1}.png" -f $tag, $k)
+        Save-Shot $h $shot ([int]$r.Width) ([int]$r.Height)
+        $w = [int]$r.Width; $hh = [int]$r.Height
+        $rec.scan = [ordered]@{
+          hMid = @(Scan-Runs $shot 0 ([int]($hh / 2)) 1 0 $w 60)
+          vMid = @(Scan-Runs $shot ([int]($w / 2)) 0 0 1 $hh 120)
+          vLeft = @(Scan-Runs $shot 6 0 0 1 $hh 120)
+          hTop = @(Scan-Runs $shot 0 3 1 0 $w 60)
+        }
+        Remove-Item $shot -ErrorAction SilentlyContinue
+      }
+    } catch { $rec.scanError = $_.Exception.Message }
+    [void]$out.Add($rec)
+    $k++
+  }
+  return $out.ToArray()
 }
 
 function Invoke-Oracle([string]$Which) {
@@ -410,9 +537,8 @@ function Invoke-Oracle([string]$Which) {
         [void]$list.Add(@($nm, $c.AutomationId, $rect[0], $rect[1], $rect[2], $rect[3], [int][bool]$c.IsOffscreen))
       }
       $cw = New-Object System.Collections.ArrayList
-      foreach ($rw in $ChromeList) {
-        [void][Native.Ui]::SetWindowPos($hwnd, [IntPtr]::Zero, 0, 0, $rw, $WindowHeight, 0x14)
-        Start-Sleep -Milliseconds $ChromeSettleMs
+      # One reading of the chrome at the current window size.
+      function Read-Chrome {
         $pr = $ribbonPane.Current.BoundingRectangle
         $px = [int]$pr.X; $py = [int]$pr.Y
         $top = New-Object System.Collections.ArrayList
@@ -450,12 +576,153 @@ function Invoke-Oracle([string]$Which) {
         }
         $gr = New-Object Native.Ui+RECT
         [void][Native.Ui]::GetWindowRect($hwnd, [ref]$gr)
-        [void]$cw.Add([ordered]@{ w = $rw; win = @(($gr.Right - $gr.Left), ($gr.Bottom - $gr.Top)); pane = @($px, $py, [int]$pr.Width, [int]$pr.Height); top = $top.ToArray(); status = $stat.ToArray(); extra = $extra.ToArray() })
+        return [ordered]@{ win = @(($gr.Right - $gr.Left), ($gr.Bottom - $gr.Top)); pane = @($px, $py, [int]$pr.Width, [int]$pr.Height); top = $top.ToArray(); status = $stat.ToArray(); extra = $extra.ToArray() }
+      }
+      $cw = New-Object System.Collections.ArrayList
+      foreach ($rw in $ChromeList) {
+        [void][Native.Ui]::SetWindowPos($hwnd, [IntPtr]::Zero, 0, 0, $rw, $WindowHeight, 0x14)
+        Start-Sleep -Milliseconds $ChromeSettleMs
+        # Office re-lays out the title row, tab row and status bar at different moments: read again until two
+        # readings 200 ms apart agree (a stale title row was seen in a 1 px sweep at ChromeSettleMs 700).
+        $rec = Read-Chrome
+        $sig = $rec | ConvertTo-Json -Depth 8 -Compress
+        for ($try = 0; $try -lt 15; $try++) {
+          Start-Sleep -Milliseconds 200
+          $rec = Read-Chrome
+          $sig2 = $rec | ConvertTo-Json -Depth 8 -Compress
+          if ($sig2 -eq $sig) { break }
+          $sig = $sig2
+        }
+        [void]$cw.Add([ordered]@{ w = $rw; win = $rec.win; pane = $rec.pane; top = $rec.top; status = $rec.status; extra = $rec.extra })
       }
       [void][Native.Ui]::SetWindowPos($hwnd, [IntPtr]::Zero, 0, 0, $WindowWidth, $WindowHeight, 0x14)
       $cj = [ordered]@{ schema = 2; app = $Which; measuredScale = $scale; note = 'w = requested outer window width in physical px (client = win[0] - 18). Records are [name, id, x, y, w, h, offscreen] with x, y relative to the ribbon pane origin.'; widths = $cw.ToArray() } | ConvertTo-Json -Depth 8 -Compress
       foreach ($t in $script:Scrub) { if ($t) { $cj = $cj.Replace($t, '<user>') } }
-      [IO.File]::WriteAllText((Join-Path $outDir ("{0}-chrome-responsive.json" -f $Which.ToLower())), $cj, (New-Object Text.UTF8Encoding($false)))
+      [IO.File]::WriteAllText((Join-Path $chromeOutDir ("{0}-chrome-responsive.json" -f $Which.ToLower())), $cj, (New-Object Text.UTF8Encoding($false)))
+    }
+
+    # Popups (Excel Home tab): open each menu / colour picker / combo list through UI Automation, record the popup
+    # windows that appear and the first sub-menus. Closing uses the pattern first, then a WM_KEYDOWN(Esc) posted to the
+    # popup's own window (never a global key press).
+    if ($Popups -and $Which -eq 'Excel') {
+      $homeTab = $tabItems | Where-Object { $_.Current.AutomationId -eq 'TabHome' } | Select-Object -First 1
+      try { $homeTab.GetCurrentPattern([Windows.Automation.SelectionItemPattern]::Pattern).Select() } catch {}
+      Start-Sleep -Milliseconds 900
+      $targets = @('FontColorPicker_Dropdown', 'CellFillColorPicker_Dropdown', 'Font', 'FontSize', 'NumberFormatGallery',
+        'BordersGallery_Dropdown', 'UnderlineGallery_Dropdown', 'AccountingFormatMenu_Dropdown', 'FormatCellsMenu',
+        'ConditionalFormattingMenu', 'FillMenu', 'FormatAsTableGallery', 'CellStylesGallery', 'ClearMenu', 'SortAndFilterMenu')
+      $recs = New-Object System.Collections.ArrayList
+      if ($PopupIds) { $targets = @($PopupIds -split ',') }
+      $script:PopupHost = $win
+      $baseline = Get-ProcTops $procId
+      function Close-Popups($el) {
+        $o = $null
+        try { if ($el.TryGetCurrentPattern([Windows.Automation.ExpandCollapsePattern]::Pattern, [ref]$o)) { $o.Collapse() } } catch {}
+        Start-Sleep -Milliseconds 500
+        for ($i = 0; $i -lt 6; $i++) {
+          $now = Get-ProcTops $procId
+          $extra = @($now.Keys | Where-Object { -not $baseline.ContainsKey($_) })
+          if ($extra.Count -eq 0) { return }
+          foreach ($k in $extra) {
+            $h = [int64]$now[$k].Current.NativeWindowHandle
+            if ($h -ne 0) { [void][Native.Msg]::PostMessage([IntPtr]$h, 0x100, [IntPtr]0x1B, [IntPtr]0); [void][Native.Msg]::PostMessage([IntPtr]$h, 0x101, [IntPtr]0x1B, [IntPtr]0) }
+          }
+          Start-Sleep -Milliseconds 400
+        }
+      }
+      foreach ($tid in $targets) {
+        $el = (Find-All $ribbonPane { param($e) $e.Current.AutomationId -eq $tid } 12) | Select-Object -First 1
+        if (-not $el) { [void]$recs.Add([ordered]@{ id = $tid; missing = $true }); continue }
+        $or = $el.Current.BoundingRectangle
+        $rec = [ordered]@{ id = $tid; name = (Scrub-Text $el.Current.Name); cls = $el.Current.ClassName; opener = @([int]($or.X - $ox), [int]($or.Y - $oy), [int]$or.Width, [int]$or.Height); windows = @(); subs = @() }
+        try {
+          $before = Get-ProcTops $procId
+          if (-not (Open-Control $el)) { $rec.noExpand = $true; [void]$recs.Add($rec); continue }
+          # Wait for the popup window to show; open again once when it did not.
+          $shown = $false
+          for ($attempt = 0; $attempt -lt 2 -and -not $shown; $attempt++) {
+            for ($i = 0; $i -lt 12 -and -not $shown; $i++) {
+              Start-Sleep -Milliseconds 250
+              $shown = @((Get-ProcTops $procId).Values | Where-Object { $_.Current.ClassName -eq 'Net UI Tool Window' }).Count -gt 0
+            }
+            if (-not $shown) { $rec.retried = $true; [void](Open-Control $el) }
+          }
+          Start-Sleep -Milliseconds 600
+          $rec.windows = @(Read-NewPopups $procId $before $ox $oy $ShotDir $tid)
+          # Sub-menus: expandable items of the first popup, at most three, each from a freshly opened menu state.
+          $afterOpen = Get-ProcTops $procId
+          $popEl = $null
+          foreach ($k in $afterOpen.Keys) { if (-not $before.ContainsKey($k) -and $afterOpen[$k].Current.ClassName -eq 'Net UI Tool Window') { $popEl = $afterOpen[$k]; break } }
+          if ($popEl) {
+            $exp = @($script:SampledExpandables | Where-Object { $_.Current.ControlType -eq [Windows.Automation.ControlType]::MenuItem } | Select-Object -First 3)
+            foreach ($se in $exp) {
+              try {
+                $sb = Get-ProcTops $procId
+                $sr = $se.Current.BoundingRectangle
+                $so = $null
+                if ($se.TryGetCurrentPattern([Windows.Automation.ExpandCollapsePattern]::Pattern, [ref]$so)) { $so.Expand() }
+                Start-Sleep -Milliseconds 1000
+                $subWins = @(Read-NewPopups $procId $sb $ox $oy $ShotDir ("{0}-sub" -f $tid))
+                $pr = $popEl.Current.BoundingRectangle
+                $rec.subs += [ordered]@{ item = (Scrub-Text $se.Current.Name); itemRect = @([int]($sr.X - $pr.X), [int]($sr.Y - $pr.Y), [int]$sr.Width, [int]$sr.Height); windows = $subWins }
+                try { $so.Collapse() } catch {}
+                Start-Sleep -Milliseconds 400
+              } catch { $rec.subError = $_.Exception.Message }
+            }
+          }
+        } catch { $rec.error = $_.Exception.Message }
+        Close-Popups $el
+        [void]$recs.Add($rec)
+      }
+      $pj = [ordered]@{ schema = 1; app = $Which; measuredScale = $scale; note = 'Rects are physical px. opener is window-relative; popup window rect is window-relative; items and scans are relative to their popup window. item = [type, name, id, cls, x, y, w, h, offscreen, depth, flags(E expandable, T toggled, S selected)]. scan = colour runs [start, length, rrggbb] along a line of the popup (hMid, vMid, vLeft at x=6, hTop at y=3).'; popups = $recs.ToArray() } | ConvertTo-Json -Depth 12 -Compress
+      foreach ($t in $script:Scrub) { if ($t) { $pj = $pj.Replace($t, '<user>') } }
+      [IO.File]::WriteAllText((Join-Path $chromeOutDir 'excel-popups.json'), $pj, (New-Object Text.UTF8Encoding($false)))
+      Write-Host ("Excel popups: {0} controls recorded, {1} bytes" -f $recs.Count, $pj.Length)
+    }
+
+    # Word page geometry: a three-page document at 100 % in Print Layout, ruler hidden and shown (restored in `finally`).
+    # Records where the first character of each page sits (object model, screen px) and colour-run scans of the window.
+    if ($PageGeometry -and $Which -eq 'Word') {
+      $doc = $office.ActiveDocument; $aw = $office.ActiveWindow
+      $doc.Content.Text = "One`fTwo`fThree"
+      $aw.View.Type = 3
+      $aw.View.Zoom.Percentage = 100
+      $script:RulerWas = [bool]$aw.ActivePane.DisplayRulers
+      $pgRec = New-Object System.Collections.ArrayList
+      foreach ($ruler in @($false, $true)) {
+        $aw.ActivePane.DisplayRulers = $ruler
+        $aw.ActivePane.VerticalPercentScrolled = 0
+        Start-Sleep -Milliseconds 1800
+        $pts = @()
+        foreach ($pgNo in 1, 2, 3) {
+          $rg = $doc.GoTo(1, 1, $pgNo)
+          $l = 0; $t = 0; $w = 0; $hh = 0
+          $aw.GetPoint([ref]$l, [ref]$t, [ref]$w, [ref]$hh, $doc.Range($rg.Start, $rg.Start))
+          $pts += , @($l, $t, $w, $hh)
+        }
+        $aw.ActivePane.VerticalPercentScrolled = 0
+        Start-Sleep -Milliseconds 600
+        $shot = Join-Path $ShotDir ("word-page-ruler{0}.png" -f [int]$ruler)
+        Save-Shot $hwnd $shot $WindowWidth $WindowHeight
+        $rec = [ordered]@{ ruler = $ruler; firstChar = $pts; zoom = $aw.View.Zoom.Percentage
+          pageSetupPt = @($doc.PageSetup.PageWidth, $doc.PageSetup.PageHeight, $doc.PageSetup.LeftMargin, $doc.PageSetup.TopMargin)
+          scanX800 = @{ origin = @(800, 0); dir = 'y'; runs = (Scan-Runs $shot 800 0 0 1 $WindowHeight 400) }
+          scanX200 = @{ origin = @(200, 0); dir = 'y'; runs = (Scan-Runs $shot 200 0 0 1 $WindowHeight 400) }
+          scanX30 = @{ origin = @(30, 0); dir = 'y'; runs = (Scan-Runs $shot 30 0 0 1 $WindowHeight 400) }
+          scanY500 = @{ origin = @(0, 500); dir = 'x'; runs = (Scan-Runs $shot 0 500 1 0 $WindowWidth 200) }
+          scanY1 = @{ origin = @(0, 1); dir = 'x'; runs = (Scan-Runs $shot 0 1 1 0 $WindowWidth 100) } }
+        if ($ruler) {
+          # Ruler band: rows 200..330 (every 2nd) across the page width; the ticks and the margin shading show as runs.
+          $rows = @{}
+          for ($yy = 200; $yy -le 330; $yy += 2) { $rows["y$yy"] = @(Scan-Runs $shot 250 $yy 1 0 1100 160) }
+          $rec.rulerRows = $rows
+        }
+        [void]$pgRec.Add($rec)
+      }
+      $aw.ActivePane.DisplayRulers = $script:RulerWas
+      $gj = [ordered]@{ schema = 1; app = 'Word'; measuredScale = $scale; window = $winRect; note = 'Scans are physical px, window-relative, runs [start, length, rrggbb] from `origin` along `dir`. firstChar = Window.GetPoint of the first character of pages 1..3 (screen px, [left, top, width, height]).'; states = $pgRec.ToArray() } | ConvertTo-Json -Depth 12 -Compress
+      [IO.File]::WriteAllText((Join-Path $chromeOutDir 'word-page.json'), $gj, (New-Object Text.UTF8Encoding($false)))
+      Write-Host ("Word page geometry: {0} bytes" -f $gj.Length)
     }
 
     # Backstage: open the File tab, record the navigation list and layout, then go back.
@@ -475,12 +742,13 @@ function Invoke-Oracle([string]$Which) {
       }
     } catch { $result.backstageError = $_.Exception.Message }
 
-    $path = Join-Path $(if ($ChromeOnly) { $ShotDir } else { $outDir }) ("{0}-ribbon.json" -f $Which.ToLower())
+    $path = Join-Path $(if ($ChromeOnly -or $Popups -or $PageGeometry) { $ShotDir } else { $outDir }) ("{0}-ribbon.json" -f $Which.ToLower())
     $json = $result | ConvertTo-Json -Depth 40 -Compress
     foreach ($t in $script:Scrub) { if ($t) { $json = $json.Replace($t, '<user>') } }
     [IO.File]::WriteAllText($path, $json, (New-Object Text.UTF8Encoding($false)))
     Write-Host ("{0}: wrote {1} ({2} tabs, {3} bytes, dpi {4}, pid {5})" -f $Which, $path, $tabs.Count, $json.Length, $dpi, $procId)
   } finally {
+    try { if ($mine -and $null -ne $script:RulerWas) { $office.ActiveWindow.ActivePane.DisplayRulers = $script:RulerWas } } catch {}
     try { if ($mine -and $script:RibbonWasCollapsed) { $office.CommandBars.ExecuteMso('MinimizeRibbon') } } catch {}
     if ($mine) {
       try { foreach ($d in @($office.Documents)) { $d.Saved = $true } } catch {}

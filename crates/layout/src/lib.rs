@@ -29,6 +29,7 @@ mod build;
 mod cancel;
 mod float;
 mod flow;
+mod frame;
 mod furniture;
 mod incremental;
 mod metrics;
@@ -398,7 +399,7 @@ impl Page {
     pub fn table_wrap_zones(&self) -> Vec<[f64; 4]> {
         self.floats
             .iter()
-            .filter(|f| f.table)
+            .filter(|f| f.table || f.frame)
             .map(|f| {
                 let s = flow::snap_edge;
                 [s(f.x0), s(f.rect[1]), s(f.x1), s(f.rect[3])]

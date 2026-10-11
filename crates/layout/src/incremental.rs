@@ -44,6 +44,7 @@ struct Fingerprint {
     model: LineMetricModel,
     font_count: usize,
     default_tab: u64,
+    compat: u32,
 }
 
 #[derive(Debug)]
@@ -120,6 +121,7 @@ fn fingerprint(doc: &Document, fonts: &FontLibrary, options: LayoutOptions) -> F
         model: options.metric_model,
         font_count: fonts.len(),
         default_tab: f64::from(doc.settings().default_tab_stop_twips).to_bits(),
+        compat: doc.settings().compatibility_mode,
     }
 }
 
@@ -200,6 +202,7 @@ impl IncrementalLayout {
             order: Some(&order),
             own_mark: None,
             links: Some(&links),
+            compat: doc.settings().compatibility_mode,
         };
         let doc_sections = doc.sections();
         let sections: Vec<SectionProps> = doc_sections.iter().map(SectionProps::from).collect();

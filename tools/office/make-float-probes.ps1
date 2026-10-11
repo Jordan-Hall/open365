@@ -303,14 +303,24 @@ notes = `"$notes`"
     $t = $d.Tables.Add($r, 3, 2)
     $t.Borders.Enable = $true
     $t.Columns.Item(1).Width = 200; $t.Columns.Item(2).Width = 200
+    # Every cell has its own text: the oracle pairs PDF rows with cell paragraphs by text, so identical cells all map to one offset (no commas: the PDF decodes them as spaces).
+    $cellTexts = @(
+      'Lanterns hang along the harbour wall and swing gently whenever the evening wind rises from the bay lighting the cobbles below.',
+      'Orchard keepers gather windfall apples in wicker baskets and sort bruised fruit from sound before the cider press opens.',
+      'Beneath the viaduct a market sells cheese and rye loaves with pickled beetroot and knitted scarves to anyone passing by.',
+      'Snow settles quietly on the signal box while the last freight train rumbles north with its brake lamps glowing amber and red.',
+      'Pupils in the village school learn to read weather from clouds and note each morning how high and how fast they travel.',
+      'Seed catalogues arrive in January and the allotment holders circle their favourites long before the soil is ready to dig.')
     $k = 0
-    foreach ($row in 1..3) { foreach ($col in 1..2) { $k++; $t.Cell($row, $col).Range.Text = $T2.Substring(0, 150) } }
+    foreach ($row in 1..3) { foreach ($col in 1..2) { $t.Cell($row, $col).Range.Text = $cellTexts[$k]; $k++ } }
     $t.Rows.Item(1).Height = 80; $t.Rows.Item(2).Height = 80
     $t.Rows.Item(2).Range.Cells.Item(1).Range.Paragraphs.Item(1).Range | Out-Null
     $t
   }
+  # The anchor goes after the cell text unless `before` is set: the oracle takes a cell line's story offset from the paragraph's Range.Text,
+  # which has no character for a floating anchor, so it adds each shape's Anchor.Start to the character marks (Walk-Table).
   function Add-FCell($t, $row, $col, $o) {
-    $r = $t.Cell($row, $col).Range.Paragraphs.Item(1).Range; $r.Collapse(1)
+    $r = $t.Cell($row, $col).Range.Paragraphs.Item(1).Range; $r.End = $r.End - 1; $r.Collapse($(if ($o.before) { 1 } else { 0 }))
     $png = if ($o.png) { $o.png } else { $script:RED }
     $sh = $script:doc.InlineShapes.AddPicture($png, $false, $true, $r).ConvertToShape()
     $sh.LockAspectRatio = 0; $sh.Width = [single]$o.w; $sh.Height = [single]$o.h
@@ -327,6 +337,16 @@ notes = `"$notes`"
     [void](Add-FCell $t 3 1 @{ w = 44; h = 30; wrap = 0; side = 0; hrel = 0; x = $RIGHT; vrel = 2; y = 0; incell = $true; png = $BLUE })
     [void](Add-FCell $t 3 2 @{ w = 45; h = 30; wrap = 0; side = 0; hrel = 0; x = $RIGHT; vrel = 2; y = 0; incell = $false; png = $GREEN })
   }
+  # The same floats anchored at the start of the cell text (a second anchor in cell 1,1 after the first): line offsets count the anchor characters.
+  $cellBeforeBuild = {
+    $t = Cell-Doc 0
+    [void](Add-FCell $t 1 1 @{ w = 40; h = 30; wrap = 3; hrel = 1; x = 10; vrel = 1; y = 120; incell = $true; before = $true })
+    [void](Add-FCell $t 1 1 @{ w = 20; h = 20; wrap = 3; hrel = 0; x = 60; vrel = 2; y = 40; incell = $true; png = $BLUE; before = $true })
+    [void](Add-FCell $t 1 2 @{ w = 41; h = 30; wrap = 3; hrel = 0; x = 10; vrel = 2; y = 10; incell = $true; png = $BLUE; before = $true })
+    [void](Add-FCell $t 2 1 @{ w = 42; h = 30; wrap = 3; hrel = 1; x = 10; vrel = 1; y = 280; incell = $false; png = $GREEN; before = $true })
+    [void](Add-FCell $t 3 1 @{ w = 44; h = 30; wrap = 0; side = 0; hrel = 0; x = $RIGHT; vrel = 2; y = 0; incell = $true; png = $BLUE; before = $true })
+  }
+  F-Fixture 'layout-float-incell-before' 'floats anchored at the start of table cell text, layoutInCell on and off, current compatibility mode' $cellBeforeBuild
   F-Fixture 'layout-float-incell' 'floats anchored in table cells, layoutInCell on and off, current compatibility mode' $cellBuild
   F-Fixture 'layout-float-incell-compat14' 'floats anchored in table cells, layoutInCell on and off, Word 2010 compatibility mode (14)' $cellBuild 14
 

@@ -11,6 +11,7 @@ use crate::fields_formula::{self, FormulaEnv, Num};
 use crate::fields_locale::LocaleNames;
 use crate::fields_number as number;
 use crate::fields_props::{DocProps, PropValue};
+use crate::fields_refs::cells::TableStyle;
 use crate::fields_scan::RawField;
 use crate::fields_snap::{Snapshot, StyleTable};
 use crate::fields_toc::TocPlan;
@@ -215,9 +216,36 @@ impl<'c> Evaluator<'c> {
     }
 
     fn formula(&self, inst: &Instruction, view: &View<'_>, raw: &RawField) -> Value {
-        let env = DocEnv { view, raw };
+        let env = DocEnv {
+            view,
+            raw,
+            style: std::cell::Cell::new(TableStyle::default()),
+        };
         match fields_formula::evaluate(&inst.body, &env) {
-            Ok(n) => Value::Num(n),
+            Ok(n) => {
+                // Without a picture or numbering switch the result is written like the cells it
+                // was summed from (thousands separators, brackets for a negative number).
+                let style = env.style.get();
+                let formatted = inst.number_picture().is_none()
+                    && !inst.general_formats().iter().any(|f| {
+                        matches!(
+                            f,
+                            GeneralFormat::CardText
+                                | GeneralFormat::OrdText
+                                | GeneralFormat::DollarText
+                                | GeneralFormat::Ordinal
+                                | GeneralFormat::Arabic
+                                | GeneralFormat::Roman(_)
+                                | GeneralFormat::Alphabetic(_)
+                                | GeneralFormat::Hex
+                        )
+                    });
+                if formatted && style != TableStyle::default() {
+                    Value::Plain(style.apply(&n.text()))
+                } else {
+                    Value::Num(n)
+                }
+            }
             Err(msg) => Value::Plain(msg),
         }
     }
@@ -532,6 +560,8 @@ fn caps(text: &str) -> String {
 struct DocEnv<'a, 'b> {
     view: &'a View<'b>,
     raw: &'a RawField,
+    /// How the cells a formula read were written.
+    style: std::cell::Cell<TableStyle>,
 }
 
 impl FormulaEnv for DocEnv<'_, '_> {
@@ -545,7 +575,13 @@ impl FormulaEnv for DocEnv<'_, '_> {
     }
 
     fn table_values(&self, reference: &str) -> Option<Vec<f64>> {
-        crate::fields_refs::table_values(self.view, self.raw, reference)
+        let (values, style) = crate::fields_refs::table_values(self.view, self.raw, reference)?;
+        let old = self.style.get();
+        self.style.set(TableStyle {
+            grouped: old.grouped || style.grouped,
+            parens: old.parens || style.parens,
+        });
+        Some(values)
     }
 }
 

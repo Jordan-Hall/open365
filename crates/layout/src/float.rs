@@ -38,6 +38,8 @@ pub(crate) struct Float {
     pub outline: Option<Arc<Outline>>,
     /// The area of a floating table (`w:tblpPr`), whose rectangle Word also reports as a clip.
     pub table: bool,
+    /// The area of a paragraph frame (`w:framePr`); Word reports its clip rectangle like a table's.
+    pub frame: bool,
     /// A floating table with `tblOverlap="never"`: later tables keep out of it too.
     pub no_overlap: bool,
 }
@@ -59,11 +61,6 @@ impl Float {
         };
         let (mut lo, mut hi) = (f64::INFINITY, f64::NEG_INFINITY);
         let n = o.points.len();
-        let (top, bottom) = match std::env::var("VAR").as_deref() {
-            Ok("B") => (bottom, bottom),
-            Ok("C") => (top, top),
-            _ => (top, bottom),
-        };
         for i in 0..n {
             let (a, b) = (o.points[i], o.points[(i + 1) % n]);
             // The part of the edge inside the band.
@@ -191,6 +188,27 @@ pub(crate) struct Frame {
 }
 
 impl Frame {
+    /// The frame of a table cell, in coordinates whose origin is the cell's outer top left corner.
+    /// Measured (`layout-float-incell`): in a cell the page-relative position counts from the cell
+    /// box, `margin` from the cell's text area and every vertical base is the cell top, so the
+    /// cell stands in for the page: its box is the page, its text area the margins.
+    pub(crate) fn cell(left: f64, right: f64, content_w: f64) -> Self {
+        let section = SectionProps {
+            page_width: left + content_w + right,
+            page_height: 1.0e6,
+            margin_top: 0.0,
+            margin_right: right,
+            margin_bottom: 0.0,
+            margin_left: left,
+            gutter: 0.0,
+            ..SectionProps::default()
+        };
+        Self {
+            col: (left, left + content_w),
+            section,
+        }
+    }
+
     /// The frame of a section without columns: the column is the margin box.
     pub(crate) fn new(section: SectionProps) -> Self {
         Self {
@@ -202,6 +220,10 @@ impl Frame {
         }
     }
 }
+
+/// The narrowest gap beside a float that Word puts text in, whatever the word: a 2-letter word
+/// is placed at 18.5 pt and goes right of the float at 15.5 (`layout-frame-gap`, 11 pt Calibri).
+const MIN_SPAN: f64 = 18.0;
 
 /// Side of the square the coordinates of a wrap polygon are in.
 const POLYGON_UNITS: f64 = 21600.0;
@@ -367,6 +389,7 @@ pub(crate) fn place(
             rect: [x, y, x + w, y + h],
             outline: outline.map(Arc::new),
             table: false,
+            frame: false,
             no_overlap: false,
         }),
         image: ImagePlacement {
@@ -407,7 +430,7 @@ pub(crate) fn dynamic_lines(
     let objects: Vec<&crate::para::ObjectBox> = para
         .objects
         .iter()
-        .filter(|o| !o.inline() && o.atom >= from_atom)
+        .filter(|o| !o.inline() && !o.page_anchored && o.atom >= from_atom)
         .collect();
     let flags: Vec<AnchorFlags> = objects.iter().map(|o| o.flags.clone()).collect();
     // Drawings placed against their anchor's line wait for it; they never move the lines above
@@ -491,7 +514,7 @@ pub(crate) fn dynamic_lines(
                 let seg_first = first && row.is_empty();
                 let line = builder.fill_in(at, seg_first, inset);
                 // The first word must fit in the span, or the span stays empty.
-                if narrowed && r - l < line_min_width(para, &line) - 1e-6 {
+                if narrowed && (r - l < line_min_width(para, &line) - 1e-6 || r - l < MIN_SPAN) {
                     continue;
                 }
                 at = line.atoms.end;

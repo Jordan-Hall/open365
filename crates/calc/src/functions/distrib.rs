@@ -236,6 +236,9 @@ pub(super) fn norm_s_inv_f(p: f64) -> Res<f64> {
     if !(p > 0.0 && p < 1.0) {
         return Err(NUM);
     }
+    if let Some(z) = super::distrib_normq::tail_quantile(p) {
+        return Ok(z);
+    }
     Ok(norm_s_inv_dd(p).to_f64())
 }
 

@@ -75,7 +75,7 @@ Inline and floating placements match `layout-img-inline`, `layout-img-none`, `la
 - Shapes in `mc:AlternateContent` without text are kept as anchors (one character, wrapping); header/footer ones are not
   emitted as images.
 
-Open: `layoutInCell` and floats in table cells (`layout-float-incell*`), clamping at the
+Open: clamping at the
 bottom margin (`layout-float-anchor-bottom`, `-anchor-nextpage`), the lookahead after an incremental restart.
 
 ## Section columns (`w:cols`; `props.rs`, `flow.rs`, `float.rs`)
@@ -144,7 +144,7 @@ Open (anchors): in `7fc3ccc4` (table 0, merged first cell) Word numbers the para
 merged cell are not in document order in the reference (possibly the oracle's pairing of empty paragraphs, not Word); not changed.
 `ad265748`: the empty paragraphs of vertically merged, centre-aligned cells (@1243, @1410, @1426) are paired with other y values in the reference; not understood.
 
-Floating tables (`w:tblpPr`; `table.rs` `TablePos`, `flow.rs` `place_float_table`, probes `layout-tblp-*` made by `tools/office/make-frame-probes.ps1`) are implemented; frames and drop caps are not.
+Floating tables (`w:tblpPr`; `table.rs` `TablePos`, `flow.rs` `place_float_table`, probes `layout-tblp-*` made by `tools/office/make-frame-probes.ps1`) and frames are implemented.
 
 | Rule | Evidence |
 |---|---|
@@ -156,11 +156,39 @@ Floating tables (`w:tblpPr`; `table.rs` `TablePos`, `flow.rs` `place_float_table
 | A floating table anchored in the next paragraph reaches back over the lines of the paragraph before it (negative `tblpY`, margin or page anchors): the lines are broken again around it with the same lookahead as pictures (`ahead_floats`). | `layout-tblp-never` |
 | The oracle reports one more clip rectangle per table: the outer box grown by the left and right text distances only (the top and bottom distances are not in it), `Page::table_wrap_zones`. Right aligned with `rightFromText` 0 it is 0.5 pt wider than that (`layout-tblp-right`, `layout-tblp-margin`: unexplained, 2 rectangles). | `layout-tblp-basic/-right2` |
 
-Open (floating tables): Word splits a floating table that does not fit the page and carries the rest to the top of the next page together with the anchor's text (`layout-tblp-bottom`, 62 of 97: rows 6 to 10 repeat as a second float on page 2); frames and tables that are not as wide as the anchor's column in a section with columns are untested.
+Open (floating tables): Word splits a floating table that does not fit the page and carries the rest to the top of the next page together with the anchor's text (`layout-tblp-bottom`, 62 of 97: rows 1 to 5 stay on page 1 at y 636 (5 rows, 70.10 pt), rows 6 to 10 start page 2 at the top margin (y 72.03), and the whole anchor paragraph L22 and L23 moves to page 2 beside them, starting at 82.58; the engine keeps all ten rows on page 1 below the bottom margin and the anchor paragraph beside them; not implemented: `place_float_table` has no split and the paragraph loop has no hook to carry the anchor); frames and tables that are not as wide as the anchor's column in a section with columns are untested.
 
-Frames (not started; probes `layout-frame-basic/-page/-dropcap/-nobdr/-bdr` have references). Measured so far: a frame paragraph is a float whose text is laid out at `w:w` (no width: the natural width up to the column, 23.06 pt for a 55 pt "L" drop cap); it starts at the frame position (x, y as for tables, same +1 twip quirk, `xAlign`/`yAlign` keywords) and leaves the flow; the next paragraph starts at the frame's top. Its clip rectangle is the text box grown **horizontally** by `space + border width + 1.5 pt` on each side (nobdr frames keep `w:space="1"`: 2.5 pt) and vertically by `space + border width`; the first line sits `space + border width` below the frame top; text wraps over that rectangle plus `hSpace` left and right and `vSpace` above and below (`vSpace` moves the wrap, not the clip rectangle). A frame inside a table cell has no effect (`4e493df5`). Drop caps wrap three lines of the next paragraph (the frame is one exact line of the cap, 40.25 pt = 3 body lines).
+Frames (`w:framePr`, drop caps; `frame.rs`, `build.rs` `frame_paragraph`, `flow.rs` `place_frame_run`; probes `layout-frame-basic/-page/-dropcap/-nobdr/-bdr/-gap`, 38/38, 39/41, 17/17, 41/43, 40/42, 79/84). A frame paragraph, or consecutive paragraphs with equal `framePr` (a drop cap stands alone), is a float that leaves the flow like a floating table; frames with `yAlign="inline"` stay in the flow.
 
-Anchored shapes in table cells (not started): no template of the corpus has one. Square-wrapped floats in `layout-float-incell` make the cell taller and wrap its text; the vertical `margin` base of a picture in a cell is the row top, `layoutInCell=0` made no difference in the current mode (`layout-float-incell`). | `layout-float-incell` (9 of 38)
+| Rule | Evidence |
+|---|---|
+| The text is laid out at `w:w`; without it at its natural width (a wrapped paragraph fills the column, a drop cap is as wide as its letter, 23.05 pt for a 55 pt "L"). | `-nobdr`, `-dropcap` |
+| Position: x, y and the keywords as for tables (odd twip values lose one twip). The text box is placed horizontally (`xAlign` right puts its right edge on the margin), the clip rectangle vertically (its top is the anchor paragraph's top for `vAnchor` text, plus y). | `-basic`, `-page` |
+| The clip rectangle is the text box grown by `hSpace` + (for a side with a `w:pBdr` element, whatever its style, `none` included: `w:space` + border width + 1.5 pt) left and right, and by `w:space` + border width above and below (no border element: 0; `vSpace` is not in it). The first line sits that far below the top. `hRule="exact"` fixes the clip height. | `-basic`, `-nobdr`, `-bdr`, `-dropcap` |
+| Text wraps over the clip rectangle horizontally and the clip rectangle grown by `vSpace` vertically; the frame of the next paragraph reaches back over the lines of the paragraph above (same lookahead as pictures). | `-bdr` (last line of the paragraph above moves right), `-page` |
+| Text is never put in a gap beside a float narrower than 18 pt (2-letter word: used at 18.5 pt, not at 15.5; "Harbour" needs its 37 pt). Applied to every float. | `-gap` |
+
+Open (frames): clip rectangle edges differ by one grid step (0.24 pt) in some probes (`-gap` 5, `-nobdr` 1, `-bdr` 1, `-page` 1): Word's frame top/bottom come out about 0.02 to 0.2 pt lower than the engine's unrounded line heights give (a line height of 13.43 instead of 13.4277 fits the frame cases, but the same rounding breaks the table probes, so it is not applied); one frame line of `-bdr` is 0.56 pt off the screen-quantised reference. `dropCap="margin"` hangs the cap left of the column (unverified), style-defined `framePr` is not read, frames in table cells are ignored (`4e493df5`), wide frames that leave no room beside them and frame overlap are untested.
+
+Floats in table cells (`table.rs` `layout_cell`, `FlowImage`; `float.rs` `Frame::cell`; probes `layout-float-incell`, `-incell-compat14` from `tools/office/make-float-probes.ps1`, 40/40 and 39/39; every cell has its own text so the oracle keys each line to its own offset, and the anchor sits after the cell text because the oracle's cell offsets come from `Range.Text`, which has no character for a floating anchor).
+
+| Rule | Evidence |
+|---|---|
+| In a cell the cell stands in for the page: `margin` (and `column`) horizontal base is the cell's text area (right alignment puts the picture's right edge on the text right), `page` horizontal base is the cell box (text left less the cell margin), every vertical base (`page`, `margin`, `paragraph`) is the cell content top, `paragraph` is the anchor paragraph's top. Compatibility mode 15 ignores `layoutInCell`. | `layout-float-incell` 40/40 |
+| A square float narrows the cell's lines beside it and rewraps them through `dynamic_lines`; the row grows only through the extra lines (row 3 of the probe 59.52 pt with the new texts). Later paragraphs of the cell see floats that still reach down. | `layout-float-incell` |
+| Mode 14 or lower with `layoutInCell="0"`: the drawing is placed against the page (margin box x, `paragraph` y counted from the outer edge of the cell's top border, i.e. 0.5 pt above the in-cell base for a 0.5 pt border, also when right aligned) and does not wrap the cell text (`ObjectBox::page_anchored`, placed when the cell is drawn). | `layout-float-incell-compat14` 39/39 |
+| Mode 14 or lower puts the left grid line of a left-aligned table one cell margin left of the indent and does not move it by half the border (text origin 72.0, cell boxes 66.96 / 266.88 on the 0.24 grid); mode 15 puts the border's outer edge on the indent. `Context::compat` carries `w:compatibilityMode` (a document without one counts as 12; the 17 corpus templates without it score the same). | `layout-float-incell-compat14` cells |
+
+Not done: floats whose anchor is inside a nested table or a text box in a cell are laid out like any cell paragraph without row-height feedback, wrapping around out-of-cell drawings in mode 14, character- and line-relative placement in cells. The oracle (`Walk-Table`) adds each shape's `Anchor.Start` to `marks`, so a cell paragraph whose anchor precedes its text gets the right line offsets (`layout-float-incell-before`, 38 of 38; before the fix the anchor characters were missing from `Range.Text` offsets). Regenerating the 17 corpus templates with floating shapes in tables changed no non-empty cell line offset; other differences between the old and new references (empty-paragraph pairing, picture rectangles of `463abd5c`) are oracle drift, not this fix, so the old references were kept.
+
+## Empty header and footer stories (`furniture.rs`; probes `layout-hdr-*` from `tools/office/make-header-probes.ps1`)
+
+| Rule | Evidence |
+|---|---|
+| A section with no header or footer reference at all reserves nothing: the body starts at the top margin even when the header distance is larger (`layout-hdr-none`, `-near`, `-style`, `-normal`, `-big`, all lines). | probes (121/121, 121/121, 121/121, 61/61, 121/121) |
+| A section that names two or more footer parts and no header part (`0a90ca9d`: default and first footers; `d52c20af`: even and default) keeps an empty paragraph of the `Header` style as its header: the body starts at `header distance + height of that paragraph` when that is lower than the top margin (10.8 pt for the 8 pt Header style of `0a90ca9d`, so 21.6 + 10.8 = 32.4; `d52c20af` 14.4 + 12.6 = 27). The same holds for a footer story when only headers are named. `Word.Headers(1).Exists` is true for these. | corpus +141 lines (`0a90ca9d` 3 to 84, `d52c20af` 2 to 62), no template lost |
+
+Open: the rule is a fit, not a mechanism. `titlePg` alone is not the trigger (`65cf689e`, `0c8d491f`, `25409d45`, `b0e9c2cf`, `114ed224` lost all lines when it was). A section that inherits its stories and sets `titlePg` later (`4e493df5`, +59 lines when treated as implied) is not covered; a probe that writes a docx with exactly one footer part, two footer parts and `titlePg` is still to be made (COM writes both parts, so the file has to be patched).
 
 ## Not matched yet
 
@@ -195,3 +223,8 @@ family match for "Aptos Display". Largest causes still open, by lines affected:
 - The last line of a page when multiple spacing adds space below the baseline: Word keeps the line when the text part fits
   (`layout-face-multiple`, Arial 10 pt, multiple 2.0, 5 lines); the engine moves it to the next page.
 - The `tblCellMar` padding and contextual spacing residue listed above is unchanged.
+
+Measured on 4982 of 8245 lines (12 of 74 templates): 581 of the 1686 failing lines are empty cell paragraphs, many of them
+paired by the oracle with the wrong PDF row (the first unconsumed empty paragraph of any table gets the next empty row; in
+`65cf689e` the engine's @100 position equals the reference of @142). A fix pairs empty rows with the paragraph whose Word position
+(`Range.Information(3, 5, 6)`) is nearest; not done. After the empty-story rule above the total is 5123 of 8245, 12 of 74.

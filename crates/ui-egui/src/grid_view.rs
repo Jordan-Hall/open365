@@ -3523,6 +3523,34 @@ fn paint_region(
             p.rect_filled(item.rect, 0.0, color);
         }
     }
+    let inherited = inherited_cells(paint, region);
+    for &(row, col, style) in &inherited {
+        let fmt = styles.cell_format(style);
+        let fill = fill_color(styles, &fmt.fill);
+        let rect = view.rect((row, col, row, col), region.shift);
+        if let Some(color) = fill {
+            p.rect_filled(rect, 0.0, color);
+        }
+        paint.log.borrow_mut().push(PaintedCell {
+            row,
+            col,
+            text: String::new(),
+            hashes: false,
+            clip: rect,
+            cell: rect,
+            bounds: rect,
+            horizontal: HorizontalAlignment::General,
+            lines: 0,
+            fill,
+            font_color: text_color(styles, &fmt.font.color, pal),
+            bold: fmt.font.bold,
+            italic: fmt.font.italic,
+            strike: fmt.font.strike,
+            underline: fmt.font.underline != Underline::None,
+            icon: None,
+            data_bar: None,
+        });
+    }
     if let Some(cf) = paint.cf {
         paint_blank_cf(&p, paint, cf, region, &items);
     }
@@ -3552,6 +3580,10 @@ fn paint_region(
             if let Some(fx) = item.fx.as_deref() {
                 paint_dxf_borders(&p, paint, item.rect, fx);
             }
+        }
+        for &(row, col, _) in &inherited {
+            let rect = view.rect((row, col, row, col), region.shift);
+            paint_border_box(&p, paint, ws, (row, col), (row, col), false, rect);
         }
     }
 
@@ -4068,13 +4100,71 @@ fn draw_edge(
     }
 }
 
+/// Blank cells (no record in the sheet) that take a format from their row or column, as
+/// `(row, col, style)`: Excel shows a whole-column fill or border on every cell of the column.
+fn inherited_cells(paint: &Paint<'_>, region: &Region) -> Vec<(u32, u32, u32)> {
+    let Some(ws) = paint.ws else {
+        return Vec::new();
+    };
+    let layout = paint.view.layout;
+    let rows = ws.rows();
+    let start = rows.partition_point(|r| r.r < region.rows.0);
+    let row_styled = rows[start..]
+        .iter()
+        .take_while(|r| r.r <= region.rows.1)
+        .any(|r| r.default_style().is_some_and(|s| s != 0));
+    if layout.col_styles.is_empty() && !row_styled {
+        return Vec::new();
+    }
+    let mut out = Vec::new();
+    for row in region.rows.0..=region.rows.1 {
+        if layout.geo.row_hidden(row) {
+            continue;
+        }
+        for col in region.cols.0..=region.cols.1 {
+            if layout.geo.col_hidden(col) || ws.cell(row, col).is_some() {
+                continue;
+            }
+            if layout.merge_at(row, col).is_some() {
+                continue;
+            }
+            let style = ws.resolved_style(row, col, &layout.col_styles);
+            if style != 0 {
+                out.push((row, col, style));
+            }
+        }
+    }
+    out
+}
+
 fn paint_cell_borders(painter: &Painter, paint: &Paint<'_>, ws: &Worksheet, item: &Item<'_>) {
+    paint_border_box(
+        painter,
+        paint,
+        ws,
+        (item.row, item.col),
+        item.end,
+        item.merged,
+        item.rect,
+    );
+}
+
+/// Draws the borders of the cell (or merge) from `(row, col)` to `end` inside `r`.
+fn paint_border_box(
+    painter: &Painter,
+    paint: &Paint<'_>,
+    ws: &Worksheet,
+    (row, col): (u32, u32),
+    end: (u32, u32),
+    merged: bool,
+    r: Rect,
+) {
     let styles = paint.wb.styles();
     let col_styles = &paint.view.layout.col_styles;
-    let b = if item.merged {
-        let tl = ws.resolved_border(styles, item.row, item.col, col_styles);
-        let tr = ws.resolved_border(styles, item.row, item.end.1, col_styles);
-        let bl = ws.resolved_border(styles, item.end.0, item.col, col_styles);
+    let b = if merged {
+        let tl = ws.resolved_border(styles, row, col, col_styles);
+        let tr = ws.resolved_border(styles, row, end.1, col_styles);
+        let bl = ws.resolved_border(styles, end.0, col, col_styles);
         Border {
             left: tl.left,
             top: tl.top,
@@ -4083,9 +4173,8 @@ fn paint_cell_borders(painter: &Painter, paint: &Paint<'_>, ws: &Worksheet, item
             ..tl
         }
     } else {
-        ws.resolved_border(styles, item.row, item.col, col_styles)
+        ws.resolved_border(styles, row, col, col_styles)
     };
-    let r = item.rect;
     let ppp = paint.ppp;
     let colour = |e: &BorderEdge| color32(styles.resolve_color(&e.color));
     if b.top.style != BorderStyle::None {

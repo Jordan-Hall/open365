@@ -351,6 +351,36 @@ fn paragraph_diffs(doc: &Document, json: &Json) -> Vec<String> {
     out
 }
 
+/// Positions, in Word's paragraph list (split-result paragraphs left out), of the end-of-row marks of
+/// the tables in `blocks`.
+fn row_end_positions(blocks: &[open365_docx::Block]) -> Vec<usize> {
+    fn walk(blocks: &[open365_docx::Block], n: &mut usize, ends: &mut Vec<usize>) {
+        for b in blocks {
+            match b {
+                open365_docx::Block::Paragraph(_) => *n += 1,
+                open365_docx::Block::Table(t) => {
+                    for child in &t.children {
+                        let open365_docx::TableChild::Row(row) = child else {
+                            continue;
+                        };
+                        for c in &row.children {
+                            if let open365_docx::RowChild::Cell(cell) = c {
+                                walk(&cell.blocks, n, ends);
+                            }
+                        }
+                        ends.push(*n);
+                        *n += 1;
+                    }
+                }
+                _ => {}
+            }
+        }
+    }
+    let mut ends = Vec::new();
+    walk(blocks, &mut 0, &mut ends);
+    ends
+}
+
 struct Outcome {
     total: usize,
     matched: usize,
@@ -405,12 +435,33 @@ fn run(set: &str) -> Outcome {
             section_of_paragraph.push(0);
         }
     } else {
-        // Word's list has table-row end marks (`\r\u{7}`); skip them to line up with the model.
+        // Word's list has an end-of-row mark (`\r\u{7}`) after the cells of every table row; the model
+        // has none. Marks are found by walking the model's tables (an empty cell reads the same).
+        // A field result that ends in a paragraph mark (REF to a whole-paragraph bookmark) splits
+        // its paragraph in Word's list: the extra empty paragraph has no counterpart in the model.
+        let split_results: Vec<&str> = reference
+            .json
+            .get("fields")
+            .arr()
+            .iter()
+            .map(|f| f.get("result").str())
+            .filter(|r| r.len() > 1 && r.ends_with('\r'))
+            .collect();
+        let row_ends = row_end_positions(doc.body().blocks.as_slice());
         let sections = doc.sections();
-        let mut idx = 0usize;
+        let mut idx = 0usize; // model paragraph index
+        let mut word_pos = 0usize; // position in Word's list without the extra split paragraphs
+        let mut previous = "";
         for p in paragraphs {
             let text = p.get("text").str();
-            if text == "\r\u{7}" || text == "\u{7}" {
+            let extra = text == "\r" && split_results.contains(&previous);
+            previous = text;
+            if extra {
+                continue;
+            }
+            let pos = word_pos;
+            word_pos += 1;
+            if row_ends.contains(&pos) {
                 continue;
             }
             by_paragraph.push((p.get("page").num() as u32, p.get("label").num() as u32));
@@ -567,18 +618,11 @@ fn format_set_matches_word() {
     report_failures("format", &out);
 }
 
-/// Dates match Word except the undocumented `g` / `n` picture characters and the genitive month
-/// names some languages (Lithuanian, Slovak, ...) use after a day number.
+/// Every date field matches Word, including the genitive month names languages use next to a day number.
 #[test]
 fn date_set_matches_word() {
     let out = run("date");
-    assert!(
-        out.matched * 100 >= out.total * 98,
-        "only {}/{} match: {:?}",
-        out.matched,
-        out.total,
-        out.mismatches
-    );
+    report_failures("date", &out);
 }
 
 fn report_failures(set: &str, out: &Outcome) {
@@ -600,14 +644,14 @@ fn report_failures(set: &str, out: &Outcome) {
 #[test]
 fn refs_set_matches_word() {
     let out = run("refs");
-    // Open: IF with literal braces, SECTIONPAGES from the test provider, thousands separators
-    // in table sums, and a cell Word reads as "1e2".
-    assert!(
-        out.matched + 4 >= out.total,
-        "{}/{}",
-        out.matched,
-        out.total
-    );
+    report_failures("refs", &out);
+}
+
+/// Table formulas over cells with separators, brackets, signs, words and exponents.
+#[test]
+fn tables_set_matches_word() {
+    let out = run("tables");
+    report_failures("tables", &out);
 }
 
 #[test]
@@ -617,14 +661,9 @@ fn toc_set_matches_word() {
 }
 
 #[test]
-fn props_set_mostly_matches_word() {
+fn props_set_matches_word() {
     let out = run("props");
-    assert!(
-        out.matched * 100 >= out.total * 85,
-        "{}/{}",
-        out.matched,
-        out.total
-    );
+    report_failures("props", &out);
 }
 
 #[test]

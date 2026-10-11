@@ -16,6 +16,11 @@ use crate::model::{Block, Inline, Paragraph, RowChild, TableChild};
 use crate::ranges::DocPos;
 use crate::xml::RawXml;
 
+// Table cell reading lives in its own file; declared here so `lib.rs` stays untouched.
+#[path = "fields_cells.rs"]
+pub(crate) mod cells;
+use cells::{CellRead, TableStyle};
+
 const REF_NOT_FOUND: &str = "Error! Reference source not found.";
 const BOOKMARK_UNDEFINED: &str = "Error! Bookmark not defined.";
 
@@ -627,7 +632,11 @@ fn merge_field(ev: &Evaluator<'_>, inst: &Instruction, lang: &str) -> Outcome {
 // ---------------------------------------------------------------------------
 
 /// The numbers of a table range for a formula field inside a table cell.
-pub(crate) fn table_values(view: &View<'_>, raw: &RawField, reference: &str) -> Option<Vec<f64>> {
+pub(crate) fn table_values(
+    view: &View<'_>,
+    raw: &RawField,
+    reference: &str,
+) -> Option<(Vec<f64>, TableStyle)> {
     let all = slots(view.doc.body());
     let slot = all.get(raw.begin.para)?;
     let Some(Step::Cell { block, row, cell }) = slot.steps.last().copied() else {
@@ -679,18 +688,8 @@ pub(crate) fn table_values(view: &View<'_>, raw: &RawField, reference: &str) -> 
         .count();
     let at = |r: usize, c: usize| grid.get(r).and_then(|row| row.get(c)).map(String::as_str);
     let upper = reference.to_ascii_uppercase();
-    // A direction runs over neighbouring cells and ends at the first cell that is blank or
-    // not a plain number (measured with Word).
-    let walk = |cells: Vec<&str>| -> Vec<f64> {
-        let mut out = Vec::new();
-        for text in cells {
-            match plain_number(text) {
-                Some(v) => out.push(v),
-                None => break,
-            }
-        }
-        out
-    };
+    // A direction runs over neighbouring cells; see `cells::walk` for what it collects.
+    let walk = |cells: Vec<&str>| cells::walk(&cells);
     let row_len = grid.get(row_pos).map_or(0, Vec::len);
     let out = match upper.as_str() {
         "ABOVE" => walk(
@@ -720,41 +719,22 @@ pub(crate) fn table_values(view: &View<'_>, raw: &RawField, reference: &str) -> 
             let (r1, c1) = cell_ref(first)?;
             let (r2, c2) = cell_ref(last)?;
             let mut out = Vec::new();
+            let mut style = TableStyle::default();
             for r in r1.min(r2)..=r1.max(r2) {
                 for c in c1.min(c2)..=c1.max(c2) {
-                    if let Some(v) = at(r, c).and_then(|t| {
-                        plain_number(t.trim_start_matches(['$', '\u{a3}', '\u{20ac}']))
-                    }) {
-                        out.push(v);
+                    if let Some(text) = at(r, c)
+                        && let CellRead::Numbers(cell) = cells::read_cell(text)
+                    {
+                        style.grouped |= cell.grouped;
+                        style.parens |= cell.parens;
+                        out.extend(cell.values);
                     }
                 }
             }
-            out
+            (out, style)
         }
     };
     Some(out)
-}
-
-/// A number as Word reads it in a table cell: optional sign, digits with thousands commas, a
-/// decimal point and an optional percent sign.
-fn plain_number(text: &str) -> Option<f64> {
-    let t = text.trim();
-    let (body, percent) = match t.strip_suffix('%') {
-        Some(b) => (b, true),
-        None => (t, false),
-    };
-    let digits = body.strip_prefix(['-', '+']).unwrap_or(body);
-    if digits.is_empty()
-        || !digits.chars().any(|c| c.is_ascii_digit())
-        || !digits
-            .chars()
-            .all(|c| c.is_ascii_digit() || matches!(c, '.' | ','))
-        || digits.matches('.').count() > 1
-    {
-        return None;
-    }
-    let value: f64 = body.replace(',', "").parse().ok()?;
-    Some(if percent { value / 100.0 } else { value })
 }
 
 /// `B3` as zero-based (row, column).

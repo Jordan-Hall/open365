@@ -1,0 +1,5 @@
+feature = "layout-float"
+made_with = "Microsoft Word 16.0.20430 (Windows)"
+author = "project member"
+expect_dropped = []
+notes = "floats anchored at the start of table cell text, layoutInCell on and off, current compatibility mode"

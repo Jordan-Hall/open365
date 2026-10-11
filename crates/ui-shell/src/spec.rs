@@ -349,6 +349,101 @@ pub struct Backstage {
     pub nav_w: i32,
 }
 
+/// One width of the Quick Access Toolbar. As the window narrows the toolbar keeps fewer of its
+/// leading items and ends with the overflow button (the last item of `Qat::items`).
+#[derive(Debug, Clone, Deserialize)]
+pub struct QatStage {
+    /// Number of leading items kept.
+    pub keep: usize,
+    /// Width of the toolbar in this stage (`u`).
+    pub width: i32,
+    /// The stage is used while the window is at least `width + min_rest` wide (`u`).
+    pub min_rest: i32,
+    /// The title row is laid out as if the window were at least this wide (Office holds the row
+    /// still between this width and the next stage).
+    #[serde(default)]
+    pub freeze: Option<i32>,
+}
+
+/// The search box (wide window) and its button form (narrow window).
+#[derive(Debug, Clone, Deserialize)]
+pub struct SearchRules {
+    /// The box is shown from this client width (`u`) upward.
+    pub box_min_cw: i32,
+    /// Box width as a percentage of the client width, up to `max_w`.
+    pub ratio_pct: i32,
+    pub max_w: i32,
+    /// Leftmost x of the box (the title keeps its minimum width).
+    pub pin_x: i32,
+    /// Distance from the box or button to the user widget.
+    pub gap: i32,
+    pub button_w: i32,
+    pub button_y: i32,
+    pub button_h: i32,
+}
+
+/// How the title row responds to a narrower window.
+#[derive(Debug, Clone, Deserialize)]
+pub struct TitleRules {
+    pub qat: Vec<QatStage>,
+    /// The document title never gets narrower than this; the user widget, then the search button
+    /// leave instead.
+    pub min_w: i32,
+    pub search: SearchRules,
+}
+
+/// One width of the tab row's right-hand buttons (Comments, Editing, Share).
+#[derive(Debug, Clone, Deserialize)]
+pub struct ClusterStage {
+    /// The stage is used from this client width (`u`) upward.
+    pub min_cw: i32,
+    /// Width of each button of `AppSpec::tab_row_right` (display options excluded).
+    pub widths: Vec<i32>,
+}
+
+/// How the tab row responds to a narrower window.
+#[derive(Debug, Clone, Deserialize)]
+pub struct TabRules {
+    /// Space between tabs.
+    pub gap: i32,
+    /// Every tab can lose this much width (padding) before the longest ones shrink alone.
+    pub rounds: i32,
+    /// Narrowest tab.
+    pub min_w: i32,
+    /// Space between the last tab and the first right-hand button.
+    pub right_gap: i32,
+    /// Space between right-hand buttons.
+    pub item_gap: i32,
+    /// Distance of the last right-hand button from the pane edge.
+    pub right_margin: i32,
+    /// Width of the scroll button shown when the tabs do not fit.
+    pub scroll_w: i32,
+    pub clusters: Vec<ClusterStage>,
+}
+
+/// How the status bar responds to a narrower window.
+#[derive(Debug, Clone, Deserialize)]
+pub struct StatusRules {
+    /// Id of the first item of the right-hand group; items before it are the left-hand items.
+    pub right_from: String,
+    /// Room right of the right-hand group that the spec does not list (the size box).
+    #[serde(default)]
+    pub grip: i32,
+    /// A left-hand item stays while this much room is left between it and the right-hand group.
+    pub min_gap: i32,
+    /// Where the left-hand items start.
+    pub left_edge: i32,
+    /// Item groups of the right-hand group in the order they leave.
+    pub drop: Vec<Vec<String>>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct ChromeRules {
+    pub title: TitleRules,
+    pub tabs: TabRules,
+    pub status: StatusRules,
+}
+
 /// Everything the shell needs to know about one application.
 #[derive(Debug, Clone, Deserialize)]
 pub struct AppSpec {
@@ -383,6 +478,10 @@ pub struct AppSpec {
     #[serde(default)]
     pub row_header_w: Option<i32>,
     pub backstage: Backstage,
+    /// Narrow-window rules of the title row, tab row and status bar (hand-written, measured by
+    /// `ribbon-oracle.ps1 -ChromeWidths`; see `spec/chrome-*.json`).
+    #[serde(default)]
+    pub rules: Option<ChromeRules>,
 }
 
 impl AppSpec {
@@ -393,6 +492,7 @@ impl AppSpec {
     #[must_use]
     pub fn writer() -> Self {
         Self::parse(include_str!("../spec/writer.json"))
+            .with_rules(include_str!("../spec/chrome-writer.json"))
     }
 
     /// The Sheets (spreadsheet) description.
@@ -402,6 +502,7 @@ impl AppSpec {
     #[must_use]
     pub fn sheets() -> Self {
         Self::parse(include_str!("../spec/sheets.json"))
+            .with_rules(include_str!("../spec/chrome-sheets.json"))
     }
 
     /// Parses a spec. The embedded files are generated, so a parse failure is a build defect.
@@ -411,6 +512,11 @@ impl AppSpec {
     #[must_use]
     pub fn parse(json: &str) -> Self {
         serde_json::from_str(json).expect("embedded ribbon spec is valid")
+    }
+
+    fn with_rules(mut self, json: &str) -> Self {
+        self.rules = Some(serde_json::from_str(json).expect("embedded chrome rules are valid"));
+        self
     }
 
     /// Tab by id.

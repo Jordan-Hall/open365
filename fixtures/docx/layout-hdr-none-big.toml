@@ -1,0 +1,5 @@
+feature = "layout-hdr"
+made_with = "Microsoft Word 16.0.20430 (Windows)"
+author = "project member"
+expect_dropped = []
+notes = "no header or footer part, distances 200 pt, margins 36 pt"

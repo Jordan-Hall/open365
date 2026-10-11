@@ -77,6 +77,11 @@ pub struct Theme {
     /// Gallery cell lift and ring of the current or hovered cell.
     pub gallery_cell: Color32,
     pub gallery_ring: Color32,
+    /// Drop-down menus: fill, 1 px border (sampled in dark mode; light values are estimates), hot row, colour cell ring.
+    pub menu_bg: Color32,
+    pub menu_border: Color32,
+    pub menu_hot: Color32,
+    pub menu_ring: Color32,
 }
 
 impl Mode {
@@ -163,6 +168,10 @@ impl Theme {
                 icon_off: Color32::from_rgb(0x83, 0x83, 0x83),
                 gallery_cell: Color32::from_rgb(0x38, 0x38, 0x38),
                 gallery_ring: Color32::from_rgb(0xad, 0xad, 0xad),
+                menu_bg: Color32::from_rgb(0x29, 0x29, 0x29),
+                menu_border: Color32::from_rgb(0xad, 0xad, 0xad),
+                menu_hot: Color32::from_rgb(0x40, 0x40, 0x40),
+                menu_ring: Color32::from_rgb(0x40, 0x40, 0x40),
             },
             Mode::Light => Self {
                 mode,
@@ -214,6 +223,10 @@ impl Theme {
                 icon_off: Color32::from_rgb(0x8a, 0x8a, 0x8a),
                 gallery_cell: Color32::from_rgb(0xf0, 0xf0, 0xf0),
                 gallery_ring: Color32::from_rgb(0x8a, 0x8a, 0x8a),
+                menu_bg: Color32::from_rgb(0xff, 0xff, 0xff),
+                menu_border: Color32::from_rgb(0xc6, 0xc6, 0xc6),
+                menu_hot: Color32::from_rgb(0xe6, 0xe6, 0xe6),
+                menu_ring: Color32::from_rgb(0xe1, 0xe1, 0xe1),
             },
         }
     }

@@ -1,0 +1,5 @@
+feature = "layout-frame"
+made_with = "Microsoft Word 16.0.20430 (Windows)"
+author = "project member"
+expect_dropped = []
+notes = "sixteen borderless frames at 6 to 72 pt from the column left, each in front of a two line paragraph that starts with a short or a long word"

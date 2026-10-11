@@ -17,7 +17,10 @@ use std::collections::HashMap;
 use std::ops::Range;
 use std::sync::Arc;
 
-use open365_docx::{Block, Document, HeaderFooterType, Inline, NoteKind, RawXml, RunContent};
+use open365_docx::{
+    Block, Document, HeaderFooterType, Inline, NoteKind, Paragraph, RawXml, RunContent, W_NS,
+    parse_xml,
+};
 
 use crate::build::Builder;
 use crate::float::{self, Frame as FloatFrame};
@@ -52,6 +55,8 @@ pub(crate) struct Furniture {
     /// main part (the part's own relationship ids differ from the main part's).
     links: HashMap<String, HashMap<String, String>>,
     heights: Vec<[[f64; 3]; 2]>,
+    /// Sections whose missing header and footer stories Word keeps as empty paragraphs.
+    implied: Vec<bool>,
 }
 
 fn kind_index(t: HeaderFooterType) -> usize {
@@ -146,6 +151,30 @@ fn place(
     }
 }
 
+/// An empty paragraph of the built-in header or footer style: what Word keeps in a header or
+/// footer story the file does not define.
+fn empty_story_paragraph(style: &str) -> Option<Paragraph> {
+    let xml = format!("<w:p xmlns:w=\"{W_NS}\"><w:pPr><w:pStyle w:val=\"{style}\"/></w:pPr></w:p>");
+    let root = parse_xml(xml.as_bytes()).ok()?.root;
+    let props = root.children.iter().find_map(|c| c.as_element().cloned());
+    Some(Paragraph {
+        head: root.head,
+        props,
+        content: Vec::new(),
+    })
+}
+
+/// Word keeps an empty header and footer story for a section with a different first page even when
+/// the file defines none (`titlePg` without references), and reserves their height.
+fn stories_implied(doc_sections: &[open365_docx::Section], section: usize) -> bool {
+    let Some(s) = doc_sections.get(section) else {
+        return false;
+    };
+    let footers = s.header_footer_refs.iter().filter(|r| r.footer).count();
+    let headers = s.header_footer_refs.len() - footers;
+    (headers == 0 && footers >= 2) || (footers == 0 && headers >= 2)
+}
+
 fn height_of(paras: &[ParaLayout]) -> f64 {
     place(paras, 0.0, 0.0, StoryKind::Main, &ImageSource::Main, None).height
 }
@@ -175,11 +204,20 @@ impl Furniture {
             rels.push(current_rels.clone());
         }
         let mut heights = Vec::new();
+        let mut implied = Vec::new();
         for (i, st) in stories.iter().enumerate() {
             let width = sections.get(i).map_or(0.0, SectionProps::text_width);
             let mut h = [[0.0; 3]; 2];
+            let implies = stories_implied(doc_sections, i);
+            implied.push(implies);
             for (f, row) in st.iter().enumerate() {
                 for (k, blocks) in row.iter().enumerate() {
+                    if blocks.is_none() && implies {
+                        let style = if f == 0 { "Header" } else { "Footer" };
+                        if let Some(p) = empty_story_paragraph(style) {
+                            h[f][k] = height_of(&layout_blocks(ctx, &[Block::Paragraph(p)], width));
+                        }
+                    }
                     if let Some(blocks) = blocks {
                         let ctx = Context {
                             links: rels[i][f][k].as_ref().and_then(|id| links.get(id)),
@@ -199,6 +237,7 @@ impl Furniture {
             rels,
             links,
             heights,
+            implied,
         }
     }
 
@@ -218,10 +257,10 @@ impl Furniture {
         let (mut top, mut bottom) = (sp.margin_top, sp.page_height - sp.margin_bottom);
         if let Some(h) = self.heights.get(section) {
             let k = self.kind(section, page, first);
-            if self.stories[section][0][k].is_some() {
+            if self.stories[section][0][k].is_some() || self.implied[section] {
                 top = top.max(sp.header_distance + h[0][k]);
             }
-            if self.stories[section][1][k].is_some() {
+            if self.stories[section][1][k].is_some() || self.implied[section] {
                 bottom = bottom.min(sp.page_height - sp.footer_distance - h[1][k]);
             }
         }

@@ -5,12 +5,14 @@
 use std::sync::Arc;
 
 use crate::build::UnitLayout;
-use crate::float::{Float, FloatKind, Frame, ahead_floats, dynamic_lines};
+use crate::float::{Float, FloatKind, Frame, ahead_floats, dynamic_lines, place};
+use crate::frame::{FrameSpec, FrameWrap};
 use crate::furniture::{Furniture, NoteStore};
 use crate::para::{AtomClass, LineBox, ParaLayout};
 use crate::props::{SectionCols, SectionProps, SectionStart};
 use crate::table::{
-    CellLayout, CellMeta, FlowLine, PosAnchor, PosSpec, RowLayout, TableLayout, TablePos,
+    CellLayout, CellMeta, FlowImage, FlowLine, ImageKind, PosAnchor, PosSpec, RowLayout,
+    TableLayout, TablePos,
 };
 use crate::{
     CellBox, Cluster, ClusterKind, GlyphRun, ImagePlacement, ImageSource, Line, NoteSlot, Page,
@@ -474,6 +476,9 @@ fn can_start(
     depth: usize,
 ) -> bool {
     let section = items[p].section;
+    if items[p].unit.frame.is_some() {
+        return true;
+    }
     let Some(para) = items[p].para() else {
         // A table starts with its first row's first line.
         let first = items[p]
@@ -984,6 +989,13 @@ impl<'a> Paginator<'a> {
             }
             self.push_line(ln, origin, y + (abs - row.top));
         }
+        let content_y = y + (cell.content_top - row.top);
+        for im in &cell.images {
+            let abs = cell.content_top + cell.lines.get(im.line).map_or(0.0, |l| l.dy);
+            if abs >= lo && abs < hi {
+                self.push_cell_image(im, cell, origin, content_y);
+            }
+        }
         for bx in &cell.boxes {
             let abs = cell.content_top + bx.dy;
             if abs < lo || abs >= hi {
@@ -997,6 +1009,41 @@ impl<'a> Paginator<'a> {
                 bx.meta,
                 self.cur.map_or(0, |c| c.1.table),
             ));
+        }
+    }
+
+    /// Draws a floating drawing of a cell. `origin` is the left of the content box and
+    /// `content_y` its top on the page.
+    fn push_cell_image(&mut self, im: &FlowImage, cell: &CellLayout, origin: f64, content_y: f64) {
+        let Some((_, base)) = self.cur else { return };
+        match &im.kind {
+            ImageKind::Cell(p) => {
+                let mut p = p.clone();
+                p.x = origin + im.dx;
+                p.y = content_y + im.dy;
+                p.paragraph += base.para;
+                self.page.images.push(p);
+            }
+            ImageKind::Page(d) => {
+                // Word counts the paragraph from the outer edge of the cell's top border
+                // (layout-float-incell-compat14).
+                let frame = Frame {
+                    section: self.page.geom,
+                    col: self.page.col_span(),
+                };
+                let a = place(
+                    &d.drawing,
+                    d.atom,
+                    &frame,
+                    content_y + im.dy - cell.border_top,
+                    base.para + d.paragraph,
+                    d.text_box.clone(),
+                    None,
+                    d.polygon.as_ref(),
+                );
+                self.page.images.push(a.image);
+                self.page.floats.extend(a.float);
+            }
         }
     }
 
@@ -1219,6 +1266,11 @@ impl<'a> Paginator<'a> {
             for ln in &cell.lines[from[pi].min(n)..to[pi].min(n)] {
                 self.push_line(ln, origin + cell.pad.left + cell.x, y + lead + ln.dy);
             }
+            for im in &cell.images {
+                if (from[pi].min(n)..to[pi].min(n)).contains(&im.line) {
+                    self.push_cell_image(im, cell, origin + cell.pad.left + cell.x, y + lead);
+                }
+            }
         }
     }
 
@@ -1376,6 +1428,7 @@ impl<'a> Paginator<'a> {
             rect: [left, top, left + w, top + h],
             outline: None,
             table: true,
+            frame: false,
             no_overlap: !pos.overlap,
         }
     }
@@ -1392,7 +1445,7 @@ impl<'a> Paginator<'a> {
     ) {
         let anchor = items[p + 1..]
             .iter()
-            .find(|i| i.table().is_none_or(|t| self.floating(t).is_none()))
+            .find(|i| !self.leaves_flow(i))
             .and_then(FlowItem::para);
         let anchor_top = match self.page.anchor_top {
             Some((page, top)) if page == self.page.number => top,
@@ -1411,6 +1464,105 @@ impl<'a> Paginator<'a> {
         self.page
             .floats
             .push(Self::table_float(table, pos, left, top));
+    }
+
+    /// Whether `item` leaves the flow: a floating table or a paragraph frame.
+    fn leaves_flow(&self, item: &FlowItem) -> bool {
+        item.unit.frame.is_some() || item.table().is_some_and(|t| self.floating(t).is_some())
+    }
+
+    /// Where a frame goes: the left edge of its text box and the top of its clip rectangle, for
+    /// an anchor paragraph whose top is `anchor_top`.
+    fn frame_spot(&self, g: &FrameGeom, anchor_top: f64) -> (f64, f64) {
+        let pr = &g.spec.pr;
+        let geo = self.page.geom;
+        let w = g.spec.box_w;
+        let along = |spec: Option<PosSpec>, base: (f64, f64), off: f64, size: f64| match spec {
+            Some(PosSpec::Start) => base.0,
+            Some(PosSpec::Center) => base.0 + (base.1 - base.0 - size) / 2.0,
+            Some(PosSpec::End) => base.1 - size,
+            _ => base.0 + off,
+        };
+        let hbase = match pr.horz {
+            PosAnchor::Text => self.page.col_span(),
+            PosAnchor::Margin => (
+                geo.margin_left + geo.gutter,
+                geo.page_width - geo.margin_right,
+            ),
+            PosAnchor::Page => (0.0, geo.page_width),
+        };
+        let vbase = match pr.vert {
+            PosAnchor::Text => (anchor_top, anchor_top),
+            PosAnchor::Margin => (geo.margin_top, geo.page_height - geo.margin_bottom),
+            PosAnchor::Page => (0.0, geo.page_height),
+        };
+        let left = if pr.drop_cap == Some(true) {
+            // A drop cap in the margin hangs left of the text.
+            self.page.col_span().0 - w - g.gr
+        } else {
+            along(pr.x_spec, hbase, pr.x, w)
+        };
+        (left, along(pr.y_spec, vbase, pr.y, g.height))
+    }
+
+    /// The area text keeps out of around a frame whose text box starts at `left`: the clip
+    /// rectangle horizontally, the clip rectangle grown by `vSpace` vertically.
+    fn frame_float(g: &FrameGeom, left: f64, top: f64) -> Float {
+        let pr = &g.spec.pr;
+        let (cl, cr) = (left - g.gl, left + g.spec.box_w + g.gr);
+        Float {
+            x0: cl,
+            y0: top - pr.v_space,
+            x1: cr,
+            y1: top + g.height + pr.v_space,
+            kind: match pr.wrap {
+                FrameWrap::Around => FloatKind::Square,
+                FrameWrap::Clear => FloatKind::TopBottom,
+            },
+            side: WrapSide::BothSides,
+            rect: [cl, top, cr, top + g.height],
+            outline: None,
+            table: false,
+            frame: true,
+            no_overlap: false,
+        }
+    }
+
+    /// Draws the frame that starts at item `p` (with the paragraphs after it that share its
+    /// properties) where its position says and makes the text of the following paragraphs wrap
+    /// around it. The frame leaves the flow like a floating table.
+    fn place_frame_run(&mut self, items: &'a [FlowItem], p: usize) {
+        let q = frame_end(items, p);
+        let Some(g) = frame_geom(items, p, q) else {
+            return;
+        };
+        let anchor = items[q..]
+            .iter()
+            .find(|i| !self.leaves_flow(i))
+            .and_then(FlowItem::para);
+        let anchor_top = match self.page.anchor_top {
+            Some((page, top)) if page == self.page.number => top,
+            _ => self.page.y + anchor.map_or(0.0, |a| first_gap(&self.page, a) + a.border_top()),
+        };
+        let (left, top) = self.frame_spot(&g, anchor_top);
+        let before = self.page.lines.len();
+        for fl in &g.lines {
+            let item = &items[fl.item];
+            let Some(para) = item.para() else { continue };
+            let lb = &para.lines[fl.line];
+            let base = item.base();
+            let y = top + fl.dy;
+            let mut line = build_line(para, lb, left, y, base);
+            line.story = item.story;
+            line.border = para.line_border(lb, left, fl.join_prev, fl.join_next);
+            let images = line_images(para, lb, left, y, base);
+            self.page.lines.push(line);
+            self.page.images.extend(images);
+        }
+        // The frame's lines do not make the column non-empty: the anchor paragraph is still
+        // its first.
+        self.page.col_mark.0 += self.page.lines.len() - before;
+        self.page.floats.push(Self::frame_float(&g, left, top));
     }
 
     fn break_in_table(
@@ -1434,6 +1586,118 @@ impl<'a> Paginator<'a> {
             }
         }
     }
+}
+
+/// One line of a frame: its item, its index in the paragraph and its top below the clip
+/// rectangle's top.
+struct FrameLine {
+    item: usize,
+    line: usize,
+    dy: f64,
+    join_prev: bool,
+    join_next: bool,
+}
+
+/// The size of a frame and where its lines stand inside it.
+struct FrameGeom {
+    spec: FrameSpec,
+    lines: Vec<FrameLine>,
+    /// How far the clip rectangle reaches left and right of the text box: `hSpace`, and for a
+    /// side with a border its distance, its width and 1.5 pt.
+    gl: f64,
+    gr: f64,
+    /// Height of the clip rectangle.
+    height: f64,
+}
+
+/// The item after the last paragraph of the frame that starts at item `p`: consecutive
+/// paragraphs with the same properties share a frame, a drop cap stands alone.
+fn frame_end(items: &[FlowItem], p: usize) -> usize {
+    let Some(spec) = items[p].unit.frame else {
+        return p + 1;
+    };
+    let mut q = p + 1;
+    if spec.pr.drop_cap.is_none() {
+        while items.get(q).is_some_and(|i| {
+            i.section == items[p].section && i.unit.frame.is_some_and(|f| f.pr == spec.pr)
+        }) {
+            q += 1;
+        }
+    }
+    q
+}
+
+/// Whether item `p` is a frame paragraph that belongs to the frame of the item before it.
+fn frame_continues(items: &[FlowItem], p: usize) -> bool {
+    p > 0 && items[p].unit.frame.is_some() && frame_end(items, p - 1) > p
+}
+
+/// Stacks the paragraphs `p..q` of a frame: spacing, borders and line tops relative to the
+/// clip rectangle, whose top is where the first border begins.
+fn frame_geom(items: &[FlowItem], p: usize, q: usize) -> Option<FrameGeom> {
+    let spec = items[p].unit.frame?;
+    let mut lines = Vec::new();
+    let mut y = 0.0;
+    let mut after = 0.0_f64;
+    let mut prev: Option<&ParaLayout> = None;
+    let (mut gl, mut gr) = (spec.pr.h_space, spec.pr.h_space);
+    for i in p..q {
+        let Some(para) = items[i].para() else {
+            continue;
+        };
+        let joined_prev = prev.is_some_and(|q| q.joins(para));
+        let joined_next = i + 1 < q
+            && items
+                .get(i + 1)
+                .and_then(FlowItem::para)
+                .is_some_and(|n| para.joins(n));
+        if prev.is_none() {
+            gl += spec.pad[0];
+            gr += spec.pad[2];
+            y += f64::from(para.props.space_before_pt);
+        } else {
+            y += after.max(f64::from(para.props.space_before_pt));
+        }
+        y += if joined_prev {
+            para.between_extent()
+        } else if prev.is_none() {
+            spec.pad[1]
+        } else {
+            para.border_top()
+        };
+        for (li, lb) in para.lines.iter().enumerate() {
+            y += lb.lead;
+            lines.push(FrameLine {
+                item: i,
+                line: li,
+                dy: y,
+                join_prev: joined_prev,
+                join_next: joined_next,
+            });
+            y += lb.height;
+        }
+        if !joined_next {
+            y += if i + 1 == q {
+                spec.pad[3]
+            } else {
+                para.border_bottom()
+            };
+        }
+        after = f64::from(para.props.space_after_pt);
+        prev = Some(para);
+    }
+    let height = match spec.pr.height {
+        Some(h) if spec.pr.exact => h,
+        Some(h) => h.max(y),
+        None => y,
+    };
+    Some(FrameGeom {
+        spec,
+        lines,
+        gl,
+        gr,
+        height,
+    })
 }
 
 impl Checkpoint {
@@ -1699,6 +1963,14 @@ impl<'a> Paginator<'a> {
         let base = item.base();
         let (para, table) = (item.para(), item.table());
 
+        if item.unit.frame.is_some() {
+            // A frame leaves the flow; the first paragraph of a run places all of it.
+            if !frame_continues(items, p) {
+                self.snapshot(p, 0);
+                self.place_frame_run(items, p);
+            }
+            return;
+        }
         if let Some(table) = table {
             if let Some(pos) = self.floating(table) {
                 self.cur = Some((item.unit.as_ref(), base));
@@ -1798,8 +2070,7 @@ impl<'a> Paginator<'a> {
             let mut q = p + 1;
             while items
                 .get(q)
-                .is_some_and(|i| i.table().is_some_and(|t| self.floating(t).is_some()))
-                && items[q].section() == section
+                .is_some_and(|i| self.leaves_flow(i) && i.section() == section)
             {
                 q += 1;
             }
@@ -1829,6 +2100,15 @@ impl<'a> Paginator<'a> {
                     {
                         let (left, ttop) = self.table_spot(tl, &pos, top, &placed);
                         let f = Self::table_float(tl, &pos, left, ttop);
+                        placed.push(f.clone());
+                        if f.y0 < y0 + used - 1e-6 {
+                            ahead.push(f);
+                        }
+                    } else if !frame_continues(items, t)
+                        && let Some(g) = frame_geom(items, t, frame_end(items, t))
+                    {
+                        let (left, ftop) = self.frame_spot(&g, top);
+                        let f = Self::frame_float(&g, left, ftop);
                         placed.push(f.clone());
                         if f.y0 < y0 + used - 1e-6 {
                             ahead.push(f);

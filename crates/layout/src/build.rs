@@ -4,8 +4,9 @@
 
 use open365_docx::{Block, Paragraph, TableCellFormat};
 
+use crate::frame::{FramePr, FrameSpec, border_pads};
 use crate::numbering::ListLabel;
-use crate::para::{Context, ParaLayout, layout_paragraph};
+use crate::para::{AtomClass, Context, ParaLayout, layout_paragraph};
 use crate::table::{TableLayout, layout_table};
 
 /// Document-order construction state of one unit.
@@ -56,6 +57,64 @@ impl<'a> Builder<'a> {
         self.arena.push(pl);
         index
     }
+
+    /// Lays out the paragraph of a frame in its text box, whose width is `w:w` or, without one,
+    /// the text's natural width up to `width` (a drop cap is as wide as its letter).
+    pub(crate) fn frame_paragraph(
+        &mut self,
+        para: &Paragraph,
+        pr: FramePr,
+        width: f64,
+    ) -> FrameSpec {
+        let (next, story) = (self.next, self.story);
+        let fixed = pr.width.map(|w| w.max(1.0));
+        let index = self.paragraph(para, fixed.unwrap_or(width), None);
+        let pad = border_pads(para, &self.arena[index].flow.borders);
+        if let Some(w) = fixed {
+            return FrameSpec { pr, box_w: w, pad };
+        }
+        let box_w = natural_width(&self.arena[index], width);
+        if box_w >= width - 0.01 {
+            return FrameSpec {
+                pr,
+                box_w: width,
+                pad,
+            };
+        }
+        // Laid out again at the natural width (a hair more, so that no word wraps).
+        self.arena.pop();
+        (self.next, self.story) = (next, story);
+        self.paragraph(para, box_w + 0.01, None);
+        FrameSpec { pr, box_w, pad }
+    }
+}
+
+/// The right edge of the widest line of `pl`: the width an automatic-width frame takes.
+fn natural_width(pl: &ParaLayout, width: f64) -> f64 {
+    // Text that wraps fills the column; only forced breaks leave shorter lines.
+    let wrapped = pl.lines.split_last().is_some_and(|(_, head)| {
+        head.iter().any(|lb| {
+            !pl.atoms
+                .get(lb.atoms.end.wrapping_sub(1))
+                .is_some_and(|a| matches!(a.class, AtomClass::LineBreak | AtomClass::PageBreak))
+        })
+    });
+    if wrapped {
+        return width;
+    }
+    pl.lines
+        .iter()
+        .map(|lb| {
+            lb.atoms
+                .clone()
+                .enumerate()
+                .filter(|(_, ai)| {
+                    matches!(pl.atoms[*ai].class, AtomClass::Text | AtomClass::Object)
+                })
+                .map(|(k, ai)| lb.xs.get(k).copied().unwrap_or(lb.left) + pl.atoms[ai].adv)
+                .fold(lb.left, f64::max)
+        })
+        .fold(0.0, f64::max)
 }
 
 /// A body paragraph or a table, laid out independently of the page.
@@ -74,6 +133,8 @@ pub(crate) struct UnitLayout {
     pub fonts: Vec<String>,
     /// Width the unit was laid out at.
     pub width: f64,
+    /// The unit is a paragraph with a floating frame (`w:framePr`), laid out in its text box.
+    pub frame: Option<FrameSpec>,
 }
 
 impl UnitLayout {
@@ -104,9 +165,15 @@ pub(crate) fn build_unit(
     width: f64,
 ) -> UnitLayout {
     let mut b = Builder::new(ctx, labels, first_paragraph);
+    let mut frame = None;
     let table = match block {
         Block::Paragraph(p) => {
-            b.paragraph(p, width, None);
+            match FramePr::read(p) {
+                Some(pr) => frame = Some(b.frame_paragraph(p, pr, width)),
+                None => {
+                    b.paragraph(p, width, None);
+                }
+            }
             None
         }
         Block::Table(t) => Some(layout_table(&mut b, t, width)),
@@ -136,5 +203,6 @@ pub(crate) fn build_unit(
         },
         fonts,
         width,
+        frame,
     }
 }

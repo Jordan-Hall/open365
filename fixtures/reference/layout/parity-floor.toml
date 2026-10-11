@@ -169,12 +169,16 @@ matched = 75
 total = 75
 
 [fixtures.layout-float-incell]
-matched = 9
+matched = 40
+total = 40
+
+[fixtures.layout-float-incell-before]
+matched = 38
 total = 38
 
 [fixtures.layout-float-incell-compat14]
-matched = 5
-total = 37
+matched = 39
+total = 39
 
 [fixtures.layout-float-pagebreak-anchor]
 matched = 26
@@ -233,24 +237,48 @@ matched = 90
 total = 92
 
 [fixtures.layout-frame-basic]
-matched = 5
+matched = 38
 total = 38
 
 [fixtures.layout-frame-bdr]
-matched = 4
+matched = 40
 total = 42
 
 [fixtures.layout-frame-dropcap]
-matched = 1
+matched = 17
 total = 17
 
+[fixtures.layout-frame-gap]
+matched = 79
+total = 84
+
 [fixtures.layout-frame-nobdr]
-matched = 3
+matched = 41
 total = 43
 
 [fixtures.layout-frame-page]
-matched = 2
+matched = 39
 total = 41
+
+[fixtures.layout-hdr-none]
+matched = 121
+total = 121
+
+[fixtures.layout-hdr-none-big]
+matched = 121
+total = 121
+
+[fixtures.layout-hdr-none-near]
+matched = 121
+total = 121
+
+[fixtures.layout-hdr-none-normal]
+matched = 61
+total = 61
+
+[fixtures.layout-hdr-none-style]
+matched = 121
+total = 121
 
 [fixtures.layout-hf-basic]
 matched = 115
@@ -657,12 +685,12 @@ matched = 75
 total = 75
 
 [system.layout-float-incell]
-matched = 9
-total = 38
+matched = 40
+total = 40
 
 [system.layout-float-incell-compat14]
-matched = 5
-total = 37
+matched = 39
+total = 39
 
 [system.layout-float-pagebreak-anchor]
 matched = 26
@@ -721,23 +749,27 @@ matched = 90
 total = 92
 
 [system.layout-frame-basic]
-matched = 5
+matched = 38
 total = 38
 
 [system.layout-frame-bdr]
-matched = 4
+matched = 40
 total = 42
 
 [system.layout-frame-dropcap]
-matched = 1
+matched = 17
 total = 17
 
+[system.layout-frame-gap]
+matched = 79
+total = 84
+
 [system.layout-frame-nobdr]
-matched = 3
+matched = 41
 total = 43
 
 [system.layout-frame-page]
-matched = 2
+matched = 39
 total = 41
 
 [system.layout-hf-basic]

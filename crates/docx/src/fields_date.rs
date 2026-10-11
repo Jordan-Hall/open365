@@ -152,10 +152,64 @@ fn civil_from_days(days: i64) -> (i32, u8, u8) {
     )
 }
 
+/// Japanese era of a date: (kanji name, initial, year in the era). `None` before Meiji
+/// 1868-09-08 (the start is assumed from the Windows table; dates before 1912 were not
+/// measurable through `QUOTE`).
+fn japanese_era(dt: CivilDateTime) -> Option<(&'static str, char, i32)> {
+    const ERAS: [((i32, u8, u8), &str, char); 5] = [
+        ((2019, 5, 1), "\u{4ee4}\u{548c}", 'R'),
+        ((1989, 1, 8), "\u{5e73}\u{6210}", 'H'),
+        ((1926, 12, 25), "\u{662d}\u{548c}", 'S'),
+        ((1912, 7, 30), "\u{5927}\u{6b63}", 'T'),
+        ((1868, 9, 8), "\u{660e}\u{6cbb}", 'M'),
+    ];
+    let key = (dt.year, dt.month, dt.day);
+    ERAS.iter()
+        .find(|(start, _, _)| key >= *start)
+        .map(|(start, name, initial)| (*name, *initial, dt.year - start.0 + 1))
+}
+
+/// What Word prints for a picture it cannot read.
+const PICTURE_ERROR: &str = "Error! Unknown character in picture string.";
+
+/// True when the picture (outside quoted text) prints the day of the month (`d`, `dd`, `D`).
+/// Word then uses the genitive month names for `MMM` and `MMMM`; `ddd` / `dddd` (weekday
+/// names) do not count.
+fn has_day_number(chars: &[char]) -> bool {
+    let mut i = 0usize;
+    while i < chars.len() {
+        match chars[i] {
+            '\'' => {
+                i += 1;
+                if chars.get(i) == Some(&'\'') {
+                    i += 1;
+                    continue;
+                }
+                while i < chars.len() && chars[i] != '\'' {
+                    i += 1;
+                }
+                i += 1;
+            }
+            '\\' => i += 2,
+            'D' => return true,
+            'd' => {
+                let n = chars[i..].iter().take_while(|x| **x == 'd').count();
+                if n <= 2 {
+                    return true;
+                }
+                i += n;
+            }
+            _ => i += 1,
+        }
+    }
+    false
+}
+
 /// Formats `dt` with a Word `\@` picture and the given names.
 #[must_use]
 pub fn format_date_picture(dt: CivilDateTime, picture: &str, names: &LocaleNames) -> String {
     let chars: Vec<char> = picture.chars().collect();
+    let genitive = has_day_number(&chars);
     let mut out = String::new();
     let mut i = 0usize;
     while i < chars.len() {
@@ -183,9 +237,21 @@ pub fn format_date_picture(dt: CivilDateTime, picture: &str, names: &LocaleNames
                 match n {
                     1 => out.push_str(&dt.month.to_string()),
                     2 => out.push_str(&format!("{:02}", dt.month)),
-                    3 => out.push_str(&names.month_abbr[usize::from(dt.month) - 1]),
+                    3 => {
+                        let list = if genitive {
+                            &names.month_abbr_genitive
+                        } else {
+                            &names.month_abbr
+                        };
+                        out.push_str(&list[usize::from(dt.month) - 1]);
+                    }
                     _ => {
-                        out.push_str(&names.month_full[usize::from(dt.month) - 1]);
+                        let list = if genitive {
+                            &names.month_full_genitive
+                        } else {
+                            &names.month_full
+                        };
+                        out.push_str(&list[usize::from(dt.month) - 1]);
                         // Word appends the month number for each extra M.
                         if n > 4 {
                             out.push_str(&dt.month.to_string());
@@ -214,8 +280,63 @@ pub fn format_date_picture(dt: CivilDateTime, picture: &str, names: &LocaleNames
                 let yy = dt.year.rem_euclid(100);
                 match n {
                     1 | 2 => out.push_str(&format!("{yy:02}")),
-                    3 => out.push_str("Error! Unknown character in picture string."),
+                    3 => return PICTURE_ERROR.to_owned(),
                     _ => out.push_str(&format!("{:04}", dt.year)),
+                }
+                i += n;
+            }
+            // Japanese era letters (measured with Word 16; they ignore the field language):
+            // `g` initial, `gg` first kanji, `ggg` name, runs repeat in threes; `e` / `n` year of
+            // the era, pairs are zero padded to two digits, a lone one is not.
+            'g' | 'e' | 'n' if japanese_era(dt).is_some() => {
+                let n = run(i, c);
+                let (name, initial, year) = japanese_era(dt).unwrap_or(("", 'R', 0));
+                if c == 'g' {
+                    for _ in 0..n / 3 {
+                        out.push_str(name);
+                    }
+                    match n % 3 {
+                        1 => out.push(initial),
+                        2 => out.extend(name.chars().next()),
+                        _ => {}
+                    }
+                } else {
+                    for _ in 0..n / 2 {
+                        out.push_str(&format!("{year:02}"));
+                    }
+                    if n % 2 == 1 {
+                        out.push_str(&year.to_string());
+                    }
+                }
+                i += n;
+            }
+            // Kanji era name: `G` first kanji, `GG` name, `GGG` name + first kanji, runs repeat in pairs.
+            'G' if japanese_era(dt).is_some() => {
+                let n = run(i, c);
+                let (name, _, _) = japanese_era(dt).unwrap_or(("", 'R', 0));
+                for _ in 0..n / 2 {
+                    out.push_str(name);
+                }
+                if n % 2 == 1 {
+                    out.extend(name.chars().next());
+                }
+                i += n;
+            }
+            // `bb` / `bbbb` Buddhist year (Gregorian + 543), `BB` / `BBBB` Gregorian year; runs
+            // pair up (`bbbbbb` = `bbbb` + `bb`) and an odd run is the picture error.
+            'b' | 'B' => {
+                let n = run(i, c);
+                if n % 2 == 1 {
+                    return PICTURE_ERROR.to_owned();
+                }
+                let year = if c == 'b' { dt.year + 543 } else { dt.year };
+                let mut left = n;
+                while left >= 4 {
+                    out.push_str(&format!("{year:04}"));
+                    left -= 4;
+                }
+                if left == 2 {
+                    out.push_str(&format!("{:02}", year.rem_euclid(100)));
                 }
                 i += n;
             }
@@ -281,6 +402,69 @@ pub fn format_date_picture(dt: CivilDateTime, picture: &str, names: &LocaleNames
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Values measured with Word 16 (`QUOTE "<date>" \@ "<picture>"`).
+    #[test]
+    fn japanese_era_letters_follow_word() {
+        let names = LocaleNames::english();
+        let at = |y, m, d| CivilDateTime::new(y, m, d, 0, 0, 0).unwrap();
+        let f = |dt, p| format_date_picture(dt, p, &names);
+        assert_eq!(f(at(2024, 3, 15), "g n"), "R 6");
+        assert_eq!(
+            f(at(2024, 3, 15), "g gg ggg gggg"),
+            "R \u{4ee4} \u{4ee4}\u{548c} \u{4ee4}\u{548c}R"
+        );
+        assert_eq!(
+            f(at(2024, 3, 15), "n nn nnn nnnn nnnnn"),
+            "6 06 066 0606 06066"
+        );
+        assert_eq!(f(at(1912, 7, 29), "g e"), "M 45");
+        assert_eq!(f(at(1912, 7, 30), "g e"), "T 1");
+        assert_eq!(f(at(1926, 12, 25), "gn"), "S1");
+        assert_eq!(f(at(1989, 1, 7), "gn"), "S64");
+        assert_eq!(f(at(1989, 1, 8), "gnn"), "H01");
+        assert_eq!(f(at(2019, 4, 30), "gn"), "H31");
+        assert_eq!(f(at(2019, 5, 1), "gn"), "R1");
+        assert_eq!(f(at(3000, 1, 1), "nnn"), "982982");
+    }
+
+    /// Measured with `QUOTE "<date>" \@ "<picture>"`: kanji era `G`, Buddhist `b`, Gregorian `B`.
+    #[test]
+    fn kanji_era_and_buddhist_year_follow_word() {
+        let names = LocaleNames::english();
+        let at = |y, m, d| CivilDateTime::new(y, m, d, 0, 0, 0).unwrap();
+        let f = |dt, p| format_date_picture(dt, p, &names);
+        assert_eq!(f(at(2024, 3, 15), "G"), "\u{4ee4}");
+        assert_eq!(f(at(2024, 3, 15), "GG"), "\u{4ee4}\u{548c}");
+        assert_eq!(f(at(2019, 4, 30), "GGG"), "\u{5e73}\u{6210}\u{5e73}");
+        assert_eq!(
+            f(at(1912, 7, 29), "GGGG"),
+            "\u{660e}\u{6cbb}\u{660e}\u{6cbb}"
+        );
+        assert_eq!(f(at(2024, 3, 15), "bb bbbb bbbbbb"), "67 2567 256767");
+        assert_eq!(f(at(1999, 12, 31), "dd/MM/bbbb"), "31/12/2542");
+        assert_eq!(f(at(2024, 3, 15), "BB BBBB"), "24 2024");
+        for picture in ["b", "bbb", "b yyyy", "d B", "bbbbb"] {
+            assert_eq!(f(at(2024, 3, 15), picture), PICTURE_ERROR, "{picture}");
+        }
+    }
+
+    /// Word uses the genitive month name whenever the picture holds a day number (Polish and
+    /// Finnish checked with `QUOTE`; the full `date` oracle set covers more languages).
+    #[test]
+    fn genitive_month_follows_a_day_number() {
+        let at = CivilDateTime::new(2024, 3, 5, 0, 0, 0).unwrap();
+        let pl = LocaleNames::for_tag("pl-PL").unwrap();
+        let f = |p| format_date_picture(at, p, &pl);
+        assert_eq!(f("d MMMM yyyy"), "5 marca 2024");
+        assert_eq!(f("yyyy MMMM d"), "2024 marca 5");
+        assert_eq!(f("d 'x' MMMM"), "5 x marca");
+        assert_eq!(f("MMMM yyyy"), "marzec 2024");
+        assert_eq!(f("dddd MMMM"), "wtorek marzec");
+        assert_eq!(f("'d' MMMM"), "d marzec");
+        let en = LocaleNames::english();
+        assert_eq!(format_date_picture(at, "d MMMM", &en), "5 March");
+    }
 
     #[test]
     fn weekday_and_roundtrip() {

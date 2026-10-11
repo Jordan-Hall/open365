@@ -1,6 +1,7 @@
 //! Open365 Sheets: `open365-sheets [file.xlsx|.xltx|.xlsm|.xltm]`.
 
 mod blank;
+mod format_ui;
 
 use std::path::{Path, PathBuf};
 
@@ -8,6 +9,9 @@ use egui::{Key, KeyboardShortcut, Modifiers, Ui};
 use open365_commands::{Command, Target};
 use open365_ui_egui::{ClipboardState, DocView, FindDialog, GridColors, GridView, Resize};
 use open365_ui_shell::{AppKind, CommandState, MenuEntry, Mode, Shell, ShellHost, Theme};
+use open365_xlsx::Workbook;
+
+use format_ui::{Action, FormatUi, Sel};
 
 const EXTENSIONS: [&str; 4] = ["xlsx", "xltx", "xlsm", "xltm"];
 
@@ -30,6 +34,10 @@ struct State {
     ui_font: Option<(&'static str, Vec<u8>)>,
     /// Enter (true) or Escape (false) pressed on the formula bar buttons.
     formula_action: Option<bool>,
+    /// Memory of the Home tab's formatting controls (Format Painter, last colours, pop-ups).
+    fmt: FormatUi,
+    /// Clock for the Format Painter double click.
+    started: std::time::Instant,
 }
 
 fn columns_label(first: u32, last: u32) -> String {
@@ -66,11 +74,40 @@ impl State {
             name_text: String::new(),
             ui_font: open365_ui_shell::fonts::system_ui_font(),
             formula_action: None,
+            fmt: FormatUi::default(),
+            started: std::time::Instant::now(),
+        }
+    }
+
+    /// The sheet, active cell and selected range the formatting controls act on.
+    fn sel(&self) -> Sel {
+        Sel {
+            sheet: self.grid.sheet(),
+            active: self.grid.active(),
+            range: self.grid.selection(),
+        }
+    }
+
+    fn workbook(&self) -> Option<&Workbook> {
+        self.target.as_ref().and_then(Target::xlsx)
+    }
+
+    /// Runs a formatting control or menu entry through the command layer.
+    fn run_format(&mut self, id: &str) {
+        let sel = self.sel();
+        let now = self.started.elapsed().as_secs_f64();
+        let action = self
+            .fmt
+            .run(id, self.target.as_ref().and_then(Target::xlsx), sel, now);
+        match action {
+            Action::None => {}
+            Action::Apply(commands) => commands.into_iter().for_each(|c| self.apply(c)),
         }
     }
 
     fn set_target(&mut self, t: Target) {
         self.target = Some(t);
+        self.fmt.reset_document();
         self.grid = GridView::new();
         if let Some((name, bytes)) = &self.ui_font {
             self.grid.set_ui_font(name, bytes.clone());
@@ -152,6 +189,36 @@ impl State {
             Ok(out) => format!("Saved {} ({} bytes)", path.display(), out.bytes_written),
             Err(e) => format!("Save failed: {e}"),
         };
+    }
+
+    /// Format Painter: once the user has chosen a range with the mouse, copies the source formats
+    /// onto it. A single use switches off; the locked one stays on until Escape.
+    fn format_painter_tick(&mut self, ctx: &egui::Context, grid_rect: egui::Rect) {
+        if !self.fmt.painter_active() {
+            return;
+        }
+        let (pressed, released, pos) = ctx.input(|i| {
+            (
+                i.pointer.primary_pressed(),
+                i.pointer.primary_released(),
+                i.pointer.latest_pos(),
+            )
+        });
+        let inside = pos.is_some_and(|p| grid_rect.contains(p));
+        if inside {
+            ctx.set_cursor_icon(egui::CursorIcon::Copy);
+        }
+        if pressed && inside {
+            self.fmt.painter_pressed = true;
+        }
+        if released
+            && self.fmt.painter_pressed
+            && let Some(command) = self
+                .fmt
+                .finish_paint(self.grid.sheet(), self.grid.selection())
+        {
+            self.apply(command);
+        }
     }
 
     fn undo(&mut self) {
@@ -361,12 +428,22 @@ impl State {
                 self.undo();
             }
         }
+        if self.fmt.painter_active()
+            && !self.grid.is_editing()
+            && take(Modifiers::NONE, Key::Escape)
+        {
+            self.fmt.cancel_painter();
+        }
         if self.find.text_focused
             || self.grid.is_editing()
             || ctx.current_pass_index() != 0
             || self.target.is_none()
+            || ctx.memory(|m| m.has_focus(egui::Id::new("open365-name-box")))
         {
             return;
+        }
+        for id in format_shortcuts(ctx) {
+            self.run_format(&id);
         }
         let events: Vec<egui::Event> = ctx.input_mut(|i| {
             let mut taken = Vec::new();
@@ -395,6 +472,35 @@ impl State {
             }
         }
     }
+}
+
+/// Takes the Ctrl+B/I/U/5 and Ctrl+Shift number-format key presses out of this frame's input and
+/// gives the control ids they run. Matching uses the key's position, so a layout that types
+/// the symbol with Shift still works.
+fn format_shortcuts(ctx: &egui::Context) -> Vec<String> {
+    ctx.input_mut(|i| {
+        let mut ids = Vec::new();
+        i.events.retain(|e| {
+            let egui::Event::Key {
+                key,
+                physical_key,
+                pressed: true,
+                modifiers,
+                ..
+            } = e
+            else {
+                return true;
+            };
+            match format_ui::shortcut_id(*key, *physical_key, *modifiers) {
+                Some(id) => {
+                    ids.push(id);
+                    false
+                }
+                None => true,
+            }
+        });
+        ids
+    })
 }
 
 struct Host<'a> {
@@ -428,6 +534,9 @@ impl ShellHost for Host<'_> {
                 CommandState::DISABLED
             }
         };
+        if format_ui::handles(id) {
+            return self.s.fmt.state(id, self.s.workbook(), self.s.sel());
+        }
         match id {
             "file.new" | "file.open" => CommandState::ENABLED,
             "qat.filesave" | "file.save" | "file.save-as" | "file.close" => on(has),
@@ -453,6 +562,10 @@ impl ShellHost for Host<'_> {
             if let Some(p) = s.recent.get(i).cloned() {
                 s.open_path(&p);
             }
+            return;
+        }
+        if format_ui::handles(id) {
+            s.run_format(id);
             return;
         }
         match id {
@@ -499,7 +612,14 @@ impl ShellHost for Host<'_> {
         (id == "status.mode").then(|| "Ready".to_owned())
     }
 
+    fn combo_commit(&mut self, id: &str, text: &str) -> Option<String> {
+        self.s.fmt.combo_commit(id, text)
+    }
+
     fn menu(&self, id: &str) -> Option<Vec<MenuEntry>> {
+        if format_ui::handles(id) {
+            return self.s.fmt.menu(id, self.s.workbook(), self.s.sel());
+        }
         let e = |i: &str, l: &str| MenuEntry::new(i, l, true);
         match id {
             "home.cells.insert" => Some(vec![
@@ -526,6 +646,9 @@ impl ShellHost for Host<'_> {
     }
 
     fn value(&self, id: &str) -> Option<String> {
+        if format_ui::handles(id) {
+            return self.s.fmt.value(id, self.s.workbook(), self.s.sel());
+        }
         match id {
             "sheet.active" => Some(self.s.grid.sheet().to_string()),
             "formula.name" => Some(self.s.grid.name_box_text()),
@@ -534,6 +657,11 @@ impl ShellHost for Host<'_> {
     }
 
     fn gallery(&self, id: &str) -> Vec<(String, String)> {
+        if id == "home.styles.cell-styles" {
+            return ["Normal", "Bad", "Good", "Neutral"]
+                .map(|n| (n.to_owned(), n.to_owned()))
+                .to_vec();
+        }
         match (id, &self.s.target) {
             ("sheet.tabs", Some(t)) => self
                 .s
@@ -613,10 +741,12 @@ impl ShellHost for Host<'_> {
         let ctx = ui.ctx().clone();
         let s = &mut *self.s;
         s.shortcuts(&ctx);
+        let grid_rect = ui.max_rect();
         match &mut s.target {
             Some(t) => {
                 s.grid.set_colors(Some(grid_colors(&self.theme)));
                 s.grid.show_grid(ui, t);
+                s.format_painter_tick(&ctx, grid_rect);
             }
             None => {
                 ui.vertical_centered(|ui| {
@@ -723,6 +853,9 @@ fn main() -> eframe::Result {
         }),
     )
 }
+
+#[cfg(test)]
+mod format_tests;
 
 #[cfg(test)]
 mod tests {

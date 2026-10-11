@@ -637,6 +637,22 @@ impl ShellHost for Host<'_> {
         self.s.doc.zoom().unwrap_or_else(|| self.s.doc.scale())
     }
 
+    fn combo_commit(&mut self, id: &str, text: &str) -> Option<String> {
+        let text = text.trim();
+        if text.is_empty() || self.s.target.is_none() {
+            return None;
+        }
+        match id {
+            "home.font.font" => Some(format!("home.font.font#{text}")),
+            "home.font.font-size" => text
+                .parse::<f64>()
+                .ok()
+                .filter(|n| (1.0..=1638.0).contains(n))
+                .map(|n| format!("home.font.font-size#{n}")),
+            _ => None,
+        }
+    }
+
     fn menu(&self, id: &str) -> Option<Vec<MenuEntry>> {
         let has = self.s.target.is_some();
         match id {

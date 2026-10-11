@@ -318,15 +318,13 @@ fn erf_series(x: Dd) -> Dd {
     FRAC_2_SQRT_PI.mul(exp(x2.neg())).mul(s)
 }
 
-/// `erfc(x)` for `x >= 0`, with a relative accuracy near 1e-30.
-pub(super) fn erfc(x: Dd) -> Dd {
-    if x.hi < 3.0 {
-        return Dd::from(1.0).sub(erf_series(x));
-    }
-    if x.hi > 27.3 {
-        return Dd::from(0.0);
-    }
-    // erfc(x) = exp(-x^2) / (sqrt(pi) (x + (1/2)/(x + 1/(x + (3/2)/(x + ...)))))
+/// `erf(x)` for `0 <= x < 3` in double-double.
+pub(super) fn erf_small(x: Dd) -> Dd {
+    erf_series(x)
+}
+
+/// The continued-fraction denominator `x + (1/2)/(x + 1/(x + (3/2)/(x + ...)))` for `x >= 3`.
+fn erfc_denominator(x: Dd) -> Dd {
     let n = if x.hi < 4.0 {
         170
     } else if x.hi < 8.0 {
@@ -338,7 +336,27 @@ pub(super) fn erfc(x: Dd) -> Dd {
     for k in (1..=n).rev() {
         t = x.add(Dd::from(f64::from(k) / 2.0).div(t));
     }
-    exp_sat(x.square().neg()).div(SQRT_PI.mul(t))
+    t
+}
+
+/// `erfc(x)` for `x >= 0`, with a relative accuracy near 1e-30.
+pub(super) fn erfc(x: Dd) -> Dd {
+    if x.hi < 3.0 {
+        return Dd::from(1.0).sub(erf_series(x));
+    }
+    if x.hi > 27.3 {
+        return Dd::from(0.0);
+    }
+    // erfc(x) = exp(-x^2) / (sqrt(pi) (x + (1/2)/(x + 1/(x + (3/2)/(x + ...)))))
+    exp_sat(x.square().neg()).div(SQRT_PI.mul(erfc_denominator(x)))
+}
+
+/// The scaled `exp(x^2) erfc(x)` for `x >= 0`, free of the overflow of `exp(x^2)`.
+pub(super) fn erfcx(x: Dd) -> Dd {
+    if x.hi < 3.0 {
+        return Dd::from(1.0).sub(erf_series(x)).mul(exp(x.square()));
+    }
+    SQRT_PI.mul(erfc_denominator(x)).recip()
 }
 
 /// `(P(Z <= z), P(Z > z))` for the standard normal, both with full relative accuracy.

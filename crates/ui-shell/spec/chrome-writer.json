@@ -1,0 +1,38 @@
+{
+  "title": {
+    "qat": [
+      { "keep": 4, "width": 285, "min_rest": 433, "freeze": 728 },
+      { "keep": 3, "width": 250, "min_rest": 434 },
+      { "keep": 2, "width": 202, "min_rest": 435 },
+      { "keep": 1, "width": 167, "min_rest": 436 },
+      { "keep": 0, "width": 35, "min_rest": 0 }
+    ],
+    "min_w": 78,
+    "search": { "box_min_cw": 1040, "ratio_pct": 27, "max_w": 460, "pin_x": 517, "gap": 10, "button_w": 58, "button_y": 7, "button_h": 46 }
+  },
+  "tabs": {
+    "gap": 1,
+    "rounds": 12,
+    "min_w": 44,
+    "right_gap": 7,
+    "item_gap": 10,
+    "right_margin": 15,
+    "scroll_w": 30,
+    "clusters": [
+      { "min_cw": 1113, "widths": [118, 105, 90] },
+      { "min_cw": 1067, "widths": [118, 105, 39] },
+      { "min_cw": 1011, "widths": [118, 44, 39] },
+      { "min_cw": 0, "widths": [30, 44, 39] }
+    ]
+  },
+  "status": {
+    "right_from": "status.focus",
+    "grip": 14,
+    "min_gap": 9,
+    "left_edge": 1,
+    "drop": [
+      ["status.zoom-percent"],
+      ["status.zoom-out", "status.zoom", "status.zoom-in"]
+    ]
+  }
+}

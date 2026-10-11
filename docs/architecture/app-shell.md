@@ -106,8 +106,7 @@ minimal (no templates, no Account/Options/Share), most tabs are present but disa
   from `cw` ~ 925 to 632, where every tab is 44 u wide and the strip stops compressing (Comments/Editing/Share stay
   at x 484/524/578). Status items leave in the order Accessibility, Text Predictions, Language, Coauthoring, Word
   count, Page, then Zoom % / zoom controls, as the right group (Focus .. Zoom %) pushes in; the right group stays anchored.
-- NOT implemented yet: the layout still places the tab row, title row and status bar at full width. The measured rules
-  above and the 1 px sweep fixtures are the input for that work (see Open).
+- Implemented in the next update (below).
 - Visual fixes: Font box shows the document's theme font (`Calibri (Body)`; the blank document now uses theme fonts,
   `SpanStyle::font_label`), Name Box / formula text uses the chrome text colour (egui widget colours set in
   `Theme::visuals`), formula strip icons sized and coloured as measured (Cancel/Enter dim 0x83, fx and chevrons 0xd4),
@@ -115,3 +114,45 @@ minimal (no templates, no Account/Options/Share), most tabs are present but disa
   lift on the current/hovered cell, an unfocused window dims its title.
 - Screenshot comparison (threshold 24, 1582 x 991, `OPEN365_SHOT`): Writer 5.22 % -> 5.17 %, Sheets 10.45 % (unchanged;
   its Font box is not wired to the active cell, so it shows the placeholder where Excel shows the cell font).
+
+## Update 2026-10-11 (responsive chrome)
+- `crates/ui-shell/src/chrome.rs` plans the title row, tab row and status bar in `u`; thresholds Office decides by its own
+  arithmetic are data in `crates/ui-shell/spec/chrome-{writer,sheets}.json` (`AppSpec::rules`). `tests/chrome.rs` replays the
+  1 px Word sweep (1494 widths, 73 290 checks, 1 px) and the Excel sweep when it is a schema 2 file.
+- Rules (Word, client width `cw`; Excel values below): search box `w = min(460, 27 % of cw)`, `x = clamp(cw/2 + 10 - w/2, 517, user.x - 10 - w)` (integer
+  halves), a 58 u button below `cw = 1040`; the title keeps 78 u: the user widget leaves first, then the search button. QAT stages
+  (285/250/202/167/35 u) while `cw - width >= 433 + stage`; the first stage holds the title row as at `cw = 728`. Comments / Editing /
+  Share become icons (30/44/39 u) at 1113 / 1067 / 1011. Tabs: the row ends 7 u before Comments, which stops at x = 484 (all tabs
+  44 u). Shrink: 12 rounds of -1 u per tab right to left, then the widest tabs lose 1 u per round, the newest joiner first. Below
+  `cw = 632` a 30 u "Column right" button appears; items at or right of its x are off screen. Status: left items stay while 9 u
+  remain before the full right-hand group; Zoom %, then the zoom slider group leave when the group would start left of x = 10 (left
+  items do not return). Word's 14 u size box is reserved by `status.grip`.
+- Ribbon scroll: when the groups at their narrowest overflow the body (`content > body`), a 30 u "Column right" button sits at
+  the body's right end, groups right of its x are off screen; `compute_scrolled` and the shell's two buttons scroll by 120 u.
+- Excel (re-swept at 1 px, 1494 widths, 71 826 checks, 0 misses) differs only in data: QAT 298 u with the same stages, hold at
+  `cw = 741`, search box pin x = 493 and box down to `cw = 1007`, two right-hand buttons (Share icon at 1086, Comments at 1040),
+  status groups judged with a 13 u gap and only Zoom % leaving.
+- Open: tab-row scroll button is drawn but inert, Excel Name Box / formula bar / sheet tabs at narrow
+  widths, `Column left` geometry (no data), Writer page geometry (shadow, page gap, ruler ticks; not measured).
+
+## Update 2026-10-11 (menus, combos, scroll buttons, Word page)
+- Oracle: `ribbon-oracle.ps1 -App Excel -Popups [-PopupIds a,b]` opens the Home tab's menus, colour pickers, combo lists and
+  first sub-menus through UIA ExpandCollapse and records `fixtures/reference/ui/excel-popups.json` (popup window rect, every
+  row found by hit-testing a grid of points, because the NetUI popups have no UIA children, plus colour-run pixel scans).
+  `-App Word -PageGeometry` records `word-page.json` (3 pages at 100 %, ruler off and on; the ruler is switched back in `finally`).
+  A full `-Popups` run takes about 9 minutes. Sub-menu windows were not captured (their geometry is unmeasured).
+- `crates/ui-shell/src/menu.rs`: `plan()` (pure geometry in u) and `show()` (draw, hover, keyboard, scroll, sub-menus). `MenuEntry`
+  now has check marks, separators, headings, swatch rows (`EntryKind::Swatches`), tile grids, sub-menus, detail line, row height.
+  Measured (125 %, u): frame+pad 2, row 36, heading 37/38, separator 3, colour cell 30 on a 34 pitch (tints 30), tile heading 37 and
+  10 under each group, scroll bar 21, font list rows 33, size list rows 30 (16 shown), Number Format rows 60. `tests/menus.rs` replays
+  the fixture (+-1 px, heights and every row/cell position; widths follow text and are not compared).
+- Editable combos (`Shell::combo`): typed input, inline auto-complete (non-numeric lists), Enter commits through
+  `ShellHost::combo_commit`, Escape cancels, arrow/Up/Down open the list, list scrolls to the checked entry.
+- Sheets uses all of it; `format_popup.rs` and the host popups are gone. Writer's font name/size boxes are editable too.
+- Tab row "Column right" / "Column left" and the ribbon scroll buttons scroll (`tests/scroll.rs`).
+- Writer page (125 %, dark): first page 15 u under the canvas, page pitch 1421 u (A4 1403.2 + 18 u gap), 1 px 8c8c8c outline and no
+  shadow in dark mode, page centred in the viewport minus a 21 u scroll bar. `PAGE_TOP_PT` 9, `PAGE_GAP_PT` 10.8. With the ruler on:
+  horizontal ruler band 30 u (page moves down 30 u), vertical ruler 30 u (page moves right 15 u), half-cm ticks 6 u tall, quarter-cm 2 u.
+- Open: Excel's "High-contrast only" filter strip (52 u) in colour pickers is not drawn; sub-menu offsets, popup text widths and
+  the font list's maximum height are assumptions; light-mode menu colours are estimates; Writer has no ruler yet (numbers only in the
+  fixture); light-mode page shadow unmeasured; Name Box / formula bar / sheet tabs at narrow widths not done.

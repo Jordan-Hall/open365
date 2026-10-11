@@ -2042,84 +2042,24 @@ id = "normsdist.e0_one"
 reason = "Excel's result is 1 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel 0.841344746068543, Open365 0.8413447460685429)"
 
 [[difference]]
-id = "norm_inv.r01"
-reason = "Excel's result is 2 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel -2.996614819259804, Open365 -2.996614819259803)"
-
-[[difference]]
-id = "norm_inv.r02"
-reason = "Excel's result is 2 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel -25.142171145990975, Open365 -25.142171145990982)"
-
-[[difference]]
 id = "norm_inv.r03"
 reason = "Excel's result is 1 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel -0.9834579130336079, Open365 -0.9834579130336077)"
-
-[[difference]]
-id = "norm_inv.r04"
-reason = "Excel's result is 1 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel 9.07239332513159, Open365 9.072393325131591)"
 
 [[difference]]
 id = "norm_inv.r06"
 reason = "Excel's result is 3 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel -3.0566925320646137, Open365 -3.0566925320646123)"
 
 [[difference]]
-id = "norm_inv.r07"
-reason = "Excel's result is 2 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel -22.734391703403933, Open365 -22.73439170340394)"
-
-[[difference]]
-id = "norm_inv.r10"
-reason = "Excel's result is 2 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel -44.13151794241752, Open365 -44.13151794241753)"
-
-[[difference]]
-id = "norm_inv.r12"
-reason = "Excel's result is 1 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel 9.448675770239985, Open365 9.448675770239987)"
-
-[[difference]]
 id = "norm_inv.r14"
 reason = "Excel's result is 2 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel 3.036173001857028, Open365 3.036173001857027)"
-
-[[difference]]
-id = "norm_inv.r16"
-reason = "Excel's result is 4 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel -12.728369858881603, Open365 -12.728369858881596)"
-
-[[difference]]
-id = "norm_inv.r21"
-reason = "Excel's result is 1 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel -12.035206698529931, Open365 -12.03520669852993)"
-
-[[difference]]
-id = "norm_inv.r22"
-reason = "Excel's result is 2 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel 12.800981099589613, Open365 12.800981099589617)"
 
 [[difference]]
 id = "norm_inv.r24"
 reason = "Excel's result is 3 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel 1.2559717731099618, Open365 1.2559717731099624)"
 
 [[difference]]
-id = "norm_inv.r25"
-reason = "Excel's result is 2 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel -49.26355401070712, Open365 -49.26355401070713)"
-
-[[difference]]
-id = "norm_inv.r27"
-reason = "Excel's result is 1 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel 8.201094321413033, Open365 8.201094321413034)"
-
-[[difference]]
-id = "norm_inv.r34"
-reason = "Excel's result is 1 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel -6.037970460535107, Open365 -6.037970460535108)"
-
-[[difference]]
-id = "norm_inv.r35"
-reason = "Excel's result is 2 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel -16.176946451533617, Open365 -16.17694645153361)"
-
-[[difference]]
 id = "norm_inv.r38"
 reason = "Excel's result is 20 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel 0.17673192019186568, Open365 0.17673192019186623)"
-
-[[difference]]
-id = "norm_inv.t41"
-reason = "Excel's result is 1 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel 1.9599639845400536, Open365 1.9599639845400538)"
-
-[[difference]]
-id = "norm_inv.t42"
-reason = "Excel's result is 2 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel -1.9599639845400538, Open365 -1.9599639845400543)"
 
 [[difference]]
 id = "norm_inv.t44"
@@ -2128,26 +2068,6 @@ reason = "Excel's result is 1 ulp from Open365's, which is the exact value round
 [[difference]]
 id = "norm_inv.t45"
 reason = "Excel's result is 7 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel 0.9999999999999888, Open365 0.999999999999988)"
-
-[[difference]]
-id = "norm_inv.t46"
-reason = "Excel's result is 2 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel 4.753424308817089, Open365 4.753424308817087)"
-
-[[difference]]
-id = "norm_inv.t48"
-reason = "Excel's result is 1 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel -6.361340902404056, Open365 -6.361340902404057)"
-
-[[difference]]
-id = "norm_inv.t50"
-reason = "Excel's result is 2 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel -21.27345356096532, Open365 -21.273453560965326)"
-
-[[difference]]
-id = "norm_inv.t53"
-reason = "Excel's result is 2 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel 7.650730905155641, Open365 7.650730905155643)"
-
-[[difference]]
-id = "norm_inv.t54"
-reason = "Excel's result is 2 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel 7.941444487415977, Open365 7.941444487415978)"
 
 [[difference]]
 id = "norm_inv.e1_numtxt"
@@ -2214,16 +2134,8 @@ id = "norm_inv.e2_one"
 reason = "Excel's result is 2 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel 0.4755994872919591, Open365 0.4755994872919592)"
 
 [[difference]]
-id = "norminv.r01"
-reason = "Excel's result is 2 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel 2.728997346288409, Open365 2.72899734628841)"
-
-[[difference]]
 id = "norminv.r03"
 reason = "Excel's result is 1 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel -0.29457567168054477, Open365 -0.2945756716805448)"
-
-[[difference]]
-id = "norminv.r04"
-reason = "Excel's result is 1 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel 14.949878348640114, Open365 14.949878348640116)"
 
 [[difference]]
 id = "norminv.r05"
@@ -2238,10 +2150,6 @@ id = "norminv.r13"
 reason = "Excel's result is 1 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel -1.2391024081324644, Open365 -1.2391024081324642)"
 
 [[difference]]
-id = "norminv.r17"
-reason = "Excel's result is 2 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel -5.966108503645833, Open365 -5.966108503645835)"
-
-[[difference]]
 id = "norminv.r18"
 reason = "Excel's result is 4 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel 0.4610137454627802, Open365 0.46101374546277996)"
 
@@ -2250,16 +2158,8 @@ id = "norminv.r21"
 reason = "Excel's result is 1 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel -2.750983885345312, Open365 -2.7509838853453115)"
 
 [[difference]]
-id = "norminv.r23"
-reason = "Excel's result is 1 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel -0.6828519098311767, Open365 -0.6828519098311768)"
-
-[[difference]]
 id = "norminv.r25"
 reason = "Excel's result is 2 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel -5.031782067960731, Open365 -5.031782067960729)"
-
-[[difference]]
-id = "norminv.r26"
-reason = "Excel's result is 2 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel -7.235345784635684, Open365 -7.235345784635682)"
 
 [[difference]]
 id = "norminv.r27"
@@ -2270,40 +2170,8 @@ id = "norminv.r28"
 reason = "Excel's result is 1 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel -2.215046708790925, Open365 -2.2150467087909256)"
 
 [[difference]]
-id = "norminv.r30"
-reason = "Excel's result is 1 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel -6.774230835060379, Open365 -6.77423083506038)"
-
-[[difference]]
-id = "norminv.r33"
-reason = "Excel's result is 2 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel -11.304882164864136, Open365 -11.304882164864132)"
-
-[[difference]]
-id = "norminv.r34"
-reason = "Excel's result is 1 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel -2.8569952455288035, Open365 -2.856995245528804)"
-
-[[difference]]
-id = "norminv.r35"
-reason = "Excel's result is 1 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel -19.8086290083323, Open365 -19.808629008332304)"
-
-[[difference]]
-id = "norminv.r36"
-reason = "Excel's result is 2 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel 5.666740559128806, Open365 5.666740559128808)"
-
-[[difference]]
-id = "norminv.r37"
-reason = "Excel's result is 2 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel -8.755280161851136, Open365 -8.755280161851132)"
-
-[[difference]]
 id = "norminv.r39"
 reason = "Excel's result is 3 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel -1.2078978283655253, Open365 -1.2078978283655246)"
-
-[[difference]]
-id = "norminv.t41"
-reason = "Excel's result is 1 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel 1.9599639845400536, Open365 1.9599639845400538)"
-
-[[difference]]
-id = "norminv.t42"
-reason = "Excel's result is 2 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel -1.9599639845400538, Open365 -1.9599639845400543)"
 
 [[difference]]
 id = "norminv.t44"
@@ -2312,26 +2180,6 @@ reason = "Excel's result is 1 ulp from Open365's, which is the exact value round
 [[difference]]
 id = "norminv.t45"
 reason = "Excel's result is 7 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel 0.9999999999999888, Open365 0.999999999999988)"
-
-[[difference]]
-id = "norminv.t46"
-reason = "Excel's result is 2 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel 4.753424308817089, Open365 4.753424308817087)"
-
-[[difference]]
-id = "norminv.t48"
-reason = "Excel's result is 1 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel -6.361340902404056, Open365 -6.361340902404057)"
-
-[[difference]]
-id = "norminv.t50"
-reason = "Excel's result is 2 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel -21.27345356096532, Open365 -21.273453560965326)"
-
-[[difference]]
-id = "norminv.t53"
-reason = "Excel's result is 2 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel 7.650730905155641, Open365 7.650730905155643)"
-
-[[difference]]
-id = "norminv.t54"
-reason = "Excel's result is 2 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel 7.941444487415977, Open365 7.941444487415978)"
 
 [[difference]]
 id = "norminv.e1_numtxt"
@@ -2402,14 +2250,6 @@ id = "norm_s_inv.r00"
 reason = "Excel's result is 3 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel 1.346938626110279, Open365 1.3469386261102796)"
 
 [[difference]]
-id = "norm_s_inv.r03"
-reason = "Excel's result is 1 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel -3.090232306167813, Open365 -3.0902323061678136)"
-
-[[difference]]
-id = "norm_s_inv.r04"
-reason = "Excel's result is 1 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel -4.2648907939228256, Open365 -4.264890793922825)"
-
-[[difference]]
 id = "norm_s_inv.r06"
 reason = "Excel's result is 1 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel -0.29865931872967966, Open365 -0.2986593187296796)"
 
@@ -2426,24 +2266,12 @@ id = "norm_s_inv.r09"
 reason = "Excel's result is 1 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel -0.4064663184839669, Open365 -0.40646631848396686)"
 
 [[difference]]
-id = "norm_s_inv.r14"
-reason = "Excel's result is 1 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel -21.180010466453016, Open365 -21.180010466453012)"
-
-[[difference]]
 id = "norm_s_inv.r15"
 reason = "Excel's result is 1 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel -1.073604455130997, Open365 -1.0736044551309967)"
 
 [[difference]]
 id = "norm_s_inv.r18"
 reason = "Excel's result is 1 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel -0.7349006540828174, Open365 -0.7349006540828172)"
-
-[[difference]]
-id = "norm_s_inv.r19"
-reason = "Excel's result is 2 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel 1.8852210499725923, Open365 1.8852210499725928)"
-
-[[difference]]
-id = "norm_s_inv.r20"
-reason = "Excel's result is 1 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel 1.7565180040119148, Open365 1.756518004011915)"
 
 [[difference]]
 id = "norm_s_inv.r21"
@@ -2458,14 +2286,6 @@ id = "norm_s_inv.r25"
 reason = "Excel's result is 1 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel 0.18274258544544394, Open365 0.18274258544544392)"
 
 [[difference]]
-id = "norm_s_inv.r26"
-reason = "Excel's result is 1 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel -4.2648907939228256, Open365 -4.264890793922825)"
-
-[[difference]]
-id = "norm_s_inv.r28"
-reason = "Excel's result is 1 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel 1.6145877500323236, Open365 1.6145877500323238)"
-
-[[difference]]
 id = "norm_s_inv.r29"
 reason = "Excel's result is 1 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel 0.4294441911012212, Open365 0.4294441911012211)"
 
@@ -2474,56 +2294,12 @@ id = "norm_s_inv.r30"
 reason = "Excel's result is 2 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel 0.8172247517525884, Open365 0.8172247517525881)"
 
 [[difference]]
-id = "norm_s_inv.r31"
-reason = "Excel's result is 1 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel 5.612001243305506, Open365 5.612001243305505)"
-
-[[difference]]
-id = "norm_s_inv.r32"
-reason = "Excel's result is 2 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel -2.1200716897421503, Open365 -2.120071689742151)"
-
-[[difference]]
-id = "norm_s_inv.r34"
-reason = "Excel's result is 1 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel 6.849708144901463, Open365 6.849708144901464)"
-
-[[difference]]
 id = "norm_s_inv.r35"
 reason = "Excel's result is 5 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel -0.8983480935147535, Open365 -0.898348093514753)"
 
 [[difference]]
-id = "norm_s_inv.r36"
-reason = "Excel's result is 1 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel -4.2648907939228256, Open365 -4.264890793922825)"
-
-[[difference]]
 id = "norm_s_inv.r39"
 reason = "Excel's result is 2 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel -1.1216765279254892, Open365 -1.1216765279254888)"
-
-[[difference]]
-id = "norm_s_inv.r40"
-reason = "Excel's result is 1 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel -21.180010466453016, Open365 -21.180010466453012)"
-
-[[difference]]
-id = "norm_s_inv.r41"
-reason = "Excel's result is 1 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel -21.180010466453016, Open365 -21.180010466453012)"
-
-[[difference]]
-id = "norm_s_inv.r43"
-reason = "Excel's result is 1 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel 6.849708144901463, Open365 6.849708144901464)"
-
-[[difference]]
-id = "norm_s_inv.r45"
-reason = "Excel's result is 1 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel -9.262340089798405, Open365 -9.262340089798407)"
-
-[[difference]]
-id = "norm_s_inv.r46"
-reason = "Excel's result is 1 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel -3.090232306167813, Open365 -3.0902323061678136)"
-
-[[difference]]
-id = "norm_s_inv.r47"
-reason = "Excel's result is 1 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel -21.230432776084246, Open365 -21.23043277608425)"
-
-[[difference]]
-id = "norm_s_inv.r48"
-reason = "Excel's result is 2 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel -5.257533884147763, Open365 -5.257533884147764)"
 
 [[difference]]
 id = "norm_s_inv.r49"
@@ -2542,14 +2318,6 @@ id = "norm_s_inv.r53"
 reason = "Excel's result is 2 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel 0.4026577762492339, Open365 0.40265777624923377)"
 
 [[difference]]
-id = "norm_s_inv.r54"
-reason = "Excel's result is 1 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel -5.61200124417479, Open365 -5.612001244174789)"
-
-[[difference]]
-id = "norm_s_inv.r55"
-reason = "Excel's result is 1 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel -1.8764027300172406, Open365 -1.8764027300172408)"
-
-[[difference]]
 id = "norm_s_inv.r56"
 reason = "Excel's result is 1 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel -1.4227797961861013, Open365 -1.4227797961861015)"
 
@@ -2560,34 +2328,6 @@ reason = "Excel's result is 1 ulp from Open365's, which is the exact value round
 [[difference]]
 id = "norm_s_inv.r59"
 reason = "Excel's result is 1 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel -0.5777987489791598, Open365 -0.57779874897916)"
-
-[[difference]]
-id = "norm_s_inv.t61"
-reason = "Excel's result is 1 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel 1.9599639845400536, Open365 1.9599639845400538)"
-
-[[difference]]
-id = "norm_s_inv.t62"
-reason = "Excel's result is 2 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel -1.9599639845400538, Open365 -1.9599639845400543)"
-
-[[difference]]
-id = "norm_s_inv.t67"
-reason = "Excel's result is 1 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel 4.26489079392384, Open365 4.264890793923841)"
-
-[[difference]]
-id = "norm_s_inv.t69"
-reason = "Excel's result is 1 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel -6.361340902404056, Open365 -6.361340902404057)"
-
-[[difference]]
-id = "norm_s_inv.t71"
-reason = "Excel's result is 2 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel -21.27345356096532, Open365 -21.273453560965326)"
-
-[[difference]]
-id = "norm_s_inv.t75"
-reason = "Excel's result is 2 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel 7.650730905155641, Open365 7.650730905155643)"
-
-[[difference]]
-id = "norm_s_inv.t76"
-reason = "Excel's result is 2 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel 7.941444487415977, Open365 7.941444487415978)"
 
 [[difference]]
 id = "norm_s_inv.t78"
@@ -2614,14 +2354,6 @@ id = "norm_s_inv.t83"
 reason = "Excel's result is 3 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel 0.8416212335729147, Open365 0.8416212335729144)"
 
 [[difference]]
-id = "norm_s_inv.t84"
-reason = "Excel's result is 1 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel -3.71901648545568, Open365 -3.7190164854556804)"
-
-[[difference]]
-id = "norm_s_inv.t85"
-reason = "Excel's result is 1 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel -4.2648907939228256, Open365 -4.264890793922825)"
-
-[[difference]]
 id = "normsinv.r00"
 reason = "Excel's result is 4 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel 1.0437523123839991, Open365 1.0437523123839982)"
 
@@ -2634,28 +2366,12 @@ id = "normsinv.r02"
 reason = "Excel's result is 1 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel -0.4198432052589234, Open365 -0.4198432052589233)"
 
 [[difference]]
-id = "normsinv.r05"
-reason = "Excel's result is 2 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel 3.963044440538852, Open365 3.963044440538853)"
-
-[[difference]]
 id = "normsinv.r06"
 reason = "Excel's result is 1 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel 0.8491461019870327, Open365 0.8491461019870326)"
 
 [[difference]]
-id = "normsinv.r09"
-reason = "Excel's result is 1 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel -1.5769805522826117, Open365 -1.576980552282612)"
-
-[[difference]]
-id = "normsinv.r14"
-reason = "Excel's result is 1 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel -21.230432776084246, Open365 -21.23043277608425)"
-
-[[difference]]
 id = "normsinv.r15"
 reason = "Excel's result is 3 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel -0.4354993647483751, Open365 -0.4354993647483749)"
-
-[[difference]]
-id = "normsinv.r16"
-reason = "Excel's result is 1 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel -3.090232306167813, Open365 -3.0902323061678136)"
 
 [[difference]]
 id = "normsinv.r17"
@@ -2666,20 +2382,8 @@ id = "normsinv.r18"
 reason = "Excel's result is 1 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel -0.27645320053727673, Open365 -0.2764532005372767)"
 
 [[difference]]
-id = "normsinv.r19"
-reason = "Excel's result is 2 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel 3.963044440538852, Open365 3.963044440538853)"
-
-[[difference]]
 id = "normsinv.r20"
 reason = "Excel's result is 4 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel -1.0498219096264119, Open365 -1.0498219096264128)"
-
-[[difference]]
-id = "normsinv.r22"
-reason = "Excel's result is 1 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel 5.612001243305506, Open365 5.612001243305505)"
-
-[[difference]]
-id = "normsinv.r24"
-reason = "Excel's result is 2 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel 3.963044440538852, Open365 3.963044440538853)"
 
 [[difference]]
 id = "normsinv.r25"
@@ -2694,24 +2398,8 @@ id = "normsinv.r27"
 reason = "Excel's result is 1 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel -0.30626879017559905, Open365 -0.306268790175599)"
 
 [[difference]]
-id = "normsinv.r30"
-reason = "Excel's result is 1 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel -21.180010466453016, Open365 -21.180010466453012)"
-
-[[difference]]
-id = "normsinv.r33"
-reason = "Excel's result is 1 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel -9.262340089798405, Open365 -9.262340089798407)"
-
-[[difference]]
-id = "normsinv.r34"
-reason = "Excel's result is 3 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel -5.451310437845481, Open365 -5.451310437845478)"
-
-[[difference]]
 id = "normsinv.r35"
 reason = "Excel's result is 2 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel -1.3626273014608783, Open365 -1.3626273014608778)"
-
-[[difference]]
-id = "normsinv.r36"
-reason = "Excel's result is 1 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel -4.2648907939228256, Open365 -4.264890793922825)"
 
 [[difference]]
 id = "normsinv.r37"
@@ -2726,68 +2414,12 @@ id = "normsinv.r40"
 reason = "Excel's result is 2 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel -0.38910293827006726, Open365 -0.38910293827006714)"
 
 [[difference]]
-id = "normsinv.r41"
-reason = "Excel's result is 1 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel -4.2648907939228256, Open365 -4.264890793922825)"
-
-[[difference]]
 id = "normsinv.r42"
 reason = "Excel's result is 1 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel 0.06572094093465737, Open365 0.06572094093465736)"
 
 [[difference]]
-id = "normsinv.r45"
-reason = "Excel's result is 1 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel 4.26489079392384, Open365 4.264890793923841)"
-
-[[difference]]
-id = "normsinv.r53"
-reason = "Excel's result is 1 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel 5.612001243305506, Open365 5.612001243305505)"
-
-[[difference]]
-id = "normsinv.r54"
-reason = "Excel's result is 1 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel -5.61200124417479, Open365 -5.612001244174789)"
-
-[[difference]]
-id = "normsinv.r55"
-reason = "Excel's result is 1 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel 1.727934322388418, Open365 1.7279343223884183)"
-
-[[difference]]
-id = "normsinv.r57"
-reason = "Excel's result is 2 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel -5.257533884147763, Open365 -5.257533884147764)"
-
-[[difference]]
-id = "normsinv.r58"
-reason = "Excel's result is 2 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel -5.257533884147763, Open365 -5.257533884147764)"
-
-[[difference]]
 id = "normsinv.r59"
 reason = "Excel's result is 1 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel 0.005765276969606804, Open365 0.0057652769696068034)"
-
-[[difference]]
-id = "normsinv.t61"
-reason = "Excel's result is 1 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel 1.9599639845400536, Open365 1.9599639845400538)"
-
-[[difference]]
-id = "normsinv.t62"
-reason = "Excel's result is 2 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel -1.9599639845400538, Open365 -1.9599639845400543)"
-
-[[difference]]
-id = "normsinv.t67"
-reason = "Excel's result is 1 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel 4.26489079392384, Open365 4.264890793923841)"
-
-[[difference]]
-id = "normsinv.t69"
-reason = "Excel's result is 1 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel -6.361340902404056, Open365 -6.361340902404057)"
-
-[[difference]]
-id = "normsinv.t71"
-reason = "Excel's result is 2 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel -21.27345356096532, Open365 -21.273453560965326)"
-
-[[difference]]
-id = "normsinv.t75"
-reason = "Excel's result is 2 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel 7.650730905155641, Open365 7.650730905155643)"
-
-[[difference]]
-id = "normsinv.t76"
-reason = "Excel's result is 2 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel 7.941444487415977, Open365 7.941444487415978)"
 
 [[difference]]
 id = "normsinv.t78"
@@ -2812,14 +2444,6 @@ reason = "Excel's result is 1 ulp from Open365's, which is the exact value round
 [[difference]]
 id = "normsinv.t83"
 reason = "Excel's result is 3 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel 0.8416212335729147, Open365 0.8416212335729144)"
-
-[[difference]]
-id = "normsinv.t84"
-reason = "Excel's result is 1 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel -3.71901648545568, Open365 -3.7190164854556804)"
-
-[[difference]]
-id = "normsinv.t85"
-reason = "Excel's result is 1 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel -4.2648907939228256, Open365 -4.264890793922825)"
 
 [[difference]]
 id = "phi.r00"
@@ -20550,20 +20174,12 @@ id = "confidence_norm.r05"
 reason = "Excel's result is 3 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel 2.249035016813495, Open365 2.249035016813494)"
 
 [[difference]]
-id = "confidence_norm.r06"
-reason = "Excel's result is 2 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel 1.2820521469931738, Open365 1.2820521469931734)"
-
-[[difference]]
 id = "confidence_norm.r07"
 reason = "Excel's result is 1 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel 1.7141605540554232, Open365 1.714160554055423)"
 
 [[difference]]
 id = "confidence_norm.r08"
 reason = "Excel's result is 2 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel 7.546391370351606, Open365 7.546391370351604)"
-
-[[difference]]
-id = "confidence_norm.r09"
-reason = "Excel's result is 2 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel 6.120723319859867, Open365 6.120723319859869)"
 
 [[difference]]
 id = "confidence_norm.r10"
@@ -20614,22 +20230,6 @@ id = "confidence_norm.r24"
 reason = "Excel's result is 2 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel 4.770422562162542, Open365 4.7704225621625405)"
 
 [[difference]]
-id = "confidence_norm.t25"
-reason = "Excel's result is 1 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel 0.8945970718585784, Open365 0.8945970718585785)"
-
-[[difference]]
-id = "confidence_norm.t26"
-reason = "Excel's result is 1 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel 1.1756998448637954, Open365 1.1756998448637956)"
-
-[[difference]]
-id = "confidence_norm.t27"
-reason = "Excel's result is 1 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel 2.016154599140251, Open365 2.0161545991402514)"
-
-[[difference]]
-id = "confidence_norm.t28"
-reason = "Excel's result is 3 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel 2.9517458182610183, Open365 2.9517458182610197)"
-
-[[difference]]
 id = "confidence_norm.t29"
 reason = "Excel's result is 2 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel 0.30786104249034885, Open365 0.30786104249034874)"
 
@@ -20642,72 +20242,8 @@ id = "confidence_norm.t32"
 reason = "Excel's result is 1 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel 5.720570206199664e-7, Open365 5.720570206199663e-7)"
 
 [[difference]]
-id = "confidence_norm.n1"
-reason = "Excel's result is 1 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel 1.9599639845400536, Open365 1.9599639845400538)"
-
-[[difference]]
-id = "confidence_norm.nfrac"
-reason = "Excel's result is 1 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel 0.6197950323045615, Open365 0.6197950323045616)"
-
-[[difference]]
 id = "confidence_norm.e0_half"
 reason = "Excel's result is 2 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel 0.30786104249034885, Open365 0.30786104249034874)"
-
-[[difference]]
-id = "confidence_norm.e1_numtxt"
-reason = "Excel's result is 1 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel 0.536758243115147, Open365 0.5367582431151471)"
-
-[[difference]]
-id = "confidence_norm.e1_bool"
-reason = "Excel's result is 1 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel 0.3578388287434313, Open365 0.35783882874343137)"
-
-[[difference]]
-id = "confidence_norm.e1_cellbool"
-reason = "Excel's result is 1 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel 0.3578388287434313, Open365 0.35783882874343137)"
-
-[[difference]]
-id = "confidence_norm.e1_cellnum"
-reason = "Excel's result is 1 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel 0.8945970718585784, Open365 0.8945970718585785)"
-
-[[difference]]
-id = "confidence_norm.e1_cellnumtxt"
-reason = "Excel's result is 1 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel 1.073516486230294, Open365 1.0735164862302942)"
-
-[[difference]]
-id = "confidence_norm.e1_one"
-reason = "Excel's result is 1 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel 0.3578388287434313, Open365 0.35783882874343137)"
-
-[[difference]]
-id = "confidence_norm.e1_half"
-reason = "Excel's result is 1 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel 0.17891941437171566, Open365 0.17891941437171568)"
-
-[[difference]]
-id = "confidence_norm.e2_numtxt"
-reason = "Excel's result is 1 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel 4.899909961350134, Open365 4.899909961350135)"
-
-[[difference]]
-id = "confidence_norm.e2_bool"
-reason = "Excel's result is 1 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel 4.899909961350134, Open365 4.899909961350135)"
-
-[[difference]]
-id = "confidence_norm.e2_cellbool"
-reason = "Excel's result is 1 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel 4.899909961350134, Open365 4.899909961350135)"
-
-[[difference]]
-id = "confidence_norm.e2_cellnum"
-reason = "Excel's result is 1 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel 3.4647595608741932, Open365 3.4647595608741937)"
-
-[[difference]]
-id = "confidence_norm.e2_cellnumtxt"
-reason = "Excel's result is 1 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel 2.828964335190429, Open365 2.8289643351904292)"
-
-[[difference]]
-id = "confidence_norm.e2_one"
-reason = "Excel's result is 1 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel 4.899909961350134, Open365 4.899909961350135)"
-
-[[difference]]
-id = "confidence.r00"
-reason = "Excel's result is 1 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel 5.998460651151483, Open365 5.9984606511514835)"
 
 [[difference]]
 id = "confidence.r01"
@@ -20724,14 +20260,6 @@ reason = "Excel's result is 3 ulp from Open365's, which is the exact value round
 [[difference]]
 id = "confidence.r05"
 reason = "Excel's result is 4 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel 3.195476514194617, Open365 3.1954765141946186)"
-
-[[difference]]
-id = "confidence.r06"
-reason = "Excel's result is 1 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel 13.06868599561624, Open365 13.068685995616242)"
-
-[[difference]]
-id = "confidence.r08"
-reason = "Excel's result is 2 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel 0.9642114836024376, Open365 0.9642114836024378)"
 
 [[difference]]
 id = "confidence.r09"
@@ -20754,10 +20282,6 @@ id = "confidence.r16"
 reason = "Excel's result is 4 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel 3.0348856261698787, Open365 3.034885626169877)"
 
 [[difference]]
-id = "confidence.r17"
-reason = "Excel's result is 2 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel 11.67165478238209, Open365 11.671654782382094)"
-
-[[difference]]
 id = "confidence.r18"
 reason = "Excel's result is 4 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel 0.07031969408240765, Open365 0.07031969408240771)"
 
@@ -20770,32 +20294,12 @@ id = "confidence.r20"
 reason = "Excel's result is 4 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel 5.021585882170635, Open365 5.021585882170639)"
 
 [[difference]]
-id = "confidence.r21"
-reason = "Excel's result is 1 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel 0.12358096529110893, Open365 0.12358096529110894)"
-
-[[difference]]
 id = "confidence.r22"
 reason = "Excel's result is 2 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel 0.3697325920934622, Open365 0.3697325920934621)"
 
 [[difference]]
 id = "confidence.r23"
 reason = "Excel's result is 4 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel 0.7703079533716847, Open365 0.7703079533716851)"
-
-[[difference]]
-id = "confidence.t25"
-reason = "Excel's result is 1 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel 0.8945970718585784, Open365 0.8945970718585785)"
-
-[[difference]]
-id = "confidence.t26"
-reason = "Excel's result is 1 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel 1.1756998448637954, Open365 1.1756998448637956)"
-
-[[difference]]
-id = "confidence.t27"
-reason = "Excel's result is 1 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel 2.016154599140251, Open365 2.0161545991402514)"
-
-[[difference]]
-id = "confidence.t28"
-reason = "Excel's result is 3 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel 2.9517458182610183, Open365 2.9517458182610197)"
 
 [[difference]]
 id = "confidence.t29"
@@ -20810,68 +20314,8 @@ id = "confidence.t32"
 reason = "Excel's result is 1 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel 5.720570206199664e-7, Open365 5.720570206199663e-7)"
 
 [[difference]]
-id = "confidence.n1"
-reason = "Excel's result is 1 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel 1.9599639845400536, Open365 1.9599639845400538)"
-
-[[difference]]
-id = "confidence.nfrac"
-reason = "Excel's result is 1 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel 0.6197950323045615, Open365 0.6197950323045616)"
-
-[[difference]]
 id = "confidence.e0_half"
 reason = "Excel's result is 2 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel 0.30786104249034885, Open365 0.30786104249034874)"
-
-[[difference]]
-id = "confidence.e1_numtxt"
-reason = "Excel's result is 1 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel 0.536758243115147, Open365 0.5367582431151471)"
-
-[[difference]]
-id = "confidence.e1_bool"
-reason = "Excel's result is 1 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel 0.3578388287434313, Open365 0.35783882874343137)"
-
-[[difference]]
-id = "confidence.e1_cellbool"
-reason = "Excel's result is 1 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel 0.3578388287434313, Open365 0.35783882874343137)"
-
-[[difference]]
-id = "confidence.e1_cellnum"
-reason = "Excel's result is 1 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel 0.8945970718585784, Open365 0.8945970718585785)"
-
-[[difference]]
-id = "confidence.e1_cellnumtxt"
-reason = "Excel's result is 1 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel 1.073516486230294, Open365 1.0735164862302942)"
-
-[[difference]]
-id = "confidence.e1_one"
-reason = "Excel's result is 1 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel 0.3578388287434313, Open365 0.35783882874343137)"
-
-[[difference]]
-id = "confidence.e1_half"
-reason = "Excel's result is 1 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel 0.17891941437171566, Open365 0.17891941437171568)"
-
-[[difference]]
-id = "confidence.e2_numtxt"
-reason = "Excel's result is 1 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel 4.899909961350134, Open365 4.899909961350135)"
-
-[[difference]]
-id = "confidence.e2_bool"
-reason = "Excel's result is 1 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel 4.899909961350134, Open365 4.899909961350135)"
-
-[[difference]]
-id = "confidence.e2_cellbool"
-reason = "Excel's result is 1 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel 4.899909961350134, Open365 4.899909961350135)"
-
-[[difference]]
-id = "confidence.e2_cellnum"
-reason = "Excel's result is 1 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel 3.4647595608741932, Open365 3.4647595608741937)"
-
-[[difference]]
-id = "confidence.e2_cellnumtxt"
-reason = "Excel's result is 1 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel 2.828964335190429, Open365 2.8289643351904292)"
-
-[[difference]]
-id = "confidence.e2_one"
-reason = "Excel's result is 1 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel 4.899909961350134, Open365 4.899909961350135)"
 
 [[difference]]
 id = "confidence_t.r02"
