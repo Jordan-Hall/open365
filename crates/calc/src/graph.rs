@@ -10,6 +10,7 @@ use std::collections::{HashMap, HashSet, VecDeque};
 
 use crate::ast::{AreaKind, Ast, MAX_COL, MAX_ROW};
 use crate::functions::is_volatile;
+use crate::tables::PlacedTable;
 
 /// Rows per index bucket.
 const BUCKET_ROWS: u32 = 256;
@@ -386,6 +387,8 @@ pub struct Deps {
     pub refs: Vec<SheetRect>,
     /// Defined names used (as written).
     pub names: Vec<String>,
+    /// Tables named by structured references (as written).
+    pub tables: Vec<String>,
     /// The formula calls a volatile function such as `NOW`.
     pub volatile: bool,
     /// The formula calls `OFFSET` or `INDIRECT`: it reads cells that no reference in the formula names, so
@@ -400,22 +403,59 @@ pub struct Deps {
 
 /// Collects the references, defined names and volatility of a formula. `resolve` expands
 /// defined names so the formula also depends on what they point to.
-pub fn extract_deps(ast: &Ast, sheet: &str, resolve: &dyn Fn(&str) -> Option<Ast>) -> Deps {
+///
+/// `cell` is the formula's own cell (1-based row, column): the relative references of a defined name resolve
+/// against it, as the name's text is stored relative to `A1`.
+pub fn extract_deps(
+    ast: &Ast,
+    sheet: &str,
+    cell: (u32, u32),
+    resolve: &dyn Fn(&str) -> Option<Ast>,
+    table: &dyn Fn(&str) -> Option<PlacedTable>,
+) -> Deps {
     let mut deps = Deps::default();
-    walk(ast, sheet, resolve, &mut deps, 0);
+    let ctx = WalkCtx {
+        sheet,
+        cell,
+        resolve,
+        table,
+    };
+    walk(ast, &ctx, &mut deps, 0, None);
     deps
 }
 
-fn walk(ast: &Ast, sheet: &str, resolve: &dyn Fn(&str) -> Option<Ast>, out: &mut Deps, depth: u32) {
+struct WalkCtx<'a> {
+    sheet: &'a str,
+    cell: (u32, u32),
+    resolve: &'a dyn Fn(&str) -> Option<Ast>,
+    table: &'a dyn Fn(&str) -> Option<PlacedTable>,
+}
+
+#[inline(never)]
+fn walk_leaf(ast: &Ast, ctx: &WalkCtx<'_>, out: &mut Deps, shift: Option<(i64, i64)>) {
+    let sheet = ctx.sheet;
     match ast {
-        Ast::Ref(r) => out.refs.push(SheetRect {
-            sheet: r.sheet.clone().unwrap_or_else(|| sheet.to_owned()),
-            row1: r.row,
-            col1: r.col,
-            row2: r.row,
-            col2: r.col,
-        }),
+        Ast::Ref(r) => {
+            let (row, col) = match shift {
+                Some((dr, dc)) => (
+                    crate::ast::shift_coord(r.row, r.row_abs, dr, MAX_ROW),
+                    crate::ast::shift_coord(r.col, r.col_abs, dc, MAX_COL),
+                ),
+                None => (r.row, r.col),
+            };
+            out.refs.push(SheetRect {
+                sheet: r.sheet.clone().unwrap_or_else(|| sheet.to_owned()),
+                row1: row,
+                col1: col,
+                row2: row,
+                col2: col,
+            });
+        }
         Ast::Area(a) => {
+            let a = &match shift {
+                Some((dr, dc)) => crate::ast::shift_area(a, dr, dc),
+                None => a.clone(),
+            };
             let (row1, row2, col1, col2) = match a.kind {
                 AreaKind::Cells => (a.row1, a.row2, a.col1, a.col2),
                 AreaKind::Cols => (1, MAX_ROW, a.col1, a.col2),
@@ -429,6 +469,31 @@ fn walk(ast: &Ast, sheet: &str, resolve: &dyn Fn(&str) -> Option<Ast>, out: &mut
                 col2: col1.max(col2),
             });
         }
+        Ast::Structured { table, spec } => {
+            if !out.tables.iter().any(|t| t.eq_ignore_ascii_case(table)) {
+                out.tables.push(table.clone());
+            }
+            if let Some(placed) = (ctx.table)(table)
+                && let Ok((row1, col1, row2, col2)) =
+                    crate::tables::resolve(&placed.def, spec, Some(ctx.cell.0))
+            {
+                out.refs.push(SheetRect {
+                    sheet: placed.sheet,
+                    row1,
+                    col1,
+                    row2,
+                    col2,
+                });
+            }
+        }
+        _ => {}
+    }
+}
+
+fn walk(ast: &Ast, ctx: &WalkCtx<'_>, out: &mut Deps, depth: u32, shift: Option<(i64, i64)>) {
+    let resolve = ctx.resolve;
+    match ast {
+        Ast::Ref(_) | Ast::Area(_) | Ast::Structured { .. } => walk_leaf(ast, ctx, out, shift),
         Ast::Name(name) => {
             if !out.names.iter().any(|n| n.eq_ignore_ascii_case(name)) {
                 out.names.push(name.clone());
@@ -436,7 +501,8 @@ fn walk(ast: &Ast, sheet: &str, resolve: &dyn Fn(&str) -> Option<Ast>, out: &mut
             if depth < MAX_NAME_DEPTH
                 && let Some(target) = resolve(name)
             {
-                walk(&target, sheet, resolve, out, depth + 1);
+                let shift = shift.or(Some((i64::from(ctx.cell.0) - 1, i64::from(ctx.cell.1) - 1)));
+                walk(&target, ctx, out, depth + 1, shift);
             }
         }
         Ast::Func { name, args, .. } => {
@@ -448,6 +514,14 @@ fn walk(ast: &Ast, sheet: &str, resolve: &dyn Fn(&str) -> Option<Ast>, out: &mut
             }
             if name.eq_ignore_ascii_case("SUBTOTAL") || name.eq_ignore_ascii_case("AGGREGATE") {
                 out.subtotal = true;
+            }
+            // `INDEX(area,r,3)` with a literal column (or row) reads that column (row) of the area only, so
+            // `=INDEX(T[],ROW(),1)` inside column 2 of table `T` is no cycle.
+            if name.eq_ignore_ascii_case("INDEX")
+                && args.len() >= 3
+                && walk_index(args, ctx, out, depth, shift)
+            {
+                return;
             }
             // `ROW(A1)`, `COLUMNS(A:Z)` and the base of `OFFSET(A1,..)` only use the position of a
             // reference, never its value: they do not depend on the cells (`=ROW(A1)` in A1 is no cycle).
@@ -461,34 +535,115 @@ fn walk(ast: &Ast, sheet: &str, resolve: &dyn Fn(&str) -> Option<Ast>, out: &mut
                 let literal = matches!(a, Ast::Ref(_) | Ast::Area(_));
                 if literal && is_formula {
                     let mut seen = Deps::default();
-                    walk(a, sheet, resolve, &mut seen, depth);
+                    walk(a, ctx, &mut seen, depth, shift);
                     out.watched.extend(seen.refs);
                     continue;
                 }
                 if literal && (position_only || offset && i == 0) {
                     continue;
                 }
-                walk(a, sheet, resolve, out, depth);
+                walk(a, ctx, out, depth, shift);
             }
         }
         Ast::Invoke { callee, args } => {
-            walk(callee, sheet, resolve, out, depth);
+            walk(callee, ctx, out, depth, shift);
             for a in args {
-                walk(a, sheet, resolve, out, depth);
+                walk(a, ctx, out, depth, shift);
             }
         }
-        Ast::Unary { operand, .. } => walk(operand, sheet, resolve, out, depth),
-        Ast::Percent(inner) => walk(inner, sheet, resolve, out, depth),
+        Ast::Unary { operand, .. } => walk(operand, ctx, out, depth, shift),
+        Ast::Percent(inner) => walk(inner, ctx, out, depth, shift),
         Ast::Binary { lhs, rhs, .. } => {
-            walk(lhs, sheet, resolve, out, depth);
-            walk(rhs, sheet, resolve, out, depth);
+            walk(lhs, ctx, out, depth, shift);
+            walk(rhs, ctx, out, depth, shift);
         }
         Ast::Array(rows) => {
             for item in rows.iter().flatten() {
-                walk(item, sheet, resolve, out, depth);
+                walk(item, ctx, out, depth, shift);
             }
         }
         Ast::Number(_) | Ast::Text(_) | Ast::Bool(_) | Ast::Error(_) | Ast::Missing => {}
+    }
+}
+
+/// The dependencies of `INDEX(area,r,c)` with a literal row or column; false when `args[0]` is not a literal area.
+#[inline(never)]
+fn walk_index(
+    args: &[Ast],
+    ctx: &WalkCtx<'_>,
+    out: &mut Deps,
+    depth: u32,
+    shift: Option<(i64, i64)>,
+) -> bool {
+    let Some((mut row1, mut col1, mut row2, mut col2)) = literal_rect(&args[0], ctx, shift) else {
+        return false;
+    };
+    if let Some(k) = literal_index(&args[1])
+        && k <= row2 - row1 + 1
+    {
+        (row1, row2) = (row1 + k - 1, row1 + k - 1);
+    }
+    if let Some(k) = literal_index(&args[2])
+        && k <= col2 - col1 + 1
+    {
+        (col1, col2) = (col1 + k - 1, col1 + k - 1);
+    }
+    out.refs.push(SheetRect {
+        sheet: literal_sheet(&args[0], ctx),
+        row1,
+        col1,
+        row2,
+        col2,
+    });
+    for a in &args[1..] {
+        walk(a, ctx, out, depth, shift);
+    }
+    true
+}
+
+/// A positive whole number written as a literal.
+fn literal_index(ast: &Ast) -> Option<u32> {
+    match ast {
+        Ast::Number(n) if *n >= 1.0 && n.fract() == 0.0 && *n <= f64::from(MAX_ROW) => {
+            Some(*n as u32)
+        }
+        _ => None,
+    }
+}
+
+/// The cell rectangle a literal area or structured reference names: `(row1, col1, row2, col2)`.
+fn literal_rect(
+    ast: &Ast,
+    ctx: &WalkCtx<'_>,
+    shift: Option<(i64, i64)>,
+) -> Option<(u32, u32, u32, u32)> {
+    match ast {
+        Ast::Area(a) if a.kind == AreaKind::Cells => {
+            let a = match shift {
+                Some((dr, dc)) => crate::ast::shift_area(a, dr, dc),
+                None => a.clone(),
+            };
+            Some((
+                a.row1.min(a.row2),
+                a.col1.min(a.col2),
+                a.row1.max(a.row2),
+                a.col1.max(a.col2),
+            ))
+        }
+        Ast::Structured { table, spec } => {
+            let placed = (ctx.table)(table)?;
+            crate::tables::resolve(&placed.def, spec, Some(ctx.cell.0)).ok()
+        }
+        _ => None,
+    }
+}
+
+/// The sheet of an area or structured reference accepted by [`literal_rect`].
+fn literal_sheet(ast: &Ast, ctx: &WalkCtx<'_>) -> String {
+    match ast {
+        Ast::Area(a) => a.sheet.clone().unwrap_or_else(|| ctx.sheet.to_owned()),
+        Ast::Structured { table, .. } => (ctx.table)(table).map_or_else(String::new, |p| p.sheet),
+        _ => ctx.sheet.to_owned(),
     }
 }
 
@@ -672,9 +827,46 @@ mod tests {
 
     fn deps_of(formula: &str) -> Deps {
         let ast = parse_formula(formula).unwrap();
-        extract_deps(&ast, "S1", &|name| {
-            (name == "Rate").then(|| parse_formula("Other!$A$1").unwrap())
-        })
+        extract_deps(
+            &ast,
+            "S1",
+            (1, 1),
+            &|name| (name == "Rate").then(|| parse_formula("Other!$A$1").unwrap()),
+            &|_| None,
+        )
+    }
+
+    #[test]
+    fn relative_name_refs_move_with_the_formula_cell() {
+        let ast = parse_formula("Next+1").unwrap();
+        let name = |n: &str| (n == "Next").then(|| parse_formula("S1!$B1").unwrap());
+        let d = extract_deps(&ast, "S1", (5, 3), &name, &|_| None);
+        assert_eq!(d.refs, vec![rect("S1", 5, 2, 5, 2)]);
+        // Wraps past the last row, as Excel does.
+        let name = |n: &str| (n == "Next").then(|| parse_formula("S1!$B1048576").unwrap());
+        let d = extract_deps(&ast, "S1", (5, 3), &name, &|_| None);
+        assert_eq!(d.refs, vec![rect("S1", 4, 2, 4, 2)]);
+    }
+
+    #[test]
+    fn structured_reference_depends_on_its_rectangle() {
+        use crate::tables::TableDef;
+        let ast = parse_formula("SUM(T[Qty])+T[[#This Row],[Price]]").unwrap();
+        let table = |n: &str| {
+            n.eq_ignore_ascii_case("t").then(|| PlacedTable {
+                sheet: "S1".into(),
+                def: TableDef {
+                    name: "T".into(),
+                    rect: (2, 1, 6, 2),
+                    header_rows: 1,
+                    totals_rows: 0,
+                    columns: vec!["Qty".into(), "Price".into()],
+                },
+            })
+        };
+        let d = extract_deps(&ast, "S1", (4, 5), &|_| None, &table);
+        assert_eq!(d.refs, vec![rect("S1", 3, 1, 6, 1), rect("S1", 4, 2, 4, 2)]);
+        assert_eq!(d.tables, vec!["T".to_owned()]);
     }
 
     fn rect(sheet: &str, r1: u32, c1: u32, r2: u32, c2: u32) -> SheetRect {

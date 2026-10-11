@@ -294,7 +294,22 @@ fn parse_a1(ctx: &EvalContext<'_>, text: &str) -> Option<RangeRef> {
     }
     let ast = parse_formula(text).ok()?;
     let resolved = match &ast {
-        Ast::Name(n) => ctx.source.name(n)?,
+        Ast::Name(n) => {
+            let target = ctx.source.name_in(ctx.sheet, n)?;
+            // A name's relative references move with the formula cell.
+            let (dr, dc) = ctx
+                .cell
+                .map_or((0, 0), |(r, c)| (i64::from(r) - 1, i64::from(c) - 1));
+            match target {
+                Ast::Ref(r) => Ast::Ref(crate::ast::CellRef {
+                    row: crate::ast::shift_coord(r.row, r.row_abs, dr, MAX_ROW),
+                    col: crate::ast::shift_coord(r.col, r.col_abs, dc, MAX_COL),
+                    ..r
+                }),
+                Ast::Area(a) => Ast::Area(crate::ast::shift_area(&a, dr, dc)),
+                other => other,
+            }
+        }
         _ => ast,
     };
     let sheet_of = |s: &Option<String>| s.clone().unwrap_or_else(|| ctx.sheet.to_owned());

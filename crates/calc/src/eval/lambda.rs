@@ -233,7 +233,7 @@ impl Evaluator<'_, '_> {
     pub(super) fn eval_value(&self, ast: &Ast) -> Arg {
         if let Ast::Name(n) = ast
             && self.local(n).is_none()
-            && self.ctx.source.name(n).is_none()
+            && self.ctx.source.name_in(self.ctx.sheet, n).is_none()
             && functions::lookup(n).is_some()
         {
             return Arg::Lambda(Arc::new(Lambda {

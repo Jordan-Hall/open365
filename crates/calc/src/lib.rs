@@ -15,6 +15,7 @@ pub mod graph;
 pub mod numfmt;
 pub mod parser;
 pub mod style;
+pub mod tables;
 pub mod value;
 pub mod xmath;
 
@@ -26,6 +27,7 @@ pub use eval::{CellSource, Clock, EvalContext, FixedClock, SystemClock, evaluate
 pub use fmtlocale::{DateOrder, FormatLocale, cldr_to_excel};
 pub use parser::{ParseError, ParseErrorKind, parse_formula};
 pub use style::{CellStyle, HAlign};
+pub use tables::TableDef;
 pub use value::{ErrorKind, Value};
 
 use graph::{CellId, Dep, Graph, extract_deps};
@@ -48,10 +50,27 @@ pub struct CellAddr {
 struct Formula {
     ast: Ast,
     names: Vec<String>,
+    /// Tables its structured references name.
+    tables: Vec<String>,
     /// The outermost add/subtract may snap a near-zero result to zero (false for `=(A1-B1)`).
     snap_root: bool,
     /// The formula contains `SUBTOTAL` or `AGGREGATE`; other subtotals ignore this cell.
     has_subtotal: bool,
+    /// Set for the cells of a legacy array formula (`{=...}` over a range).
+    array: Option<ArrayRole>,
+}
+
+/// What a cell is within an array formula set by [`Engine::set_array_formula`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ArrayRole {
+    /// Top-left cell: holds the formula and the whole array result.
+    Master,
+    /// Another cell of the range: shows element `(d_row, d_col)` of the master's result.
+    Member {
+        master: CellId,
+        d_row: u32,
+        d_col: u32,
+    },
 }
 
 /// True when the whole formula text sits inside one pair of parentheses, as in `=(A1-B1)`.
@@ -107,7 +126,13 @@ pub struct Engine {
     sheets: Vec<SheetData>,
     graph: Graph,
     names: HashMap<String, Ast>,
+    /// Sheet-scoped names, keyed by lower-case sheet name and lower-case name.
+    sheet_names: HashMap<(String, String), Ast>,
     name_users: HashMap<String, HashSet<CellId>>,
+    /// Tables by lower-case name.
+    tables: HashMap<String, tables::PlacedTable>,
+    /// Formulas with a structured reference to a table, by lower-case table name.
+    table_users: HashMap<String, HashSet<CellId>>,
     date1904: bool,
     locale: Arc<FormatLocale>,
     clock: Box<dyn Clock>,
@@ -141,7 +166,10 @@ impl Engine {
             sheets: Vec::new(),
             graph: Graph::new(),
             names: HashMap::new(),
+            sheet_names: HashMap::new(),
             name_users: HashMap::new(),
+            tables: HashMap::new(),
+            table_users: HashMap::new(),
             date1904: false,
             locale: FormatLocale::en_us(),
             clock,
@@ -278,14 +306,19 @@ impl Engine {
     }
 
     fn forget_names(&mut self, id: CellId) {
-        let used = self.sheets[id.sheet as usize]
+        let (used, tables) = self.sheets[id.sheet as usize]
             .cells
             .get_mut(&(id.row, id.col))
             .and_then(|c| c.formula.take())
-            .map(|f| f.names)
+            .map(|f| (f.names, f.tables))
             .unwrap_or_default();
         for name in used {
             if let Some(users) = self.name_users.get_mut(&name.to_ascii_lowercase()) {
+                users.remove(&id);
+            }
+        }
+        for table in tables {
+            if let Some(users) = self.table_users.get_mut(&table.to_ascii_lowercase()) {
                 users.remove(&id);
             }
         }
@@ -386,23 +419,91 @@ impl Engine {
     ) -> Result<(), ParseError> {
         let ast = parse_formula(formula)?;
         let id = self.id(sheet, row, col);
-        self.install_formula(id, ast, !fully_parenthesized(formula));
+        self.install_formula(id, ast, !fully_parenthesized(formula), None);
         Ok(())
     }
 
-    fn install_formula(&mut self, id: CellId, ast: Ast, snap_root: bool) {
+    /// Stores a legacy array formula (`{=formula}`) over the rectangle `(row1, col1, row2, col2)` of `sheet`
+    /// (1-based, corners in any order). The formula is evaluated once, as an array, in the top-left cell; each
+    /// other cell of the rectangle shows its element of the result and keeps no formula of its own. A scalar
+    /// result fills the rectangle, a single row or column is repeated across the other dimension, and cells
+    /// beyond a larger result's size show `#N/A`, as Excel does. Editing the top-left cell later does not
+    /// clear the other cells; set each of them.
+    ///
+    /// # Errors
+    /// [`ParseError`] when the formula does not parse; nothing is changed then.
+    pub fn set_array_formula(
+        &mut self,
+        sheet: &str,
+        (row1, col1, row2, col2): (u32, u32, u32, u32),
+        formula: &str,
+    ) -> Result<(), ParseError> {
+        let ast = parse_formula(formula)?;
+        let (r1, r2) = (row1.min(row2), row1.max(row2));
+        let (c1, c2) = (col1.min(col2), col1.max(col2));
+        let master = self.id(sheet, r1, c1);
+        self.install_formula(
+            master,
+            ast.clone(),
+            !fully_parenthesized(formula),
+            Some(ArrayRole::Master),
+        );
+        for row in r1..=r2 {
+            for col in c1..=c2 {
+                if (row, col) == (r1, c1) {
+                    continue;
+                }
+                let id = CellId {
+                    sheet: master.sheet,
+                    row,
+                    col,
+                };
+                let previous = self.sheets[id.sheet as usize]
+                    .cells
+                    .get(&(row, col))
+                    .map(|c| c.value.clone());
+                self.drop_formula(id);
+                self.graph.set_formula(id, [Dep::Cell(master)], false);
+                self.sheets[id.sheet as usize].cells.insert(
+                    (row, col),
+                    CellData {
+                        value: previous.unwrap_or(Value::Empty),
+                        formula: Some(Formula {
+                            ast: ast.clone(),
+                            names: Vec::new(),
+                            tables: Vec::new(),
+                            snap_root: false,
+                            has_subtotal: false,
+                            array: Some(ArrayRole::Member {
+                                master,
+                                d_row: row - r1,
+                                d_col: col - c1,
+                            }),
+                        }),
+                    },
+                );
+                self.touch(id);
+                self.dirty.insert(id);
+                self.mark_dependents(id);
+            }
+        }
+        Ok(())
+    }
+
+    fn install_formula(&mut self, id: CellId, ast: Ast, snap_root: bool, array: Option<ArrayRole>) {
         let previous = self.sheets[id.sheet as usize]
             .cells
             .get(&(id.row, id.col))
             .map(|c| c.value.clone());
         self.drop_formula(id);
         let sheet_name = self.sheets[id.sheet as usize].name.clone();
-        let deps = {
-            let names = &self.names;
-            extract_deps(&ast, &sheet_name, &|n| {
-                names.get(&n.to_ascii_lowercase()).cloned()
-            })
-        };
+        let deps = extract_deps(
+            &ast,
+            &sheet_name,
+            (id.row, id.col),
+            &|n| self.lookup_name(&sheet_name, n),
+            &|t| self.tables.get(&t.to_ascii_lowercase()).cloned(),
+        );
         let graph_deps: Vec<Dep> = deps
             .refs
             .iter()
@@ -420,6 +521,12 @@ impl Engine {
             self.watchers
                 .push((id, sheet, w.row1, w.col1, w.row2, w.col2));
         }
+        for table in &deps.tables {
+            self.table_users
+                .entry(table.to_ascii_lowercase())
+                .or_default()
+                .insert(id);
+        }
         for name in &deps.names {
             self.name_users
                 .entry(name.to_ascii_lowercase())
@@ -433,8 +540,10 @@ impl Engine {
                 formula: Some(Formula {
                     ast,
                     names: deps.names,
+                    tables: deps.tables,
                     snap_root,
                     has_subtotal: deps.subtotal,
+                    array,
                 }),
             },
         );
@@ -444,11 +553,37 @@ impl Engine {
     }
 
     /// Defines (or redefines) a workbook-level name as a formula, e.g. `Sheet1!$A$1:$A$10`.
+    ///
+    /// Relative references in the formula are stored relative to `A1` (as in a workbook file) and move with
+    /// the cell that uses the name: `Sheet1!$B1` used in `C5` reads `Sheet1!$B5`.
     pub fn define_name(&mut self, name: &str, formula: &str) -> Result<(), ParseError> {
         let ast = parse_formula(formula)?;
         self.names.insert(name.to_ascii_lowercase(), ast);
         self.refresh_name_users(name);
         Ok(())
+    }
+
+    /// Defines (or redefines) a name scoped to one sheet. Formulas on that sheet see it before a workbook-level
+    /// name of the same spelling; formulas on other sheets do not see it.
+    pub fn define_name_scoped(
+        &mut self,
+        sheet: &str,
+        name: &str,
+        formula: &str,
+    ) -> Result<(), ParseError> {
+        let ast = parse_formula(formula)?;
+        self.sheet_names
+            .insert((sheet.to_ascii_lowercase(), name.to_ascii_lowercase()), ast);
+        self.refresh_name_users(name);
+        Ok(())
+    }
+
+    fn lookup_name(&self, sheet: &str, name: &str) -> Option<Ast> {
+        let lower = name.to_ascii_lowercase();
+        self.sheet_names
+            .get(&(sheet.to_ascii_lowercase(), lower.clone()))
+            .or_else(|| self.names.get(&lower))
+            .cloned()
     }
 
     /// Removes a defined name; formulas using it evaluate to `#NAME?`.
@@ -457,20 +592,57 @@ impl Engine {
         self.refresh_name_users(name);
     }
 
+    /// Defines (or redefines) a table for structured references such as `Sales[Qty]`. Formulas that already
+    /// use the table name are re-read against the new definition. `sheet` is the sheet the table sits on.
+    pub fn define_table(&mut self, sheet: &str, def: TableDef) {
+        self.ensure_sheet(sheet);
+        let key = def.name.to_ascii_lowercase();
+        self.tables.insert(
+            key.clone(),
+            tables::PlacedTable {
+                sheet: sheet.to_owned(),
+                def,
+            },
+        );
+        let users: Vec<CellId> = self
+            .table_users
+            .get(&key)
+            .map(|s| s.iter().copied().collect())
+            .unwrap_or_default();
+        self.reinstall(users);
+    }
+
+    /// Removes a table; formulas that name it evaluate to `#REF!`.
+    pub fn remove_table(&mut self, name: &str) {
+        let key = name.to_ascii_lowercase();
+        self.tables.remove(&key);
+        let users: Vec<CellId> = self
+            .table_users
+            .get(&key)
+            .map(|s| s.iter().copied().collect())
+            .unwrap_or_default();
+        self.reinstall(users);
+    }
+
     fn refresh_name_users(&mut self, name: &str) {
         let users: Vec<CellId> = self
             .name_users
             .get(&name.to_ascii_lowercase())
             .map(|s| s.iter().copied().collect())
             .unwrap_or_default();
+        self.reinstall(users);
+    }
+
+    /// Installs the formulas of `users` again, so their dependencies follow a changed name or table.
+    fn reinstall(&mut self, users: Vec<CellId>) {
         for id in users {
             let formula = self.sheets[id.sheet as usize]
                 .cells
                 .get(&(id.row, id.col))
                 .and_then(|c| c.formula.as_ref())
-                .map(|f| (f.ast.clone(), f.snap_root));
-            if let Some((ast, snap_root)) = formula {
-                self.install_formula(id, ast, snap_root);
+                .map(|f| (f.ast.clone(), f.snap_root, f.array));
+            if let Some((ast, snap_root, array)) = formula {
+                self.install_formula(id, ast, snap_root, array);
             }
         }
     }
@@ -624,7 +796,40 @@ impl Engine {
             clock,
             locale: &self.locale,
         };
-        evaluate_root(&formula.ast, &ctx, formula.snap_root)
+        match formula.array {
+            None => evaluate_root(&formula.ast, &ctx, formula.snap_root),
+            Some(ArrayRole::Master) => eval::evaluate_array_root(&formula.ast, &ctx),
+            Some(ArrayRole::Member {
+                master,
+                d_row,
+                d_col,
+            }) => self.array_element(master, d_row, d_col),
+        }
+    }
+
+    /// Element `(d_row, d_col)` of the array result held by an array formula's top-left cell.
+    fn array_element(&self, master: CellId, d_row: u32, d_col: u32) -> Value {
+        let result = self.sheets[master.sheet as usize]
+            .cells
+            .get(&(master.row, master.col))
+            .map_or(Value::Empty, |c| c.value.clone());
+        let Value::Array(rows) = result else {
+            return result;
+        };
+        let row = if rows.len() == 1 {
+            rows.first()
+        } else {
+            rows.get(d_row as usize)
+        };
+        row.and_then(|r| {
+            if r.len() == 1 {
+                r.first()
+            } else {
+                r.get(d_col as usize)
+            }
+        })
+        .cloned()
+        .unwrap_or(Value::Error(ErrorKind::NA))
     }
 }
 
@@ -636,6 +841,14 @@ impl CellSource for Engine {
 
     fn name(&self, name: &str) -> Option<Ast> {
         self.names.get(&name.to_ascii_lowercase()).cloned()
+    }
+
+    fn name_in(&self, sheet: &str, name: &str) -> Option<Ast> {
+        self.lookup_name(sheet, name)
+    }
+
+    fn table(&self, name: &str) -> Option<tables::PlacedTable> {
+        self.tables.get(&name.to_ascii_lowercase()).cloned()
     }
 
     fn sheet_exists(&self, sheet: &str) -> bool {
@@ -699,5 +912,7 @@ impl CellSource for Engine {
 mod engine_tests;
 #[cfg(test)]
 mod function_tests;
+#[cfg(test)]
+mod scope_tests;
 #[cfg(test)]
 mod test_support;

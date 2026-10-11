@@ -115,6 +115,8 @@ enum Tok {
     RParen,
     LBrace,
     RBrace,
+    /// A table specifier directly after a name: `[Qty]`, `[[#This Row],[Qty]]` (brackets included).
+    Bracket(String),
     Eof,
 }
 
@@ -265,6 +267,42 @@ fn tokenize(src: &str, base: usize) -> Result<Vec<Token>, ParseError> {
                 }
                 let end = chars.get(i).map_or(src.len(), |&(p, _)| p);
                 let word = src[chars[start].0..end].to_owned();
+                if at(i) == Some('[') && !word.contains('$') {
+                    // A table name followed by its column specifier.
+                    out.push(Token {
+                        tok: Tok::Word(word),
+                        pos,
+                        space_before: space,
+                    });
+                    let open = i;
+                    let mut depth = 0usize;
+                    while let Some(ch) = at(i) {
+                        match ch {
+                            '\'' => i += 1,
+                            '[' => depth += 1,
+                            ']' => {
+                                depth = depth.saturating_sub(1);
+                                if depth == 0 {
+                                    i += 1;
+                                    break;
+                                }
+                            }
+                            _ => {}
+                        }
+                        i += 1;
+                    }
+                    if depth != 0 || i > chars.len() {
+                        return err(ParseErrorKind::UnexpectedChar('['), off(open));
+                    }
+                    let spec = src[chars[open].0..off(i) - base].to_owned();
+                    out.push(Token {
+                        tok: Tok::Bracket(spec),
+                        pos: off(open),
+                        space_before: false,
+                    });
+                    space = false;
+                    continue;
+                }
                 if at(i) == Some('(') && !word.contains('$') {
                     Tok::Func(word)
                 } else if at(i) == Some('!') {
@@ -652,6 +690,13 @@ impl Parser {
     }
 
     fn word(&mut self, w: &str, sheet: Option<String>, pos: usize) -> Result<Ast, ParseError> {
+        if let Tok::Bracket(spec) = self.peek().tok.clone() {
+            self.advance();
+            return Ok(Ast::Structured {
+                table: w.to_owned(),
+                spec,
+            });
+        }
         if let Some((row, abs)) = row_from_word(w)
             && let Some(area) = self.finish_rows(row, abs, sheet.clone())
         {

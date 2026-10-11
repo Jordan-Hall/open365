@@ -3,7 +3,7 @@
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 
-use open365_calc::{CellAddr, Engine, ErrorKind, Value, parse_formula};
+use open365_calc::{CellAddr, Engine, ErrorKind, TableDef, Value, parse_formula};
 use open365_xlsx::{CellError, CellInput, CellValue, SheetKind, Workbook};
 
 use crate::command::{CellEntry, CellRef};
@@ -222,6 +222,35 @@ pub(crate) fn build_engine_cancellable(
     let mut engine = Engine::new();
     engine.set_cancel(cancel.cloned());
     engine.set_date1904(wb.date1904());
+    // Names first, so a formula installed later resolves them without a second pass. A sheet-scoped
+    // name (`localSheetId`) is only seen by formulas on its sheet.
+    for name in wb.defined_names() {
+        let scope = name
+            .local_sheet_id
+            .and_then(|i| wb.sheets().get(usize::try_from(i).ok()?))
+            .map(|s| s.name.as_str());
+        let _ = match scope {
+            Some(sheet) => engine.define_name_scoped(sheet, &name.name, &name.formula),
+            None if name.local_sheet_id.is_some() => continue,
+            None => engine.define_name(&name.name, &name.formula),
+        };
+    }
+    // Tables, for structured references (`Table[Column]`).
+    for (i, table) in wb.tables() {
+        let (Some(info), Some(rect)) = (wb.sheets().get(i), table.rect) else {
+            continue;
+        };
+        engine.define_table(
+            &info.name,
+            TableDef {
+                name: table.display_name.clone(),
+                rect,
+                header_rows: table.header_row_count,
+                totals_rows: table.totals_row_count,
+                columns: table.columns.iter().map(|c| c.name.clone()).collect(),
+            },
+        );
+    }
     for (i, info) in wb.sheets().iter().enumerate() {
         if info.kind != SheetKind::Worksheet || !keep(i, 0, 0) {
             continue;
@@ -238,10 +267,8 @@ pub(crate) fn build_engine_cancellable(
             if cell.formula.is_some() {
                 // Seed the cached value so the engine starts from the file's results.
                 engine.set_value(&info.name, row, col, to_calc_value(&cell.value));
-                // Non-master cells of a legacy array formula have no text (`None`), so
-                // they keep their cached values. The engine has no array formula or
-                // sheet-scoped name support yet: see docs/architecture/xlsx-model.md,
-                // "What calc needs".
+                // Non-master cells of a legacy array formula have no text (`None`): they get
+                // their value from the array formula installed below.
                 if let Some(text) = ws.formula_text(row, col) {
                     // An unparseable formula keeps its cached value as a constant.
                     let _ = engine.set_formula(&info.name, row, col, &text);
@@ -250,11 +277,10 @@ pub(crate) fn build_engine_cancellable(
                 engine.set_value(&info.name, row, col, to_calc_value(&cell.value));
             }
         }
-    }
-    // Only workbook-scoped names: `Engine::define_name` has no sheet scope.
-    for name in wb.defined_names() {
-        if name.local_sheet_id.is_none() {
-            let _ = engine.define_name(&name.name, &name.formula);
+        // Legacy array formulas: evaluated once as arrays, each cell of the range shows its element.
+        for array in ws.array_formulas() {
+            let (r1, c1, r2, c2) = array.range;
+            let _ = engine.set_array_formula(&info.name, (r1, c1, r2, c2), &array.text);
         }
     }
     engine.recalc_dirty();

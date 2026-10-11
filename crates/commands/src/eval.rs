@@ -112,6 +112,20 @@ impl FormulaEngine {
         &self.engine
     }
 
+    /// The value the engine holds for a cell (1-based `row`, `col`) of the sheet named `sheet`: the formula's
+    /// result, or the cell's constant. Empty for a blank cell or an unknown sheet. For a formula that returns an
+    /// array, the cell shows its top-left element.
+    pub fn value(&self, sheet: &str, row: u32, col: u32) -> Value {
+        self.engine.get(sheet, row, col)
+    }
+
+    /// Selects the locale of the workbook's user (date text, number-format names) and recalculates every
+    /// formula under it. The default is en-US.
+    pub fn set_format_locale(&mut self, locale: Arc<open365_calc::FormatLocale>) {
+        self.engine.set_format_locale(locale);
+        self.engine.recalc_dirty();
+    }
+
     pub fn build(wb: &Workbook, keep: &dyn Fn(usize, u32, u32) -> bool) -> Self {
         Self {
             engine: build_engine(wb, keep),

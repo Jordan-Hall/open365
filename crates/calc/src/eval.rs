@@ -29,8 +29,19 @@ pub trait CellSource {
     /// The value of a cell; [`Value::Empty`] for blank cells and unknown sheets.
     fn cell(&self, sheet: &str, row: u32, col: u32) -> Value;
 
-    /// The formula of a defined name, if the name exists.
+    /// The formula of a defined name, if the name exists (workbook scope).
     fn name(&self, name: &str) -> Option<Ast>;
+
+    /// The formula of a defined name as seen from a formula on `sheet`: a name scoped to that sheet hides a
+    /// workbook-scoped name of the same spelling.
+    fn name_in(&self, _sheet: &str, name: &str) -> Option<Ast> {
+        self.name(name)
+    }
+
+    /// A table by name (case-insensitive), for structured references.
+    fn table(&self, _name: &str) -> Option<crate::tables::PlacedTable> {
+        None
+    }
 
     /// Whether a sheet exists. References to missing sheets evaluate to `#REF!`.
     fn sheet_exists(&self, _sheet: &str) -> bool {
@@ -215,6 +226,10 @@ impl<'a> EvalContext<'a> {
             }
             if r.row1 == r.row2 && (r.col1..=r.col2).contains(&col) {
                 return self.source.cell(&r.sheet, r.row1, col);
+            }
+            // A range of several rows and columns gives the cell at the formula's own row and column.
+            if (r.row1..=r.row2).contains(&row) && (r.col1..=r.col2).contains(&col) {
+                return self.source.cell(&r.sheet, row, col);
             }
         }
         Value::Error(ErrorKind::Value)
@@ -496,6 +511,8 @@ pub fn evaluate_root(ast: &Ast, ctx: &EvalContext<'_>, snap_root: bool) -> Value
         fn_depth: Cell::new(0),
         locals: RefCell::new(Vec::new()),
         lambda_depth: Cell::new(0),
+        shift: Cell::new((0, 0)),
+        cse: false,
     };
     let arg = match ast {
         Ast::Binary {
@@ -524,6 +541,53 @@ pub fn evaluate_root(ast: &Ast, ctx: &EvalContext<'_>, snap_root: bool) -> Value
     }
 }
 
+/// Evaluates the formula of a legacy array formula (`{=...}`): operators work over whole ranges, and the result
+/// is the full array (a range is read into one; a blank element shows `0`).
+pub fn evaluate_array_root(ast: &Ast, ctx: &EvalContext<'_>) -> Value {
+    let _locale = Scope::enter(ctx.locale);
+    let ev = Evaluator {
+        ctx,
+        name_depth: Cell::new(0),
+        under_n: Cell::new(false),
+        fn_depth: Cell::new(0),
+        locals: RefCell::new(Vec::new()),
+        lambda_depth: Cell::new(0),
+        shift: Cell::new((0, 0)),
+        cse: true,
+    };
+    let nonblank = |v: Value| {
+        if v == Value::Empty {
+            Value::Number(0.0)
+        } else {
+            v
+        }
+    };
+    match ev.eval_in(ast, true) {
+        Arg::Missing => Value::Number(0.0),
+        Arg::Value(v) => nonblank(v),
+        Arg::Array(rows) => Value::Array(rows),
+        Arg::Range(r) if r.is_single_cell() => nonblank(ctx.scalar(&Arg::Range(r))),
+        Arg::Range(r) => {
+            let arg = Arg::Range(r);
+            match ctx.grid(&arg) {
+                Some(grid) => Value::Array(
+                    (0..grid.scan_rows().max(1))
+                        .map(|row| {
+                            (0..grid.scan_cols().max(1))
+                                .map(|col| nonblank(grid.get(row, col)))
+                                .collect()
+                        })
+                        .collect(),
+                ),
+                None => Value::Error(ErrorKind::Value),
+            }
+        }
+        Arg::Union(_) => Value::Error(ErrorKind::Value),
+        Arg::Lambda(_) => Value::Error(ErrorKind::Calc),
+        refs @ Arg::Refs(_) => nonblank(ctx.scalar(&refs)),
+    }
+}
+
 struct Evaluator<'c, 'a> {
     ctx: &'c EvalContext<'a>,
     name_depth: Cell<u32>,
@@ -537,6 +601,12 @@ struct Evaluator<'c, 'a> {
     locals: RefCell<Vec<(String, Arg)>>,
     /// How many lambda calls are in progress.
     lambda_depth: Cell<u32>,
+    /// While a defined name is evaluated: how far its relative references move, `(rows, columns)`. The name's
+    /// text is stored relative to `A1`, so this is the formula cell's offset from `A1`.
+    shift: Cell<(i64, i64)>,
+    /// Evaluating a legacy array formula (`{=...}`): every function argument is evaluated in array mode, so
+    /// `IF(A1:A5>2,1,0)` works on the whole range.
+    cse: bool,
 }
 
 /// Operand of an arithmetic operator after reference resolution.
@@ -563,6 +633,7 @@ impl Evaluator<'_, '_> {
             Ast::Ref(r) => self.eval_ref(r),
             Ast::Area(a) => self.eval_area(a),
             Ast::Name(n) => self.eval_name(n),
+            Ast::Structured { table, spec } => self.eval_structured(table, spec),
             Ast::Func { name, args, .. } => self.eval_call(name, args, array),
             Ast::Unary { op, operand } => {
                 let v = self.eval_in(operand, array);
@@ -619,9 +690,13 @@ impl Evaluator<'_, '_> {
         self.cell_range(r)
     }
 
+    #[inline(never)]
     fn cell_range(&self, r: &CellRef) -> Arg {
         let sheet = self.sheet_of(r.sheet.as_ref());
-        Arg::Range(RangeRef::new(sheet, r.row, r.col, r.row, r.col))
+        let (dr, dc) = self.shift.get();
+        let row = crate::ast::shift_coord(r.row, r.row_abs, dr, MAX_ROW);
+        let col = crate::ast::shift_coord(r.col, r.col_abs, dc, MAX_COL);
+        Arg::Range(RangeRef::new(sheet, row, col, row, col))
     }
 
     fn eval_area(&self, a: &AreaRef) -> Arg {
@@ -632,8 +707,17 @@ impl Evaluator<'_, '_> {
         self.area_range(a)
     }
 
+    #[inline(never)]
     fn area_range(&self, a: &AreaRef) -> Arg {
         let sheet = self.sheet_of(a.sheet.as_ref());
+        let (dr, dc) = self.shift.get();
+        let shifted;
+        let a = if (dr, dc) == (0, 0) {
+            a
+        } else {
+            shifted = crate::ast::shift_area(a, dr, dc);
+            &shifted
+        };
         let (row1, row2, col1, col2) = match a.kind {
             AreaKind::Cells => (a.row1, a.row2, a.col1, a.col2),
             AreaKind::Cols => (1, MAX_ROW, a.col1, a.col2),
@@ -648,15 +732,32 @@ impl Evaluator<'_, '_> {
         match ast {
             Ast::Ref(r) => Some(self.cell_range(r)),
             Ast::Area(a) => Some(self.area_range(a)),
+            Ast::Structured { table, spec } => Some(self.eval_structured(table, spec)),
             _ => None,
         }
     }
 
+    /// `Table[Column]`: the rectangle it selects, `#REF!` for an unknown table or column.
+    #[inline(never)]
+    fn eval_structured(&self, table: &str, spec: &str) -> Arg {
+        let Some(placed) = self.ctx.source.table(table) else {
+            return Arg::error(ErrorKind::Ref);
+        };
+        let row = self.ctx.cell.map(|(row, _)| row);
+        match crate::tables::resolve(&placed.def, spec, row) {
+            Ok((row1, col1, row2, col2)) => {
+                Arg::Range(RangeRef::new(&placed.sheet, row1, col1, row2, col2))
+            }
+            Err(e) => Arg::error(e),
+        }
+    }
+
+    #[inline(never)]
     fn eval_name(&self, name: &str) -> Arg {
         if let Some(local) = self.local(name) {
             return local;
         }
-        let Some(ast) = self.ctx.source.name(name) else {
+        let Some(ast) = self.ctx.source.name_in(self.ctx.sheet, name) else {
             return Arg::error(ErrorKind::Name);
         };
         let depth = self.name_depth.get();
@@ -664,9 +765,38 @@ impl Evaluator<'_, '_> {
             return Arg::error(ErrorKind::Name);
         }
         self.name_depth.set(depth + 1);
+        let before = self.shift.get();
+        if depth == 0
+            && let Some((row, col)) = self.ctx.cell
+        {
+            self.shift.set((i64::from(row) - 1, i64::from(col) - 1));
+        }
         let result = self.eval(&ast);
+        self.shift.set(before);
         self.name_depth.set(depth);
         result
+    }
+
+    /// In a legacy array formula `TRANSPOSE(A1:C1)` shapes the whole range, not its intersection.
+    #[inline(never)]
+    fn whole_ranges_for_transpose(&self, name: &str, evaluated: Vec<Arg>) -> Vec<Arg> {
+        if !self.cse || !name.eq_ignore_ascii_case("TRANSPOSE") {
+            return evaluated;
+        }
+        evaluated
+            .into_iter()
+            .map(|a| match &a {
+                Arg::Range(_) => match self.ctx.grid(&a) {
+                    Some(g) => Arg::Array(
+                        (0..g.scan_rows())
+                            .map(|r| (0..g.scan_cols()).map(|c| g.get(r, c)).collect())
+                            .collect(),
+                    ),
+                    None => a.clone(),
+                },
+                _ => a,
+            })
+            .collect()
     }
 
     fn eval_call(&self, name: &str, args: &[Ast], array: bool) -> Arg {
@@ -720,7 +850,7 @@ impl Evaluator<'_, '_> {
                 let lifted = lifted
                     || array
                         && (feeds_array_of_refs || ref_fn.is_some_and(|l| (l.scalar_param)(i)));
-                let array_param = lifted || functions::is_array_param(name, i);
+                let array_param = lifted || self.cse || functions::is_array_param(name, i);
                 let arg = self.eval_in(a, array_param);
                 // `IFERROR(A1,0)` is a value for `ROW`, `ISREF` and friends, though `ISBLANK` sees through it.
                 match (&arg, a) {
@@ -736,6 +866,7 @@ impl Evaluator<'_, '_> {
             })
             .collect();
         self.fn_depth.set(self.fn_depth.get() - 1);
+        let evaluated = self.whole_ranges_for_transpose(name, evaluated);
         let evaluated = self.scalarize_names(name, args, evaluated, lifting, array, expand);
         if let Some(l) = lifting {
             let triggers = evaluated.iter().enumerate().any(|(i, a)| {

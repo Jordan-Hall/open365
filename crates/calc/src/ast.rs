@@ -59,6 +59,37 @@ pub struct AreaRef {
     pub col2_abs: bool,
 }
 
+/// `value` (1-based) moved by `delta` when it is relative, wrapping inside `1..=max` as Excel does for the
+/// relative references of a defined name.
+pub(crate) fn shift_coord(value: u32, absolute: bool, delta: i64, max: u32) -> u32 {
+    if absolute || delta == 0 {
+        return value;
+    }
+    let m = i64::from(max);
+    let moved = (i64::from(value) - 1 + delta).rem_euclid(m) + 1;
+    u32::try_from(moved).unwrap_or(value)
+}
+
+/// An area with its relative corners moved by `(d_row, d_col)`, corners put in order.
+pub(crate) fn shift_area(a: &AreaRef, d_row: i64, d_col: i64) -> AreaRef {
+    let mut out = a.clone();
+    if a.kind != AreaKind::Cols {
+        out.row1 = shift_coord(a.row1, a.row1_abs, d_row, MAX_ROW);
+        out.row2 = shift_coord(a.row2, a.row2_abs, d_row, MAX_ROW);
+        if out.row1 > out.row2 {
+            std::mem::swap(&mut out.row1, &mut out.row2);
+        }
+    }
+    if a.kind != AreaKind::Rows {
+        out.col1 = shift_coord(a.col1, a.col1_abs, d_col, MAX_COL);
+        out.col2 = shift_coord(a.col2, a.col2_abs, d_col, MAX_COL);
+        if out.col1 > out.col2 {
+            std::mem::swap(&mut out.col1, &mut out.col2);
+        }
+    }
+    out
+}
+
 /// Prefix operators.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum UnaryOp {
@@ -156,6 +187,13 @@ pub enum Ast {
     Area(AreaRef),
     /// Defined name.
     Name(String),
+    /// Structured table reference such as `Sales[[#This Row],[Qty]]`, resolved when evaluated.
+    Structured {
+        /// Table name as written.
+        table: String,
+        /// The bracketed part as written, outer brackets included: `[Qty]`, `[[#Totals],[Qty]]`.
+        spec: String,
+    },
     /// Function call. `xlfn` records a `_xlfn.` prefix that was stripped from `name`.
     Func {
         /// Upper-case function name without the `_xlfn.` prefix.
@@ -411,6 +449,10 @@ fn write_ast(ast: &Ast, out: &mut String) {
             }
         }
         Ast::Name(n) => out.push_str(n),
+        Ast::Structured { table, spec } => {
+            out.push_str(table);
+            out.push_str(spec);
+        }
         Ast::Func { name, xlfn, args } => {
             if *xlfn {
                 out.push_str("_xlfn.");

@@ -20,7 +20,8 @@ use std::fmt::Write as _;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use open365_calc::{Engine, ErrorKind, Value};
+use open365_calc::{ErrorKind, Value};
+use open365_commands::FormulaEngine;
 use std::sync::Arc;
 
 use open365_calc::FormatLocale;
@@ -174,39 +175,6 @@ fn to_calc_value(v: &CellValue) -> Value {
     }
 }
 
-/// The calculation engine for a workbook, built as the commands crate builds its own (cached
-/// values seed the formula cells, then every formula is recalculated). The commands crate keeps
-/// its builder private and its `FormulaEngine` cannot read a cell back, and one evaluation per
-/// cell is quadratic on volatile chains, so the same steps are repeated here.
-fn build_engine(wb: &Workbook) -> Engine {
-    let mut engine = Engine::new();
-    engine.set_date1904(wb.date1904());
-    for (i, info) in wb.sheets().iter().enumerate() {
-        if info.kind != SheetKind::Worksheet {
-            continue;
-        }
-        engine.add_sheet(&info.name);
-        let Some(ws) = wb.sheet(i) else { continue };
-        for (row, col, cell) in ws.iter_cells() {
-            if cell.formula.is_some() {
-                engine.set_value(&info.name, row, col, to_calc_value(&cell.value));
-                if let Some(text) = ws.formula_text(row, col) {
-                    let _ = engine.set_formula(&info.name, row, col, &text);
-                }
-            } else if !matches!(cell.value, CellValue::Empty) {
-                engine.set_value(&info.name, row, col, to_calc_value(&cell.value));
-            }
-        }
-    }
-    for name in wb.defined_names() {
-        if name.local_sheet_id.is_none() {
-            let _ = engine.define_name(&name.name, &name.formula);
-        }
-    }
-    engine.recalc_dirty();
-    engine
-}
-
 /// The locale the references were produced in (Windows English (United Kingdom), LCID 0x809): the
 /// built-in short date and time formats follow it.
 const ORACLE_LCID: u32 = 0x0809;
@@ -273,9 +241,11 @@ fn run_one(id: &str, xlsx: &Path, refs: &Path, report: &mut String) -> Result<Co
     let json: serde_json::Value =
         serde_json::from_slice(&fs::read(refs).map_err(|e| e.to_string())?)
             .map_err(|e| e.to_string())?;
-    let engine = build_engine(&wb);
+    let mut engine = FormulaEngine::build(&wb, &|_, _, _| true);
     let locale: Arc<FormatLocale> =
         FormatLocale::for_lcid(ORACLE_LCID).unwrap_or_else(FormatLocale::en_us);
+    // The references were produced under this locale: date text such as `Mar 15` reads under it too.
+    engine.set_format_locale(Arc::clone(&locale));
     let mut c = Counts::default();
     let sheets = json["sheets"].as_array().cloned().unwrap_or_default();
     for sheet in &sheets {
@@ -305,7 +275,7 @@ fn run_one(id: &str, xlsx: &Path, refs: &Path, report: &mut String) -> Result<Co
                 }
             }
             let ours = if formula.is_some() {
-                engine.get(name, row, col)
+                engine.value(name, row, col)
             } else {
                 wb.cell(si, row, col)
                     .map_or(Value::Empty, |x| to_calc_value(&x.value))
