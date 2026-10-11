@@ -370,3 +370,85 @@ mod tests {
         assert_eq!(overflow_room(3, -1, 10, 500.0, &|_| true, &width), 100.0);
     }
 }
+
+/// The padding Excel's auto-fit adds to a cell's text: `2 * ceil(mdw / 4) + 3` pixels, where
+/// `mdw` is the widest digit of the cell's own font (measured for Calibri 9 to 20 and Cambria
+/// 11 and 14 at 120 dpi: 7, 9, 9, 13 and 9, 11 px; 7 px for Calibri 11 at 96 dpi).
+pub(crate) fn fit_padding(mdw: f32) -> f32 {
+    2.0 * (mdw / 4.0).ceil() + 3.0
+}
+
+/// The width Excel's `AutoFit` gives a column whose text and padding take `px` pixels. With the
+/// workbook's maximum digit width at 9 px (120 dpi) it adds one pixel per 36 px beyond the
+/// first 83, whatever the font, text or glyphs (`tools/office/grid-advances-oracle.ps1`,
+/// `fixtures/reference/xlsx/grid-advances`). Other digit widths are unmeasured: left alone.
+pub(crate) fn excel_fit_px(px: u32, normal_mdw: u32) -> u32 {
+    if normal_mdw == 9 && px >= 83 {
+        px + (px - 83) / 36
+    } else {
+        px
+    }
+}
+
+#[cfg(test)]
+mod advance_tests {
+    use super::*;
+
+    /// Excel's auto-fit of `"H" + c * 20` for every printable ASCII `c`, in five fonts, is
+    /// reproduced exactly by hinted advances, the font's own padding and the fit scaling.
+    /// Needs the installed Calibri and Cambria; skipped without them.
+    #[test]
+    fn hinted_advances_reproduce_excel_auto_fit() {
+        let js: serde_json::Value = serde_json::from_str(
+            &std::fs::read_to_string(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/../../fixtures/reference/xlsx/grid-advances/advances.json"
+            ))
+            .unwrap(),
+        )
+        .unwrap();
+        let dpi = js["dpi"].as_f64().unwrap();
+        let fonts =
+            std::path::PathBuf::from(std::env::var("WINDIR").unwrap_or_default()).join("Fonts");
+        let mut checked = 0;
+        for c in js["cases"].as_array().unwrap() {
+            let font = c["font"].as_str().unwrap();
+            let file = if font == "Calibri" {
+                "calibri.ttf"
+            } else {
+                "cambria.ttc"
+            };
+            let Ok(bytes) = std::fs::read(fonts.join(file)) else {
+                continue;
+            };
+            let ppem = (c["size"].as_f64().unwrap() * dpi / 72.0).round() as u32;
+            let face = HintedFace::new(Arc::new(FontData::from_owned(bytes)), ppem).unwrap();
+            let mdw = ('0'..='9')
+                .map(|d| face.advance(d).unwrap())
+                .fold(0.0, f32::max);
+            let pad = fit_padding(mdw);
+            let h = face.advance('H').unwrap();
+            let fit = |t: f32| excel_fit_px(t as u32, 9) as f64;
+            assert_eq!(fit(h + pad), c["base_px"].as_f64().unwrap(), "{font} base");
+            // The fit scaling's first step is measured at 83 px for Calibri 11 (the Normal font);
+            // other fonts step 0 to 3 px earlier or later, so they may be 1 px off at long widths.
+            let slack = if font == "Calibri" && c["size"] == 11 {
+                0.0
+            } else {
+                1.0
+            };
+            for ch in c["chars"].as_array().unwrap() {
+                let code = ch["c"].as_u64().unwrap() as u8 as char;
+                let a = face.advance(code).unwrap();
+                let got = fit(h + pad + 20.0 * a);
+                let want = ch["w20"].as_f64().unwrap();
+                assert!(
+                    (got - want).abs() <= slack,
+                    "{font} {code:?}: {got} vs {want}"
+                );
+                checked += 1;
+            }
+        }
+        eprintln!("{checked} glyph widths checked");
+    }
+}

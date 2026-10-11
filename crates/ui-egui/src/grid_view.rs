@@ -48,8 +48,8 @@ use crate::a11y;
 use crate::fonts::{Face, FontBook};
 use crate::grid_cf::{ICON_SLOT_PX, bar_extent_px, paint_data_bar, paint_icon};
 use crate::grid_text::{
-    HintCache, HintedFace, NumberText, TEXT_INSET_PX, color32, effective_horizontal, fill_text,
-    fit_number, is_numeric, line_px, overflow_room,
+    HintCache, HintedFace, NumberText, TEXT_INSET_PX, color32, effective_horizontal, excel_fit_px,
+    fill_text, fit_number, fit_padding, is_numeric, line_px, overflow_room,
 };
 
 const ROW_HEADER_W: f32 = 54.0;
@@ -2669,7 +2669,7 @@ fn content_px(painter: &Painter, paint: &Paint<'_>, cell: &Cell, fmt: &CellForma
     let align = &fmt.alignment;
     let mut width = match align.rotation_degrees() {
         // Rotated up or down: the text's height is its width on the row.
-        Some(90 | -90) => line_height_px(paint, &cf).unwrap_or(cf.ppem) as f32,
+        Some(90 | -90) => line_height_px(paint, &cf).unwrap_or(cf.ppem) as f32 + 1.0,
         // Wrapped text needs its longest run between spaces (a line break is not a break
         // point for this: Excel measures the run across it with the break itself zero-wide).
         _ if align.wrap_text && !is_numeric(&cell.value) => text
@@ -2691,7 +2691,7 @@ fn content_px(painter: &Painter, paint: &Paint<'_>, cell: &Cell, fmt: &CellForma
     };
     if fmt.font.italic {
         // Slanted glyphs overhang their advance.
-        width += (cf.ppem as f32 * 0.4).round();
+        width += (cf.ppem as f32 / 3.0).round();
     }
     if matches!(
         align.horizontal,
@@ -2700,7 +2700,16 @@ fn content_px(painter: &Painter, paint: &Paint<'_>, cell: &Cell, fmt: &CellForma
         let space = text_px(painter, hinted, " ", &cf.id, ppp);
         width += align.indent as f32 * 3.0 * space;
     }
-    width
+    width + fit_pad_px(painter, &cf, ppp)
+}
+
+/// The padding auto-fit adds to a cell's text, from the widest digit of the cell's own font.
+fn fit_pad_px(painter: &Painter, cf: &CellFont, ppp: f32) -> f32 {
+    let hinted = cf.hinted.as_deref();
+    let mdw = ('0'..='9')
+        .map(|d| text_px(painter, hinted, d.encode_utf8(&mut [0; 4]), &cf.id, ppp))
+        .fold(0.0, f32::max);
+    fit_padding(mdw)
 }
 
 /// Height in pixels of one line of text in `cf`, as a row holds it.
@@ -2758,7 +2767,7 @@ fn fit_columns(
     let mut widths: Vec<(u32, u32)> = content_widths(painter, paint, first, last)
         .into_iter()
         .map(|(col, w)| {
-            let px = (w + fit_padding_px(paint.ppp)).ceil() as u32;
+            let px = excel_fit_px(w.ceil() as u32, metrics.mdw);
             (col, px.min(metrics.col_px(MAX_COL_WIDTH_CHARS)))
         })
         .collect();
