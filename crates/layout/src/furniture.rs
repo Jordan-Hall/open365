@@ -111,7 +111,7 @@ fn place(
         if let Some(sp) = section {
             let frame = FloatFrame { section: *sp };
             for o in pl.objects.iter().filter(|o| !o.inline()) {
-                let mut im = float::place(&o.drawing, o.atom, &frame, y, 0).image;
+                let mut im = float::place(&o.drawing, o.atom, &frame, y, 0, None).image;
                 im.source = source.clone();
                 images.push((lines.len(), im));
             }

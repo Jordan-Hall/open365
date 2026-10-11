@@ -30,7 +30,8 @@ mod workbook;
 mod xml;
 
 pub use conditional::{
-    CellIsOp, CfBlock, CfKind, CfRule, Cfvo, CfvoKind, Dxf, DxfBorder, DxfFill, DxfFont, TimePeriod,
+    CellIsOp, CfBlock, CfKind, CfRule, Cfvo, CfvoKind, DataBarAxis, DataBarDirection, DataBarExt,
+    Dxf, DxfBorder, DxfFill, DxfFont, TimePeriod,
 };
 pub use error::XlsxError;
 pub use format::{

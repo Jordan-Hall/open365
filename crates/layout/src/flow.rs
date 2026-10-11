@@ -236,6 +236,7 @@ impl PageBuild {
             lines: self.lines,
             cells: self.cells.into_iter().map(snap_cell).collect(),
             images: self.images,
+            frames: Vec::new(),
             floats: self.floats,
             section_index: self.section_index,
             first_in_section: self.first_in_section,
@@ -631,6 +632,7 @@ pub(crate) fn build_line(
     }
     Line {
         story: StoryKind::Main,
+        frame: None,
         paragraph: base.para + para.index,
         start: base.story + lb.start,
         end: base.story + lb.end,
@@ -678,6 +680,7 @@ pub(crate) fn line_images(
             anchored: false,
             behind_text: false,
             source: ImageSource::Main,
+            text_box: o.text_box.clone(),
         });
     }
     out
@@ -1263,6 +1266,9 @@ pub(crate) fn paginate<'a>(
     };
 
     for p in start..items.len() {
+        if crate::cancel::cancelled() {
+            break;
+        }
         let ck = checkpoint(&pg, force_break);
         if let Some(prev) = previous
             && p >= prev.first

@@ -1,0 +1,1971 @@
+{
+  "source": "fixtures/xlsx/grid-databar.xlsx",
+  "oracle": "Microsoft Excel via COM: FormatConditions DataBar properties, and the pixel runs of each bar (solid, no border) in a PrintWindow render at 100 percent zoom; from/to are pixels from the cell left grid line",
+  "excel_build": "20430",
+  "cases": [
+    {
+      "name": "positive automatic",
+      "col": 1,
+      "first_row": 2,
+      "rows_n": 8,
+      "cell_width_px": 151,
+      "excel": {
+        "axis_position": 0,
+        "bar_fill_type": 1,
+        "direction": -5002,
+        "negative_color_type": 1,
+        "bar_color": 13012579,
+        "negative_color": 13012579,
+        "axis_color": 0,
+        "min_type": 1,
+        "min_value": 0.0,
+        "max_type": 2,
+        "max_value": 0.0
+      },
+      "rows": [
+        {
+          "row": 2,
+          "value": 10.0,
+          "runs": []
+        },
+        {
+          "row": 3,
+          "value": 20.0,
+          "runs": [
+            {
+              "from": 2,
+              "to": 23,
+              "first": "638EC6",
+              "last": "638EC6"
+            }
+          ]
+        },
+        {
+          "row": 4,
+          "value": 30.0,
+          "runs": [
+            {
+              "from": 2,
+              "to": 44,
+              "first": "638EC6",
+              "last": "638EC6"
+            }
+          ]
+        },
+        {
+          "row": 5,
+          "value": 40.0,
+          "runs": [
+            {
+              "from": 2,
+              "to": 65,
+              "first": "638EC6",
+              "last": "638EC6"
+            }
+          ]
+        },
+        {
+          "row": 6,
+          "value": 50.0,
+          "runs": [
+            {
+              "from": 2,
+              "to": 87,
+              "first": "638EC6",
+              "last": "638EC6"
+            }
+          ]
+        },
+        {
+          "row": 7,
+          "value": 60.0,
+          "runs": [
+            {
+              "from": 2,
+              "to": 108,
+              "first": "638EC6",
+              "last": "638EC6"
+            }
+          ]
+        },
+        {
+          "row": 8,
+          "value": 70.0,
+          "runs": [
+            {
+              "from": 2,
+              "to": 129,
+              "first": "638EC6",
+              "last": "638EC6"
+            }
+          ]
+        },
+        {
+          "row": 9,
+          "value": 80.0,
+          "runs": [
+            {
+              "from": 2,
+              "to": 150,
+              "first": "638EC6",
+              "last": "638EC6"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "mixed automatic",
+      "col": 2,
+      "first_row": 2,
+      "rows_n": 8,
+      "cell_width_px": 151,
+      "excel": {
+        "axis_position": 0,
+        "bar_fill_type": 1,
+        "direction": -5002,
+        "negative_color_type": 1,
+        "bar_color": 13012579,
+        "negative_color": 13012579,
+        "axis_color": 0,
+        "min_type": 1,
+        "min_value": 0.0,
+        "max_type": 2,
+        "max_value": 0.0
+      },
+      "rows": [
+        {
+          "row": 2,
+          "value": -50.0,
+          "runs": [
+            {
+              "from": 2,
+              "to": 52,
+              "first": "638EC6",
+              "last": "000000"
+            }
+          ]
+        },
+        {
+          "row": 3,
+          "value": -25.0,
+          "runs": [
+            {
+              "from": 26,
+              "to": 52,
+              "first": "638EC6",
+              "last": "000000"
+            }
+          ]
+        },
+        {
+          "row": 4,
+          "value": 0.0,
+          "runs": [
+            {
+              "from": 51,
+              "to": 52,
+              "first": "000000",
+              "last": "000000"
+            }
+          ]
+        },
+        {
+          "row": 5,
+          "value": 25.0,
+          "runs": [
+            {
+              "from": 51,
+              "to": 77,
+              "first": "000000",
+              "last": "638EC6"
+            }
+          ]
+        },
+        {
+          "row": 6,
+          "value": 50.0,
+          "runs": [
+            {
+              "from": 51,
+              "to": 101,
+              "first": "000000",
+              "last": "638EC6"
+            }
+          ]
+        },
+        {
+          "row": 7,
+          "value": 75.0,
+          "runs": [
+            {
+              "from": 51,
+              "to": 126,
+              "first": "000000",
+              "last": "638EC6"
+            }
+          ]
+        },
+        {
+          "row": 8,
+          "value": 100.0,
+          "runs": [
+            {
+              "from": 51,
+              "to": 150,
+              "first": "000000",
+              "last": "638EC6"
+            }
+          ]
+        },
+        {
+          "row": 9,
+          "value": 10.0,
+          "runs": [
+            {
+              "from": 51,
+              "to": 62,
+              "first": "000000",
+              "last": "638EC6"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "mostly negative automatic",
+      "col": 3,
+      "first_row": 2,
+      "rows_n": 8,
+      "cell_width_px": 151,
+      "excel": {
+        "axis_position": 0,
+        "bar_fill_type": 1,
+        "direction": -5002,
+        "negative_color_type": 1,
+        "bar_color": 13012579,
+        "negative_color": 13012579,
+        "axis_color": 0,
+        "min_type": 1,
+        "min_value": 0.0,
+        "max_type": 2,
+        "max_value": 0.0
+      },
+      "rows": [
+        {
+          "row": 2,
+          "value": -100.0,
+          "runs": [
+            {
+              "from": 2,
+              "to": 125,
+              "first": "638EC6",
+              "last": "638EC6"
+            }
+          ]
+        },
+        {
+          "row": 3,
+          "value": -80.0,
+          "runs": [
+            {
+              "from": 26,
+              "to": 125,
+              "first": "638EC6",
+              "last": "638EC6"
+            }
+          ]
+        },
+        {
+          "row": 4,
+          "value": -40.0,
+          "runs": [
+            {
+              "from": 76,
+              "to": 125,
+              "first": "638EC6",
+              "last": "638EC6"
+            }
+          ]
+        },
+        {
+          "row": 5,
+          "value": -10.0,
+          "runs": [
+            {
+              "from": 113,
+              "to": 125,
+              "first": "638EC6",
+              "last": "638EC6"
+            }
+          ]
+        },
+        {
+          "row": 6,
+          "value": 5.0,
+          "runs": [
+            {
+              "from": 126,
+              "to": 132,
+              "first": "638EC6",
+              "last": "638EC6"
+            }
+          ]
+        },
+        {
+          "row": 7,
+          "value": 20.0,
+          "runs": [
+            {
+              "from": 126,
+              "to": 150,
+              "first": "638EC6",
+              "last": "638EC6"
+            }
+          ]
+        },
+        {
+          "row": 8,
+          "value": -60.0,
+          "runs": [
+            {
+              "from": 51,
+              "to": 125,
+              "first": "638EC6",
+              "last": "638EC6"
+            }
+          ]
+        },
+        {
+          "row": 9,
+          "value": 0.0,
+          "runs": []
+        }
+      ]
+    },
+    {
+      "name": "all negative automatic",
+      "col": 4,
+      "first_row": 2,
+      "rows_n": 8,
+      "cell_width_px": 151,
+      "excel": {
+        "axis_position": 0,
+        "bar_fill_type": 1,
+        "direction": -5002,
+        "negative_color_type": 1,
+        "bar_color": 13012579,
+        "negative_color": 13012579,
+        "axis_color": 0,
+        "min_type": 1,
+        "min_value": 0.0,
+        "max_type": 2,
+        "max_value": 0.0
+      },
+      "rows": [
+        {
+          "row": 2,
+          "value": -10.0,
+          "runs": []
+        },
+        {
+          "row": 3,
+          "value": -20.0,
+          "runs": [
+            {
+              "from": 129,
+              "to": 150,
+              "first": "638EC6",
+              "last": "638EC6"
+            }
+          ]
+        },
+        {
+          "row": 4,
+          "value": -30.0,
+          "runs": [
+            {
+              "from": 108,
+              "to": 150,
+              "first": "638EC6",
+              "last": "638EC6"
+            }
+          ]
+        },
+        {
+          "row": 5,
+          "value": -40.0,
+          "runs": [
+            {
+              "from": 87,
+              "to": 150,
+              "first": "638EC6",
+              "last": "638EC6"
+            }
+          ]
+        },
+        {
+          "row": 6,
+          "value": -50.0,
+          "runs": [
+            {
+              "from": 65,
+              "to": 150,
+              "first": "638EC6",
+              "last": "638EC6"
+            }
+          ]
+        },
+        {
+          "row": 7,
+          "value": -60.0,
+          "runs": [
+            {
+              "from": 44,
+              "to": 150,
+              "first": "638EC6",
+              "last": "638EC6"
+            }
+          ]
+        },
+        {
+          "row": 8,
+          "value": -70.0,
+          "runs": [
+            {
+              "from": 23,
+              "to": 150,
+              "first": "638EC6",
+              "last": "638EC6"
+            }
+          ]
+        },
+        {
+          "row": 9,
+          "value": -80.0,
+          "runs": [
+            {
+              "from": 2,
+              "to": 150,
+              "first": "638EC6",
+              "last": "638EC6"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "mixed midpoint",
+      "col": 5,
+      "first_row": 2,
+      "rows_n": 8,
+      "cell_width_px": 151,
+      "excel": {
+        "axis_position": 1,
+        "bar_fill_type": 1,
+        "direction": -5002,
+        "negative_color_type": 1,
+        "bar_color": 13012579,
+        "negative_color": 13012579,
+        "axis_color": 0,
+        "min_type": 1,
+        "min_value": 0.0,
+        "max_type": 2,
+        "max_value": 0.0
+      },
+      "rows": [
+        {
+          "row": 2,
+          "value": -50.0,
+          "runs": [
+            {
+              "from": 39,
+              "to": 77,
+              "first": "638EC6",
+              "last": "000000"
+            }
+          ]
+        },
+        {
+          "row": 3,
+          "value": -25.0,
+          "runs": [
+            {
+              "from": 57,
+              "to": 77,
+              "first": "638EC6",
+              "last": "000000"
+            }
+          ]
+        },
+        {
+          "row": 4,
+          "value": 0.0,
+          "runs": [
+            {
+              "from": 76,
+              "to": 77,
+              "first": "000000",
+              "last": "000000"
+            }
+          ]
+        },
+        {
+          "row": 5,
+          "value": 25.0,
+          "runs": [
+            {
+              "from": 76,
+              "to": 96,
+              "first": "000000",
+              "last": "638EC6"
+            }
+          ]
+        },
+        {
+          "row": 6,
+          "value": 50.0,
+          "runs": [
+            {
+              "from": 76,
+              "to": 114,
+              "first": "000000",
+              "last": "638EC6"
+            }
+          ]
+        },
+        {
+          "row": 7,
+          "value": 75.0,
+          "runs": [
+            {
+              "from": 76,
+              "to": 133,
+              "first": "000000",
+              "last": "638EC6"
+            }
+          ]
+        },
+        {
+          "row": 8,
+          "value": 100.0,
+          "runs": [
+            {
+              "from": 76,
+              "to": 150,
+              "first": "000000",
+              "last": "638EC6"
+            }
+          ]
+        },
+        {
+          "row": 9,
+          "value": 10.0,
+          "runs": [
+            {
+              "from": 76,
+              "to": 84,
+              "first": "000000",
+              "last": "638EC6"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "mixed no axis",
+      "col": 6,
+      "first_row": 2,
+      "rows_n": 8,
+      "cell_width_px": 151,
+      "excel": {
+        "axis_position": 2,
+        "bar_fill_type": 1,
+        "direction": -5002,
+        "negative_color_type": 1,
+        "bar_color": 13012579,
+        "negative_color": 13012579,
+        "axis_color": 0,
+        "min_type": 1,
+        "min_value": 0.0,
+        "max_type": 2,
+        "max_value": 0.0
+      },
+      "rows": [
+        {
+          "row": 2,
+          "value": -50.0,
+          "runs": []
+        },
+        {
+          "row": 3,
+          "value": -25.0,
+          "runs": [
+            {
+              "from": 2,
+              "to": 27,
+              "first": "638EC6",
+              "last": "638EC6"
+            }
+          ]
+        },
+        {
+          "row": 4,
+          "value": 0.0,
+          "runs": [
+            {
+              "from": 2,
+              "to": 51,
+              "first": "638EC6",
+              "last": "638EC6"
+            }
+          ]
+        },
+        {
+          "row": 5,
+          "value": 25.0,
+          "runs": [
+            {
+              "from": 2,
+              "to": 76,
+              "first": "638EC6",
+              "last": "638EC6"
+            }
+          ]
+        },
+        {
+          "row": 6,
+          "value": 50.0,
+          "runs": [
+            {
+              "from": 2,
+              "to": 101,
+              "first": "638EC6",
+              "last": "638EC6"
+            }
+          ]
+        },
+        {
+          "row": 7,
+          "value": 75.0,
+          "runs": [
+            {
+              "from": 2,
+              "to": 125,
+              "first": "638EC6",
+              "last": "638EC6"
+            }
+          ]
+        },
+        {
+          "row": 8,
+          "value": 100.0,
+          "runs": [
+            {
+              "from": 2,
+              "to": 150,
+              "first": "638EC6",
+              "last": "638EC6"
+            }
+          ]
+        },
+        {
+          "row": 9,
+          "value": 10.0,
+          "runs": [
+            {
+              "from": 2,
+              "to": 61,
+              "first": "638EC6",
+              "last": "638EC6"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "mixed red negative",
+      "col": 7,
+      "first_row": 2,
+      "rows_n": 8,
+      "cell_width_px": 151,
+      "excel": {
+        "axis_position": 0,
+        "bar_fill_type": 1,
+        "direction": -5002,
+        "negative_color_type": 0,
+        "bar_color": 13012579,
+        "negative_color": 255,
+        "axis_color": 0,
+        "min_type": 1,
+        "min_value": 0.0,
+        "max_type": 2,
+        "max_value": 0.0
+      },
+      "rows": [
+        {
+          "row": 2,
+          "value": -50.0,
+          "runs": [
+            {
+              "from": 2,
+              "to": 52,
+              "first": "FF0000",
+              "last": "000000"
+            }
+          ]
+        },
+        {
+          "row": 3,
+          "value": -25.0,
+          "runs": [
+            {
+              "from": 26,
+              "to": 52,
+              "first": "FF0000",
+              "last": "000000"
+            }
+          ]
+        },
+        {
+          "row": 4,
+          "value": 0.0,
+          "runs": [
+            {
+              "from": 51,
+              "to": 52,
+              "first": "000000",
+              "last": "000000"
+            }
+          ]
+        },
+        {
+          "row": 5,
+          "value": 25.0,
+          "runs": [
+            {
+              "from": 51,
+              "to": 77,
+              "first": "000000",
+              "last": "638EC6"
+            }
+          ]
+        },
+        {
+          "row": 6,
+          "value": 50.0,
+          "runs": [
+            {
+              "from": 51,
+              "to": 101,
+              "first": "000000",
+              "last": "638EC6"
+            }
+          ]
+        },
+        {
+          "row": 7,
+          "value": 75.0,
+          "runs": [
+            {
+              "from": 51,
+              "to": 126,
+              "first": "000000",
+              "last": "638EC6"
+            }
+          ]
+        },
+        {
+          "row": 8,
+          "value": 100.0,
+          "runs": [
+            {
+              "from": 51,
+              "to": 150,
+              "first": "000000",
+              "last": "638EC6"
+            }
+          ]
+        },
+        {
+          "row": 9,
+          "value": 10.0,
+          "runs": [
+            {
+              "from": 51,
+              "to": 62,
+              "first": "000000",
+              "last": "638EC6"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "mixed right to left",
+      "col": 1,
+      "first_row": 13,
+      "rows_n": 8,
+      "cell_width_px": 151,
+      "excel": {
+        "axis_position": 0,
+        "bar_fill_type": 1,
+        "direction": -5004,
+        "negative_color_type": 1,
+        "bar_color": 13012579,
+        "negative_color": 13012579,
+        "axis_color": 0,
+        "min_type": 1,
+        "min_value": 0.0,
+        "max_type": 2,
+        "max_value": 0.0
+      },
+      "rows": [
+        {
+          "row": 13,
+          "value": -50.0,
+          "runs": [
+            {
+              "from": 100,
+              "to": 150,
+              "first": "000000",
+              "last": "638EC6"
+            }
+          ]
+        },
+        {
+          "row": 14,
+          "value": -25.0,
+          "runs": [
+            {
+              "from": 100,
+              "to": 126,
+              "first": "000000",
+              "last": "638EC6"
+            }
+          ]
+        },
+        {
+          "row": 15,
+          "value": 0.0,
+          "runs": [
+            {
+              "from": 100,
+              "to": 101,
+              "first": "000000",
+              "last": "000000"
+            }
+          ]
+        },
+        {
+          "row": 16,
+          "value": 25.0,
+          "runs": [
+            {
+              "from": 75,
+              "to": 101,
+              "first": "638EC6",
+              "last": "000000"
+            }
+          ]
+        },
+        {
+          "row": 17,
+          "value": 50.0,
+          "runs": [
+            {
+              "from": 51,
+              "to": 101,
+              "first": "638EC6",
+              "last": "000000"
+            }
+          ]
+        },
+        {
+          "row": 18,
+          "value": 75.0,
+          "runs": [
+            {
+              "from": 26,
+              "to": 101,
+              "first": "638EC6",
+              "last": "000000"
+            }
+          ]
+        },
+        {
+          "row": 19,
+          "value": 100.0,
+          "runs": [
+            {
+              "from": 2,
+              "to": 101,
+              "first": "638EC6",
+              "last": "000000"
+            }
+          ]
+        },
+        {
+          "row": 20,
+          "value": 10.0,
+          "runs": [
+            {
+              "from": 90,
+              "to": 101,
+              "first": "638EC6",
+              "last": "000000"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "mixed solid",
+      "col": 2,
+      "first_row": 13,
+      "rows_n": 8,
+      "cell_width_px": 151,
+      "excel": {
+        "axis_position": 0,
+        "bar_fill_type": 0,
+        "direction": -5002,
+        "negative_color_type": 1,
+        "bar_color": 13012579,
+        "negative_color": 13012579,
+        "axis_color": 0,
+        "min_type": 1,
+        "min_value": 0.0,
+        "max_type": 2,
+        "max_value": 0.0
+      },
+      "rows": [
+        {
+          "row": 13,
+          "value": -50.0,
+          "runs": [
+            {
+              "from": 2,
+              "to": 52,
+              "first": "638EC6",
+              "last": "000000"
+            }
+          ]
+        },
+        {
+          "row": 14,
+          "value": -25.0,
+          "runs": [
+            {
+              "from": 26,
+              "to": 52,
+              "first": "638EC6",
+              "last": "000000"
+            }
+          ]
+        },
+        {
+          "row": 15,
+          "value": 0.0,
+          "runs": [
+            {
+              "from": 51,
+              "to": 52,
+              "first": "000000",
+              "last": "000000"
+            }
+          ]
+        },
+        {
+          "row": 16,
+          "value": 25.0,
+          "runs": [
+            {
+              "from": 51,
+              "to": 77,
+              "first": "000000",
+              "last": "638EC6"
+            }
+          ]
+        },
+        {
+          "row": 17,
+          "value": 50.0,
+          "runs": [
+            {
+              "from": 51,
+              "to": 101,
+              "first": "000000",
+              "last": "638EC6"
+            }
+          ]
+        },
+        {
+          "row": 18,
+          "value": 75.0,
+          "runs": [
+            {
+              "from": 51,
+              "to": 126,
+              "first": "000000",
+              "last": "638EC6"
+            }
+          ]
+        },
+        {
+          "row": 19,
+          "value": 100.0,
+          "runs": [
+            {
+              "from": 51,
+              "to": 150,
+              "first": "000000",
+              "last": "638EC6"
+            }
+          ]
+        },
+        {
+          "row": 20,
+          "value": 10.0,
+          "runs": [
+            {
+              "from": 51,
+              "to": 62,
+              "first": "000000",
+              "last": "638EC6"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "mixed fixed -50 to 50",
+      "col": 3,
+      "first_row": 13,
+      "rows_n": 8,
+      "cell_width_px": 151,
+      "excel": {
+        "axis_position": 0,
+        "bar_fill_type": 1,
+        "direction": -5002,
+        "negative_color_type": 1,
+        "bar_color": 13012579,
+        "negative_color": 13012579,
+        "axis_color": 0,
+        "min_type": 0,
+        "min_value": -50.0,
+        "max_type": 0,
+        "max_value": 50.0
+      },
+      "rows": [
+        {
+          "row": 13,
+          "value": -80.0,
+          "runs": [
+            {
+              "from": 2,
+              "to": 77,
+              "first": "638EC6",
+              "last": "000000"
+            }
+          ]
+        },
+        {
+          "row": 14,
+          "value": -50.0,
+          "runs": [
+            {
+              "from": 2,
+              "to": 77,
+              "first": "638EC6",
+              "last": "000000"
+            }
+          ]
+        },
+        {
+          "row": 15,
+          "value": -25.0,
+          "runs": [
+            {
+              "from": 39,
+              "to": 77,
+              "first": "638EC6",
+              "last": "000000"
+            }
+          ]
+        },
+        {
+          "row": 16,
+          "value": 0.0,
+          "runs": [
+            {
+              "from": 76,
+              "to": 77,
+              "first": "000000",
+              "last": "000000"
+            }
+          ]
+        },
+        {
+          "row": 17,
+          "value": 25.0,
+          "runs": [
+            {
+              "from": 76,
+              "to": 114,
+              "first": "000000",
+              "last": "638EC6"
+            }
+          ]
+        },
+        {
+          "row": 18,
+          "value": 50.0,
+          "runs": [
+            {
+              "from": 76,
+              "to": 150,
+              "first": "000000",
+              "last": "638EC6"
+            }
+          ]
+        },
+        {
+          "row": 19,
+          "value": 80.0,
+          "runs": [
+            {
+              "from": 76,
+              "to": 150,
+              "first": "000000",
+              "last": "638EC6"
+            }
+          ]
+        },
+        {
+          "row": 20,
+          "value": 10.0,
+          "runs": [
+            {
+              "from": 76,
+              "to": 92,
+              "first": "000000",
+              "last": "638EC6"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "positive fixed 20 to 60",
+      "col": 4,
+      "first_row": 13,
+      "rows_n": 8,
+      "cell_width_px": 151,
+      "excel": {
+        "axis_position": 0,
+        "bar_fill_type": 1,
+        "direction": -5002,
+        "negative_color_type": 1,
+        "bar_color": 13012579,
+        "negative_color": 13012579,
+        "axis_color": 0,
+        "min_type": 0,
+        "min_value": 20.0,
+        "max_type": 0,
+        "max_value": 60.0
+      },
+      "rows": [
+        {
+          "row": 13,
+          "value": 10.0,
+          "runs": []
+        },
+        {
+          "row": 14,
+          "value": 20.0,
+          "runs": []
+        },
+        {
+          "row": 15,
+          "value": 30.0,
+          "runs": [
+            {
+              "from": 2,
+              "to": 39,
+              "first": "638EC6",
+              "last": "638EC6"
+            }
+          ]
+        },
+        {
+          "row": 16,
+          "value": 40.0,
+          "runs": [
+            {
+              "from": 2,
+              "to": 76,
+              "first": "638EC6",
+              "last": "638EC6"
+            }
+          ]
+        },
+        {
+          "row": 17,
+          "value": 50.0,
+          "runs": [
+            {
+              "from": 2,
+              "to": 113,
+              "first": "638EC6",
+              "last": "638EC6"
+            }
+          ]
+        },
+        {
+          "row": 18,
+          "value": 60.0,
+          "runs": [
+            {
+              "from": 2,
+              "to": 150,
+              "first": "638EC6",
+              "last": "638EC6"
+            }
+          ]
+        },
+        {
+          "row": 19,
+          "value": 70.0,
+          "runs": [
+            {
+              "from": 2,
+              "to": 150,
+              "first": "638EC6",
+              "last": "638EC6"
+            }
+          ]
+        },
+        {
+          "row": 20,
+          "value": 80.0,
+          "runs": [
+            {
+              "from": 2,
+              "to": 150,
+              "first": "638EC6",
+              "last": "638EC6"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "tiny negative",
+      "col": 5,
+      "first_row": 13,
+      "rows_n": 8,
+      "cell_width_px": 151,
+      "excel": {
+        "axis_position": 0,
+        "bar_fill_type": 1,
+        "direction": -5002,
+        "negative_color_type": 1,
+        "bar_color": 13012579,
+        "negative_color": 13012579,
+        "axis_color": 0,
+        "min_type": 1,
+        "min_value": 0.0,
+        "max_type": 2,
+        "max_value": 0.0
+      },
+      "rows": [
+        {
+          "row": 13,
+          "value": -1.0,
+          "runs": [
+            {
+              "from": 2,
+              "to": 3,
+              "first": "000000",
+              "last": "000000"
+            }
+          ]
+        },
+        {
+          "row": 14,
+          "value": 100.0,
+          "runs": [
+            {
+              "from": 2,
+              "to": 150,
+              "first": "000000",
+              "last": "638EC6"
+            }
+          ]
+        },
+        {
+          "row": 15,
+          "value": 50.0,
+          "runs": [
+            {
+              "from": 2,
+              "to": 76,
+              "first": "000000",
+              "last": "638EC6"
+            }
+          ]
+        },
+        {
+          "row": 16,
+          "value": 25.0,
+          "runs": [
+            {
+              "from": 2,
+              "to": 40,
+              "first": "000000",
+              "last": "638EC6"
+            }
+          ]
+        },
+        {
+          "row": 17,
+          "value": 0.0,
+          "runs": [
+            {
+              "from": 2,
+              "to": 3,
+              "first": "000000",
+              "last": "000000"
+            }
+          ]
+        },
+        {
+          "row": 18,
+          "value": 75.0,
+          "runs": [
+            {
+              "from": 2,
+              "to": 113,
+              "first": "000000",
+              "last": "638EC6"
+            }
+          ]
+        },
+        {
+          "row": 19,
+          "value": 10.0,
+          "runs": [
+            {
+              "from": 2,
+              "to": 18,
+              "first": "000000",
+              "last": "638EC6"
+            }
+          ]
+        },
+        {
+          "row": 20,
+          "value": 90.0,
+          "runs": [
+            {
+              "from": 2,
+              "to": 135,
+              "first": "000000",
+              "last": "638EC6"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "positive automatic min",
+      "col": 6,
+      "first_row": 13,
+      "rows_n": 8,
+      "cell_width_px": 151,
+      "excel": {
+        "axis_position": 0,
+        "bar_fill_type": 1,
+        "direction": -5002,
+        "negative_color_type": 1,
+        "bar_color": 13012579,
+        "negative_color": 13012579,
+        "axis_color": 0,
+        "min_type": 6,
+        "min_value": 0.0,
+        "max_type": 7,
+        "max_value": 0.0
+      },
+      "rows": [
+        {
+          "row": 13,
+          "value": 10.0,
+          "runs": [
+            {
+              "from": 2,
+              "to": 21,
+              "first": "638EC6",
+              "last": "638EC6"
+            }
+          ]
+        },
+        {
+          "row": 14,
+          "value": 20.0,
+          "runs": [
+            {
+              "from": 2,
+              "to": 39,
+              "first": "638EC6",
+              "last": "638EC6"
+            }
+          ]
+        },
+        {
+          "row": 15,
+          "value": 30.0,
+          "runs": [
+            {
+              "from": 2,
+              "to": 58,
+              "first": "638EC6",
+              "last": "638EC6"
+            }
+          ]
+        },
+        {
+          "row": 16,
+          "value": 40.0,
+          "runs": [
+            {
+              "from": 2,
+              "to": 76,
+              "first": "638EC6",
+              "last": "638EC6"
+            }
+          ]
+        },
+        {
+          "row": 17,
+          "value": 50.0,
+          "runs": [
+            {
+              "from": 2,
+              "to": 95,
+              "first": "638EC6",
+              "last": "638EC6"
+            }
+          ]
+        },
+        {
+          "row": 18,
+          "value": 60.0,
+          "runs": [
+            {
+              "from": 2,
+              "to": 113,
+              "first": "638EC6",
+              "last": "638EC6"
+            }
+          ]
+        },
+        {
+          "row": 19,
+          "value": 70.0,
+          "runs": [
+            {
+              "from": 2,
+              "to": 132,
+              "first": "638EC6",
+              "last": "638EC6"
+            }
+          ]
+        },
+        {
+          "row": 20,
+          "value": 80.0,
+          "runs": [
+            {
+              "from": 2,
+              "to": 150,
+              "first": "638EC6",
+              "last": "638EC6"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "mixed automatic min",
+      "col": 7,
+      "first_row": 13,
+      "rows_n": 8,
+      "cell_width_px": 151,
+      "excel": {
+        "axis_position": 0,
+        "bar_fill_type": 1,
+        "direction": -5002,
+        "negative_color_type": 1,
+        "bar_color": 13012579,
+        "negative_color": 13012579,
+        "axis_color": 0,
+        "min_type": 6,
+        "min_value": 0.0,
+        "max_type": 7,
+        "max_value": 0.0
+      },
+      "rows": [
+        {
+          "row": 13,
+          "value": -50.0,
+          "runs": [
+            {
+              "from": 2,
+              "to": 52,
+              "first": "638EC6",
+              "last": "000000"
+            }
+          ]
+        },
+        {
+          "row": 14,
+          "value": -25.0,
+          "runs": [
+            {
+              "from": 26,
+              "to": 52,
+              "first": "638EC6",
+              "last": "000000"
+            }
+          ]
+        },
+        {
+          "row": 15,
+          "value": 0.0,
+          "runs": [
+            {
+              "from": 51,
+              "to": 52,
+              "first": "000000",
+              "last": "000000"
+            }
+          ]
+        },
+        {
+          "row": 16,
+          "value": 25.0,
+          "runs": [
+            {
+              "from": 51,
+              "to": 77,
+              "first": "000000",
+              "last": "638EC6"
+            }
+          ]
+        },
+        {
+          "row": 17,
+          "value": 50.0,
+          "runs": [
+            {
+              "from": 51,
+              "to": 101,
+              "first": "000000",
+              "last": "638EC6"
+            }
+          ]
+        },
+        {
+          "row": 18,
+          "value": 75.0,
+          "runs": [
+            {
+              "from": 51,
+              "to": 126,
+              "first": "000000",
+              "last": "638EC6"
+            }
+          ]
+        },
+        {
+          "row": 19,
+          "value": 100.0,
+          "runs": [
+            {
+              "from": 51,
+              "to": 150,
+              "first": "000000",
+              "last": "638EC6"
+            }
+          ]
+        },
+        {
+          "row": 20,
+          "value": 10.0,
+          "runs": [
+            {
+              "from": 51,
+              "to": 62,
+              "first": "000000",
+              "last": "638EC6"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "all negative automatic min",
+      "col": 1,
+      "first_row": 24,
+      "rows_n": 8,
+      "cell_width_px": 151,
+      "excel": {
+        "axis_position": 0,
+        "bar_fill_type": 1,
+        "direction": -5002,
+        "negative_color_type": 1,
+        "bar_color": 13012579,
+        "negative_color": 13012579,
+        "axis_color": 0,
+        "min_type": 6,
+        "min_value": 0.0,
+        "max_type": 7,
+        "max_value": 0.0
+      },
+      "rows": [
+        {
+          "row": 24,
+          "value": -10.0,
+          "runs": [
+            {
+              "from": 131,
+              "to": 150,
+              "first": "638EC6",
+              "last": "638EC6"
+            }
+          ]
+        },
+        {
+          "row": 25,
+          "value": -20.0,
+          "runs": [
+            {
+              "from": 113,
+              "to": 150,
+              "first": "638EC6",
+              "last": "638EC6"
+            }
+          ]
+        },
+        {
+          "row": 26,
+          "value": -30.0,
+          "runs": [
+            {
+              "from": 94,
+              "to": 150,
+              "first": "638EC6",
+              "last": "638EC6"
+            }
+          ]
+        },
+        {
+          "row": 27,
+          "value": -40.0,
+          "runs": [
+            {
+              "from": 76,
+              "to": 150,
+              "first": "638EC6",
+              "last": "638EC6"
+            }
+          ]
+        },
+        {
+          "row": 28,
+          "value": -50.0,
+          "runs": [
+            {
+              "from": 57,
+              "to": 150,
+              "first": "638EC6",
+              "last": "638EC6"
+            }
+          ]
+        },
+        {
+          "row": 29,
+          "value": -60.0,
+          "runs": [
+            {
+              "from": 39,
+              "to": 150,
+              "first": "638EC6",
+              "last": "638EC6"
+            }
+          ]
+        },
+        {
+          "row": 30,
+          "value": -70.0,
+          "runs": [
+            {
+              "from": 20,
+              "to": 150,
+              "first": "638EC6",
+              "last": "638EC6"
+            }
+          ]
+        },
+        {
+          "row": 31,
+          "value": -80.0,
+          "runs": [
+            {
+              "from": 2,
+              "to": 150,
+              "first": "638EC6",
+              "last": "638EC6"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "positive midpoint",
+      "col": 2,
+      "first_row": 24,
+      "rows_n": 8,
+      "cell_width_px": 151,
+      "excel": {
+        "axis_position": 1,
+        "bar_fill_type": 1,
+        "direction": -5002,
+        "negative_color_type": 1,
+        "bar_color": 13012579,
+        "negative_color": 13012579,
+        "axis_color": 0,
+        "min_type": 1,
+        "min_value": 0.0,
+        "max_type": 2,
+        "max_value": 0.0
+      },
+      "rows": [
+        {
+          "row": 24,
+          "value": 10.0,
+          "runs": [
+            {
+              "from": 77,
+              "to": 86,
+              "first": "638EC6",
+              "last": "638EC6"
+            }
+          ]
+        },
+        {
+          "row": 25,
+          "value": 20.0,
+          "runs": [
+            {
+              "from": 77,
+              "to": 96,
+              "first": "638EC6",
+              "last": "638EC6"
+            }
+          ]
+        },
+        {
+          "row": 26,
+          "value": 30.0,
+          "runs": [
+            {
+              "from": 77,
+              "to": 105,
+              "first": "638EC6",
+              "last": "638EC6"
+            }
+          ]
+        },
+        {
+          "row": 27,
+          "value": 40.0,
+          "runs": [
+            {
+              "from": 77,
+              "to": 114,
+              "first": "638EC6",
+              "last": "638EC6"
+            }
+          ]
+        },
+        {
+          "row": 28,
+          "value": 50.0,
+          "runs": [
+            {
+              "from": 77,
+              "to": 123,
+              "first": "638EC6",
+              "last": "638EC6"
+            }
+          ]
+        },
+        {
+          "row": 29,
+          "value": 60.0,
+          "runs": [
+            {
+              "from": 77,
+              "to": 133,
+              "first": "638EC6",
+              "last": "638EC6"
+            }
+          ]
+        },
+        {
+          "row": 30,
+          "value": 70.0,
+          "runs": [
+            {
+              "from": 77,
+              "to": 142,
+              "first": "638EC6",
+              "last": "638EC6"
+            }
+          ]
+        },
+        {
+          "row": 31,
+          "value": 80.0,
+          "runs": [
+            {
+              "from": 77,
+              "to": 150,
+              "first": "638EC6",
+              "last": "638EC6"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "all negative midpoint",
+      "col": 3,
+      "first_row": 24,
+      "rows_n": 8,
+      "cell_width_px": 151,
+      "excel": {
+        "axis_position": 1,
+        "bar_fill_type": 1,
+        "direction": -5002,
+        "negative_color_type": 1,
+        "bar_color": 13012579,
+        "negative_color": 13012579,
+        "axis_color": 0,
+        "min_type": 1,
+        "min_value": 0.0,
+        "max_type": 2,
+        "max_value": 0.0
+      },
+      "rows": [
+        {
+          "row": 24,
+          "value": -10.0,
+          "runs": [
+            {
+              "from": 67,
+              "to": 77,
+              "first": "638EC6",
+              "last": "000000"
+            }
+          ]
+        },
+        {
+          "row": 25,
+          "value": -20.0,
+          "runs": [
+            {
+              "from": 57,
+              "to": 77,
+              "first": "638EC6",
+              "last": "000000"
+            }
+          ]
+        },
+        {
+          "row": 26,
+          "value": -30.0,
+          "runs": [
+            {
+              "from": 48,
+              "to": 77,
+              "first": "638EC6",
+              "last": "000000"
+            }
+          ]
+        },
+        {
+          "row": 27,
+          "value": -40.0,
+          "runs": [
+            {
+              "from": 39,
+              "to": 77,
+              "first": "638EC6",
+              "last": "000000"
+            }
+          ]
+        },
+        {
+          "row": 28,
+          "value": -50.0,
+          "runs": [
+            {
+              "from": 30,
+              "to": 77,
+              "first": "638EC6",
+              "last": "000000"
+            }
+          ]
+        },
+        {
+          "row": 29,
+          "value": -60.0,
+          "runs": [
+            {
+              "from": 20,
+              "to": 77,
+              "first": "638EC6",
+              "last": "000000"
+            }
+          ]
+        },
+        {
+          "row": 30,
+          "value": -70.0,
+          "runs": [
+            {
+              "from": 11,
+              "to": 77,
+              "first": "638EC6",
+              "last": "000000"
+            }
+          ]
+        },
+        {
+          "row": 31,
+          "value": -80.0,
+          "runs": [
+            {
+              "from": 2,
+              "to": 77,
+              "first": "638EC6",
+              "last": "000000"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

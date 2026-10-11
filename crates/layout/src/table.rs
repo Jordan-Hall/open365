@@ -5,7 +5,7 @@
 //! `docs/architecture/word-layout.md`.
 
 use open365_docx::{
-    Block, Border, Cell, CellMargins, CellPosition, HeightRule, Shading, Table, TableJustification,
+    Block, Border, CellMargins, CellPosition, HeightRule, Shading, Table, TableJustification,
     TableProps, VerticalAlign,
 };
 
@@ -183,9 +183,9 @@ struct Prev {
 }
 
 /// Content of a cell laid out in a box `content_w` wide.
-fn layout_cell(
+pub(crate) fn layout_cell(
     b: &mut Builder<'_>,
-    cell: &Cell,
+    blocks: &[Block],
     content_w: f64,
     fmt: &open365_docx::TableCellFormat,
 ) -> (Vec<FlowLine>, Vec<FlowBox>, f64) {
@@ -197,15 +197,15 @@ fn layout_cell(
     // has not added yet: a following paragraph with the same borders takes it into its box.
     let mut run_prev: Option<usize> = None;
     let mut pending_bottom = 0.0;
-    let count = cell.blocks.len();
-    for (bi, block) in cell.blocks.iter().enumerate() {
+    let count = blocks.len();
+    for (bi, block) in blocks.iter().enumerate() {
         match block {
             Block::Paragraph(p) => {
                 let idx = b.paragraph(p, content_w, Some(fmt));
                 let pl = &b.arena[idx];
                 // Measured (layout-table-flow): the empty paragraph that must follow a nested
                 // table at the end of a cell takes no height.
-                let after_table = bi > 0 && matches!(cell.blocks[bi - 1], Block::Table(_));
+                let after_table = bi > 0 && matches!(blocks[bi - 1], Block::Table(_));
                 if after_table
                     && bi + 1 == count
                     && pl.atoms.iter().all(|a| a.class == AtomClass::Mark)
@@ -269,7 +269,7 @@ fn layout_cell(
                 boxes.extend(bx);
                 y += h;
             }
-            Block::Raw(_) => {}
+            Block::Sdt(_) | Block::Raw(_) => {}
         }
     }
     y += pending_bottom;
@@ -441,7 +441,7 @@ pub(crate) fn layout_table(b: &mut Builder<'_>, table: &Table, avail: f64) -> Ta
                 })
                 .unwrap_or_default();
             let content_w = (cell_w - pad.left - pad.right).max(1.0);
-            let (lines, boxes, content_h) = layout_cell(b, c.cell, content_w, &fmt);
+            let (lines, boxes, content_h) = layout_cell(b, &c.cell.blocks, content_w, &fmt);
             // Borders: the cell's own, then its table style's, then the table's. A style's
             // cell borders name its region's outer edges (`left`, `right`) and the edges between
             // its cells (`insideV`): a header row that states `insideV` nil has no vertical

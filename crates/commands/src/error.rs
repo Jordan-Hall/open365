@@ -27,7 +27,7 @@ pub enum CommandError {
     Exists { path: String },
     #[error("the PDF is larger than {limit} bytes")]
     TooLarge { limit: usize },
-    #[error("the export was cancelled")]
+    #[error("the operation was cancelled")]
     Cancelled,
     #[error("nothing to undo")]
     NothingToUndo,

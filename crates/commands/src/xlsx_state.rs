@@ -1,5 +1,8 @@
 //! A workbook plus a lazily built calculation engine kept in step with it.
 
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
+
 use open365_calc::{CellAddr, Engine, ErrorKind, Value, parse_formula};
 use open365_xlsx::{CellError, CellInput, CellValue, SheetKind, Workbook};
 
@@ -206,7 +209,18 @@ impl XlsxState {
 /// the initial recalculation only primes the engine. `keep(sheet, row, col)` leaves cells
 /// out (a hidden row, say); a sheet is left out when `keep(sheet, 0, 0)` is false.
 pub(crate) fn build_engine(wb: &Workbook, keep: &dyn Fn(usize, u32, u32) -> bool) -> Engine {
+    build_engine_cancellable(wb, keep, None).unwrap_or_default()
+}
+
+/// As [`build_engine`]; `None` when `cancel` was set before the engine was ready.
+pub(crate) fn build_engine_cancellable(
+    wb: &Workbook,
+    keep: &dyn Fn(usize, u32, u32) -> bool,
+    cancel: Option<&Arc<AtomicBool>>,
+) -> Option<Engine> {
+    let stop = || cancel.is_some_and(|c| c.load(Ordering::Relaxed));
     let mut engine = Engine::new();
+    engine.set_cancel(cancel.cloned());
     engine.set_date1904(wb.date1904());
     for (i, info) in wb.sheets().iter().enumerate() {
         if info.kind != SheetKind::Worksheet || !keep(i, 0, 0) {
@@ -215,6 +229,9 @@ pub(crate) fn build_engine(wb: &Workbook, keep: &dyn Fn(usize, u32, u32) -> bool
         engine.add_sheet(&info.name);
         let Some(ws) = wb.sheet(i) else { continue };
         for (row, col, cell) in ws.iter_cells() {
+            if stop() {
+                return None;
+            }
             if !keep(i, row, col) {
                 continue;
             }
@@ -241,7 +258,11 @@ pub(crate) fn build_engine(wb: &Workbook, keep: &dyn Fn(usize, u32, u32) -> bool
         }
     }
     engine.recalc_dirty();
-    engine
+    if stop() {
+        return None;
+    }
+    engine.set_cancel(None);
+    Some(engine)
 }
 
 pub(crate) fn to_calc_value(v: &CellValue) -> Value {

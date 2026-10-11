@@ -65,7 +65,7 @@ impl ToolError {
         Self {
             kind: ErrorKind::Timeout,
             message: format!(
-                "{what} did not finish within {} s and was abandoned; its worker thread may still finish in the background. Nothing was written.",
+                "{what} did not finish within {} s and was cancelled. Nothing was written.",
                 deadline.as_secs_f64()
             ),
         }

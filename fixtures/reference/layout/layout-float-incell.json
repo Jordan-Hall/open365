@@ -1,0 +1,60 @@
+{
+  "source": "fixtures/docx/layout-float-incell.docx",
+  "oracle": "Microsoft Word 16.0 (16.0.20430), Print Layout, tools/office/word-layout-oracle.ps1",
+  "units": "points; page and top/left/baseline measured from the page top-left corner; start/end are UTF-16 offsets in the main story",
+  "precision": "top/left/lastX are screen-quantised (+-0.3 pt); baseline/inkLeft and cell rectangles come from the 600 dpi PDF and are exact",
+  "pageCount": 1,
+  "cells": [
+    {"page": 1, "x": 72.504, "y": 151.726, "w": 199.51, "h": 79.944},
+    {"page": 1, "x": 272.5, "y": 151.726, "w": 199.78, "h": 79.944},
+    {"page": 1, "x": 72.504, "y": 232.156, "w": 199.51, "h": 80.184},
+    {"page": 1, "x": 272.5, "y": 232.156, "w": 199.78, "h": 80.184},
+    {"page": 1, "x": 72.504, "y": 312.816, "w": 199.51, "h": 72.984},
+    {"page": 1, "x": 272.5, "y": 312.816, "w": 199.78, "h": 72.984}
+  ],
+  "images": [
+    {"page": 1, "x": 82.5, "y": 271.64, "w": 40.0, "h": 30.0},
+    {"page": 1, "x": 287.65, "y": 161.64, "w": 41.0, "h": 30.0},
+    {"page": 1, "x": 82.5, "y": 512.14, "w": 42.0, "h": 30.0},
+    {"page": 1, "x": 287.65, "y": 242.14, "w": 43.0, "h": 30.0},
+    {"page": 1, "x": 222.85, "y": 312.64, "w": 44.0, "h": 30.0},
+    {"page": 1, "x": 421.85, "y": 312.64, "w": 45.0, "h": 30.0}
+  ],
+  "compat": 15,
+  "floats": [
+    {"index": 1, "name": "Picture 1", "kind": "picture", "page": 1, "x": 82.5, "y": 271.64, "w": 40.0, "h": 30.0, "src": "pdf", "wrap": 3, "side": 0, "hrel": 1, "vrel": 1, "posX": 10.0, "posY": 120.0, "distT": 0.0, "distB": 0.0, "distL": 9.0, "distR": 9.0, "allowOverlap": true, "layoutInCell": true, "anchorStart": 397, "anchorPage": 1, "anchorX": 77.4, "anchorY": 151.8, "around": []},
+    {"index": 2, "name": "Picture 2", "kind": "picture", "page": 1, "x": 287.65, "y": 161.64, "w": 41.0, "h": 30.0, "src": "pdf", "wrap": 3, "side": 0, "hrel": 0, "vrel": 2, "posX": 10.0, "posY": 10.0, "distT": 0.0, "distB": 0.0, "distL": 9.0, "distR": 9.0, "allowOverlap": true, "layoutInCell": true, "anchorStart": 549, "anchorPage": 1, "anchorX": 277.8, "anchorY": 151.8, "around": []},
+    {"index": 3, "name": "Picture 3", "kind": "picture", "page": 1, "x": 82.5, "y": 512.14, "w": 42.0, "h": 30.0, "src": "pdf", "wrap": 3, "side": 0, "hrel": 1, "vrel": 1, "posX": 10.0, "posY": 280.0, "distT": 0.0, "distB": 0.0, "distL": 9.0, "distR": 9.0, "allowOverlap": true, "layoutInCell": true, "anchorStart": 702, "anchorPage": 1, "anchorX": 77.4, "anchorY": 232.2, "around": []},
+    {"index": 4, "name": "Picture 4", "kind": "picture", "page": 1, "x": 287.65, "y": 242.14, "w": 43.0, "h": 30.0, "src": "pdf", "wrap": 3, "side": 0, "hrel": 0, "vrel": 2, "posX": 10.0, "posY": 10.0, "distT": 0.0, "distB": 0.0, "distL": 9.0, "distR": 9.0, "allowOverlap": true, "layoutInCell": true, "anchorStart": 854, "anchorPage": 1, "anchorX": 277.8, "anchorY": 232.2, "around": []},
+    {"index": 5, "name": "Picture 5", "kind": "picture", "page": 1, "x": 222.85, "y": 312.64, "w": 44.0, "h": 30.0, "src": "pdf", "wrap": 0, "side": 0, "hrel": 0, "vrel": 2, "posX": -999996.0, "posY": 0.0, "distT": 0.0, "distB": 0.0, "distL": 9.0, "distR": 9.0, "allowOverlap": true, "layoutInCell": true, "anchorStart": 1007, "anchorPage": 1, "anchorX": 77.4, "anchorY": 312.6, "around": []},
+    {"index": 6, "name": "Picture 6", "kind": "picture", "page": 1, "x": 421.85, "y": 312.64, "w": 45.0, "h": 30.0, "src": "pdf", "wrap": 0, "side": 0, "hrel": 0, "vrel": 2, "posX": -999996.0, "posY": 0.0, "distT": 0.0, "distB": 0.0, "distL": 9.0, "distR": 9.0, "allowOverlap": true, "layoutInCell": true, "anchorStart": 1159, "anchorPage": 1, "anchorX": 277.8, "anchorY": 312.6, "around": []}
+  ],
+  "lines": [
+    {"page": 1, "start": 0, "end": 100, "top": 72.0, "left": 72.0, "lastX": 516.0, "baseline": 82.58, "inkLeft": 72.024, "text": "The morning ferry crosses the estuary twice before the tide turns, carrying commuters, bicycles and "},
+    {"page": 1, "start": 100, "end": 205, "top": 85.2, "left": 72.0, "lastX": 538.2, "baseline": 96.02, "inkLeft": 72.024, "text": "crates of vegetables from the farms on the far shore. Nobody on board hurries; they read, drink tea from "},
+    {"page": 1, "start": 205, "end": 308, "top": 99.0, "left": 72.0, "lastX": 532.8, "baseline": 109.46, "inkLeft": 72.024, "text": "flasks and watch the herons stand in the shallows. When the ferry docks, a short queue forms along the "},
+    {"page": 1, "start": 308, "end": 367, "top": 112.2, "left": 72.0, "lastX": 329.4, "baseline": 122.93, "inkLeft": 72.024, "text": "jetty and the deckhand coils the rope with practised ease.\u000d"},
+    {"page": 1, "start": 367, "end": 397, "top": 132.0, "left": 72.0, "lastX": 204.0, "baseline": 142.37, "inkLeft": 72.024, "text": "Cell placement probe follows.\u000d"},
+    {"page": 1, "start": 399, "end": 432, "top": 162.29, "left": 77.784, "lastX": null, "baseline": 162.29, "inkLeft": 77.784, "text": "well-made map leaves out far more", "cell": true, "repeat": true},
+    {"page": 1, "start": 399, "end": 432, "top": 162.29, "left": 277.8, "lastX": null, "baseline": 162.29, "inkLeft": 277.8, "text": "well-made map leaves out far more", "cell": true, "repeat": true},
+    {"page": 1, "start": 399, "end": 432, "top": 242.71, "left": 277.8, "lastX": null, "baseline": 242.71, "inkLeft": 277.8, "text": "well-made map leaves out far more", "cell": true, "repeat": true},
+    {"page": 1, "start": 399, "end": 432, "top": 242.71, "left": 77.784, "lastX": null, "baseline": 242.71, "inkLeft": 77.784, "text": "well-made map leaves out far more", "cell": true, "repeat": true},
+    {"page": 1, "start": 399, "end": 423, "top": 323.38, "left": 277.8, "lastX": null, "baseline": 323.38, "inkLeft": 277.8, "text": "well-made map leaves out", "cell": true, "repeat": true},
+    {"page": 1, "start": 399, "end": 423, "top": 323.38, "left": 77.784, "lastX": null, "baseline": 323.38, "inkLeft": 77.784, "text": "well-made map leaves out", "cell": true, "repeat": true},
+    {"page": 1, "start": 424, "end": 451, "top": 336.82, "left": 277.8, "lastX": null, "baseline": 336.82, "inkLeft": 277.8, "text": "far more than it shows. The", "cell": true, "repeat": true},
+    {"page": 1, "start": 424, "end": 451, "top": 336.82, "left": 77.784, "lastX": null, "baseline": 336.82, "inkLeft": 77.784, "text": "far more than it shows. The", "cell": true, "repeat": true},
+    {"page": 1, "start": 433, "end": 472, "top": 175.73, "left": 77.784, "lastX": null, "baseline": 175.73, "inkLeft": 77.784, "text": "than it shows. The cartographer decides", "cell": true, "repeat": true},
+    {"page": 1, "start": 433, "end": 472, "top": 175.73, "left": 277.8, "lastX": null, "baseline": 175.73, "inkLeft": 277.8, "text": "than it shows. The cartographer decides", "cell": true, "repeat": true},
+    {"page": 1, "start": 433, "end": 472, "top": 256.15, "left": 77.784, "lastX": null, "baseline": 256.15, "inkLeft": 77.784, "text": "than it shows. The cartographer decides", "cell": true, "repeat": true},
+    {"page": 1, "start": 433, "end": 472, "top": 256.15, "left": 277.8, "lastX": null, "baseline": 256.15, "inkLeft": 277.8, "text": "than it shows. The cartographer decides", "cell": true, "repeat": true},
+    {"page": 1, "start": 452, "end": 478, "top": 350.26, "left": 277.8, "lastX": null, "baseline": 350.26, "inkLeft": 277.8, "text": "cartographer decides which", "cell": true, "repeat": true},
+    {"page": 1, "start": 452, "end": 478, "top": 350.26, "left": 77.784, "lastX": null, "baseline": 350.26, "inkLeft": 77.784, "text": "cartographer decides which", "cell": true, "repeat": true},
+    {"page": 1, "start": 514, "end": 546, "top": 202.63, "left": 277.8, "lastX": null, "baseline": 202.63, "inkLeft": 277.8, "text": "a name and where a label may sit", "cell": true, "repeat": true},
+    {"page": 1, "start": 514, "end": 546, "top": 202.63, "left": 77.784, "lastX": null, "baseline": 202.63, "inkLeft": 77.784, "text": "a name and where a label may sit", "cell": true, "repeat": true},
+    {"page": 1, "start": 514, "end": 546, "top": 283.06, "left": 277.8, "lastX": null, "baseline": 283.06, "inkLeft": 277.8, "text": "a name and where a label may sit", "cell": true, "repeat": true},
+    {"page": 1, "start": 514, "end": 546, "top": 283.06, "left": 77.784, "lastX": null, "baseline": 283.06, "inkLeft": 77.784, "text": "a name and where a label may sit", "cell": true, "repeat": true},
+    {"page": 1, "start": 521, "end": 546, "top": 376.92, "left": 77.784, "lastX": null, "baseline": 376.92, "inkLeft": 77.784, "text": "and where a label may sit", "cell": true, "repeat": true},
+    {"page": 1, "start": 521, "end": 546, "top": 376.92, "left": 277.8, "lastX": null, "baseline": 376.92, "inkLeft": 277.8, "text": "and where a label may sit", "cell": true, "repeat": true},
+    {"page": 1, "start": 1312, "end": 1313, "top": 386.4, "left": 72.0, "lastX": 72.0, "baseline": 396.84, "inkLeft": 72.024, "text": "\u000d"}
+  ]
+}

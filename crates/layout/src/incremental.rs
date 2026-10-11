@@ -21,6 +21,7 @@ use open365_docx::{Block, Document, NoteKind, flatten_content_controls};
 use open365_text::FontLibrary;
 
 use crate::build::{UnitLayout, build_unit};
+use crate::cancel;
 use crate::flow::{Checkpoint, Env, FlowItem, Previous, Resume, paginate};
 use crate::furniture::{Furniture, NoteStore, note_order};
 use crate::numbering::{Labeler, ListLabel, NumberingState};
@@ -59,7 +60,7 @@ pub struct IncrementalLayout {
     layout: Layout,
     state: Option<State>,
     labels: Vec<Option<ListLabel>>,
-    /// Layout index of each addressable paragraph, when block-level content controls shift them.
+    /// Layout index of each addressable paragraph, when row-level content controls shift them.
     addressable: Option<Vec<usize>>,
     stats: UpdateStats,
 }
@@ -83,7 +84,16 @@ pub struct UpdateStats {
 
 /// The list label of every paragraph in document order (tables included).
 pub(crate) fn all_labels(doc: &Document) -> Vec<Option<ListLabel>> {
-    all_labels_in(doc, &doc.body().blocks)
+    match flatten_content_controls(&doc.body().blocks) {
+        None => all_labels_in(doc, &doc.body().blocks),
+        Some(flat) => {
+            let labels = all_labels_in(doc, &flat.blocks);
+            flat.addressable
+                .iter()
+                .map(|i| labels.get(*i).cloned().flatten())
+                .collect()
+        }
+    }
 }
 
 /// The list label of every paragraph of `blocks` (the body, or the body with its content
@@ -146,6 +156,16 @@ impl IncrementalLayout {
         self.state = None;
     }
 
+    /// Drops the cache and the layout after a cancelled run, so nothing partial is ever read.
+    fn abandon(&mut self) -> &Layout {
+        self.layout = Layout::default();
+        self.state = None;
+        self.labels.clear();
+        self.addressable = None;
+        self.stats = UpdateStats::default();
+        &self.layout
+    }
+
     /// Brings the layout in line with `doc`, reusing what did not change.
     pub fn update(
         &mut self,
@@ -203,13 +223,20 @@ impl IncrementalLayout {
                 })
             })
             .collect();
-        if flat.is_some() {
+        // Block-level controls are addressable; only paragraphs of row-level controls are not.
+        let shifted = flat
+            .as_ref()
+            .is_some_and(|f| f.addressable.iter().enumerate().any(|(i, a)| i != *a));
+        if shifted {
             layout.notes.push(
-                "block-level content controls: Line::paragraph counts their paragraphs, which                  Document::paragraph does not address"
+                "row-level content controls: Line::paragraph counts their paragraphs, which Document::paragraph does not address"
                     .to_owned(),
             );
         }
-        self.addressable = flat.as_ref().map(|f| f.addressable.clone());
+        self.addressable = flat
+            .as_ref()
+            .filter(|_| shifted)
+            .map(|f| f.addressable.clone());
         let labels = all_labels_in(doc, body_blocks);
         let mut blocks: Vec<&Block> = body_blocks
             .iter()
@@ -268,6 +295,9 @@ impl IncrementalLayout {
         let (mut section, mut para, mut story, mut tables) = (0usize, 0usize, 0usize, 0usize);
         let mut story_kind = StoryKind::Main;
         for (i, block) in blocks.iter().enumerate() {
+            if cancel::cancelled() {
+                return self.abandon();
+            }
             let (kind, mark) = if i < body_n {
                 (StoryKind::Main, None)
             } else {
@@ -353,6 +383,7 @@ impl IncrementalLayout {
             // Nothing in the body changed; only the notes and fonts need refreshing.
             layout.pages = std::mem::take(&mut self.layout.pages);
             furniture.apply(&mut layout.pages, &ctx);
+            crate::textbox::apply(&mut layout.pages);
             layout.fonts = font_uses(&items, fonts);
             self.layout = layout;
             self.state = Some(State {
@@ -368,6 +399,9 @@ impl IncrementalLayout {
         let (pages, checkpoints) = match prev {
             None => {
                 let out = paginate(&items, &env, None, None);
+                if cancel::cancelled() {
+                    return self.abandon();
+                }
                 stats.blocks_paginated = n;
                 stats.pages_built = out.pages.len();
                 (out.pages, out.checkpoints)
@@ -390,16 +424,21 @@ impl IncrementalLayout {
                     footer_images: Vec::new(),
                     note_images: Vec::new(),
                     rules: Vec::new(),
+                    frames: Vec::new(),
                     ..pg.clone()
                 });
                 let Some(current) = current else {
                     // The cache and the layout disagree: start over.
                     let out = paginate(&items, &env, None, None);
+                    if cancel::cancelled() {
+                        return self.abandon();
+                    }
                     stats.full = true;
                     stats.blocks_paginated = n;
                     stats.pages_built = out.pages.len();
                     layout.pages = out.pages;
                     furniture.apply(&mut layout.pages, &ctx);
+                    crate::textbox::apply(&mut layout.pages);
                     layout.fonts = font_uses(&items, fonts);
                     self.layout = layout;
                     let checkpoints = out.checkpoints;
@@ -427,6 +466,9 @@ impl IncrementalLayout {
                     first: tail,
                 });
                 let out = paginate(&items, &env, Some(resume), previous.as_ref());
+                if cancel::cancelled() {
+                    return self.abandon();
+                }
                 match (out.converged, out.open) {
                     (Some(c), Some(mut open)) => {
                         stats.converged = true;
@@ -499,6 +541,7 @@ impl IncrementalLayout {
 
         layout.pages = pages;
         furniture.apply(&mut layout.pages, &ctx);
+        crate::textbox::apply(&mut layout.pages);
         layout.fonts = font_uses(&items, fonts);
         self.layout = layout;
         self.state = Some(State {

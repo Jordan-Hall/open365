@@ -121,10 +121,11 @@ fn reference() -> serde_json::Value {
 }
 
 /// Excel's `Columns(c).AutoFit()` on the fixture, measured at 120 dpi. Our widths are the
-/// width of the widest cell (hinted advances of the bundled Carlito and Caladea, which stand in
-/// for Calibri and Cambria) plus Excel's 9 px of padding at that dpi. 25 of the 39 cases are
-/// pixel-exact; the rest differ by the hinted advances of the real Calibri (a few pixels on
-/// long text), by 5 px for wrapped text with a line break, and by 2 px for Calibri 9.
+/// width of the widest cell (hinted advances of the installed Calibri and Cambria, or the
+/// bundled Carlito and Caladea when they are missing) plus Excel's 9 px of padding at that dpi.
+/// 25 of the 39 cases are pixel-exact (same with Carlito); the rest are narrower than Excel by
+/// 1 to 7 px, mostly on long text, and 5 px for wrapped text with a line break. The Cambria
+/// cases need the installed face (12 px off with Caladea).
 #[test]
 fn column_auto_fit_matches_excel() {
     let mut h = harness("grid-autofit", 1.25, vec2(6000.0, 700.0));
@@ -149,6 +150,9 @@ fn column_auto_fit_matches_excel() {
         let diff = i64::from(width_px(&h, dpi, &got[0])) - want;
         total += 1;
         exact += i64::from(diff == 0);
+        if diff != 0 {
+            eprintln!("column {col} {}: off by {diff}", c["label"]);
+        }
         worst = worst.max(diff.abs());
         assert!(
             diff.abs() <= 7,
@@ -156,6 +160,7 @@ fn column_auto_fit_matches_excel() {
             c["label"]
         );
     }
+    eprintln!("column auto-fit: {exact} of {total} pixel-exact, worst {worst} px");
     assert!(
         exact >= 24,
         "only {exact} of {total} columns are pixel-exact"

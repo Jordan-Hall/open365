@@ -118,7 +118,7 @@ pub struct NumberFormat {
 }
 
 /// Splits at `;` outside quotes, escapes and brackets.
-fn split_sections(code: &str) -> Result<Vec<&str>, FormatError> {
+pub(super) fn split_sections(code: &str) -> Result<Vec<&str>, FormatError> {
     let mut parts = Vec::new();
     let mut start = 0;
     let mut chars = code.char_indices().peekable();
@@ -170,7 +170,7 @@ const COLOR_NAMES: [&str; 8] = [
     "black", "blue", "cyan", "green", "magenta", "red", "white", "yellow",
 ];
 
-fn is_color(body: &str) -> bool {
+pub(super) fn is_color(body: &str) -> bool {
     let lower = body.to_ascii_lowercase();
     if COLOR_NAMES.contains(&lower.as_str()) {
         return true;

@@ -21,22 +21,35 @@ use std::sync::Arc;
 use open365_calc::eval::FixedClock;
 use open365_calc::{EvalContext, Value, evaluate, parse_formula};
 use open365_xlsx::{
-    CellIsOp, CellValue, CfBlock, CfKind, CfRule, Cfvo, CfvoKind, Dxf, Rgb, TimePeriod, Workbook,
-    cell_ref_string, shift_formula,
+    CellIsOp, CellValue, CfBlock, CfKind, CfRule, Cfvo, CfvoKind, Color, DataBarAxis,
+    DataBarDirection, DataBarExt, Dxf, Rgb, TimePeriod, Workbook, cell_ref_string, shift_formula,
 };
 
 use crate::eval::FormulaEngine;
 use crate::xlsx_state::to_calc_value;
 
-/// A data bar for one cell.
+/// A data bar for one cell, resolved to geometry: positions and lengths are fractions of the
+/// bar span (the cell width less the bar's margins), counted from the cell's left edge.
 #[derive(Debug, Clone, PartialEq)]
 pub struct DataBarEffect {
     /// Where the value sits between the bar's minimum and maximum, `0.0..=1.0`.
     pub fraction: f64,
-    /// Bar length at `fraction` 0 and 1, in percent of the cell width.
-    pub min_length: u32,
-    pub max_length: u32,
+    /// Where the bar starts: the axis, `0.0..=1.0` from the left edge.
+    pub axis: f64,
+    /// How long the bar is, `0.0..=1.0` of the span; 0 draws nothing.
+    pub length: f64,
+    /// The bar grows leftwards from the axis (negative values, or right-to-left bars).
+    pub grows_left: bool,
+    /// The value is below zero.
+    pub negative: bool,
+    /// The fill, already the negative colour for a negative bar that has its own.
     pub color: Rgb,
+    /// Gradient fill (a solid one otherwise).
+    pub gradient: bool,
+    /// The border colour, when the bar has a border.
+    pub border: Option<Rgb>,
+    /// The axis line, drawn at `axis` for ranges that hold negative values.
+    pub axis_line: Option<Rgb>,
     pub show_value: bool,
 }
 
@@ -417,6 +430,7 @@ impl ConditionalFormats {
                 max_length,
                 color,
                 show_value,
+                ext,
                 ..
             } => {
                 let CellValue::Number(n) = value else {
@@ -425,17 +439,17 @@ impl ConditionalFormats {
                 let Stats::Bar { min, max } = self.stats(wb, prepared, block) else {
                     return None;
                 };
-                let fraction = if max > min {
-                    ((n - min) / (max - min)).clamp(0.0, 1.0)
-                } else {
-                    1.0
+                let styles = wb.styles();
+                let positive = styles.resolve_color(color);
+                let bar = match ext {
+                    Some(ext) => {
+                        bar_geometry(ext, n, *min, *max, positive, |c| styles.resolve_color(c))
+                    }
+                    None => legacy_bar(n, *min, *max, positive, *min_length, *max_length),
                 };
                 Some(Hit::Bar(DataBarEffect {
-                    fraction,
-                    min_length: *min_length,
-                    max_length: *max_length,
-                    color: wb.styles().resolve_color(color),
                     show_value: *show_value,
+                    ..bar
                 }))
             }
             CfKind::IconSet {
@@ -509,6 +523,8 @@ impl ConditionalFormats {
                 match c.kind {
                     CfvoKind::Min => min.unwrap_or(fallback),
                     CfvoKind::Max => max.unwrap_or(fallback),
+                    CfvoKind::AutoMin => min.unwrap_or(fallback).min(0.0),
+                    CfvoKind::AutoMax => max.unwrap_or(fallback).max(0.0),
                     CfvoKind::Num => parse_num(c.val.as_deref()).unwrap_or(fallback),
                     CfvoKind::Percent => {
                         let p = parse_num(c.val.as_deref()).unwrap_or(0.0);
@@ -596,10 +612,17 @@ impl ConditionalFormats {
                         .collect();
                     Stats::Scale(points)
                 }
-                CfKind::DataBar { min, max, .. } => Stats::Bar {
-                    min: threshold_value(min, 0.0),
-                    max: threshold_value(max, 0.0),
-                },
+                CfKind::DataBar { min, max, ext, .. } => {
+                    // The Excel 2010 extension carries its own minimum and maximum (`autoMin`).
+                    let (min, max) = ext
+                        .as_ref()
+                        .and_then(|x| x.min.as_ref().zip(x.max.as_ref()))
+                        .unwrap_or((min, max));
+                    Stats::Bar {
+                        min: threshold_value(min, 0.0),
+                        max: threshold_value(max, 0.0),
+                    }
+                }
                 CfKind::IconSet { cfvos, .. } => {
                     Stats::Icons(cfvos.iter().map(|c| threshold_value(c, 0.0)).collect())
                 }
@@ -615,6 +638,129 @@ enum Hit {
     Fill(Rgb),
     Bar(DataBarEffect),
     Icon(IconEffect),
+}
+
+/// Excel's red for negative bars that have no colour of their own.
+const NEGATIVE_RED: Rgb = Rgb {
+    r: 0xFF,
+    g: 0,
+    b: 0,
+};
+
+/// A 2007 data bar (no Excel 2010 extension): no axis, every bar grows from the left edge, the
+/// lowest value at `min_length` percent and the highest at `max_length`.
+fn legacy_bar(
+    n: f64,
+    min: f64,
+    max: f64,
+    color: Rgb,
+    min_length: u32,
+    max_length: u32,
+) -> DataBarEffect {
+    let fraction = if max > min {
+        ((n - min) / (max - min)).clamp(0.0, 1.0)
+    } else {
+        1.0
+    };
+    let pct = |p: u32| f64::from(p.min(100)) / 100.0;
+    let (lo, hi) = (pct(min_length), pct(max_length));
+    DataBarEffect {
+        fraction,
+        axis: 0.0,
+        length: lo + (hi - lo) * fraction,
+        grows_left: false,
+        negative: n < 0.0,
+        color,
+        gradient: true,
+        border: Some(color),
+        axis_line: None,
+        show_value: true,
+    }
+}
+
+/// An Excel 2010 data bar, as Excel draws it (measured against Excel, see
+/// `fixtures/reference/xlsx/grid-databar`). With `min` and `max` the range the value is placed
+/// in: the automatic axis sits where zero falls in it (at the left edge when every value is
+/// positive, the right edge when every value is negative) and a bar is as long as the value is
+/// far from zero, or from the end of the range that has no zero; a midpoint axis is the middle
+/// of the cell with both halves scaled to the larger absolute end; without an axis every bar
+/// grows from the left in proportion to its place in the range.
+fn bar_geometry(
+    ext: &DataBarExt,
+    n: f64,
+    min: f64,
+    max: f64,
+    positive: Rgb,
+    resolve: impl Fn(&Color) -> Rgb,
+) -> DataBarEffect {
+    let span = max - min;
+    let v = n.clamp(min.min(max), max.max(min));
+    let fraction = if span > 0.0 { (v - min) / span } else { 1.0 };
+    let (mut axis, mut length, mut grows_left) = match ext.axis {
+        DataBarAxis::None => (0.0, fraction, false),
+        DataBarAxis::Midpoint => {
+            let scale = min.abs().max(max.abs());
+            let half = if scale > 0.0 {
+                v.abs() / scale / 2.0
+            } else {
+                0.5
+            };
+            (0.5, half, v < 0.0)
+        }
+        DataBarAxis::Automatic if span > 0.0 => {
+            let zero = 0.0_f64.clamp(min, max);
+            ((zero - min) / span, (v - zero).abs() / span, v < zero)
+        }
+        DataBarAxis::Automatic => (0.0, 1.0, false),
+    };
+    let lo = f64::from(ext.min_length.min(100)) / 100.0;
+    let hi = f64::from(ext.max_length.min(100)) / 100.0;
+    length = if ext.axis == DataBarAxis::None {
+        // The lowest value gets `lo`, the highest `hi`; a bar of no length stays empty.
+        if length > 0.0 {
+            lo + (hi - lo) * length
+        } else {
+            0.0
+        }
+    } else {
+        length * hi
+    };
+    if ext.direction == DataBarDirection::RightToLeft {
+        axis = 1.0 - axis;
+        grows_left = !grows_left;
+    }
+    let negative = n < 0.0;
+    let own = negative && !ext.negative_same_as_positive;
+    let color = if own {
+        ext.negative_fill.as_ref().map_or(NEGATIVE_RED, &resolve)
+    } else {
+        positive
+    };
+    let border = ext.border.then(|| {
+        if negative && !ext.negative_border_same_as_positive {
+            ext.negative_border_color.as_ref().map_or(color, &resolve)
+        } else {
+            ext.border_color.as_ref().map_or(positive, &resolve)
+        }
+    });
+    let edge = axis <= 0.0 || axis >= 1.0;
+    let axis_line = (ext.axis != DataBarAxis::None && min < 0.0 && !edge).then(|| {
+        ext.axis_color
+            .as_ref()
+            .map_or(Rgb { r: 0, g: 0, b: 0 }, &resolve)
+    });
+    DataBarEffect {
+        fraction,
+        axis,
+        length: length.clamp(0.0, 1.0),
+        grows_left,
+        negative,
+        color,
+        gradient: ext.gradient,
+        border,
+        axis_line,
+        show_value: true,
+    }
 }
 
 fn parse_num(v: Option<&str>) -> Option<f64> {

@@ -22,6 +22,7 @@ fn lines_with_glyphs(page: &open365_layout::Page) -> Vec<&Line> {
     page.header
         .iter()
         .chain(&page.lines)
+        .chain(page.frames.iter().flat_map(|f| f.lines.iter()))
         .chain(&page.notes)
         .chain(&page.footer)
         .filter(|l| l.runs.iter().any(|r| !r.glyphs.is_empty()))
@@ -87,10 +88,7 @@ fn glyph_positions_and_text_round_trip() {
                         text.push_str(t);
                     }
                 }
-                // Content controls: `Paragraph::text` has no control content and the paragraphs of
-                // a block-level control are not addressable, so the text check skips `layout-sdt`.
                 if line.story == open365_layout::StoryKind::Main
-                    && name != "layout-sdt"
                     && seen.insert((line.paragraph, line.start))
                 {
                     para_text.entry(line.paragraph).or_default().push_str(&text);

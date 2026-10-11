@@ -14,6 +14,7 @@ pub mod functions;
 pub mod graph;
 pub mod numfmt;
 pub mod parser;
+pub mod style;
 pub mod value;
 pub mod xmath;
 
@@ -24,6 +25,7 @@ pub use ast::{Ast, to_formula_string};
 pub use eval::{CellSource, Clock, EvalContext, FixedClock, SystemClock, evaluate, evaluate_root};
 pub use fmtlocale::{DateOrder, FormatLocale, cldr_to_excel};
 pub use parser::{ParseError, ParseErrorKind, parse_formula};
+pub use style::{CellStyle, HAlign};
 pub use value::{ErrorKind, Value};
 
 use graph::{CellId, Dep, Graph, extract_deps};
@@ -89,6 +91,9 @@ struct SheetData {
     cells: HashMap<(u32, u32), CellData>,
     max_row: u32,
     max_col: u32,
+    styles: HashMap<(u32, u32), CellStyle>,
+    col_widths: HashMap<u32, f64>,
+    standard_width: f64,
 }
 
 /// An in-memory workbook: constant values and formulas per sheet, a dependency graph and
@@ -114,6 +119,8 @@ pub struct Engine {
     /// recalculated when that cell gains or loses a formula but are not graph dependencies.
     watchers: Vec<(CellId, u32, u32, u32, u32, u32)>,
     all_dirty: bool,
+    /// Cooperative cancellation of recalculation; see [`Engine::set_cancel`].
+    cancel: Option<Arc<std::sync::atomic::AtomicBool>>,
 }
 
 impl Default for Engine {
@@ -143,7 +150,23 @@ impl Engine {
             dynamic: HashSet::new(),
             watchers: Vec::new(),
             all_dirty: false,
+            cancel: None,
         }
+    }
+
+    /// Installs (or removes) a cancellation flag. While it is set, [`Engine::recalc_dirty`]
+    /// stops before the next cell and keeps the cells it did not reach dirty, so a later
+    /// recalculation (after the flag is cleared or replaced) finishes the job and the engine
+    /// stays consistent. The flag is looked at once per cell.
+    pub fn set_cancel(&mut self, cancel: Option<Arc<std::sync::atomic::AtomicBool>>) {
+        self.cancel = cancel;
+    }
+
+    /// True when the installed cancellation flag is set.
+    pub fn cancel_requested(&self) -> bool {
+        self.cancel
+            .as_ref()
+            .is_some_and(|f| f.load(std::sync::atomic::Ordering::Relaxed))
     }
 
     /// Replaces the clock. Volatile formulas pick it up on the next recalculation.
@@ -207,6 +230,9 @@ impl Engine {
             cells: HashMap::new(),
             max_row: 0,
             max_col: 0,
+            styles: HashMap::new(),
+            col_widths: HashMap::new(),
+            standard_width: style::STANDARD_COLUMN_WIDTH,
         });
         self.sheets.len() - 1
     }
@@ -316,6 +342,32 @@ impl Engine {
             self.touch(id);
         }
         self.mark_dependents(id);
+    }
+
+    /// Sets the presentation `CELL` reports for a cell and schedules a full recalculation.
+    pub fn set_cell_style(&mut self, sheet: &str, row: u32, col: u32, style: CellStyle) {
+        let index = self.ensure_sheet(sheet) as usize;
+        let styles = &mut self.sheets[index].styles;
+        if style == CellStyle::default() {
+            styles.remove(&(row, col));
+        } else {
+            styles.insert((row, col), style);
+        }
+        self.all_dirty = true;
+    }
+
+    /// Sets the width of one column, in characters.
+    pub fn set_column_width(&mut self, sheet: &str, col: u32, width: f64) {
+        let index = self.ensure_sheet(sheet) as usize;
+        self.sheets[index].col_widths.insert(col, width);
+        self.all_dirty = true;
+    }
+
+    /// Sets the width of every column that has none of its own.
+    pub fn set_standard_column_width(&mut self, sheet: &str, width: f64) {
+        let index = self.ensure_sheet(sheet) as usize;
+        self.sheets[index].standard_width = width;
+        self.all_dirty = true;
     }
 
     /// Clears a cell.
@@ -500,6 +552,9 @@ impl Engine {
         if !self.dynamic.is_empty() {
             let dynamic: Vec<CellId> = self.dynamic.iter().copied().collect();
             for _ in 0..MAX_DYNAMIC_ROUNDS {
+                if self.cancel_requested() {
+                    break;
+                }
                 let mut again = self.graph.dirty_from(&dynamic);
                 again.extend(dynamic.iter().copied());
                 let plan = self.graph.plan(&again);
@@ -520,7 +575,11 @@ impl Engine {
         recomputed: &mut Vec<CellAddr>,
     ) -> bool {
         let mut changed = false;
-        for id in plan.order {
+        for (k, id) in plan.order.iter().copied().enumerate() {
+            if self.cancel_requested() {
+                self.dirty.extend(plan.order[k..].iter().copied());
+                break;
+            }
             let value = if plan.cyclic.contains(&id) {
                 self.circular.insert(id);
                 Value::Number(0.0)
@@ -599,6 +658,35 @@ impl CellSource for Engine {
         self.cell_data(sheet, row, col)
             .and_then(|c| c.formula.as_ref())
             .is_some_and(|f| f.has_subtotal)
+    }
+
+    fn cell_style(&self, sheet: &str, row: u32, col: u32) -> CellStyle {
+        self.find_sheet(sheet)
+            .and_then(|i| self.sheets[i].styles.get(&(row, col)))
+            .cloned()
+            .unwrap_or_default()
+    }
+
+    fn column_width(&self, sheet: &str, col: u32) -> (f64, bool) {
+        let Some(i) = self.find_sheet(sheet) else {
+            return (style::STANDARD_COLUMN_WIDTH, true);
+        };
+        let s = &self.sheets[i];
+        match s.col_widths.get(&col) {
+            Some(w) => (*w, (*w - s.standard_width).abs() < 0.005),
+            None => (s.standard_width, true),
+        }
+    }
+
+    fn sheet_position(&self, sheet: &str) -> Option<usize> {
+        let i = self.find_sheet(sheet)?;
+        self.sheets[i]
+            .exists
+            .then(|| self.sheets[..i].iter().filter(|s| s.exists).count())
+    }
+
+    fn sheet_count(&self) -> usize {
+        self.sheets.iter().filter(|s| s.exists).count()
     }
 
     fn used_bounds(&self, sheet: &str) -> (u32, u32) {

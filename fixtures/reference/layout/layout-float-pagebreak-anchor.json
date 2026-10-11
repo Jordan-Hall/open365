@@ -1,0 +1,43 @@
+{
+  "source": "fixtures/docx/layout-float-pagebreak-anchor.docx",
+  "oracle": "Microsoft Word 16.0 (16.0.20430), Print Layout, tools/office/word-layout-oracle.ps1",
+  "units": "points; page and top/left/baseline measured from the page top-left corner; start/end are UTF-16 offsets in the main story",
+  "precision": "top/left/lastX are screen-quantised (+-0.3 pt); baseline/inkLeft and cell rectangles come from the 600 dpi PDF and are exact",
+  "pageCount": 2,
+  "images": [
+    {"page": 1, "x": 300.0, "y": 131.71, "w": 102.0, "h": 40.0},
+    {"page": 2, "x": 72.0, "y": 72.0, "w": 100.0, "h": 60.0},
+    {"page": 2, "x": 300.0, "y": 92.0, "w": 101.0, "h": 40.0}
+  ],
+  "compat": 15,
+  "floats": [
+    {"index": 1, "name": "Picture 1", "kind": "picture", "page": 2, "x": 72.0, "y": 72.0, "w": 100.0, "h": 60.0, "src": "pdf", "wrap": 0, "side": 0, "hrel": 0, "vrel": 2, "posX": -999998.0, "posY": 0.0, "distT": 0.0, "distB": 0.0, "distL": 9.0, "distR": 9.0, "allowOverlap": true, "layoutInCell": true, "anchorStart": 1027, "anchorPage": 2, "anchorX": 181.8, "anchorY": 72.0, "around": [{"start": 1026, "baseline": 82.58, "left": 181.8, "inkLeft": 181.51, "lastX": 513.0}, {"start": 1104, "baseline": 96.02, "left": 181.8, "inkLeft": 181.51, "lastX": 528.6}, {"start": 1182, "baseline": 109.46, "left": 181.8, "inkLeft": 181.51, "lastX": 537.0}, {"start": 1261, "baseline": 122.93, "left": 181.8, "inkLeft": 181.51, "lastX": 538.8}, {"start": 1342, "baseline": 136.37, "left": 181.8, "inkLeft": 181.51, "lastX": 416.4}]},
+    {"index": 2, "name": "Picture 2", "kind": "picture", "page": 2, "x": 300.0, "y": 92.0, "w": 101.0, "h": 40.0, "src": "pdf", "wrap": 3, "side": 0, "hrel": 1, "vrel": 0, "posX": 300.0, "posY": 20.0, "distT": 0.0, "distB": 0.0, "distL": 9.0, "distR": 9.0, "allowOverlap": true, "layoutInCell": true, "anchorStart": 1026, "anchorPage": 2, "anchorX": 181.8, "anchorY": 72.0, "around": [{"start": 1026, "baseline": 82.58, "left": 181.8, "inkLeft": 181.51, "lastX": 513.0}, {"start": 1104, "baseline": 96.02, "left": 181.8, "inkLeft": 181.51, "lastX": 528.6}, {"start": 1182, "baseline": 109.46, "left": 181.8, "inkLeft": 181.51, "lastX": 537.0}, {"start": 1261, "baseline": 122.93, "left": 181.8, "inkLeft": 181.51, "lastX": 538.8}, {"start": 1342, "baseline": 136.37, "left": 181.8, "inkLeft": 181.51, "lastX": 416.4}]},
+    {"index": 3, "name": "Picture 3", "kind": "picture", "page": 1, "x": 300.0, "y": 131.71, "w": 102.0, "h": 40.0, "src": "pdf", "wrap": 3, "side": 0, "hrel": 1, "vrel": 2, "posX": 300.0, "posY": 0.0, "distT": 0.0, "distB": 0.0, "distL": 9.0, "distR": 9.0, "allowOverlap": true, "layoutInCell": true, "anchorStart": 367, "anchorPage": 1, "anchorX": 72.0, "anchorY": 132.0, "around": [{"start": 308, "baseline": 122.93, "left": 72.0, "inkLeft": 72.024, "lastX": 329.4}, {"start": 367, "baseline": 142.37, "left": 72.0, "inkLeft": 72.024, "lastX": 540.0}, {"start": 470, "baseline": 155.81, "left": 72.0, "inkLeft": 72.024, "lastX": 526.8}, {"start": 575, "baseline": 169.25, "left": 72.0, "inkLeft": 72.024, "lastX": 522.6}, {"start": 677, "baseline": 182.69, "left": 72.0, "inkLeft": 72.024, "lastX": 197.4}]}
+  ],
+  "lines": [
+    {"page": 1, "start": 0, "end": 100, "top": 72.0, "left": 72.0, "lastX": 516.0, "baseline": 82.58, "inkLeft": 72.024, "text": "The morning ferry crosses the estuary twice before the tide turns, carrying commuters, bicycles and "},
+    {"page": 1, "start": 100, "end": 205, "top": 85.2, "left": 72.0, "lastX": 538.2, "baseline": 96.02, "inkLeft": 72.024, "text": "crates of vegetables from the farms on the far shore. Nobody on board hurries; they read, drink tea from "},
+    {"page": 1, "start": 205, "end": 308, "top": 99.0, "left": 72.0, "lastX": 532.8, "baseline": 109.46, "inkLeft": 72.024, "text": "flasks and watch the herons stand in the shallows. When the ferry docks, a short queue forms along the "},
+    {"page": 1, "start": 308, "end": 367, "top": 112.2, "left": 72.0, "lastX": 329.4, "baseline": 122.93, "inkLeft": 72.024, "text": "jetty and the deckhand coils the rope with practised ease.\u000d"},
+    {"page": 1, "start": 367, "end": 470, "top": 132.0, "left": 72.0, "lastX": 540.0, "baseline": 142.37, "inkLeft": 72.024, "text": "A well-made map leaves out far more than it shows. The cartographer decides which roads matter, which "},
+    {"page": 1, "start": 470, "end": 575, "top": 145.2, "left": 72.0, "lastX": 526.8, "baseline": 155.81, "inkLeft": 72.024, "text": "rivers deserve a name and where a label may sit without hiding a village. Every choice trades detail for "},
+    {"page": 1, "start": 575, "end": 677, "top": 159.0, "left": 72.0, "lastX": 522.6, "baseline": 169.25, "inkLeft": 72.024, "text": "clarity, and the reader trusts the result because the trades were made carefully and applied the same "},
+    {"page": 1, "start": 677, "end": 705, "top": 172.2, "left": 72.0, "lastX": 197.4, "baseline": 182.69, "inkLeft": 72.024, "text": "way across the whole sheet.\u000d"},
+    {"page": 1, "start": 705, "end": 815, "top": 191.4, "left": 72.0, "lastX": 539.4, "baseline": 202.15, "inkLeft": 72.024, "text": "In the workshop the lamps stay lit late. Shavings gather under the bench, a kettle ticks as it cools, and the "},
+    {"page": 1, "start": 815, "end": 923, "top": 204.6, "left": 72.0, "lastX": 523.2, "baseline": 215.35, "inkLeft": 72.024, "text": "half-finished chair waits for its last joint. The maker steps back, squints along the rail and decides that "},
+    {"page": 1, "start": 923, "end": 1026, "top": 218.4, "left": 72.0, "lastX": 527.4, "baseline": 228.79, "inkLeft": 72.024, "text": "tomorrow will do for the glue, since good work is not improved by being rushed past the point of care.\u000d"},
+    {"page": 2, "start": 1026, "end": 1104, "top": 72.0, "left": 181.8, "lastX": 513.0, "baseline": 82.58, "inkLeft": 181.51, "text": "The morning ferry crosses the estuary twice before the tide turns, carrying "},
+    {"page": 2, "start": 1104, "end": 1182, "top": 85.2, "left": 181.8, "lastX": 528.6, "baseline": 96.02, "inkLeft": 181.51, "text": "commuters, bicycles and crates of vegetables from the farms on the far shore. "},
+    {"page": 2, "start": 1182, "end": 1261, "top": 99.0, "left": 181.8, "lastX": 537.0, "baseline": 109.46, "inkLeft": 181.51, "text": "Nobody on board hurries; they read, drink tea from flasks and watch the herons "},
+    {"page": 2, "start": 1261, "end": 1342, "top": 112.2, "left": 181.8, "lastX": 538.8, "baseline": 122.93, "inkLeft": 181.51, "text": "stand in the shallows. When the ferry docks, a short queue forms along the jetty "},
+    {"page": 2, "start": 1342, "end": 1395, "top": 126.0, "left": 181.8, "lastX": 416.4, "baseline": 136.37, "inkLeft": 181.51, "text": "and the deckhand coils the rope with practised ease.\u000d"},
+    {"page": 2, "start": 1395, "end": 1497, "top": 145.2, "left": 72.0, "lastX": 540.0, "baseline": 155.81, "inkLeft": 72.024, "text": "A well-made map leaves out far more than it shows. The cartographer decides which roads matter, which "},
+    {"page": 2, "start": 1497, "end": 1602, "top": 158.4, "left": 72.0, "lastX": 526.8, "baseline": 169.25, "inkLeft": 72.024, "text": "rivers deserve a name and where a label may sit without hiding a village. Every choice trades detail for "},
+    {"page": 2, "start": 1602, "end": 1704, "top": 172.2, "left": 72.0, "lastX": 522.6, "baseline": 182.69, "inkLeft": 72.024, "text": "clarity, and the reader trusts the result because the trades were made carefully and applied the same "},
+    {"page": 2, "start": 1704, "end": 1732, "top": 185.4, "left": 72.0, "lastX": 197.4, "baseline": 196.13, "inkLeft": 72.024, "text": "way across the whole sheet.\u000d"},
+    {"page": 2, "start": 1732, "end": 1842, "top": 204.6, "left": 72.0, "lastX": 539.4, "baseline": 215.35, "inkLeft": 72.024, "text": "In the workshop the lamps stay lit late. Shavings gather under the bench, a kettle ticks as it cools, and the "},
+    {"page": 2, "start": 1842, "end": 1950, "top": 217.8, "left": 72.0, "lastX": 523.2, "baseline": 228.79, "inkLeft": 72.024, "text": "half-finished chair waits for its last joint. The maker steps back, squints along the rail and decides that "},
+    {"page": 2, "start": 1950, "end": 2053, "top": 231.6, "left": 72.0, "lastX": 527.4, "baseline": 242.23, "inkLeft": 72.024, "text": "tomorrow will do for the glue, since good work is not improved by being rushed past the point of care.\u000d"}
+  ]
+}

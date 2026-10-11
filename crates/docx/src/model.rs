@@ -32,8 +32,73 @@ pub struct Body {
 pub enum Block {
     Paragraph(Paragraph),
     Table(Table),
-    /// Block-level `w:sdt`, `w:customXml`, bookmarks, section properties, `mc:AlternateContent`...
+    /// Block-level content control (`w:sdt`): its paragraphs are addressable like any other.
+    Sdt(Sdt),
+    /// `w:customXml`, bookmarks, section properties, `mc:AlternateContent`...
     Raw(RawXml),
+}
+
+/// Block-level `w:sdt`. `w:sdtPr`, `w:sdtEndPr` and anything else stay raw in place.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Sdt {
+    pub head: ElementHead,
+    pub children: Vec<SdtChild>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum SdtChild {
+    Raw(RawXml),
+    Content(SdtContent),
+}
+
+/// `w:sdtContent` of a block-level control.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SdtContent {
+    pub head: ElementHead,
+    pub blocks: Vec<Block>,
+}
+
+impl Sdt {
+    fn from_xml(e: XmlElement) -> Self {
+        let children = e
+            .children
+            .into_iter()
+            .map(|child| match child {
+                RawXml::Element(c) if c.head.is_w("sdtContent") => SdtChild::Content(SdtContent {
+                    head: c.head,
+                    blocks: blocks_from(c.children),
+                }),
+                other => SdtChild::Raw(other),
+            })
+            .collect();
+        Self {
+            head: e.head,
+            children,
+        }
+    }
+
+    /// The blocks of every `w:sdtContent`, in order.
+    pub fn content(&self) -> impl Iterator<Item = &SdtContent> {
+        self.children.iter().filter_map(|c| match c {
+            SdtChild::Content(c) => Some(c),
+            SdtChild::Raw(_) => None,
+        })
+    }
+
+    fn write(&self, out: &mut String) {
+        if self.children.is_empty() {
+            write_head(&self.head, true, out);
+            return;
+        }
+        write_head(&self.head, false, out);
+        for child in &self.children {
+            match child {
+                SdtChild::Raw(r) => r.write(out),
+                SdtChild::Content(c) => write_blocks(&c.head, &c.blocks, out),
+            }
+        }
+        write_end(&self.head, out);
+    }
 }
 
 /// `w:p`. The paragraph properties are typed only as far as raw XML; `props` holds the
@@ -253,12 +318,11 @@ fn sdt_content_children(raw: &RawXml) -> Option<Vec<RawXml>> {
 }
 
 impl Block {
-    /// The blocks inside a block-level content control (`w:sdt`), read-only and typed on the
-    /// fly; `None` when this block is not one. The paragraphs are not addressable by
-    /// [`Body::paragraphs`].
+    /// The blocks inside a block-level content control (`w:sdt`); `None` when this block is
+    /// not one. Its paragraphs are addressable by [`Body::paragraphs`].
     pub fn sdt_content(&self) -> Option<Vec<Block>> {
         match self {
-            Self::Raw(raw) => sdt_content_children(raw).map(blocks_from),
+            Self::Sdt(sdt) => Some(sdt.content().flat_map(|c| c.blocks.clone()).collect()),
             _ => None,
         }
     }
@@ -283,11 +347,20 @@ impl Block {
 }
 
 impl Inline {
-    /// The inline content of an inline content control (`w:sdt`), read-only and typed on
-    /// the fly; `None` when this is not one.
+    /// The inline content of an inline content control (`w:sdt`, a [`Group`]); `None` when
+    /// this is not one.
     pub fn sdt_content(&self) -> Option<Vec<Inline>> {
         match self {
-            Self::Raw(raw) => sdt_content_children(raw).map(|c| inlines_from(c.into_iter())),
+            Self::Group(g) if g.head.is_w("sdt") => Some(
+                g.content
+                    .iter()
+                    .filter_map(|i| match i {
+                        Self::Group(c) if c.head.is_w("sdtContent") => Some(c.content.clone()),
+                        _ => None,
+                    })
+                    .flatten()
+                    .collect(),
+            ),
             _ => None,
         }
     }
@@ -312,6 +385,7 @@ pub(crate) fn blocks_from(children: Vec<RawXml>) -> Vec<Block> {
         .map(|child| match child {
             RawXml::Element(e) if e.head.is_w("p") => Block::Paragraph(Paragraph::from_xml(e)),
             RawXml::Element(e) if e.head.is_w("tbl") => Block::Table(Table::from_xml(e)),
+            RawXml::Element(e) if e.head.is_w("sdt") => Block::Sdt(Sdt::from_xml(e)),
             other => Block::Raw(other),
         })
         .collect()
@@ -327,6 +401,7 @@ fn write_blocks(head: &ElementHead, blocks: &[Block], out: &mut String) {
         match block {
             Block::Paragraph(p) => p.write(out),
             Block::Table(t) => t.write(out),
+            Block::Sdt(s) => s.write(out),
             Block::Raw(r) => r.write(out),
         }
     }
@@ -464,6 +539,9 @@ const GROUPS: &[&str] = &[
     "moveTo",
     "smartTag",
     "fldSimple",
+    // Inline content controls: `w:sdtPr` stays raw, the text lives in `w:sdtContent`.
+    "sdt",
+    "sdtContent",
 ];
 
 fn inlines_from(children: impl Iterator<Item = RawXml>) -> Vec<Inline> {
@@ -706,9 +784,9 @@ impl Paragraph {
 }
 
 impl Body {
-    /// Paragraphs in document order, including those in table cells (recursively).
-    /// Paragraphs inside raw blocks (content controls, `mc:AlternateContent`) are not
-    /// included.
+    /// Paragraphs in document order, including those in table cells and block-level content
+    /// controls (recursively). Paragraphs inside raw blocks (`mc:AlternateContent`, row-level
+    /// controls) are not included.
     pub fn paragraphs(&self) -> Vec<&Paragraph> {
         fn walk<'a>(blocks: &'a [Block], out: &mut Vec<&'a Paragraph>) {
             for block in blocks {
@@ -719,6 +797,11 @@ impl Body {
                             for cell in row.cells() {
                                 walk(&cell.blocks, out);
                             }
+                        }
+                    }
+                    Block::Sdt(sdt) => {
+                        for content in sdt.content() {
+                            walk(&content.blocks, out);
                         }
                     }
                     Block::Raw(_) => {}
@@ -754,6 +837,16 @@ impl Body {
                                 if let Some(p) = walk(&mut cell.blocks, seen, index) {
                                     return Some(p);
                                 }
+                            }
+                        }
+                    }
+                    Block::Sdt(sdt) => {
+                        for child in &mut sdt.children {
+                            let SdtChild::Content(content) = child else {
+                                continue;
+                            };
+                            if let Some(p) = walk(&mut content.blocks, seen, index) {
+                                return Some(p);
                             }
                         }
                     }

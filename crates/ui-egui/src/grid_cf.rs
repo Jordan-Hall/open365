@@ -23,39 +23,99 @@ const BLACK: Color32 = Color32::from_rgb(0x33, 0x33, 0x33);
 const GRAY: Color32 = Color32::from_rgb(0x8C, 0x8C, 0x8C);
 const BLUE: Color32 = Color32::from_rgb(0x4F, 0x81, 0xBD);
 
-/// Draws the data bar of a cell: a gradient from the bar colour to near white, a solid edge in
-/// the bar colour, inset from the cell like Excel's.
+/// Pixels between the cell's left grid line and the bar span, and between the span and the next
+/// grid line: Excel leaves the pixel next to each grid line empty and starts the span one further
+/// in on the left (measured, `fixtures/reference/xlsx/grid-databar`).
+const BAR_LEFT_PX: f32 = 2.0;
+const BAR_RIGHT_PX: f32 = 1.0;
+/// Vertical margin of a bar in a cell, in device pixels.
+const BAR_VERTICAL_PX: f32 = 2.0;
+
+/// Where a data bar lies in a cell `width_px` wide: `(from, to, axis)` in device pixels from the
+/// cell's left edge, `from <= to`; `None` when nothing is drawn.
+pub(crate) fn bar_extent_px(width_px: f32, bar: &DataBarEffect) -> Option<(f32, f32, f32)> {
+    let span = (width_px - BAR_LEFT_PX - BAR_RIGHT_PX).max(0.0);
+    let axis = BAR_LEFT_PX + span * bar.axis.clamp(0.0, 1.0) as f32;
+    let length = span * bar.length.clamp(0.0, 1.0) as f32;
+    let (from, to) = if bar.grows_left {
+        (axis - length, axis)
+    } else {
+        (axis, axis + length)
+    };
+    (length >= 1.0).then_some((from, to, axis))
+}
+
+/// Draws the data bar of a cell: a gradient from the bar colour at the axis to near white at the
+/// far end (or a solid fill), an optional border, and the axis line of a range with negative values.
 pub(crate) fn paint_data_bar(painter: &Painter, cell: Rect, bar: &DataBarEffect, ppp: f32) {
     let px = |v: f32| v / ppp;
-    let span = (cell.width() - px(4.0)).max(0.0);
-    let pct = |p: u32| (p.min(100) as f32) / 100.0;
-    let (lo, hi) = (pct(bar.min_length), pct(bar.max_length));
-    let fraction = bar.fraction.clamp(0.0, 1.0) as f32;
-    let length = span * (lo + (hi - lo) * fraction);
-    if length < px(1.0) || cell.height() < px(5.0) {
+    if cell.height() < px(5.0) {
         return;
     }
-    let rect = Rect::from_min_size(
-        Pos2::new(cell.left() + px(2.0), cell.top() + px(2.0)),
-        vec2(length, cell.height() - px(4.0)),
+    let (top, bottom) = (
+        cell.top() + px(BAR_VERTICAL_PX),
+        cell.bottom() - px(BAR_VERTICAL_PX),
     );
-    let c = Color32::from_rgb(bar.color.r, bar.color.g, bar.color.b);
-    let light = mix(c, Color32::WHITE, 0.85);
-    let mut mesh = Mesh::default();
-    let v = |pos: Pos2, color: Color32| Vertex {
-        pos,
-        uv: WHITE_UV,
-        color,
-    };
-    mesh.vertices = vec![
-        v(rect.left_top(), c),
-        v(rect.right_top(), light),
-        v(rect.right_bottom(), light),
-        v(rect.left_bottom(), c),
-    ];
-    mesh.indices = vec![0, 1, 2, 0, 2, 3];
-    painter.add(Shape::mesh(mesh));
-    painter.rect_stroke(rect, 0.0, Stroke::new(px(1.0), c), StrokeKind::Inside);
+    if let Some((from, to, axis)) = bar_extent_px(cell.width() * ppp, bar) {
+        let rect = Rect::from_min_max(
+            Pos2::new(cell.left() + px(from), top),
+            Pos2::new(cell.left() + px(to), bottom),
+        );
+        let c = Color32::from_rgb(bar.color.r, bar.color.g, bar.color.b);
+        let light = if bar.gradient {
+            mix(c, Color32::WHITE, 0.85)
+        } else {
+            c
+        };
+        // The darker end is the base, at the axis.
+        let (left, right) = if bar.grows_left {
+            (light, c)
+        } else {
+            (c, light)
+        };
+        let mut mesh = Mesh::default();
+        let v = |pos: Pos2, color: Color32| Vertex {
+            pos,
+            uv: WHITE_UV,
+            color,
+        };
+        mesh.vertices = vec![
+            v(rect.left_top(), left),
+            v(rect.right_top(), right),
+            v(rect.right_bottom(), right),
+            v(rect.left_bottom(), left),
+        ];
+        mesh.indices = vec![0, 1, 2, 0, 2, 3];
+        painter.add(Shape::mesh(mesh));
+        if let Some(edge) = bar.border {
+            let edge = Color32::from_rgb(edge.r, edge.g, edge.b);
+            painter.rect_stroke(rect, 0.0, Stroke::new(px(1.0), edge), StrokeKind::Inside);
+        }
+        paint_axis(painter, cell, bar, axis, ppp);
+    } else if let Some(axis) = bar_axis_px(cell.width() * ppp, bar) {
+        paint_axis(painter, cell, bar, axis, ppp);
+    }
+}
+
+/// The axis position of `bar` in device pixels from the cell's left edge.
+fn bar_axis_px(width_px: f32, bar: &DataBarEffect) -> Option<f32> {
+    let span = (width_px - BAR_LEFT_PX - BAR_RIGHT_PX).max(0.0);
+    bar.axis_line
+        .map(|_| BAR_LEFT_PX + span * bar.axis.clamp(0.0, 1.0) as f32)
+}
+
+/// The dashed axis line, full cell height.
+fn paint_axis(painter: &Painter, cell: Rect, bar: &DataBarEffect, axis: f32, ppp: f32) {
+    let Some(color) = bar.axis_line else { return };
+    let px = |v: f32| v / ppp;
+    let x = cell.left() + px(axis);
+    let color = Color32::from_rgb(color.r, color.g, color.b);
+    painter.add(Shape::dashed_line(
+        &[Pos2::new(x, cell.top()), Pos2::new(x, cell.bottom())],
+        Stroke::new(px(1.0), color),
+        px(2.0),
+        px(2.0),
+    ));
 }
 
 fn mix(a: Color32, b: Color32, t: f32) -> Color32 {

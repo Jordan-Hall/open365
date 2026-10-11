@@ -256,6 +256,8 @@ pub(crate) struct ObjectBox {
     pub height: f64,
     /// Index of the object's atom.
     pub atom: usize,
+    /// The laid-out text of a text box shape.
+    pub text_box: Option<crate::textbox::BoxRef>,
 }
 
 impl ObjectBox {
@@ -564,6 +566,13 @@ impl Collector<'_, '_> {
         let Some(d) = Drawing::from_element(e) else {
             return;
         };
+        self.add_drawing(d, style);
+    }
+
+    fn add_drawing(&mut self, d: Drawing, style: usize) {
+        if self.suppressed() {
+            return;
+        }
         self.split = true;
         self.objects.push((self.text.len(), d));
         self.push(OBJECT_CHAR, style);
@@ -675,6 +684,9 @@ impl Collector<'_, '_> {
         } else if h.is_w("separator") || h.is_w("continuationSeparator") {
             self.separator = true;
             self.hide(1);
+        } else if let Some(d) = Drawing::from_alternate_content(e) {
+            // A text box: the choice holds the `w:drawing`, the fallback a VML copy.
+            self.add_drawing(d, style);
         }
     }
 
@@ -760,17 +772,16 @@ impl Collector<'_, '_> {
                     }
                     self.hide(1);
                 }
-                Inline::Group(g) => self.inlines(&g.content),
-                Inline::Raw(_) if open365_docx::is_sdt_marker(inline) => self.hide(1),
-                Inline::Raw(_) => {
+                Inline::Group(g) if g.head.is_w("sdt") => {
                     // A content control: its start and end each count as one story character
                     // (`layout-sdt`), the content lays out like plain content.
-                    if let Some(content) = inline.sdt_content() {
-                        self.hide(1);
-                        self.inlines(&content);
-                        self.hide(1);
-                    }
+                    self.hide(1);
+                    self.inlines(&g.content);
+                    self.hide(1);
                 }
+                Inline::Group(g) => self.inlines(&g.content),
+                Inline::Raw(_) if open365_docx::is_sdt_marker(inline) => self.hide(1),
+                Inline::Raw(_) => {}
             }
         }
     }
@@ -888,6 +899,10 @@ pub(crate) fn layout_paragraph(
                 width: if inline { w + el + er } else { 0.0 },
                 height: if inline { h + et + eb } else { 0.0 },
                 atom: atoms.len(),
+                text_box: d
+                    .text_box
+                    .as_ref()
+                    .map(|tb| crate::textbox::BoxRef::new(ctx, tb, w)),
             });
             atoms.push(Atom {
                 byte_start: range.start,

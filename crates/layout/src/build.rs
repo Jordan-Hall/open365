@@ -110,7 +110,7 @@ pub(crate) fn build_unit(
             None
         }
         Block::Table(t) => Some(layout_table(&mut b, t, width)),
-        Block::Raw(_) => None,
+        Block::Sdt(_) | Block::Raw(_) => None,
     };
     let story_len = b.story;
     let tables = b.tables;

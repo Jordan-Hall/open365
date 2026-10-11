@@ -8,7 +8,7 @@ That page has 514 table rows naming 521 distinct functions (seven rows pair a fu
 earlier, recalled list: `COPILOT` is not on the page (removed); `CALL`, `DETECTLANGUAGE`, `EUROCONVERT`, `JIS`, `REGISTER.ID` and
 `TRANSLATE` are on it (added under "Web, cube, other"). No registered function is missing from the page. In the table below a name that is
 also in another category counts in both (the legacy names repeat), so the category total is larger than 521. Distinct names: 521 on the page,
-312 registered, 209 missing. Before the previous change: 236 registered; before this one: 301.
+316 registered, 205 missing. Before the previous changes: 236, then 301, then 312 registered.
 
 | Category | Excel | Registered | Missing |
 |---|---:|---:|---:|
@@ -19,12 +19,12 @@ also in another category counts in both (the legacy names repeat), so the catego
 | Text | 44 | 40 | 4 |
 | Lookup and reference | 36 | 34 | 2 |
 | Logical | 18 | 18 | 0 |
-| Information | 21 | 17 | 4 |
+| Information | 21 | 21 | 0 |
 | Engineering | 54 | 36 | 18 |
 | Database | 12 | 12 | 0 |
 | Compatibility (legacy names) | 41 | 10 | 31 |
 | Web, cube, other | 25 | 0 | 25 |
-| **Total** | 524 | 314 | 210 |
+| **Total** | 524 | 318 | 206 |
 
 ## Missing by category
 
@@ -42,7 +42,7 @@ also in another category counts in both (the legacy names repeat), so the catego
 
 **Logical** (0): none
 
-**Information** (4): CELL, INFO, SHEET, SHEETS
+**Information** (0): none
 
 **Engineering** (18): BESSELI, BESSELJ, BESSELK, BESSELY, CONVERT, ERF, ERF.PRECISE, ERFC, ERFC.PRECISE, IMABS, IMCOT, IMCSC, IMCSCH, IMPOWER, IMSEC, IMSECH, IMSQRT, IMTAN
 
@@ -52,17 +52,25 @@ also in another category counts in both (the legacy names repeat), so the catego
 
 **Web, cube, other** (25): ENCODEURL, FILTERXML, WEBSERVICE, CUBEKPIMEMBER, CUBEMEMBER, CUBEMEMBERPROPERTY, CUBERANKEDMEMBER, CUBESET, CUBESETCOUNT, CUBEVALUE, IMAGE, STOCKHISTORY, TRIMRANGE, GROUPBY, PIVOTBY, PERCENTOF, REGEXTEST, REGEXEXTRACT, REGEXREPLACE, CALL, DETECTLANGUAGE, EUROCONVERT, JIS, REGISTER.ID, TRANSLATE
 
-## Fourth batch (this change): lambdas, LET, XMATCH, FORMULATEXT
+## Fifth batch (this change): CELL, INFO, SHEET, SHEETS
+
+Added and verified against Excel (about 1,400 cases, groups `cell`, `cell2`, `cellfmt`, `info`, `sheet`): CELL (all info types), INFO,
+SHEET, SHEETS. Every information and logical function of the page is now registered. `CELL` needs cell presentation, so the engine gained
+`CellStyle` (number format, horizontal alignment, locked), column widths and `CellSource::{cell_style, column_width, sheet_position,
+sheet_count}`; the oracle and the conformance test accept a case field `styles`. Findings and residue are in `calc-conformance.md`.
+
+Not done: ASC, DBCS, BAHTTEXT, PHONETIC, JIS, ENCODEURL, REGEXTEST, REGEXEXTRACT, REGEXREPLACE (group 2) and the statistical group 3 were not
+started; the probe corpora for them were written but their results were not reviewed. `XMATCH`/`XLOOKUP` `match_mode` 3 (regular expression)
+is unchanged.
+
+## Fourth batch: lambdas, LET, XMATCH, FORMULATEXT
 
 Added and verified against Excel (about 1,940 cases; residue in `fixtures/calc/known-differences.toml`): LET, LAMBDA, MAP, REDUCE, SCAN,
 BYROW, BYCOL, MAKEARRAY, ISOMITTED, XMATCH, FORMULATEXT. `LET` and the lambda family live in `eval/lambda.rs` (they need unevaluated
 arguments); `Arg::Lambda` is the closure value.
 
-Not done in this change (no code, no cases): CELL, INFO, SHEET, SHEETS (group 2) and ASC, DBCS, BAHTTEXT, PHONETIC, REGEXTEST,
-REGEXEXTRACT, REGEXREPLACE (group 3). Findings for whoever continues: this Excel build has REGEX functions and `XMATCH`/`XLOOKUP`
-`match_mode` 3 is a regular-expression match; `CELL("filename")` and `INFO("osversion")` must be tested for type and shape only
-(for example `ISTEXT(INFO("osversion"))`) because they depend on the machine; the oracle's columns are 60 wide, so `CELL("width")`
-cannot match an engine without column widths.
+Findings carried forward: this Excel build has REGEX functions and `XMATCH`/`XLOOKUP` `match_mode` 3 is a regular-expression match
+(still open, see the fifth batch).
 
 ## Third batch: engineering, database, arrays, small lookups
 

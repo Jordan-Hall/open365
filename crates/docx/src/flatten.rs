@@ -5,7 +5,9 @@
 
 use std::sync::Arc;
 
-use crate::model::{Block, Cell, Inline, Paragraph, Row, RowChild, Table, TableChild};
+use crate::model::{
+    Block, Cell, Inline, Paragraph, Row, RowChild, Sdt, SdtChild, Table, TableChild,
+};
 use crate::xml::{ElementHead, RawXml, W_NS, XmlElement};
 
 /// Blocks with the block-level content controls unwrapped.
@@ -41,7 +43,8 @@ pub fn is_sdt_marker(inline: &Inline) -> bool {
 
 fn has_sdt(blocks: &[Block]) -> bool {
     blocks.iter().any(|b| match b {
-        Block::Raw(_) => b.sdt_content().is_some(),
+        Block::Sdt(_) => true,
+        Block::Raw(_) => false,
         Block::Table(t) => t.children.iter().any(|c| match c {
             TableChild::Row(r) => r.children.iter().any(|rc| match rc {
                 RowChild::Cell(c) => has_sdt(&c.blocks),
@@ -78,24 +81,29 @@ impl Flattener {
                     let t = self.table(t, in_sdt);
                     out.push(Block::Table(t));
                 }
-                Block::Raw(_) => match block.sdt_content() {
-                    Some(content) => {
-                        let mut inner = Vec::new();
-                        self.blocks(&content, true, &mut inner);
-                        let first = inner.iter().position(|b| matches!(b, Block::Paragraph(_)));
-                        let last = inner.iter().rposition(|b| matches!(b, Block::Paragraph(_)));
-                        if let Some(Block::Paragraph(p)) = first.and_then(|i| inner.get_mut(i)) {
-                            add_marker(p, SDT_START, true);
-                        }
-                        if let Some(Block::Paragraph(p)) = last.and_then(|i| inner.get_mut(i)) {
-                            add_marker(p, SDT_END, false);
-                        }
-                        out.extend(inner);
-                    }
-                    None => out.push(block.clone()),
-                },
+                Block::Sdt(sdt) => self.sdt(sdt, in_sdt, out),
+                Block::Raw(_) => out.push(block.clone()),
             }
         }
+    }
+
+    fn sdt(&mut self, sdt: &Sdt, in_sdt: bool, out: &mut Vec<Block>) {
+        // A block-level control's paragraphs are addressable like any other.
+        let mut inner = Vec::new();
+        for child in &sdt.children {
+            if let SdtChild::Content(content) = child {
+                self.blocks(&content.blocks, in_sdt, &mut inner);
+            }
+        }
+        let first = inner.iter().position(|b| matches!(b, Block::Paragraph(_)));
+        let last = inner.iter().rposition(|b| matches!(b, Block::Paragraph(_)));
+        if let Some(Block::Paragraph(p)) = first.and_then(|i| inner.get_mut(i)) {
+            add_marker(p, SDT_START, true);
+        }
+        if let Some(Block::Paragraph(p)) = last.and_then(|i| inner.get_mut(i)) {
+            add_marker(p, SDT_END, false);
+        }
+        out.extend(inner);
     }
 
     fn table(&mut self, t: &Table, in_sdt: bool) -> Table {

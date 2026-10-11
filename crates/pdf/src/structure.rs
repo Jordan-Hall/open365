@@ -114,6 +114,12 @@ impl Walker<'_> {
                     }
                 }
                 Block::Table(t) => out.push(self.table(t)),
+                // The paragraphs of a content control follow the layout's order in place.
+                Block::Sdt(sdt) => {
+                    for content in sdt.content() {
+                        out.extend(self.blocks(&content.blocks));
+                    }
+                }
                 Block::Raw(_) => {}
             }
         }

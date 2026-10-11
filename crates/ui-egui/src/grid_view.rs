@@ -46,7 +46,7 @@ use open365_xlsx::{
 
 use crate::a11y;
 use crate::fonts::{Face, FontBook};
-use crate::grid_cf::{ICON_SLOT_PX, paint_data_bar, paint_icon};
+use crate::grid_cf::{ICON_SLOT_PX, bar_extent_px, paint_data_bar, paint_icon};
 use crate::grid_text::{
     HintCache, HintedFace, NumberText, TEXT_INSET_PX, color32, effective_horizontal, fill_text,
     fit_number, is_numeric, line_px, overflow_room,
@@ -2996,8 +2996,24 @@ pub struct PaintedCell {
     pub underline: bool,
     /// Icon set name and icon index (0 = lowest band) drawn in the cell.
     pub icon: Option<(String, usize)>,
-    /// Data bar length as a fraction `0.0..=1.0` of the value's position.
-    pub data_bar: Option<f64>,
+    /// The data bar drawn in the cell.
+    pub data_bar: Option<PaintedBar>,
+}
+
+/// A data bar as drawn, in device pixels from the cell's left edge.
+#[derive(Debug, Clone, PartialEq)]
+pub struct PaintedBar {
+    /// Where the value sits between the bar's minimum and maximum, `0.0..=1.0`.
+    pub fraction: f64,
+    /// The bar's extent, `from <= to`; equal when the bar is empty.
+    pub from_px: f32,
+    pub to_px: f32,
+    /// The axis the bar grows from.
+    pub axis_px: f32,
+    pub negative: bool,
+    pub color: Color32,
+    pub gradient: bool,
+    pub has_axis_line: bool,
 }
 
 /// Everything a painting pass needs besides the painter.
@@ -3715,7 +3731,22 @@ fn paint_cell_text(painter: &Painter, paint: &Paint<'_>, item: &Item<'_>, region
         strike: font.strike,
         underline: font.underline != Underline::None,
         icon: fx.and_then(|f| f.icon.as_ref().map(|i| (i.set.clone(), i.index))),
-        data_bar: fx.and_then(|f| f.data_bar.as_ref().map(|b| b.fraction)),
+        data_bar: fx.and_then(|f| {
+            f.data_bar.as_ref().map(|b| {
+                let (from_px, to_px, axis_px) =
+                    bar_extent_px(cell_rect.width() * paint.ppp, b).unwrap_or((0.0, 0.0, 0.0));
+                PaintedBar {
+                    fraction: b.fraction,
+                    from_px,
+                    to_px,
+                    axis_px,
+                    negative: b.negative,
+                    color: Color32::from_rgb(b.color.r, b.color.g, b.color.b),
+                    gradient: b.gradient,
+                    has_axis_line: b.axis_line.is_some(),
+                }
+            })
+        }),
     });
     let _ = region;
 }

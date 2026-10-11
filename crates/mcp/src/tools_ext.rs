@@ -5,13 +5,13 @@
 use std::collections::{BTreeMap, HashSet};
 use std::path::Path;
 use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::AtomicBool;
 
 use open365_commands::{
     Command, CommandError, EffectClass, PdfOptions, Target, template_output_extension,
 };
 use open365_docx::Document;
-use open365_layout::{LayoutOptions, ParaRole, layout_document};
+use open365_layout::{LayoutOptions, ParaRole, layout_document_cancellable};
 use open365_text::{FontLibrary, FontMatch};
 use open365_xlsx::parse_cell_ref;
 use serde_json::{Value, json};
@@ -95,18 +95,16 @@ impl Server {
             return Err(ToolError::invalid("export_pdf needs a DOCX document"));
         }
         let bytes = snapshot(s)?;
-        let cancel = Arc::new(AtomicBool::new(false));
-        let options = PdfOptions {
-            max_bytes: Some(MAX_EXPORT_BYTES),
-            cancel: Some(Arc::clone(&cancel)),
-            ..PdfOptions::default()
-        };
         let target_path = path.clone();
         // The export is the `export_pdf` command on a private copy of the document, so the
         // open document is not borrowed while the layout runs.
-        let done = bounded::run(deadline, move || {
+        let done = bounded::run(deadline, move |cancel| {
             let mut copy = Target::open_docx(&bytes)?;
-            copy.set_pdf_options(options);
+            copy.set_pdf_options(PdfOptions {
+                max_bytes: Some(MAX_EXPORT_BYTES),
+                cancel: Some(cancel),
+                ..PdfOptions::default()
+            });
             copy.apply(Command::ExportPdf {
                 path: target_path,
                 overwrite,
@@ -122,12 +120,11 @@ impl Server {
             Ok(Err(e @ CommandError::TooLarge { .. })) => {
                 return Err(ToolError::refused(e.to_string()));
             }
-            Ok(Err(e)) => return Err(ToolError::failed(e.to_string())),
-            Err(BoundedError::TimedOut) => {
-                // The worker checks this before it creates the file.
-                cancel.store(true, Ordering::Relaxed);
+            Ok(Err(CommandError::Cancelled)) | Err(BoundedError::TimedOut) => {
+                // The timeout set the request's flag; the writer removes a file it created.
                 return Err(ToolError::timeout("export_pdf", deadline));
             }
+            Ok(Err(e)) => return Err(ToolError::failed(e.to_string())),
             Err(BoundedError::Failed) => {
                 return Err(ToolError::failed("the export worker stopped unexpectedly"));
             }
@@ -216,15 +213,20 @@ impl Server {
             return Err(ToolError::invalid("layout_summary needs a DOCX document"));
         }
         let bytes = snapshot(s)?;
-        let summary = bounded::run(deadline, move || {
-            let copy = Target::open_docx(&bytes).map_err(|e| e.to_string())?;
-            let doc = copy.docx().ok_or("not a DOCX document")?;
-            Ok::<Value, String>(summarize(doc, hidden))
+        let summary = bounded::run(deadline, move |cancel| {
+            let copy =
+                Target::open_docx(&bytes).map_err(|e| SummaryError::Failed(e.to_string()))?;
+            let doc = copy
+                .docx()
+                .ok_or_else(|| SummaryError::Failed("not a DOCX document".to_owned()))?;
+            summarize(doc, hidden, &cancel).ok_or(SummaryError::Cancelled)
         });
         match summary {
             Ok(Ok(v)) => Ok(v),
-            Ok(Err(e)) => Err(ToolError::failed(e)),
-            Err(BoundedError::TimedOut) => Err(ToolError::timeout("layout_summary", deadline)),
+            Ok(Err(SummaryError::Cancelled)) | Err(BoundedError::TimedOut) => {
+                Err(ToolError::timeout("layout_summary", deadline))
+            }
+            Ok(Err(SummaryError::Failed(e))) => Err(ToolError::failed(e)),
             Err(BoundedError::Failed) => {
                 Err(ToolError::failed("the layout worker stopped unexpectedly"))
             }
@@ -281,13 +283,12 @@ impl Server {
         let answer = worker.evaluate(deadline, index, row, col, formula.map(str::to_owned));
         let out = match answer {
             Ok(Ok(out)) => out,
-            Ok(Err(e)) => return Err(ToolError::invalid(e)),
-            Err(BoundedError::TimedOut) => {
-                // Drop the worker: the next call builds a fresh engine instead of queueing
-                // behind a job that may never end.
-                s.eval = None;
+            Ok(Err(CommandError::Cancelled)) | Err(BoundedError::TimedOut) => {
+                // The job was cancelled. The worker keeps its engine: the probe cell is put
+                // back and unfinished cells stay dirty, so the next call can reuse it.
                 return Err(ToolError::timeout("evaluate_formula", deadline));
             }
+            Ok(Err(e)) => return Err(ToolError::invalid(e.to_string())),
             Err(BoundedError::Failed) => {
                 s.eval = None;
                 return Err(ToolError::failed(
@@ -316,10 +317,16 @@ fn snapshot(s: &mut Session) -> Result<Vec<u8>, ToolError> {
         .map_err(|e| ToolError::failed(format!("the edited document cannot be copied: {e}")))
 }
 
+/// Why a layout summary produced nothing.
+enum SummaryError {
+    Cancelled,
+    Failed(String),
+}
+
 /// The `layout_summary` result for a document. Runs on a worker thread.
-fn summarize(doc: &Document, hidden: bool) -> Value {
+fn summarize(doc: &Document, hidden: bool, cancel: &Arc<AtomicBool>) -> Option<Value> {
     let fonts = FontLibrary::bundled();
-    let layout = layout_document(doc, &fonts, LayoutOptions::default());
+    let layout = layout_document_cancellable(doc, &fonts, LayoutOptions::default(), cancel)?;
     let page_lines: Vec<usize> = layout
         .pages
         .iter()
@@ -380,7 +387,7 @@ fn summarize(doc: &Document, hidden: bool) -> Value {
         .iter()
         .filter(|f| f.matched == FontMatch::Fallback)
         .count();
-    json!({
+    Some(json!({
         "page_count": layout.pages.len(),
         "page_lines": page_lines,
         "pages_truncated": layout.pages.len() > MAX_SUMMARY_PAGES,
@@ -391,5 +398,5 @@ fn summarize(doc: &Document, hidden: bool) -> Value {
         "layout_notes": notes,
         "fallback_fonts": fallback_fonts,
         "notice": NOTICE,
-    })
+    }))
 }

@@ -1,6 +1,7 @@
 //! Worksheet function registry and shared argument helpers.
 
 mod arith;
+mod cellinfo;
 mod complex;
 mod criteria;
 mod database;
@@ -202,6 +203,10 @@ static TABLE: &[(&str, Func)] = &[
     ("ISREF", Func::Res(info::isref)),
     ("ISFORMULA", Func::Res(info::isformula)),
     ("FORMULATEXT", Func::Res(info::formulatext)),
+    ("CELL", Func::Res(cellinfo::cell)),
+    ("INFO", Func::Res(cellinfo::info)),
+    ("SHEET", Func::Res(cellinfo::sheet)),
+    ("SHEETS", Func::Res(cellinfo::sheets)),
     ("TYPE", Func::Res(info::type_)),
     ("ERROR.TYPE", Func::Res(info::error_type)),
     ("ROWS", Func::Res(refs::rows)),
@@ -442,6 +447,9 @@ pub(crate) fn takes_reference(name: &str) -> bool {
         "ISFORMULA",
         "FORMULATEXT",
         "AREAS",
+        "CELL",
+        "SHEET",
+        "SHEETS",
     ]
     .iter()
     .any(|n| n.eq_ignore_ascii_case(name))

@@ -14,7 +14,9 @@ use serde::{Deserialize, Serialize};
 use crate::DocxError;
 use crate::document::Document;
 use crate::edit::needs_preserve;
-use crate::model::{Block, Body, Group, Inline, Paragraph, RowChild, Run, RunContent, TableChild};
+use crate::model::{
+    Block, Body, Group, Inline, Paragraph, RowChild, Run, RunContent, SdtChild, TableChild,
+};
 use crate::props::RunPropsPatch;
 use crate::xml::{RawXml, XmlElement};
 
@@ -46,12 +48,19 @@ pub struct EditLogEntry {
 // Containers
 // ---------------------------------------------------------------------------
 
-/// One hop into a table cell: block index, table child index, row child index.
+/// One hop into a container: a table cell (block index, table child index, row child
+/// index) or the content of a block-level control (block index, control child index).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-struct Step {
-    block: usize,
-    child: usize,
-    cell: usize,
+enum Step {
+    Cell {
+        block: usize,
+        child: usize,
+        cell: usize,
+    },
+    Sdt {
+        block: usize,
+        child: usize,
+    },
 }
 
 type Path = Vec<Step>;
@@ -78,7 +87,7 @@ fn find_paragraph(
                     };
                     for (ri, rc) in row.children.iter().enumerate() {
                         let RowChild::Cell(cell) = rc else { continue };
-                        path.push(Step {
+                        path.push(Step::Cell {
                             block: bi,
                             child: ci,
                             cell: ri,
@@ -88,6 +97,21 @@ fn find_paragraph(
                         }
                         path.pop();
                     }
+                }
+            }
+            Block::Sdt(sdt) => {
+                for (ci, child) in sdt.children.iter().enumerate() {
+                    let SdtChild::Content(content) = child else {
+                        continue;
+                    };
+                    path.push(Step::Sdt {
+                        block: bi,
+                        child: ci,
+                    });
+                    if let Some(found) = find_paragraph(&content.blocks, seen, target, path) {
+                        return Some(found);
+                    }
+                    path.pop();
                 }
             }
             Block::Raw(_) => {}
@@ -106,16 +130,59 @@ fn locate_paragraph(body: &Body, para: usize) -> Option<(Path, usize)> {
 fn container_mut<'a>(body: &'a mut Body, path: &[Step]) -> Option<&'a mut Vec<Block>> {
     let mut blocks = &mut body.blocks;
     for step in path {
-        let Block::Table(table) = blocks.get_mut(step.block)? else {
-            return None;
+        blocks = match *step {
+            Step::Cell { block, child, cell } => {
+                let Block::Table(table) = blocks.get_mut(block)? else {
+                    return None;
+                };
+                let TableChild::Row(row) = table.children.get_mut(child)? else {
+                    return None;
+                };
+                let RowChild::Cell(cell) = row.children.get_mut(cell)? else {
+                    return None;
+                };
+                &mut cell.blocks
+            }
+            Step::Sdt { block, child } => {
+                let Block::Sdt(sdt) = blocks.get_mut(block)? else {
+                    return None;
+                };
+                let SdtChild::Content(content) = sdt.children.get_mut(child)? else {
+                    return None;
+                };
+                &mut content.blocks
+            }
         };
-        let TableChild::Row(row) = table.children.get_mut(step.child)? else {
-            return None;
+    }
+    Some(blocks)
+}
+
+fn container<'a>(body: &'a Body, path: &[Step]) -> Option<&'a Vec<Block>> {
+    let mut blocks = &body.blocks;
+    for step in path {
+        blocks = match *step {
+            Step::Cell { block, child, cell } => {
+                let Block::Table(table) = blocks.get(block)? else {
+                    return None;
+                };
+                let TableChild::Row(row) = table.children.get(child)? else {
+                    return None;
+                };
+                let RowChild::Cell(cell) = row.children.get(cell)? else {
+                    return None;
+                };
+                &cell.blocks
+            }
+            Step::Sdt { block, child } => {
+                let Block::Sdt(sdt) = blocks.get(block)? else {
+                    return None;
+                };
+                let SdtChild::Content(content) = sdt.children.get(child)? else {
+                    return None;
+                };
+                &content.blocks
+            }
         };
-        let RowChild::Cell(cell) = row.children.get_mut(step.cell)? else {
-            return None;
-        };
-        blocks = &mut cell.blocks;
     }
     Some(blocks)
 }
@@ -674,7 +741,7 @@ impl Document {
             .ok_or_else(|| DocxError::UnsupportedRange("paragraph not found".to_owned()))?;
         if path != path_e {
             return Err(DocxError::UnsupportedRange(
-                "the range crosses a table boundary".to_owned(),
+                "the range crosses a table or content control boundary".to_owned(),
             ));
         }
         let s_len = self.paragraph(s.para).map_or(0, Paragraph::char_len);
@@ -691,7 +758,7 @@ impl Document {
             match block {
                 Block::Paragraph(_) => paragraph_blocks += 1,
                 Block::Raw(raw) if is_marker(raw) => {}
-                Block::Raw(_) => {
+                Block::Raw(_) | Block::Sdt(_) => {
                     return Err(DocxError::UnsupportedRange(
                         "the range covers a content control or other block".to_owned(),
                     ));
@@ -912,25 +979,8 @@ impl Document {
                 "the paragraphs are not in one container".to_owned(),
             ));
         }
-        let mut blocks = &self.body().blocks;
-        for step in &path {
-            let Some(Block::Table(table)) = blocks.get(step.block) else {
-                return Err(DocxError::UnsupportedRange(
-                    "container not found".to_owned(),
-                ));
-            };
-            let Some(TableChild::Row(row)) = table.children.get(step.child) else {
-                return Err(DocxError::UnsupportedRange(
-                    "container not found".to_owned(),
-                ));
-            };
-            let Some(RowChild::Cell(cell)) = row.children.get(step.cell) else {
-                return Err(DocxError::UnsupportedRange(
-                    "container not found".to_owned(),
-                ));
-            };
-            blocks = &cell.blocks;
-        }
+        let blocks = container(self.body(), &path)
+            .ok_or_else(|| DocxError::UnsupportedRange("container not found".to_owned()))?;
         Ok(Snapshot {
             path,
             start: bi_first,

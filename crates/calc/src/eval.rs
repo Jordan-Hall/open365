@@ -52,6 +52,26 @@ pub trait CellSource {
         false
     }
 
+    /// Number format, alignment and protection of a cell (for `CELL`).
+    fn cell_style(&self, _sheet: &str, _row: u32, _col: u32) -> crate::style::CellStyle {
+        crate::style::CellStyle::default()
+    }
+
+    /// Width of a column in characters and whether it is the standard width (for `CELL("width")`).
+    fn column_width(&self, _sheet: &str, _col: u32) -> (f64, bool) {
+        (crate::style::STANDARD_COLUMN_WIDTH, true)
+    }
+
+    /// Zero-based position of an existing sheet in the workbook (for `SHEET`).
+    fn sheet_position(&self, _sheet: &str) -> Option<usize> {
+        Some(0)
+    }
+
+    /// Number of sheets in the workbook (for `SHEETS`).
+    fn sheet_count(&self) -> usize {
+        1
+    }
+
     /// The last used `(row, col)` of a sheet (0 when empty). Whole-column and whole-row
     /// references only scan up to these bounds.
     fn used_bounds(&self, _sheet: &str) -> (u32, u32) {

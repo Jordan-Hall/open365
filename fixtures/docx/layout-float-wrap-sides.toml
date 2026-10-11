@@ -1,0 +1,5 @@
+feature = "layout-float"
+made_with = "Microsoft Word 16.0.20430 (Windows)"
+author = "project member"
+expect_dropped = []
+notes = "square wrapping with wrap side left, right and largest, float at an offset inside the text column"

@@ -880,3 +880,11 @@ reason = "A REDUCE whose lambda returns a lambda yields a lambda value; ARRAYTOT
 [[difference]]
 id = "scan.c0106"
 reason = "Same as reduce.c0106 (SCAN accumulating lambdas)."
+
+[[difference]]
+id = "cellfmt.c0619"
+reason = "CELL(\"format\",J20) in J20 itself: Excel reads the format without evaluating the cell, so it is not circular and returns \"P0\". Open365 records every reference argument as a dependency, so the cell is a cycle and holds 0."
+
+[[difference]]
+id = "cellfmt.c0620"
+reason = "Same as cellfmt.c0619 (a reference to the formula's own cell in CELL with a value-independent info type)."

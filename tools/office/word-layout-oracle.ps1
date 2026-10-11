@@ -38,6 +38,13 @@ HOW (fast path; ~0.4 s for a 7-line page, ~0.05 s per additional page, no per-ch
      ("repeat": true). Lines in cells carry "cell": true. Rectangles carry the 0.024 pt PDF origin offset as glyphs do.
   6. Pictures. Word's PDF draws each picture with `w 0 0 h x y cm /ImageN Do`; the rectangles are written as "images"
      (page, x, y (top), w, h in points, page top-left origin, same 0.024 pt x offset as glyphs).
+  7. Floating pictures and shapes (only with -Floats, or for documents named layout-float-*; other output is unchanged).
+     Each member of doc.Shapes is written to "floats": its object-model placement (wrap type/side, wrap distances,
+     relative-to enums, the raw Left/Top, which hold a WdShapePosition constant when the position is aligned, size, allowOverlap,
+     layoutInCell), the page and position of its anchor (Information 3/5/6), and its final rectangle on the page ("x","y","w","h",
+     points from the page top-left). The rectangle comes from the page's wdShapeRectangle Rectangles entry (integer points),
+     refined to the exact value by the matching picture / filled rectangle of the PDF ("src": "pdf") when one is found within
+     1.5 pt; "around" lists the body lines whose baselines lie within one line of the float's vertical extent.
   Slower alternatives rejected: per-character Range.Information (thousands of COM calls), and
   Selection.HomeKey/EndKey/MoveDown stepping (3-4 calls per line plus selection side effects).
 #>
@@ -46,7 +53,8 @@ param(
   [string]$InputDir,  # optional: scan this directory (in addition to -Path)
   [string]$OutDir,    # optional: write <OutDir>/<name>/layout.json instead of fixtures/reference/layout/<name>.json
   [switch]$NoPdf,  # skip the PDF baseline pass (then baseline/inkLeft are null)
-  [switch]$Rules   # also write "rules": every filled rectangle of the PDF (paragraph borders, rules, shading), page-top origin
+  [switch]$Rules,  # also write "rules": every filled rectangle of the PDF (paragraph borders, rules, shading), page-top origin
+  [switch]$Floats  # also write "floats" (final rectangle of every floating picture/shape); always on for layout-float-* documents
 )
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
@@ -150,9 +158,7 @@ function Read-PdfPages([string]$pdf) {
   }
   $pagesObj = $objs.Keys | Where-Object { $objs[$_] -match '/Type\s*/Pages' } | Select-Object -First 1
   $kids = @([regex]::Matches([regex]::Match($objs[$pagesObj], '/Kids\s*\[(.*?)\]', 'Singleline').Groups[1].Value, '(\d+) 0 R') | ForEach-Object { [int]$_.Groups[1].Value })
-  $rx = '(?<rx>[\d.\-]+) (?<ry>[\d.\-]+) (?<rw>[\d.\-]+) (?<rh>[\d.\-]+) re\r?\nW\* n|(?<fx>[\d.\-]+) (?<fy>[\d.\-]+) (?<fw>[\d.\-]+) (?<fh>[\d.\-]+) re\r?\nf\*?|(?<cr>[\d.]+) (?<cg>[\d.]+) (?<cb>[\d.]+) rg|(?<gy>[\d.]+) g\r?\n|/(?<fn>F\d+) (?<fs>[\d.]+) Tf|1 0 0 1 (?<tx>[\d.\-]+) (?<ty>[\d.\-]+) Tm|\[(?<tj>[^\]]*)\] TJ|(?<iw>[\d.\-]+) 0 0 (?<ih>[\d.\-]+) (?<ix>[\d.\-]+) (?<iy>[\d.\-]+) cm
-?
-/(?<im>\w+) Do'
+  $rx = '(?<rx>[\d.\-]+) (?<ry>[\d.\-]+) (?<rw>[\d.\-]+) (?<rh>[\d.\-]+) re\r?\nW\* n|(?<fx>[\d.\-]+) (?<fy>[\d.\-]+) (?<fw>[\d.\-]+) (?<fh>[\d.\-]+) re\r?\nf\*?|(?<cr>[\d.]+) (?<cg>[\d.]+) (?<cb>[\d.]+) rg|(?<gy>[\d.]+) g\r?\n|/(?<fn>F\d+) (?<fs>[\d.]+) Tf|1 0 0 1 (?<tx>[\d.\-]+) (?<ty>[\d.\-]+) Tm|\[(?<tj>[^\]]*)\] TJ|(?<iw>[\d.\-]+) 0 0 (?<ih>[\d.\-]+) (?<ix>[\d.\-]+) (?<iy>[\d.\-]+) cm\r?\n/(?<im>\w+) Do'
   $pages = New-Object System.Collections.Generic.List[object]
   foreach ($po in $kids) {
     $pd = $objs[$po]
@@ -256,14 +262,25 @@ function Ref-Layout($f) {
     $pcount = [int]$pane.Pages.Count
     $hasTables = [int]$doc.Tables.Count -gt 0
     $lines = New-Object System.Collections.Generic.List[object]
+    # Text boxes: one story (StoryType 5, offsets from 0) per box, listed in anchor order by StoryRanges(5).
+    # A box gets its index in that list as `frame`.
+    $boxTexts = New-Object System.Collections.Generic.List[string]
+    try { $sr = $doc.StoryRanges.Item(5); while ($sr) { $boxTexts.Add([string]$sr.Text); $sr = $sr.NextStoryRange } } catch {}
+    $usedFrames = @{}
+    $emitFloats = ($Floats -or $name -like 'layout-float-*') -and [int]$doc.Shapes.Count -gt 0
+    $shapeRects = New-Object System.Collections.Generic.List[object]
     for ($pi = 1; $pi -le $pcount; $pi++) {
       $page = $pane.Pages.Item($pi)
       $rects = $page.Rectangles
       $rc = [int]$rects.Count
       for ($ri = 1; $ri -le $rc; $ri++) {
         $rect = $rects.Item($ri)
+        if ($emitFloats -and [int]$rect.RectangleType -eq 1) {
+          $shapeRects.Add(@{ page = $pi; x = [double]$rect.Left; y = [double]$rect.Top; w = [double]$rect.Width; h = [double]$rect.Height; used = $false })
+        }
         if ([int]$rect.RectangleType -ne 0) { continue }   # wdTextRectangle only (main text; skips headers, notes, shapes)
         $ls = $rect.Lines; $lc = [int]$ls.Count
+        $rectFrame = $null
         for ($li = 1; $li -le $lc; $li++) {
           $r = $ls.Item($li).Range
           $s = [int]$r.Start; $e = [int]$r.End
@@ -275,6 +292,18 @@ function Ref-Layout($f) {
             $c = $r.Duplicate; $c.Collapse(1)
             $ce = $r.Duplicate; $ce.SetRange([math]::Max($s, $e - 1), [math]::Max($s, $e - 1))
             $top = [double]$c.Information(6)
+            $frame = $null
+            if ($st -eq 5) {
+              # The box is the one whose story holds this line's text at its offsets (first unused one on a tie).
+              if ($null -eq $rectFrame) {
+                for ($bf = 0; $bf -lt $boxTexts.Count; $bf++) {
+                  $bt = $boxTexts[$bf]
+                  if ($usedFrames.ContainsKey($bf) -or $bt.Length -lt $e) { continue }
+                  if ($bt.Substring($s, $e - $s) -eq [string]$r.Text) { $rectFrame = $bf; $usedFrames[$bf] = 1; break }
+                }
+              }
+              $frame = $rectFrame
+            }
             if ($lines.Exists([Predicate[object]]{ param($o) $o.page -eq $pi -and $o.Contains('story') -and $o.story -eq $st -and $o.start -eq $s -and $o.end -eq $e -and $o.top -eq $top })) { continue }
             $lines.Add([ordered]@{
                 page = $pi; start = $s; end = $e; story = $st
@@ -282,6 +311,7 @@ function Ref-Layout($f) {
                 lastX = [double]$ce.Information(5)
                 text = [string]$r.Text
               })
+            if ($null -ne $frame) { $lines[$lines.Count - 1]['frame'] = $frame }
             continue
           }
           $c = $doc.Range($s, $s)
@@ -319,9 +349,32 @@ function Ref-Layout($f) {
         # A clip that reaches the page edge is the page clipping a cell that runs off the page: not a cell box.
         if ($Rules) { foreach ($fl in $pg.fills) { $ruleRects.Add([ordered]@{ page = $pi; x = $fl.x; y = $fl.y; w = $fl.w; h = $fl.h; color = $fl.color; cell = ($fl.clip -ge 0) }) } }
         foreach ($im in $pg.images) { $imageRects.Add([ordered]@{ page = $pi; x = $im.x; y = $im.y; w = $im.w; h = $im.h }) }
-        foreach ($c in $pg.cells) { if ($c.x + $c.w -ge $pg.pw - 0.01) { continue }; if (@($pg.images | Where-Object { $c.x -ge $_.x - 8 -and $c.x + $c.w -le $_.x + $_.w + 8 -and $c.top -ge $_.y - 8 -and $c.top + $c.h -le $_.y + $_.h + 8 }).Count -gt 0) { continue }; $cellRects.Add([ordered]@{ page = $pi; x = $c.x; y = $c.top; w = $c.w; h = $c.h }) }
+        $ci = -1
+        foreach ($c in $pg.cells) { $ci++; if ($c.x + $c.w -ge $pg.pw - 0.01) { continue }; if (@($pg.images | Where-Object { $c.x -ge $_.x - 8 -and $c.x + $c.w -le $_.x + $_.w + 8 -and $c.top -ge $_.y - 8 -and $c.top + $c.h -le $_.y + $_.h + 8 }).Count -gt 0) { continue }; $cellRects.Add([ordered]@{ page = $pi; clip = $ci; x = $c.x; y = $c.top; w = $c.w; h = $c.h }) }
         if (-not $byPage.ContainsKey($pi)) { continue }
-        $inked = $byPage[$pi].ToArray()   # every line, even an empty paragraph, prints a space glyph for its mark
+        # Text boxes: Word clips the box text to a rectangle of its own, so its PDF rows are the rows of one clip. A box
+        # pairs with the clip whose rows, in order, read like its lines; they leave the page's other rows alone.
+        $boxLines = @($byPage[$pi] | Where-Object { $_.Contains('story') -and $_.story -eq 5 })
+        foreach ($fid in @($boxLines | ForEach-Object { $_.frame } | Where-Object { $null -ne $_ } | Sort-Object -Unique)) {
+          $fl = @($boxLines | Where-Object { $_.frame -eq $fid } | Sort-Object { $_.start })
+          $norm = { param($t) ([string]$t -replace '[\r\a]+$', '').Trim() }
+          $first = & $norm $fl[0].text
+          # A glyph the font's ToUnicode map lacks decodes as a space and is trimmed: the row then lacks that first or last character.
+          $like = { param($t, $row) $t -eq $row -or ($t.Length -eq $row.Length + 1 -and ($t.EndsWith($row) -or $t.StartsWith($row))) }
+          $paired = $false
+          foreach ($ck in @($pg.rows | Where-Object { $_.clip -ge 0 -and -not $_.frame -and (& $like $first $_.text) } | ForEach-Object { $_.clip } | Sort-Object -Unique)) {
+            $cr = @($pg.rows | Where-Object { $_.clip -eq $ck -and -not $_.frame } | Sort-Object { $_.y })
+            if ($cr.Count -ne $fl.Count) { continue }
+            $same = $true
+            for ($k = 0; $k -lt $fl.Count; $k++) { if (-not (& $like (& $norm $fl[$k].text) $cr[$k].text)) { $same = $false; break } }
+            if (-not $same) { continue }
+            for ($k = 0; $k -lt $fl.Count; $k++) { $fl[$k]['baseline'] = $cr[$k].y; $fl[$k]['inkLeft'] = $cr[$k].x; $cr[$k].frame = $fid }
+            foreach ($cc in $cellRects) { if ($cc.page -eq $pi -and $cc.clip -eq $ck) { $cc['frame'] = $fid } }
+            $paired = $true; break
+          }
+          if (-not $paired) { $warn += "page ${pi}: text box $fid (first line $first, $($fl.Count) lines) matches no clipped rows; clipped rows: " + ((@($pg.rows | Where-Object { $_.clip -ge 0 -and -not $_.frame } | ForEach-Object { "$($_.clip):$($_.text)" })) -join " | ") }
+        }
+        $inked = @($byPage[$pi].ToArray() | Where-Object { -not ($_.Contains('story') -and $_.story -eq 5) })   # every line, even an empty paragraph, prints a space glyph for its mark
         if (@($inked | Where-Object { $_.Contains('story') }).Count -gt 0) {
           # Lines of other stories: top-to-bottom order is header, body, endnotes, footnotes, footer.
           $inked = @($inked | Sort-Object @{ Expression = { Story-Rank $_ } }, @{ Expression = { $_.start } })
@@ -348,6 +401,22 @@ function Ref-Layout($f) {
           $inkedText = @($inked | Where-Object { -not ($_.Contains('story') -and $_.story -in 12, 13, 15, 16) })
           if ($inkedText.Count -eq $rows.Count) { $inked = $inkedText }
         }
+        if ($emitFloats -and $inked.Count -gt $rows.Count -and @($inked | Where-Object { $_.Contains('story') }).Count -eq 0) {
+          # Text wrapped around a float: Word lists each segment of a line as a line of its own, the PDF has one row per
+          # baseline. A segment takes the row whose baseline is the first one below its top; its first ink is the left-most
+          # PDF text run that starts at or after the segment's left edge.
+          $bad = 0
+          foreach ($sg in $inked) {
+            $hit = $null
+            foreach ($rw in $rows) { if ($rw.y -gt $sg.top - 1 -and $rw.y - $sg.top -lt 30 -and ($null -eq $hit -or $rw.y -lt $hit.y)) { $hit = $rw } }
+            if ($null -eq $hit) { $bad++; continue }
+            $ink = $null
+            foreach ($pt in $hit.parts) { if ($pt.x -ge $sg.left - 1.5 -and ($null -eq $ink -or $pt.x -lt $ink)) { $ink = $pt.x } }
+            $sg['baseline'] = $hit.y; $sg['inkLeft'] = $ink
+          }
+          if ($bad -gt 0) { $warn += "page ${pi}: $bad wrapped line segments matched no PDF baseline" }
+          continue
+        }
         if ($inked.Count -ne $rows.Count) { $warn += "page ${pi}: $($inked.Count) inked lines vs $($rows.Count) PDF baselines; baselines left null"; continue }
         for ($k = 0; $k -lt $inked.Count; $k++) { $inked[$k]['baseline'] = $rows[$k].y; $inked[$k]['inkLeft'] = $rows[$k].x }
       }
@@ -357,7 +426,7 @@ function Ref-Layout($f) {
         $active = -1
         $tabId = 0; foreach ($t in $doc.Tables) { Walk-Table $t $tp $seen $tabId; $tabId++ }
         for ($pi = 1; $pi -le [math]::Min($pcount, $pdfPages.Count); $pi++) {
-          foreach ($row in @($pdfPages[$pi - 1].rows | Where-Object { $_.clip -ge 0 })) {
+          foreach ($row in @($pdfPages[$pi - 1].rows | Where-Object { $_.clip -ge 0 -and -not $_.frame })) {
             $t = $row.text; $hit = $null; $off = 0
             $repeat = $false
             # Cell texts are not unique across tables (every table has an R1C1w1), so a drawn row is matched
@@ -395,6 +464,54 @@ function Ref-Layout($f) {
       }
     }
     $lines = @($lines | Sort-Object @{ Expression = { $_.page } }, @{ Expression = { Story-Rank $_ } }, @{ Expression = { $_.start } }, @{ Expression = { $_.top } })
+    $floatRows = New-Object System.Collections.Generic.List[object]
+    if ($emitFloats) {
+      $si = 0
+      foreach ($sh in $doc.Shapes) {
+        $si++
+        $fr = [ordered]@{ index = $si; name = [string]$sh.Name; kind = $(if ([int]$sh.Type -eq 13) { 'picture' } else { 'shape' }) }
+        $fr.wrap = [int]$sh.WrapFormat.Type
+        $fr.side = $null; try { $fr.side = [int]$sh.WrapFormat.Side } catch {}
+        $fr.hrel = [int]$sh.RelativeHorizontalPosition; $fr.vrel = [int]$sh.RelativeVerticalPosition
+        $fr.posX = [double]$sh.Left; $fr.posY = [double]$sh.Top
+        $fr.distT = [double]$sh.WrapFormat.DistanceTop; $fr.distB = [double]$sh.WrapFormat.DistanceBottom
+        $fr.distL = [double]$sh.WrapFormat.DistanceLeft; $fr.distR = [double]$sh.WrapFormat.DistanceRight
+        $fr.allowOverlap = $null; try { $fr.allowOverlap = ([int]$sh.WrapFormat.AllowOverlap -ne 0) } catch {}
+        $fr.layoutInCell = $null; try { $fr.layoutInCell = ([int]$sh.LayoutInCell -ne 0) } catch {}
+        $fr.w = [double]$sh.Width; $fr.h = [double]$sh.Height
+        $an = $sh.Anchor; $ac = $an.Duplicate; $ac.Collapse(1)
+        $fr.anchorStart = [int]$an.Start; $fr.anchorPage = [int]$ac.Information(3)
+        $fr.anchorX = [double]$ac.Information(5); $fr.anchorY = [double]$ac.Information(6)
+        # Final rectangle: the page's shape rectangle of the same size (first unused), refined by the PDF drawing of it.
+        $fr.page = $null; $fr.x = $null; $fr.y = $null; $fr.src = $null
+        $best = $null
+        foreach ($sr in $shapeRects) {
+          if ($sr.used -or [math]::Abs($sr.w - $fr.w) -gt 1.5 -or [math]::Abs($sr.h - $fr.h) -gt 1.5) { continue }
+          if ($null -eq $best -or ($sr.page -eq $fr.anchorPage -and $best.page -ne $fr.anchorPage)) { $best = $sr }
+        }
+        if ($best) {
+          $best.used = $true; $fr.page = $best.page; $fr.x = $best.x; $fr.y = $best.y; $fr.src = 'rect'
+          if ($pdfPages -and $best.page -le $pdfPages.Count) {
+            $pg = $pdfPages[$best.page - 1]
+            $cands = New-Object System.Collections.Generic.List[object]; foreach ($im in $pg.images) { $cands.Add($im) }; foreach ($fl in $pg.fills) { if ($fl.clip -lt 0) { $cands.Add($fl) } }
+            foreach ($cd in $cands) {
+              if ([math]::Abs($cd.x - $best.x) -le 1.5 -and [math]::Abs($cd.y - $best.y) -le 1.5 -and [math]::Abs($cd.w - $fr.w) -le 1.5 -and [math]::Abs($cd.h - $fr.h) -le 1.5) {
+                $fr.x = $cd.x; $fr.y = $cd.y; $fr.w = $cd.w; $fr.h = $cd.h; $fr.src = 'pdf'; break
+              }
+            }
+          }
+        }
+        $around = New-Object System.Collections.Generic.List[object]
+        if ($fr.page) {
+          foreach ($l in $lines) {
+            if ($l.page -ne $fr.page -or $l.Contains('story') -or $l.Contains('cell') -or $null -eq $l.baseline) { continue }
+            if ($l.baseline -ge $fr.y - 16 -and $l.baseline -le $fr.y + $fr.h + 16) { $around.Add($l) }
+          }
+        }
+        $fr.around = $around
+        $floatRows.Add($fr)
+      }
+    }
     $sb = New-Object Text.StringBuilder
     [void]$sb.Append("{`n")
     [void]$sb.Append('  "source": ' + (Jstr (Rel $f)) + ",`n")
@@ -406,7 +523,7 @@ function Ref-Layout($f) {
       [void]$sb.Append('  "cells": [' + "`n")
       for ($i = 0; $i -lt $cellRects.Count; $i++) {
         $c = $cellRects[$i]
-        $row = '    {"page": ' + $c.page + ', "x": ' + (Num $c.x) + ', "y": ' + (Num $c.y) + ', "w": ' + (Num $c.w) + ', "h": ' + (Num $c.h) + '}'
+        $row = '    {"page": ' + $c.page + ', "x": ' + (Num $c.x) + ', "y": ' + (Num $c.y) + ', "w": ' + (Num $c.w) + ', "h": ' + (Num $c.h) + $(if ($c.Contains('frame')) { ', "frame": ' + $c.frame } else { '' }) + '}'
         if ($i -lt $cellRects.Count - 1) { $row += ',' }
         [void]$sb.Append($row + "`n")
       }
@@ -432,12 +549,33 @@ function Ref-Layout($f) {
       }
       [void]$sb.Append("  ],`n")
     }
+    if ($floatRows.Count -gt 0) {
+      [void]$sb.Append('  "compat": ' + [int]$doc.CompatibilityMode + ",`n")
+      [void]$sb.Append('  "floats": [' + "`n")
+      for ($i = 0; $i -lt $floatRows.Count; $i++) {
+        $f = $floatRows[$i]
+        $b = { param($v) if ($null -eq $v) { 'null' } elseif ($v) { 'true' } else { 'false' } }
+        $ar = @($f.around | ForEach-Object { '{"start": ' + $_.start + ', "baseline": ' + (Num $_.baseline) + ', "left": ' + (Num $_.left) + ', "inkLeft": ' + (Num $_.inkLeft) + ', "lastX": ' + (Num $_.lastX) + '}' }) -join ', '
+        $row = '    {"index": ' + $f.index + ', "name": ' + (Jstr $f.name) + ', "kind": "' + $f.kind + '", "page": ' + $(if ($null -eq $f.page) { 'null' } else { $f.page }) +
+          ', "x": ' + (Num $f.x) + ', "y": ' + (Num $f.y) + ', "w": ' + (Num $f.w) + ', "h": ' + (Num $f.h) + ', "src": ' + $(if ($f.src) { '"' + $f.src + '"' } else { 'null' }) +
+          ', "wrap": ' + $f.wrap + ', "side": ' + $(if ($null -eq $f.side) { 'null' } else { $f.side }) + ', "hrel": ' + $f.hrel + ', "vrel": ' + $f.vrel +
+          ', "posX": ' + (Num $f.posX) + ', "posY": ' + (Num $f.posY) +
+          ', "distT": ' + (Num $f.distT) + ', "distB": ' + (Num $f.distB) + ', "distL": ' + (Num $f.distL) + ', "distR": ' + (Num $f.distR) +
+          ', "allowOverlap": ' + (& $b $f.allowOverlap) + ', "layoutInCell": ' + (& $b $f.layoutInCell) +
+          ', "anchorStart": ' + $f.anchorStart + ', "anchorPage": ' + $f.anchorPage + ', "anchorX": ' + (Num $f.anchorX) + ', "anchorY": ' + (Num $f.anchorY) +
+          ', "around": [' + $ar + ']}'
+        if ($i -lt $floatRows.Count - 1) { $row += ',' }
+        [void]$sb.Append($row + "`n")
+      }
+      [void]$sb.Append("  ],`n")
+    }
     [void]$sb.Append('  "lines": [' + "`n")
     for ($i = 0; $i -lt $lines.Count; $i++) {
       $l = $lines[$i]
       $row = '    {"page": ' + $l.page + ', "start": ' + $l.start + ', "end": ' + $l.end + ', "top": ' + (Num $l.top) + ', "left": ' + (Num $l.left) +
         ', "lastX": ' + (Num $l.lastX) + ', "baseline": ' + (Num $l.baseline) + ', "inkLeft": ' + (Num $l.inkLeft) + ', "text": ' + (Jstr $l.text)
       if ($l.Contains('story')) { $row += ', "story": ' + $l.story }
+      if ($l.Contains('frame')) { $row += ', "frame": ' + $l.frame }
       if ($l.Contains('cell')) { $row += ', "cell": true' + $(if ($l.repeat) { ', "repeat": true' } else { '' }) }
       $row += '}'
       if ($i -lt $lines.Count - 1) { $row += ',' }

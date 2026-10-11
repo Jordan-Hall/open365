@@ -15,6 +15,7 @@ mod writer;
 
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::fmt;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use open365_docx::Document;
 use open365_layout::{
@@ -63,6 +64,8 @@ pub enum PdfError {
     Font(String),
     /// The font's licence bits (OS/2 fsType) forbid embedding.
     FontEmbeddingForbidden(String),
+    /// The caller's cancellation flag was set; no output was produced.
+    Cancelled,
 }
 
 impl fmt::Display for PdfError {
@@ -74,6 +77,7 @@ impl fmt::Display for PdfError {
             Self::FontEmbeddingForbidden(n) => {
                 write!(f, "the licence of font {n} forbids embedding")
             }
+            Self::Cancelled => write!(f, "the export was cancelled"),
         }
     }
 }
@@ -147,6 +151,26 @@ pub fn export_pdf(
     fonts: &FontLibrary,
     meta: &PdfMetadata,
 ) -> Result<PdfOutput, PdfError> {
+    export_pdf_cancellable(doc, layout, fonts, meta, &AtomicBool::new(false))
+}
+
+/// As [`export_pdf`], but gives up with [`PdfError::Cancelled`] soon after `cancel` is set. The
+/// flag is looked at before each font is embedded and before each page is drawn.
+pub fn export_pdf_cancellable(
+    doc: &Document,
+    layout: &Layout,
+    fonts: &FontLibrary,
+    meta: &PdfMetadata,
+    cancel: &AtomicBool,
+) -> Result<PdfOutput, PdfError> {
+    let check = || {
+        if cancel.load(Ordering::Relaxed) {
+            Err(PdfError::Cancelled)
+        } else {
+            Ok(())
+        }
+    };
+    check()?;
     if layout.pages.is_empty() {
         return Err(PdfError::NoPages);
     }
@@ -167,6 +191,7 @@ pub fn export_pdf(
     let mut face_draw = BTreeMap::new();
     let mut font_objects = Vec::new();
     for (n, (index, gids)) in used.iter().enumerate() {
+        check()?;
         let face = fonts
             .try_face(open365_text::FaceId::from_index(*index))
             .ok_or(PdfError::MissingFace(*index))?;
@@ -211,6 +236,7 @@ pub fn export_pdf(
 
     let mut page_owners: Vec<Vec<u32>> = Vec::new();
     for (i, page) in layout.pages.iter().enumerate() {
+        check()?;
         let (content, owners) = ex.render_page(i, page);
         let content_id = ex.pdf.add_stream("", content.as_bytes(), true);
         let (w, h) = (page.section.page_width, page.section.page_height);
@@ -251,6 +277,7 @@ pub fn export_pdf(
         ),
     );
 
+    check()?;
     let struct_root = ex.write_structure(&page_owners);
     let info = write_info(&mut ex.pdf, meta);
     let xmp = write_xmp(&mut ex.pdf, meta);
@@ -413,6 +440,7 @@ impl Export<'_> {
             .header
             .iter()
             .chain(&page.lines)
+            .chain(page.frames.iter().flat_map(|f| f.lines.iter()))
             .chain(&page.notes)
             .chain(&page.footer)
         {

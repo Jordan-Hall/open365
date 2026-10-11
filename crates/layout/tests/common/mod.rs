@@ -20,6 +20,8 @@ const CELL_TOLERANCE_X: f64 = 0.05;
 /// Horizontal PDF scale of cell edges: Word's 600 dpi device pixel is 0.120048 pt in the PDF
 /// (edges at 600 px = 72.024, 4500 px = 540.21), 1.0004 times the nominal 0.12 pt.
 const PDF_SCALE_X: f64 = 1.0004;
+/// Text box clip rectangles: the same grid as cells, a little looser while the rule is young.
+const FRAME_TOLERANCE: f64 = 0.6;
 const CELL_TOLERANCE_Y: f64 = 0.05;
 /// Pictures: Word places them on its device grid and the PDF rounds the numbers; a picture must
 /// land within this of Word's, edge by edge.
@@ -35,6 +37,8 @@ pub fn root() -> PathBuf {
 pub struct RefLine {
     /// Word's `WdStoryType` of the line's story (1, the main story, unless the oracle says).
     story: u8,
+    /// The text box the line is in (`frame` in the reference), 0 for other stories.
+    frame: u64,
     page: u64,
     start: u64,
     end: u64,
@@ -54,6 +58,8 @@ pub struct RefCell {
     y: f64,
     w: f64,
     h: f64,
+    /// The text box whose text this clip rectangle bounds.
+    frame: Option<u64>,
 }
 
 pub fn load_cells(path: &Path) -> Vec<RefCell> {
@@ -79,6 +85,7 @@ pub fn load_rects(path: &Path, key: &str) -> Vec<RefCell> {
                     y: c["y"].as_f64().expect("cell y"),
                     w: c["w"].as_f64().expect("cell w"),
                     h: c["h"].as_f64().expect("cell h"),
+                    frame: c["frame"].as_u64(),
                 })
                 .collect()
         })
@@ -94,6 +101,7 @@ pub fn load_reference(path: &Path) -> Vec<RefLine> {
         .iter()
         .map(|l| RefLine {
             story: l["story"].as_u64().map_or(1, |v| v as u8),
+            frame: l["frame"].as_u64().unwrap_or(0),
             page: l["page"].as_u64().expect("page"),
             start: l["start"].as_u64().expect("start"),
             end: l["end"].as_u64().expect("end"),
@@ -166,10 +174,11 @@ pub fn score_doc(
 
     // Lines by first-character offset; a repeated table header row shares its offset with the
     // original, so there can be several per key.
-    let mut engine: BTreeMap<(u8, usize), Vec<(usize, &open365_layout::Line)>> = BTreeMap::new();
+    type Key = (u8, usize, usize);
+    let mut engine: BTreeMap<Key, Vec<(usize, &open365_layout::Line)>> = BTreeMap::new();
     for (p, l) in layout.all_lines() {
         engine
-            .entry((l.story.word_code(), l.start))
+            .entry((l.story.word_code(), l.frame.unwrap_or(0), l.start))
             .or_default()
             .push((p, l));
     }
@@ -179,11 +188,13 @@ pub fn score_doc(
     };
     let mut report = String::new();
     for r in &reference {
-        let found = engine.get(&(r.story, r.start as usize)).and_then(|c| {
-            c.iter()
-                .find(|(p, _)| *p as u64 == r.page)
-                .or_else(|| c.first())
-        });
+        let found = engine
+            .get(&(r.story, r.frame as usize, r.start as usize))
+            .and_then(|c| {
+                c.iter()
+                    .find(|(p, _)| *p as u64 == r.page)
+                    .or_else(|| c.first())
+            });
         let mut ok = false;
         if let Some((page, l)) = found {
             let page_ok = *page as u64 == r.page;
@@ -243,6 +254,35 @@ pub fn score_doc(
     // Table cell rectangles: each reference rectangle needs an unused engine rectangle that agrees.
     let mut used: Vec<(usize, usize)> = Vec::new();
     for c in &ref_cells {
+        if let Some(f) = c.frame {
+            let ok = layout
+                .pages
+                .iter()
+                .filter(|p| p.number as u64 == c.page)
+                .flat_map(|p| p.frames.iter())
+                .any(|b| {
+                    b.id as u64 == f
+                        && (b.x - c.x / PDF_SCALE_X).abs() <= FRAME_TOLERANCE
+                        && (b.y - c.y / PDF_SCALE).abs() <= FRAME_TOLERANCE
+                        && (b.width - c.w / PDF_SCALE_X).abs() <= FRAME_TOLERANCE
+                        && (b.height - c.h / PDF_SCALE).abs() <= FRAME_TOLERANCE
+                });
+            s.matched += usize::from(ok);
+            if detail {
+                let _ = writeln!(
+                    report,
+                    "{} frame {} p{} x {:>7.2} y {:>7.2} w {:>7.2} h {:>7.2}",
+                    if ok { "ok  " } else { "FAIL" },
+                    f,
+                    c.page,
+                    c.x,
+                    c.y,
+                    c.w,
+                    c.h
+                );
+            }
+            continue;
+        }
         let hit = layout
             .pages
             .iter()

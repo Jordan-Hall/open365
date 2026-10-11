@@ -94,6 +94,7 @@ pub(crate) fn place(
     frame: &Frame,
     para_top: f64,
     paragraph: usize,
+    text_box: Option<crate::textbox::BoxRef>,
 ) -> Anchored {
     let s = &frame.section;
     let (w, h) = d.size_pt();
@@ -140,6 +141,7 @@ pub(crate) fn place(
             anchored: true,
             behind_text: d.behind_text,
             source: crate::ImageSource::Main,
+            text_box,
         },
     }
 }
@@ -166,7 +168,7 @@ pub(crate) fn dynamic_lines(
         .objects
         .iter()
         .filter(|o| !o.inline() && o.atom >= from_atom)
-        .map(|o| place(&o.drawing, o.atom, frame, y0, paragraph))
+        .map(|o| place(&o.drawing, o.atom, frame, y0, paragraph, o.text_box.clone()))
         .collect();
     let mut all: Vec<Float> = floats.to_vec();
     all.extend(anchors.iter().filter_map(|a| a.float));

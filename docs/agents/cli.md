@@ -56,3 +56,15 @@ Evaluates the formula as if entered in the cell, against the workbook as stored,
 ```
 
 `result.type` is `number`, `text`, `bool`, `error` (value like `#DIV/0!`), `empty` or `array` (rows of results, at most 100 x 100). An error value is a result with exit code 0; a formula that does not parse is an error with exit code 1. Formulas are limited to 8192 characters. Unlike the MCP tool, the CLI sees hidden sheets, rows and columns: the user running it owns the file.
+
+## Cancellation and deadlines
+
+The MCP server (`open365 mcp --timeout-secs <n>`, default 30) gives each `layout_summary`, `export_pdf` and `evaluate_formula` call a deadline. When it passes, the call returns `status: "timeout"` and the work is cancelled, not abandoned:
+
+- Each request has one cancellation token, an atomic flag. The deadline sets it.
+- Layout checks the token once per block laid out and once per item placed on a page. PDF export checks it before each font, each page and the structure tree. Recalculation checks it before each cell. A cancelled run stops at the next check and returns nothing.
+- `export_pdf` writes the file last. With `overwrite` false the file is created with `create_new`; if the token is set after that, the export removes the file it created and returns the timeout. It never removes a file it did not create. With `overwrite` true the token is checked before the replacing write.
+- `evaluate_formula` keeps its engine. A cancelled job puts the scratch formula back and leaves the cells it did not reach marked for recalculation, so the next call reuses the engine. A cancelled first build is discarded and the next call builds again.
+- The CLI commands above (`docx export-pdf`, `docx layout`, `xlsx eval`) run to completion; they have no deadline. A script that needs one wraps the process in its own timeout.
+
+For library callers the entry points are `layout_document_cancellable`, `export_pdf_cancellable`, `Engine::set_cancel`, `FormulaEngine::evaluate_cancellable` and `PdfOptions::cancel`. The old functions are unchanged wrappers. Tests: `crates/mcp/tests/cancel.rs`.

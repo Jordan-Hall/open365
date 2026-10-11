@@ -1729,11 +1729,15 @@ impl DocView {
         let atlas = &mut self.atlas;
         let mut batch = GlyphBatch::default();
         let mut decorations: Vec<(Pos2, Pos2, Color32, f32)> = Vec::new();
-        for (lines, dim) in [
-            (&p.header, FURNITURE_DIM),
-            (&p.notes, 1.0),
-            (&p.footer, FURNITURE_DIM),
-        ] {
+        type Lines<'a> = Box<dyn Iterator<Item = &'a open365_layout::Line> + 'a>;
+        let stories: [(Lines<'_>, f32); 4] = [
+            (Box::new(p.header.iter()), FURNITURE_DIM),
+            // Text boxes are drawn in full, like the body, but are not part of the caret model.
+            (Box::new(p.frames.iter().flat_map(|f| f.lines.iter())), 1.0),
+            (Box::new(p.notes.iter()), 1.0),
+            (Box::new(p.footer.iter()), FURNITURE_DIM),
+        ];
+        for (lines, dim) in stories {
             for line in lines {
                 let top = origin.y + line.top as f32 * s;
                 if top > clip.max.y || top + line.height as f32 * s < clip.min.y {

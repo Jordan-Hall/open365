@@ -1,0 +1,5 @@
+feature = "grid-databar"
+made_with = "Microsoft Excel 20430 (Windows)"
+author = "project member"
+expect_dropped = []
+notes = "one data bar rule per column over eight numbers: all-positive, mixed-sign and all-negative ranges, the three axis positions, a distinct negative colour, right-to-left bars, solid bars, fixed and automatic minimum and maximum"

@@ -1,4 +1,5 @@
 /target
+/target-*/
 **/*.rs.bk
 /fixtures/external/*
 !/fixtures/external/ms-templates.toml

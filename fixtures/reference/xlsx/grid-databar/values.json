@@ -1,0 +1,778 @@
+{
+  "source": "fixtures/xlsx/grid-databar.xlsx",
+  "sheets": [
+    {
+      "name": "Sheet1",
+      "visible": -1,
+      "usedRange": "A1:G31",
+      "truncatedAt2000": false,
+      "cells": {
+        "A1": {
+          "value2": "positive automatic",
+          "text": "positive automatic",
+          "formula": null
+        },
+        "B1": {
+          "value2": "mixed automatic",
+          "text": "mixed automatic",
+          "formula": null
+        },
+        "C1": {
+          "value2": "mostly negative automatic",
+          "text": "mostly negative automatic",
+          "formula": null
+        },
+        "D1": {
+          "value2": "all negative automatic",
+          "text": "all negative automatic",
+          "formula": null
+        },
+        "E1": {
+          "value2": "mixed midpoint",
+          "text": "mixed midpoint",
+          "formula": null
+        },
+        "F1": {
+          "value2": "mixed no axis",
+          "text": "mixed no axis",
+          "formula": null
+        },
+        "G1": {
+          "value2": "mixed red negative",
+          "text": "mixed red negative",
+          "formula": null
+        },
+        "A2": {
+          "value2": 10.0,
+          "text": "10",
+          "formula": null
+        },
+        "B2": {
+          "value2": -50.0,
+          "text": "-50",
+          "formula": null
+        },
+        "C2": {
+          "value2": -100.0,
+          "text": "-100",
+          "formula": null
+        },
+        "D2": {
+          "value2": -10.0,
+          "text": "-10",
+          "formula": null
+        },
+        "E2": {
+          "value2": -50.0,
+          "text": "-50",
+          "formula": null
+        },
+        "F2": {
+          "value2": -50.0,
+          "text": "-50",
+          "formula": null
+        },
+        "G2": {
+          "value2": -50.0,
+          "text": "-50",
+          "formula": null
+        },
+        "A3": {
+          "value2": 20.0,
+          "text": "20",
+          "formula": null
+        },
+        "B3": {
+          "value2": -25.0,
+          "text": "-25",
+          "formula": null
+        },
+        "C3": {
+          "value2": -80.0,
+          "text": "-80",
+          "formula": null
+        },
+        "D3": {
+          "value2": -20.0,
+          "text": "-20",
+          "formula": null
+        },
+        "E3": {
+          "value2": -25.0,
+          "text": "-25",
+          "formula": null
+        },
+        "F3": {
+          "value2": -25.0,
+          "text": "-25",
+          "formula": null
+        },
+        "G3": {
+          "value2": -25.0,
+          "text": "-25",
+          "formula": null
+        },
+        "A4": {
+          "value2": 30.0,
+          "text": "30",
+          "formula": null
+        },
+        "B4": {
+          "value2": 0.0,
+          "text": "0",
+          "formula": null
+        },
+        "C4": {
+          "value2": -40.0,
+          "text": "-40",
+          "formula": null
+        },
+        "D4": {
+          "value2": -30.0,
+          "text": "-30",
+          "formula": null
+        },
+        "E4": {
+          "value2": 0.0,
+          "text": "0",
+          "formula": null
+        },
+        "F4": {
+          "value2": 0.0,
+          "text": "0",
+          "formula": null
+        },
+        "G4": {
+          "value2": 0.0,
+          "text": "0",
+          "formula": null
+        },
+        "A5": {
+          "value2": 40.0,
+          "text": "40",
+          "formula": null
+        },
+        "B5": {
+          "value2": 25.0,
+          "text": "25",
+          "formula": null
+        },
+        "C5": {
+          "value2": -10.0,
+          "text": "-10",
+          "formula": null
+        },
+        "D5": {
+          "value2": -40.0,
+          "text": "-40",
+          "formula": null
+        },
+        "E5": {
+          "value2": 25.0,
+          "text": "25",
+          "formula": null
+        },
+        "F5": {
+          "value2": 25.0,
+          "text": "25",
+          "formula": null
+        },
+        "G5": {
+          "value2": 25.0,
+          "text": "25",
+          "formula": null
+        },
+        "A6": {
+          "value2": 50.0,
+          "text": "50",
+          "formula": null
+        },
+        "B6": {
+          "value2": 50.0,
+          "text": "50",
+          "formula": null
+        },
+        "C6": {
+          "value2": 5.0,
+          "text": "5",
+          "formula": null
+        },
+        "D6": {
+          "value2": -50.0,
+          "text": "-50",
+          "formula": null
+        },
+        "E6": {
+          "value2": 50.0,
+          "text": "50",
+          "formula": null
+        },
+        "F6": {
+          "value2": 50.0,
+          "text": "50",
+          "formula": null
+        },
+        "G6": {
+          "value2": 50.0,
+          "text": "50",
+          "formula": null
+        },
+        "A7": {
+          "value2": 60.0,
+          "text": "60",
+          "formula": null
+        },
+        "B7": {
+          "value2": 75.0,
+          "text": "75",
+          "formula": null
+        },
+        "C7": {
+          "value2": 20.0,
+          "text": "20",
+          "formula": null
+        },
+        "D7": {
+          "value2": -60.0,
+          "text": "-60",
+          "formula": null
+        },
+        "E7": {
+          "value2": 75.0,
+          "text": "75",
+          "formula": null
+        },
+        "F7": {
+          "value2": 75.0,
+          "text": "75",
+          "formula": null
+        },
+        "G7": {
+          "value2": 75.0,
+          "text": "75",
+          "formula": null
+        },
+        "A8": {
+          "value2": 70.0,
+          "text": "70",
+          "formula": null
+        },
+        "B8": {
+          "value2": 100.0,
+          "text": "100",
+          "formula": null
+        },
+        "C8": {
+          "value2": -60.0,
+          "text": "-60",
+          "formula": null
+        },
+        "D8": {
+          "value2": -70.0,
+          "text": "-70",
+          "formula": null
+        },
+        "E8": {
+          "value2": 100.0,
+          "text": "100",
+          "formula": null
+        },
+        "F8": {
+          "value2": 100.0,
+          "text": "100",
+          "formula": null
+        },
+        "G8": {
+          "value2": 100.0,
+          "text": "100",
+          "formula": null
+        },
+        "A9": {
+          "value2": 80.0,
+          "text": "80",
+          "formula": null
+        },
+        "B9": {
+          "value2": 10.0,
+          "text": "10",
+          "formula": null
+        },
+        "C9": {
+          "value2": 0.0,
+          "text": "0",
+          "formula": null
+        },
+        "D9": {
+          "value2": -80.0,
+          "text": "-80",
+          "formula": null
+        },
+        "E9": {
+          "value2": 10.0,
+          "text": "10",
+          "formula": null
+        },
+        "F9": {
+          "value2": 10.0,
+          "text": "10",
+          "formula": null
+        },
+        "G9": {
+          "value2": 10.0,
+          "text": "10",
+          "formula": null
+        },
+        "A12": {
+          "value2": "mixed right to left",
+          "text": "mixed right to left",
+          "formula": null
+        },
+        "B12": {
+          "value2": "mixed solid",
+          "text": "mixed solid",
+          "formula": null
+        },
+        "C12": {
+          "value2": "mixed fixed -50 to 50",
+          "text": "mixed fixed -50 to 50",
+          "formula": null
+        },
+        "D12": {
+          "value2": "positive fixed 20 to 60",
+          "text": "positive fixed 20 to 60",
+          "formula": null
+        },
+        "E12": {
+          "value2": "tiny negative",
+          "text": "tiny negative",
+          "formula": null
+        },
+        "F12": {
+          "value2": "positive automatic min",
+          "text": "positive automatic min",
+          "formula": null
+        },
+        "G12": {
+          "value2": "mixed automatic min",
+          "text": "mixed automatic min",
+          "formula": null
+        },
+        "A13": {
+          "value2": -50.0,
+          "text": "-50",
+          "formula": null
+        },
+        "B13": {
+          "value2": -50.0,
+          "text": "-50",
+          "formula": null
+        },
+        "C13": {
+          "value2": -80.0,
+          "text": "-80",
+          "formula": null
+        },
+        "D13": {
+          "value2": 10.0,
+          "text": "10",
+          "formula": null
+        },
+        "E13": {
+          "value2": -1.0,
+          "text": "-1",
+          "formula": null
+        },
+        "F13": {
+          "value2": 10.0,
+          "text": "10",
+          "formula": null
+        },
+        "G13": {
+          "value2": -50.0,
+          "text": "-50",
+          "formula": null
+        },
+        "A14": {
+          "value2": -25.0,
+          "text": "-25",
+          "formula": null
+        },
+        "B14": {
+          "value2": -25.0,
+          "text": "-25",
+          "formula": null
+        },
+        "C14": {
+          "value2": -50.0,
+          "text": "-50",
+          "formula": null
+        },
+        "D14": {
+          "value2": 20.0,
+          "text": "20",
+          "formula": null
+        },
+        "E14": {
+          "value2": 100.0,
+          "text": "100",
+          "formula": null
+        },
+        "F14": {
+          "value2": 20.0,
+          "text": "20",
+          "formula": null
+        },
+        "G14": {
+          "value2": -25.0,
+          "text": "-25",
+          "formula": null
+        },
+        "A15": {
+          "value2": 0.0,
+          "text": "0",
+          "formula": null
+        },
+        "B15": {
+          "value2": 0.0,
+          "text": "0",
+          "formula": null
+        },
+        "C15": {
+          "value2": -25.0,
+          "text": "-25",
+          "formula": null
+        },
+        "D15": {
+          "value2": 30.0,
+          "text": "30",
+          "formula": null
+        },
+        "E15": {
+          "value2": 50.0,
+          "text": "50",
+          "formula": null
+        },
+        "F15": {
+          "value2": 30.0,
+          "text": "30",
+          "formula": null
+        },
+        "G15": {
+          "value2": 0.0,
+          "text": "0",
+          "formula": null
+        },
+        "A16": {
+          "value2": 25.0,
+          "text": "25",
+          "formula": null
+        },
+        "B16": {
+          "value2": 25.0,
+          "text": "25",
+          "formula": null
+        },
+        "C16": {
+          "value2": 0.0,
+          "text": "0",
+          "formula": null
+        },
+        "D16": {
+          "value2": 40.0,
+          "text": "40",
+          "formula": null
+        },
+        "E16": {
+          "value2": 25.0,
+          "text": "25",
+          "formula": null
+        },
+        "F16": {
+          "value2": 40.0,
+          "text": "40",
+          "formula": null
+        },
+        "G16": {
+          "value2": 25.0,
+          "text": "25",
+          "formula": null
+        },
+        "A17": {
+          "value2": 50.0,
+          "text": "50",
+          "formula": null
+        },
+        "B17": {
+          "value2": 50.0,
+          "text": "50",
+          "formula": null
+        },
+        "C17": {
+          "value2": 25.0,
+          "text": "25",
+          "formula": null
+        },
+        "D17": {
+          "value2": 50.0,
+          "text": "50",
+          "formula": null
+        },
+        "E17": {
+          "value2": 0.0,
+          "text": "0",
+          "formula": null
+        },
+        "F17": {
+          "value2": 50.0,
+          "text": "50",
+          "formula": null
+        },
+        "G17": {
+          "value2": 50.0,
+          "text": "50",
+          "formula": null
+        },
+        "A18": {
+          "value2": 75.0,
+          "text": "75",
+          "formula": null
+        },
+        "B18": {
+          "value2": 75.0,
+          "text": "75",
+          "formula": null
+        },
+        "C18": {
+          "value2": 50.0,
+          "text": "50",
+          "formula": null
+        },
+        "D18": {
+          "value2": 60.0,
+          "text": "60",
+          "formula": null
+        },
+        "E18": {
+          "value2": 75.0,
+          "text": "75",
+          "formula": null
+        },
+        "F18": {
+          "value2": 60.0,
+          "text": "60",
+          "formula": null
+        },
+        "G18": {
+          "value2": 75.0,
+          "text": "75",
+          "formula": null
+        },
+        "A19": {
+          "value2": 100.0,
+          "text": "100",
+          "formula": null
+        },
+        "B19": {
+          "value2": 100.0,
+          "text": "100",
+          "formula": null
+        },
+        "C19": {
+          "value2": 80.0,
+          "text": "80",
+          "formula": null
+        },
+        "D19": {
+          "value2": 70.0,
+          "text": "70",
+          "formula": null
+        },
+        "E19": {
+          "value2": 10.0,
+          "text": "10",
+          "formula": null
+        },
+        "F19": {
+          "value2": 70.0,
+          "text": "70",
+          "formula": null
+        },
+        "G19": {
+          "value2": 100.0,
+          "text": "100",
+          "formula": null
+        },
+        "A20": {
+          "value2": 10.0,
+          "text": "10",
+          "formula": null
+        },
+        "B20": {
+          "value2": 10.0,
+          "text": "10",
+          "formula": null
+        },
+        "C20": {
+          "value2": 10.0,
+          "text": "10",
+          "formula": null
+        },
+        "D20": {
+          "value2": 80.0,
+          "text": "80",
+          "formula": null
+        },
+        "E20": {
+          "value2": 90.0,
+          "text": "90",
+          "formula": null
+        },
+        "F20": {
+          "value2": 80.0,
+          "text": "80",
+          "formula": null
+        },
+        "G20": {
+          "value2": 10.0,
+          "text": "10",
+          "formula": null
+        },
+        "A23": {
+          "value2": "all negative automatic min",
+          "text": "all negative automatic min",
+          "formula": null
+        },
+        "B23": {
+          "value2": "positive midpoint",
+          "text": "positive midpoint",
+          "formula": null
+        },
+        "C23": {
+          "value2": "all negative midpoint",
+          "text": "all negative midpoint",
+          "formula": null
+        },
+        "A24": {
+          "value2": -10.0,
+          "text": "-10",
+          "formula": null
+        },
+        "B24": {
+          "value2": 10.0,
+          "text": "10",
+          "formula": null
+        },
+        "C24": {
+          "value2": -10.0,
+          "text": "-10",
+          "formula": null
+        },
+        "A25": {
+          "value2": -20.0,
+          "text": "-20",
+          "formula": null
+        },
+        "B25": {
+          "value2": 20.0,
+          "text": "20",
+          "formula": null
+        },
+        "C25": {
+          "value2": -20.0,
+          "text": "-20",
+          "formula": null
+        },
+        "A26": {
+          "value2": -30.0,
+          "text": "-30",
+          "formula": null
+        },
+        "B26": {
+          "value2": 30.0,
+          "text": "30",
+          "formula": null
+        },
+        "C26": {
+          "value2": -30.0,
+          "text": "-30",
+          "formula": null
+        },
+        "A27": {
+          "value2": -40.0,
+          "text": "-40",
+          "formula": null
+        },
+        "B27": {
+          "value2": 40.0,
+          "text": "40",
+          "formula": null
+        },
+        "C27": {
+          "value2": -40.0,
+          "text": "-40",
+          "formula": null
+        },
+        "A28": {
+          "value2": -50.0,
+          "text": "-50",
+          "formula": null
+        },
+        "B28": {
+          "value2": 50.0,
+          "text": "50",
+          "formula": null
+        },
+        "C28": {
+          "value2": -50.0,
+          "text": "-50",
+          "formula": null
+        },
+        "A29": {
+          "value2": -60.0,
+          "text": "-60",
+          "formula": null
+        },
+        "B29": {
+          "value2": 60.0,
+          "text": "60",
+          "formula": null
+        },
+        "C29": {
+          "value2": -60.0,
+          "text": "-60",
+          "formula": null
+        },
+        "A30": {
+          "value2": -70.0,
+          "text": "-70",
+          "formula": null
+        },
+        "B30": {
+          "value2": 70.0,
+          "text": "70",
+          "formula": null
+        },
+        "C30": {
+          "value2": -70.0,
+          "text": "-70",
+          "formula": null
+        },
+        "A31": {
+          "value2": -80.0,
+          "text": "-80",
+          "formula": null
+        },
+        "B31": {
+          "value2": 80.0,
+          "text": "80",
+          "formula": null
+        },
+        "C31": {
+          "value2": -80.0,
+          "text": "-80",
+          "formula": null
+        }
+      }
+    }
+  ]
+}

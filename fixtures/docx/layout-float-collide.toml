@@ -1,0 +1,5 @@
+feature = "layout-float"
+made_with = "Microsoft Word 16.0.20430 (Windows)"
+author = "project member"
+expect_dropped = []
+notes = "two square-wrapped floats whose positions collide: allowOverlap off (pair 1, pair 2) and on (pair 3)"

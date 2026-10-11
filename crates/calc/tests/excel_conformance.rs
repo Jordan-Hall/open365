@@ -14,7 +14,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use open365_calc::numfmt::{format_value_in, validate_format};
-use open365_calc::{Engine, ErrorKind, FormatLocale, Value};
+use open365_calc::{CellStyle, Engine, ErrorKind, FormatLocale, HAlign, Value};
 use open365_locale::Locale;
 use serde::Deserialize;
 
@@ -39,6 +39,45 @@ struct Case {
     /// `"en-GB"`: the case depends on the oracle's system locale and Open365 evaluates it in that locale.
     /// Without it the case must give the same answer in every locale.
     locale: Option<String>,
+    /// Cell styles on Sheet1 for `CELL`: number format, alignment, locked flag and column width.
+    #[serde(default)]
+    styles: BTreeMap<String, StyleSpec>,
+}
+
+#[derive(Debug, Deserialize)]
+struct StyleSpec {
+    nf: Option<String>,
+    ha: Option<String>,
+    locked: Option<bool>,
+    width: Option<f64>,
+}
+
+fn apply_styles(engine: &mut Engine, styles: &BTreeMap<String, StyleSpec>) {
+    // The oracle sets every column to 60 characters.
+    engine.set_standard_column_width("Sheet1", 60.0);
+    engine.set_standard_column_width("Sheet2", 60.0);
+    for (addr, spec) in styles {
+        let (row, col) = parse_addr(addr);
+        let halign = match spec.ha.as_deref() {
+            Some("left") => HAlign::Left,
+            Some("right") => HAlign::Right,
+            Some("center") => HAlign::Center,
+            Some("fill") => HAlign::Fill,
+            Some("justify") => HAlign::Justify,
+            Some("across") => HAlign::CenterAcrossSelection,
+            Some("distributed") => HAlign::Distributed,
+            _ => HAlign::General,
+        };
+        let style = CellStyle {
+            number_format: spec.nf.clone(),
+            halign,
+            locked: spec.locked.unwrap_or(true),
+        };
+        engine.set_cell_style("Sheet1", row, col, style);
+        if let Some(width) = spec.width {
+            engine.set_column_width("Sheet1", col, width);
+        }
+    }
 }
 
 /// The locale a case is evaluated in (en-US unless the case names one); built once per tag.
@@ -143,6 +182,7 @@ fn run_case(case: &Case) -> Outcome {
     engine.set_format_locale(case_locale(case));
     engine.add_sheet("Sheet1");
     engine.add_sheet("Sheet2");
+    apply_styles(&mut engine, &case.styles);
     load_cells(&mut engine, "Sheet1", &case.cells);
     load_cells(&mut engine, "Sheet2", &case.sheet2);
     let (row, col) = parse_addr(case.at.as_deref().unwrap_or("J20"));

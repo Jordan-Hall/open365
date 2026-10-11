@@ -63,14 +63,21 @@ Inline and floating placements match `layout-img-inline`, `layout-img-none`, `la
 
 | Rule | Evidence |
 |---|---|
-| A content control, inline or block, lays out like plain content: its `w:sdtContent` is part of the line, a placeholder (`showingPlcHdr`) is ordinary text in the control. The typed model keeps the control as raw XML, so layout reads it through `Inline::sdt_content` and `Block::sdt_content`; `flatten_content_controls` unwraps block-level controls (also in cells and rows). | `layout-sdt` (19 of 19) |
+| A content control, inline or block, lays out like plain content: its `w:sdtContent` is part of the line, a placeholder (`showingPlcHdr`) is ordinary text in the control. The typed model has `Block::Sdt` (block-level controls) and an `sdt`/`sdtContent` `Group` (inline ones), both round-tripping `w:sdtPr` raw, so `Body::paragraphs`, `Document::paragraph` and `Paragraph::text` cover control content and `Line::paragraph` is a `Document::paragraph` index; `flatten_content_controls` unwraps controls for layout (only paragraphs of row-level controls stay unaddressable). | `layout-sdt` (19 of 19) |
 | The start and the end of each control count as one story character each (`Range.Start`, line ranges, the next paragraph's start): `Alpha beta ...` with one inline control is 36 + 2 characters; a block control around one paragraph adds 2; nested and adjacent controls add 2 each. A line that begins at the paragraph start of a control begins on the start character. | `layout-sdt` |
 | In table cells the oracle reads text from the PDF and used `paragraph start + text index` for a line, which ignores the control characters; the oracle now adds them (`marks` in `Walk-Table`). | `layout-sdt`, corpus |
 
-Text boxes (measured with COM, not implemented): a text box is a `wdTextRectangle` of `StoryType` 5 whose offsets start at 0
-in its own story (one story per box, listed by `StoryRanges(5)` in anchor order); Word clips the box text in its PDF, so the oracle reports
-the frame as a cell rectangle and the lines carry no baseline (`layout-txbx-basic`, `layout-txbx-wrap`: lines `top` and `left` only).
-Inset defaults, anchors, autofit and wrap-none are in those references; the engine does not draw the boxes yet.
+## Text boxes (`wps:txbx`; `crates/layout/src/textbox.rs`, `Page::frames`)
+
+| Rule | Evidence |
+|---|---|
+| A text box is Word story 5, one per box, offsets from 0; `StoryRanges(5)` lists them in anchor order (document order of the anchoring paragraphs). The oracle gives each box line a `frame` (index in that list) and pairs the PDF rows of the box's clip rectangle with the box's lines in order (a glyph the ToUnicode map lacks decodes as a space, so a row may lack its first or last character). `FrameBox::id` is the same index. | `layout-txbx-basic` (22 of 22) |
+| The anchor counts as one character of the body paragraph (`Body paragraph one` is 38 + 6 characters for six boxes). | `layout-txbx-basic` |
+| The `w:txbxContent` is laid out as its own story at shape width less `lIns` and `rIns` (defaults 7.2 pt; 3.6 pt for `tIns`/`bIns`); the content area starts `lIns`, `tIns` inside the shape. `anchor` `t`/`ctr`/`b` places the stack at the top, centred, or at the bottom of the shape less `tIns` and `bIns`. | `layout-txbx-basic` |
+| `wrap="none"`: lines never wrap; the clip rectangle is `lIns + widest line + rIns` wide. | `layout-txbx-basic` (Zeta) |
+| The clip rectangle Word draws is the shape inset by half the outline width (`a:ln/@w`) all round and by `tIns`/`bIns` vertically; `spAutoFit` does not resize the shape on open (Epsilon keeps its 30 pt clip while its third line falls outside). | `layout-txbx-basic` clip rectangles |
+
+Not matched: body text wrapping around square-wrapped boxes (`layout-txbx-wrap`, 21 of 66: the lines beside a box are placed below it, and the baselines of that page are unpaired in the reference); the box text is not clipped in the PDF or the desktop view.
 
 ## Not matched yet
 

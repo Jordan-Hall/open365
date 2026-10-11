@@ -9,6 +9,7 @@
 //! from a table measured in Excel's default font ([`glyph_units`]), so those parts match the oracle but are an
 //! emulation of what a real column would show.
 
+mod cellcode;
 mod date;
 mod decimal;
 mod layout;
@@ -20,6 +21,7 @@ use crate::fmtlocale::FormatLocale;
 use crate::value::Value;
 use parse::{Kind, NumberFormat, Section};
 
+pub use cellcode::cell_format_code;
 pub use parse::NumberFormat as ParsedFormat;
 
 /// Width of the reference column in digit widths (the oracle sets `ColumnWidth = 60`).

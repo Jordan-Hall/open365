@@ -48,6 +48,86 @@ total = 39
 matched = 13
 total = 27
 
+[fixtures.layout-float-align]
+matched = 44
+total = 44
+
+[fixtures.layout-float-anchor-bottom]
+matched = 41
+total = 67
+
+[fixtures.layout-float-anchor-nextpage]
+matched = 41
+total = 69
+
+[fixtures.layout-float-collide]
+matched = 13
+total = 68
+
+[fixtures.layout-float-collide-compat14]
+matched = 14
+total = 53
+
+[fixtures.layout-float-collide-tb]
+matched = 31
+total = 38
+
+[fixtures.layout-float-dist]
+matched = 1
+total = 78
+
+[fixtures.layout-float-dist-mixed]
+matched = 1
+total = 75
+
+[fixtures.layout-float-incell]
+matched = 9
+total = 38
+
+[fixtures.layout-float-incell-compat14]
+matched = 5
+total = 37
+
+[fixtures.layout-float-pagebreak-anchor]
+matched = 26
+total = 26
+
+[fixtures.layout-float-poscol]
+matched = 2
+total = 236
+
+[fixtures.layout-float-posh]
+matched = 41
+total = 41
+
+[fixtures.layout-float-posv]
+matched = 50
+total = 50
+
+[fixtures.layout-float-posv-line]
+matched = 4
+total = 24
+
+[fixtures.layout-float-wrap-behind-front]
+matched = 25
+total = 25
+
+[fixtures.layout-float-wrap-sides]
+matched = 46
+total = 46
+
+[fixtures.layout-float-wrap-square]
+matched = 28
+total = 43
+
+[fixtures.layout-float-wrap-tight]
+matched = 25
+total = 68
+
+[fixtures.layout-float-wrap-topbottom]
+matched = 21
+total = 36
+
 [fixtures.layout-fn-basic]
 matched = 97
 total = 101
@@ -197,11 +277,11 @@ matched = 9
 total = 18
 
 [fixtures.layout-txbx-basic]
-matched = 1
+matched = 22
 total = 22
 
 [fixtures.layout-txbx-wrap]
-matched = 1
+matched = 21
 total = 66
 
 [fixtures.layout-wrap]

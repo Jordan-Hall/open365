@@ -26,6 +26,7 @@
 //! [`ParaRole`].
 
 mod build;
+mod cancel;
 mod float;
 mod flow;
 mod furniture;
@@ -36,6 +37,7 @@ mod para;
 mod props;
 mod rules;
 mod table;
+mod textbox;
 
 use std::ops::Range;
 use std::sync::Arc;
@@ -144,6 +146,8 @@ pub enum StoryKind {
     FirstFooter,
     FootnoteSeparator,
     EndnoteSeparator,
+    /// A text box (`wdTextFrameStory`): one story per box, offsets from 0; see [`Line::frame`].
+    TextBox,
 }
 
 impl StoryKind {
@@ -161,6 +165,7 @@ impl StoryKind {
             Self::FirstFooter => 11,
             Self::FootnoteSeparator => 12,
             Self::EndnoteSeparator => 15,
+            Self::TextBox => 5,
         }
     }
 }
@@ -170,7 +175,9 @@ impl StoryKind {
 pub struct Line {
     /// The story the offsets `start` and `end` count in.
     pub story: StoryKind,
-    /// Paragraph index in document order (tables included).
+    /// The text box the line is in (its [`FrameBox::id`]), for lines of [`StoryKind::TextBox`].
+    pub frame: Option<usize>,
+    /// Paragraph index in document order (tables included; in a text box, within the box).
     pub paragraph: usize,
     /// Story offset of the first character.
     pub start: usize,
@@ -313,6 +320,8 @@ pub struct ImagePlacement {
     pub behind_text: bool,
     /// Which part's relationships `embed` belongs to.
     pub source: ImageSource,
+    /// The shape is a text box: [`Page::frames`] holds its text.
+    pub(crate) text_box: Option<textbox::BoxRef>,
 }
 
 /// The package part whose relationship table resolves a picture's `embed` id.
@@ -327,6 +336,22 @@ pub enum ImageSource {
     Endnotes,
 }
 
+/// A text box on a page: Word's clip rectangle of its text, and the lines in it (story
+/// [`StoryKind::TextBox`], offsets from 0 in the box's own story).
+#[derive(Debug, Clone, PartialEq)]
+pub struct FrameBox {
+    /// Index of the box in anchor order over the whole document (`StoryRanges(5)` order).
+    pub id: usize,
+    /// Document-order index of the paragraph the box is anchored in.
+    pub paragraph: usize,
+    /// The rectangle the text is clipped to, page coordinates (points, y down).
+    pub x: f64,
+    pub y: f64,
+    pub width: f64,
+    pub height: f64,
+    pub lines: Vec<Line>,
+}
+
 /// One page of the main story.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Page {
@@ -338,6 +363,8 @@ pub struct Page {
     pub cells: Vec<CellBox>,
     /// Pictures on this page, in drawing order.
     pub images: Vec<ImagePlacement>,
+    /// Text boxes on this page, in anchor order.
+    pub frames: Vec<FrameBox>,
     /// The areas floating pictures keep text out of (see `float.rs`).
     pub(crate) floats: Vec<float::Float>,
     /// Index of the page's section.
@@ -423,6 +450,7 @@ impl Layout {
             p.header
                 .iter()
                 .chain(&p.lines)
+                .chain(p.frames.iter().flat_map(|f| f.lines.iter()))
                 .chain(&p.notes)
                 .chain(&p.footer)
                 .map(move |l| (p.number, l))
@@ -454,7 +482,7 @@ fn collect_items<'a>(blocks: &'a [Block], items: &mut Vec<Item<'a>>) {
                     }
                 }
             }
-            Block::Raw(_) => {}
+            Block::Sdt(_) | Block::Raw(_) => {}
         }
     }
 }
@@ -482,4 +510,22 @@ pub fn layout_document(doc: &Document, fonts: &FontLibrary, options: LayoutOptio
     let mut layout = IncrementalLayout::new();
     layout.update(doc, fonts, options);
     layout.into_layout()
+}
+
+/// As [`layout_document`], but stops soon after `cancel` is set and returns `None`. The flag is
+/// looked at once per block and once per item placed on a page, so a cancelled run ends within
+/// one block's layout. Nothing partial is returned.
+pub fn layout_document_cancellable(
+    doc: &Document,
+    fonts: &FontLibrary,
+    options: LayoutOptions,
+    cancel: &std::sync::Arc<std::sync::atomic::AtomicBool>,
+) -> Option<Layout> {
+    let _scope = cancel::Scope::enter(cancel);
+    let mut layout = IncrementalLayout::new();
+    layout.update(doc, fonts, options);
+    if cancel::cancelled() {
+        return None;
+    }
+    Some(layout.into_layout())
 }

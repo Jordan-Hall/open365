@@ -149,6 +149,10 @@ pub enum CfvoKind {
     Min,
     Formula,
     Percentile,
+    /// `autoMin` (Excel 2010 data bars): the lowest value, or 0 when every value is positive.
+    AutoMin,
+    /// `autoMax` (Excel 2010 data bars): the highest value, or 0 when every value is negative.
+    AutoMax,
 }
 
 /// A conditional-format value object (`cfvo`).
@@ -169,11 +173,19 @@ impl Cfvo {
             Some("max") => CfvoKind::Max,
             Some("formula") => CfvoKind::Formula,
             Some("percentile") => CfvoKind::Percentile,
+            Some("autoMin") => CfvoKind::AutoMin,
+            Some("autoMax") => CfvoKind::AutoMax,
             _ => CfvoKind::Min,
         };
+        // The Excel 2010 form keeps the value in an `<xm:f>` child instead of `val`.
+        let val = e.head.attr("val").map(str::to_owned).or_else(|| {
+            e.elements()
+                .find(|c| c.head.local_name() == "f")
+                .map(XmlElement::own_text)
+        });
         Self {
             kind,
-            val: e.head.attr("val").map(str::to_owned),
+            val,
             gte: !matches!(e.head.attr("gte").map(str::trim), Some("0" | "false")),
         }
     }
@@ -247,6 +259,8 @@ pub enum CfKind {
         min_length: u32,
         max_length: u32,
         show_value: bool,
+        /// The Excel 2010 `x14:dataBar` extension of the rule, when the sheet has one.
+        ext: Option<DataBarExt>,
     },
     IconSet {
         name: String,
@@ -268,6 +282,8 @@ pub struct CfRule {
     pub stop_if_true: bool,
     /// The rule's first `formula` as stored (relative to the top-left cell of the block).
     pub formula: Option<String>,
+    /// The `x14:id` that links the rule to its Excel 2010 extension (`x14:cfRule`), if any.
+    pub ext_id: Option<String>,
 }
 
 /// One `conditionalFormatting` element: the cells (`sqref`) and the rules applying to them.
@@ -415,6 +431,7 @@ fn parse_rule(e: &XmlElement) -> CfRule {
                     min_length: uint(db, "minLength").unwrap_or(10),
                     max_length: uint(db, "maxLength").unwrap_or(90),
                     show_value: flag(db, "showValue", true),
+                    ext: None,
                 })
             })
             .unwrap_or_else(|| CfKind::Unknown("dataBar".to_owned())),
@@ -443,7 +460,132 @@ fn parse_rule(e: &XmlElement) -> CfRule {
         dxf_id: uint(e, "dxfId"),
         stop_if_true: flag(e, "stopIfTrue", false),
         formula: formulas.into_iter().next(),
+        ext_id: ext_id(e),
     }
+}
+
+/// The `x14:id` inside the rule's `extLst`.
+fn ext_id(rule: &XmlElement) -> Option<String> {
+    rule.elements()
+        .filter(|c| c.head.is_main("extLst"))
+        .flat_map(XmlElement::elements)
+        .flat_map(XmlElement::elements)
+        .find(|c| c.head.local_name() == "id")
+        .map(|c| c.own_text().trim().to_owned())
+        .filter(|id| !id.is_empty())
+}
+
+/// Where the axis of an Excel 2010 data bar sits.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum DataBarAxis {
+    /// Where zero falls between the minimum and the maximum (the default).
+    #[default]
+    Automatic,
+    /// The middle of the cell.
+    Midpoint,
+    /// No axis: every bar grows from the left (or right) edge.
+    None,
+}
+
+/// Which way the positive bars of an Excel 2010 data bar grow.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum DataBarDirection {
+    #[default]
+    Context,
+    LeftToRight,
+    RightToLeft,
+}
+
+/// The Excel 2010 `x14:dataBar` extension: what the 2007 `dataBar` element cannot say. Read from
+/// the sheet's `extLst`; the raw tree keeps it byte for byte, so it survives a save.
+#[derive(Debug, Clone, PartialEq)]
+pub struct DataBarExt {
+    /// Bar length at the lowest and highest value, in percent of the cell width.
+    pub min_length: u32,
+    pub max_length: u32,
+    /// Gradient fill (default) or solid.
+    pub gradient: bool,
+    /// Draw a border around the bar, in `border_color` (the bar colour when absent).
+    pub border: bool,
+    pub border_color: Option<Color>,
+    /// Negative bars use the positive bar's colour.
+    pub negative_same_as_positive: bool,
+    /// Fill of negative bars; Excel's default is red when absent.
+    pub negative_fill: Option<Color>,
+    pub negative_border_same_as_positive: bool,
+    pub negative_border_color: Option<Color>,
+    pub axis: DataBarAxis,
+    pub axis_color: Option<Color>,
+    pub direction: DataBarDirection,
+    /// The extension's own minimum and maximum (`autoMin`, `autoMax`, numbers, ...).
+    pub min: Option<Cfvo>,
+    pub max: Option<Cfvo>,
+}
+
+impl DataBarExt {
+    fn parse(db: &XmlElement) -> Self {
+        let local = |name: &str| db.elements().find(|c| c.head.local_name() == name);
+        let cfvos: Vec<Cfvo> = db
+            .elements()
+            .filter(|c| c.head.local_name() == "cfvo")
+            .map(Cfvo::parse)
+            .collect();
+        Self {
+            min_length: uint(db, "minLength").unwrap_or(0),
+            max_length: uint(db, "maxLength").unwrap_or(100),
+            gradient: flag(db, "gradient", true),
+            border: flag(db, "border", false),
+            border_color: local("borderColor").map(Color::parse),
+            negative_same_as_positive: flag(db, "negativeBarColorSameAsPositive", false),
+            negative_fill: local("negativeFillColor").map(Color::parse),
+            negative_border_same_as_positive: flag(
+                db,
+                "negativeBarBorderColorSameAsPositive",
+                true,
+            ),
+            negative_border_color: local("negativeBorderColor").map(Color::parse),
+            axis: match db.head.attr("axisPosition") {
+                Some("middle") => DataBarAxis::Midpoint,
+                Some("none") => DataBarAxis::None,
+                _ => DataBarAxis::Automatic,
+            },
+            axis_color: local("axisColor").map(Color::parse),
+            direction: match db.head.attr("direction") {
+                Some("leftToRight") => DataBarDirection::LeftToRight,
+                Some("rightToLeft") => DataBarDirection::RightToLeft,
+                _ => DataBarDirection::Context,
+            },
+            min: cfvos.first().cloned(),
+            max: cfvos.get(1).cloned(),
+        }
+    }
+}
+
+/// The data bar extensions of a sheet's `extLst`, by the id the `cfRule` points at.
+fn data_bar_exts(after: &[RawXml]) -> Vec<(String, DataBarExt)> {
+    let mut out = Vec::new();
+    for ext_lst in after
+        .iter()
+        .filter_map(RawXml::as_element)
+        .filter(|e| e.head.is_main("extLst"))
+    {
+        let rules = ext_lst
+            .elements()
+            .flat_map(XmlElement::elements)
+            .filter(|e| e.head.local_name() == "conditionalFormattings")
+            .flat_map(XmlElement::elements)
+            .filter(|e| e.head.local_name() == "conditionalFormatting")
+            .flat_map(XmlElement::elements)
+            .filter(|e| e.head.local_name() == "cfRule");
+        for rule in rules {
+            let id = rule.head.attr("id").map(str::to_owned);
+            let bar = rule.elements().find(|c| c.head.local_name() == "dataBar");
+            if let (Some(id), Some(bar)) = (id, bar) {
+                out.push((id, DataBarExt::parse(bar)));
+            }
+        }
+    }
+    out
 }
 
 /// Parses a `conditionalFormatting` element; `None` when it has no usable range.
@@ -469,12 +611,27 @@ impl Worksheet {
     /// The sheet's `conditionalFormatting` blocks in source order (read from the preserved
     /// tree; the sheet is not changed).
     pub fn conditional_formats(&self) -> Vec<CfBlock> {
-        self.raw_after()
+        let mut blocks: Vec<CfBlock> = self
+            .raw_after()
             .iter()
             .filter_map(RawXml::as_element)
             .filter(|e| e.head.is_main("conditionalFormatting"))
             .filter_map(parse_block)
-            .collect()
+            .collect();
+        let exts = data_bar_exts(self.raw_after());
+        if !exts.is_empty() {
+            for rule in blocks.iter_mut().flat_map(|b| b.rules.iter_mut()) {
+                let found = rule
+                    .ext_id
+                    .as_ref()
+                    .and_then(|id| exts.iter().find(|(i, _)| i == id));
+                if let (Some((_, ext)), CfKind::DataBar { ext: slot, .. }) = (found, &mut rule.kind)
+                {
+                    *slot = Some(ext.clone());
+                }
+            }
+        }
+        blocks
     }
 }
 
@@ -525,5 +682,30 @@ mod tests {
         assert!(d.fill.unwrap().bg.is_some());
         assert!(d.border.left.is_some());
         assert!(d.border.right.is_none());
+    }
+
+    #[test]
+    fn an_x14_data_bar_extension_is_read() {
+        let e = element(&format!(
+            r#"<dataBar {NS} xmlns:x14="http://schemas.microsoft.com/office/spreadsheetml/2009/9/main" xmlns:xm="http://schemas.microsoft.com/office/excel/2006/main" minLength="0" maxLength="100" gradient="0" axisPosition="middle" direction="rightToLeft"><x14:cfvo type="autoMin"/><x14:cfvo type="num"><xm:f>50</xm:f></x14:cfvo><x14:negativeFillColor rgb="FFFF0000"/><x14:axisColor rgb="FF000000"/></dataBar>"#
+        ));
+        let x = DataBarExt::parse(&e);
+        assert_eq!((x.min_length, x.max_length), (0, 100));
+        assert!(!x.gradient && !x.border);
+        assert!(!x.negative_same_as_positive);
+        assert_eq!(x.axis, DataBarAxis::Midpoint);
+        assert_eq!(x.direction, DataBarDirection::RightToLeft);
+        assert_eq!(x.min.unwrap().kind, CfvoKind::AutoMin);
+        let max = x.max.unwrap();
+        assert_eq!((max.kind, max.val.as_deref()), (CfvoKind::Num, Some("50")));
+        assert!(x.negative_fill.is_some() && x.axis_color.is_some());
+    }
+
+    #[test]
+    fn a_rule_names_its_extension_id() {
+        let e = element(&format!(
+            r#"<cfRule {NS} xmlns:x14="http://schemas.microsoft.com/office/spreadsheetml/2009/9/main" type="dataBar" priority="1"><dataBar><cfvo type="min"/><cfvo type="max"/><color rgb="FF638EC6"/></dataBar><extLst><ext uri="{{B025F937-C7B1-47D3-B67F-A62EFF666E3E}}"><x14:id>{{AB-12}}</x14:id></ext></extLst></cfRule>"#
+        ));
+        assert_eq!(parse_rule(&e).ext_id.as_deref(), Some("{AB-12}"));
     }
 }

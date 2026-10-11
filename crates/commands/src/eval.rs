@@ -4,12 +4,15 @@
 //! so the open workbook and its file are never touched. Read-only, so the effect class is
 //! `Read`.
 
+use std::sync::Arc;
+use std::sync::atomic::AtomicBool;
+
 use open365_calc::{Engine, Value};
 use open365_xlsx::Workbook;
 use serde::Serialize;
 
 use crate::error::CommandError;
-use crate::xlsx_state::build_engine;
+use crate::xlsx_state::{build_engine, build_engine_cancellable};
 
 /// Longest formula accepted, in characters.
 pub const MAX_FORMULA_CHARS: usize = 8192;
@@ -115,6 +118,21 @@ impl FormulaEngine {
         }
     }
 
+    /// As [`FormulaEngine::build`], but gives up with [`CommandError::Cancelled`] soon after
+    /// `cancel` is set. Nothing partial is returned.
+    ///
+    /// # Errors
+    /// [`CommandError::Cancelled`].
+    pub fn build_cancellable(
+        wb: &Workbook,
+        keep: &dyn Fn(usize, u32, u32) -> bool,
+        cancel: &Arc<AtomicBool>,
+    ) -> Result<Self, CommandError> {
+        build_engine_cancellable(wb, keep, Some(cancel))
+            .map(|engine| Self { engine })
+            .ok_or(CommandError::Cancelled)
+    }
+
     /// As [`evaluate_formula`], on this engine. `wb` and `keep` must be the ones the engine
     /// was built from.
     ///
@@ -130,6 +148,27 @@ impl FormulaEngine {
         keep: &dyn Fn(usize, u32, u32) -> bool,
     ) -> Result<Evaluated, CommandError> {
         evaluate_on(&mut self.engine, wb, sheet, row, col, formula, keep)
+    }
+
+    /// As [`FormulaEngine::evaluate`] with the cell as `(sheet, row, col)`, but stops soon after
+    /// `cancel` is set and returns [`CommandError::Cancelled`]. The engine stays usable: the probe cell is put back and
+    /// the cells the recalculation did not reach stay marked dirty, so the next evaluation
+    /// finishes them.
+    ///
+    /// # Errors
+    /// As [`FormulaEngine::evaluate`], plus [`CommandError::Cancelled`].
+    pub fn evaluate_cancellable(
+        &mut self,
+        wb: &Workbook,
+        (sheet, row, col): (usize, u32, u32),
+        formula: Option<&str>,
+        keep: &dyn Fn(usize, u32, u32) -> bool,
+        cancel: &Arc<AtomicBool>,
+    ) -> Result<Evaluated, CommandError> {
+        self.engine.set_cancel(Some(Arc::clone(cancel)));
+        let out = evaluate_on(&mut self.engine, wb, sheet, row, col, formula, keep);
+        self.engine.set_cancel(None);
+        out
     }
 }
 
@@ -175,6 +214,9 @@ fn evaluate_on(
     } else {
         None
     };
+    // Cancelled mid-recalculation: the result may be stale. Put the cell back below but do
+    // not recalculate; the cells not reached are still dirty and the next call settles them.
+    let cancelled = engine.cancel_requested();
     // Put the cell back, so the next evaluation starts from the workbook's own state.
     match prior_formula {
         Some(f) => {
@@ -182,6 +224,9 @@ fn evaluate_on(
         }
         None if prior_value == Value::Empty => engine.clear(&info.name, row, col),
         None => engine.set_value(&info.name, row, col, prior_value),
+    }
+    if cancelled {
+        return Err(CommandError::Cancelled);
     }
     engine.recalc_dirty();
     let value = match (set, result) {

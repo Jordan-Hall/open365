@@ -70,9 +70,9 @@ function New-Book($app, [string]$name) {
   while ($wb.Worksheets.Count -lt 2) { [void]$wb.Worksheets.Add([Type]::Missing, $wb.Worksheets.Item($wb.Worksheets.Count)) }
   $s1 = $wb.Worksheets.Item(1); $s1.Name = 'Sheet1'
   $s2 = $wb.Worksheets.Item(2); $s2.Name = 'Sheet2'
-  $s1.Cells.ColumnWidth = 60
-  $s2.Cells.ColumnWidth = 60
-  return @{ wb = $wb; s1 = $s1; s2 = $s2; formats = @{} }
+  $s1.StandardWidth = 60   # the standard width, so CELL("width") reports the second element TRUE (not a custom width)
+  $s2.StandardWidth = 60
+  return @{ wb = $wb; s1 = $s1; s2 = $s2; formats = @{}; widthDirty = $null }
 }
 
 # Excel keeps every distinct custom number format in the workbook and refuses new ones after roughly 250, so a
@@ -177,16 +177,34 @@ function Set-Cell($ws, [string]$addr, $val) {
   $cell.Value2 = [double]$val
 }
 
+# Cell styles for the information functions (CELL): "nf" number format, "ha" horizontal alignment, "locked",
+# "width" column width of the cell's column (the other columns keep the 60-character default).
+$script:hAlign = @{ general = 1; left = -4131; right = -4152; center = -4108; fill = 5; justify = -4130; across = 7; distributed = -4117 }
+function Set-Style($ws, [string]$addr, $style, $book) {
+  $r = $ws.Range($addr)
+  if ($style.ContainsKey('nf')) { $r.NumberFormat = $style['nf']; $book.formats[$style['nf']] = $true }
+  if ($style.ContainsKey('ha')) { $r.HorizontalAlignment = $script:hAlign[$style['ha']] }
+  if ($style.ContainsKey('locked')) { $r.Locked = [bool]$style['locked'] }
+  if ($style.ContainsKey('width')) {
+    $r.ColumnWidth = [double]$style['width']
+    if (-not $book.widthDirty) { $book.widthDirty = New-Object System.Collections.Generic.List[int] }
+    $book.widthDirty.Add([int]$r.Column)
+  }
+}
+
 function Invoke-Case($case) {
   $bookName = if ($case.date1904) { 'd1904' } else { 'd1900' }
   if ($case.format -and -not $script:books[$bookName].formats.ContainsKey($case.format) -and $script:books[$bookName].formats.Count -ge 100) { Reset-Book $bookName }
+  if ($case.styles -and $script:books[$bookName].formats.Count -ge 100) { Reset-Book $bookName }
   $book = $script:books[$bookName]
   if ($case.format) { $book.formats[$case.format] = $true }
   $s1 = $book.s1; $s2 = $book.s2
   $s1.Cells.Clear() | Out-Null
   $s2.Cells.Clear() | Out-Null
+  if ($book.widthDirty) { foreach ($c in $book.widthDirty) { $s1.Columns.Item($c).UseStandardWidth = $true }; $book.widthDirty = $null }
   if ($case.cells) { foreach ($k in $case.cells.Keys) { Set-Cell $s1 $k $case.cells[$k] } }
   if ($case.sheet2) { foreach ($k in $case.sheet2.Keys) { Set-Cell $s2 $k $case.sheet2[$k] } }
+  if ($case.styles) { foreach ($k in $case.styles.Keys) { Set-Style $s1 $k $case.styles[$k] $book } }
   $at = if ($case.at) { $case.at } else { $script:defaultAt }
   $target = $s1.Range($at)
   try {

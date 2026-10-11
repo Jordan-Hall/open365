@@ -1,0 +1,5 @@
+feature = "layout-float"
+made_with = "Microsoft Word 16.0.20430 (Windows)"
+author = "project member"
+expect_dropped = []
+notes = "anchor paragraph with page-break-before: floats relative to paragraph, page, margin, and square wrapping after the break"

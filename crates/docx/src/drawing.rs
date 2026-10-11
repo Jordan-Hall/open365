@@ -4,6 +4,9 @@
 //! Nothing here is written back: the drawing stays raw XML in its run. Values are clamped to
 //! what a page can hold so that hostile numbers cannot overflow later arithmetic.
 
+use std::sync::Arc;
+
+use crate::model::{Block, blocks_from};
 use crate::xml::{ElementHead, RawXml, XmlElement};
 
 /// English Metric Units per point.
@@ -83,9 +86,42 @@ pub enum Position {
     Align(Align),
 }
 
+/// Vertical anchor of the text in a text box (`wps:bodyPr/@anchor`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TextBoxAnchor {
+    Top,
+    Middle,
+    Bottom,
+}
+
+/// The text of a shape (`wps:txbx/w:txbxContent`) and the body properties that place it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TextBox {
+    /// The blocks of `w:txbxContent`: their own story.
+    pub blocks: Vec<Block>,
+    /// `lIns`, `tIns`, `rIns`, `bIns` in EMU (defaults 91440, 45720, 91440, 45720).
+    pub insets_emu: [i64; 4],
+    pub anchor: TextBoxAnchor,
+    /// False for `wrap="none"`: lines never wrap at the shape's width.
+    pub wrap: bool,
+    /// Shape outline width (`a:ln/@w`) in EMU; 0 when the shape has no `a:ln`.
+    pub line_emu: i64,
+    /// `a:spAutoFit` (shape resizes to fit the text).
+    pub auto_fit: bool,
+}
+
+impl TextBox {
+    /// `lIns`, `tIns`, `rIns`, `bIns` in points.
+    pub fn insets_pt(&self) -> [f64; 4] {
+        self.insets_emu.map(|v| v as f64 / EMU_PER_POINT)
+    }
+}
+
 /// An inline or anchored drawing.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Drawing {
+    /// The text of a text box shape, when the drawing is one.
+    pub text_box: Option<Arc<TextBox>>,
     /// True for `wp:anchor`, false for `wp:inline`.
     pub anchored: bool,
     /// `wp:extent` (`cx`, `cy`) in EMU.
@@ -145,6 +181,7 @@ impl Drawing {
             name: None,
             description: None,
             embed: None,
+            text_box: None,
         };
         if anchored {
             out.wrap = WrapType::None;
@@ -221,7 +258,28 @@ impl Drawing {
             }
         }
         out.embed = find_embed(container, 0);
+        out.text_box = find_text_box(container, 0).map(Arc::new);
         Some(out)
+    }
+
+    /// The text box drawing inside an `mc:AlternateContent` (its `mc:Choice` holds the
+    /// `w:drawing`); `None` when it holds no text box.
+    pub fn from_alternate_content(e: &XmlElement) -> Option<Self> {
+        if e.head.local_name() != "AlternateContent" {
+            return None;
+        }
+        let choice = e
+            .children
+            .iter()
+            .filter_map(RawXml::as_element)
+            .find(|c| c.head.local_name() == "Choice")?;
+        choice
+            .children
+            .iter()
+            .filter_map(RawXml::as_element)
+            .filter(|d| d.head.is_w("drawing"))
+            .find_map(Self::from_element)
+            .filter(|d| d.text_box.is_some())
     }
 
     /// Width and height of the picture in points (`wp:extent`).
@@ -366,4 +424,82 @@ fn find_embed(e: &XmlElement, depth: usize) -> Option<String> {
         }
     }
     None
+}
+
+/// The text box of the first `wps:wsp` below `e`.
+fn find_text_box(e: &XmlElement, depth: usize) -> Option<TextBox> {
+    if depth > 16 {
+        return None;
+    }
+    for c in e.children.iter().filter_map(RawXml::as_element) {
+        if c.head.local_name() == "wsp" {
+            return text_box_of(c);
+        }
+        if let Some(found) = find_text_box(c, depth + 1) {
+            return Some(found);
+        }
+    }
+    None
+}
+
+fn text_box_of(wsp: &XmlElement) -> Option<TextBox> {
+    let mut content: Option<&XmlElement> = None;
+    let mut body_pr: Option<&XmlElement> = None;
+    let mut line_emu = 0;
+    for c in wsp.children.iter().filter_map(RawXml::as_element) {
+        match c.head.local_name() {
+            "txbx" => {
+                content = c
+                    .children
+                    .iter()
+                    .filter_map(RawXml::as_element)
+                    .find(|t| t.head.local_name() == "txbxContent");
+            }
+            "bodyPr" => body_pr = Some(c),
+            "spPr" => {
+                if let Some(ln) = c
+                    .children
+                    .iter()
+                    .filter_map(RawXml::as_element)
+                    .find(|l| l.head.local_name() == "ln")
+                {
+                    line_emu = emu_attr(&ln.head, "w").max(0);
+                }
+            }
+            _ => {}
+        }
+    }
+    let content = content?;
+    let (mut insets, mut anchor, mut wrap, mut auto_fit) = (
+        [91440, 45720, 91440, 45720],
+        TextBoxAnchor::Top,
+        true,
+        false,
+    );
+    if let Some(bp) = body_pr {
+        for (i, key) in ["lIns", "tIns", "rIns", "bIns"].into_iter().enumerate() {
+            if attr(&bp.head, key).is_some() {
+                insets[i] = emu_attr(&bp.head, key);
+            }
+        }
+        anchor = match attr(&bp.head, "anchor") {
+            Some("ctr") => TextBoxAnchor::Middle,
+            Some("b") => TextBoxAnchor::Bottom,
+            _ => TextBoxAnchor::Top,
+        };
+        wrap = attr(&bp.head, "wrap") != Some("none");
+        auto_fit = bp
+            .children
+            .iter()
+            .filter_map(RawXml::as_element)
+            .any(|c| c.head.local_name() == "spAutoFit");
+    }
+    Some(TextBox {
+        blocks: blocks_from(content.children.clone()),
+        insets_emu: insets,
+        anchor,
+        wrap,
+        line_emu,
+        auto_fit,
+    })
 }

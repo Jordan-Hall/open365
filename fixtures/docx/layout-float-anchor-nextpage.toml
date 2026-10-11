@@ -1,0 +1,5 @@
+feature = "layout-float"
+made_with = "Microsoft Word 16.0.20430 (Windows)"
+author = "project member"
+expect_dropped = []
+notes = "anchor paragraph that does not fit in the space left on page 1 (widow and orphan control) starts page 2 instead; floats relative to paragraph, page and margin follow it"

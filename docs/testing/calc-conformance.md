@@ -5,7 +5,7 @@ never needs Excel.
 
 | File | Role |
 |---|---|
-| `fixtures/calc/conformance.json` | The corpus: 50,620 cases. Edited by hand or by script; one case per line. |
+| `fixtures/calc/conformance.json` | The corpus: 53,965 cases. Edited by hand or by script; one case per line. |
 | `tools/office/calc-oracle.ps1` | Local-only tool. Runs every case in Excel over COM and writes the results. |
 | `fixtures/reference/calc/conformance-results.json` | Excel's answers, committed. Includes Excel version, build and decimal separator. |
 | `fixtures/calc/known-differences.toml` | Cases where Open365 intentionally or temporarily differs, each with a reason. |
@@ -40,6 +40,9 @@ regional settings (decimal and thousands separators are recorded). Do not add ca
 * `formula` is en-US syntax and goes into the cell `at` (default `J20`, away from the data). `at` matters for
   implicit intersection.
 * `date1904` evaluates the case in a workbook using the 1904 date system.
+* `styles` sets cell presentation on Sheet1 for `CELL`: `{"A1": {"nf": "0.00", "ha": "right", "locked": false, "width": 20}}`
+  (`nf` number format, `ha` one of general, left, right, center, fill, justify, across, distributed, `width` the column's width).
+  The oracle sets the sheets' standard column width to 60, so `CELL("width")` reports `{60,TRUE}` unless a case sets a width.
 * Formulas are entered with `Range.Formula`, not `Formula2`: Excel evaluates them as a pre-dynamic-array formula
   (implicit intersection, no spilling). That is the semantics of an ordinary cell loaded from an XLSX file.
 * Results have `kind` `number`, `text`, `bool`, `error` or `rejected` (Excel refused the formula text, for
@@ -66,15 +69,46 @@ forms; the corpus has no case for them.
 
 ## Current state
 
-52,555 cases, 52,336 pass, 219 known differences listed in `known-differences.toml` (158 older ones, 47 from the third batch, 14 from the fourth).
+53,965 cases, 53,744 pass, 221 known differences listed in `known-differences.toml` (158 older ones, 47 from the third batch, 14 from the fourth, 2 from the fifth).
 Older entries: the `**` parse quirk, XLOOKUP array results (no spill), a
 few undocumented Excel quirks, large COMBIN, variance accumulation order, accounting fill, `DB` last period and two `IFERROR`
 over arrays of references. New entries: SINH/TANH below |x| = 1 (last digits) and one `x^-5000` case. The test also fails for a
 corpus case without an Excel result or a stored result without a case.
 
+## Information functions (CELL, INFO, SHEET, SHEETS)
+
+Corpus groups `cell`, `cell2`, `cellfmt`, `info`, `sheet` (1,410 cases, all matching except the two listed). Measured on Excel 16:
+
+* `CELL` uses the first cell of a reference; a union reads `$A$1,$B$2:$C$3` (first area by its top-left cell, later areas whole). A
+  reference to a missing sheet is `#N/A` before the info type is checked; a non-reference second argument and an unknown, non-text or
+  empty info type are `#VALUE!`. `"color"` is `#VALUE!` in this build for every format. `CELL("row",)` is refused.
+* `"contents"` of a blank cell is 0; `"type"` is `b` blank, `l` text (including a formula that returns text), `v` otherwise;
+  `"prefix"` is set only for constant text (`'` default, left and justify; `"` right; `^` centre; backslash fill), never for a formula.
+* `"width"` is `{round(width), isStandard}`; `isStandard` is true when the width equals the sheet's standard width. In a scalar
+  context the first element is used. `"filename"` is empty for an unsaved workbook (the oracle's), the real value depends on the file.
+  A cell of another sheet prints as `[Book1]Sheet2!$B$3`; the book name varies (`Book2`), so the corpus compares text after `]`.
+* `"format"` follows rules recorded in `numfmt/cellcode.rs`: the first section decides; currency symbol of the locale (unquoted or
+  escaped) gives `C`, `%` `P`, an exponent `S`, a thousands separator `,`, otherwise `F`, followed by the decimals (at most 15);
+  `-` when section 1 or 2 of a multi-section format has a colour; `()` when section 1 has an opening parenthesis; fractions, text and
+  literal-only formats are `G`; `;;;` is `H` (`;0` is `G`); dates by the order of the first components (d-m-y `D1`, d-m `D2`, m-y `D3`,
+  m-d-y `D4`, m-d `D5`, h-mm-ss AM/PM `D6`, h-mm AM/PM `D7`, h-mm-ss `D8`, h-mm `D9`, anything else `G`); a `[$-LCID]` prefix counts as
+  a leading day (so `[$-409]mmmm d, yyyy` is `D2`) and `[$-F800]`/`[$-F400]` are `G`. The cases run in `en-GB` because the currency
+  symbol of the machine decides `C`. `"parentheses"` is 1 exactly when the code ends in `()`.
+* Without a reference Excel reports the last changed cell, which is not reproducible; Open365 uses the formula's own cell and the
+  corpus has no case for it. `INFO("directory")`, `INFO("numfile")` and `INFO("osversion")` describe the machine and are tested for
+  type and shape only; `origin` (`$A:$A$1`), `recalc` (`Automatic`), `release` (`16.0`) and `system` (`pcdos`) are constants, and
+  `memavail`, `memused`, `totmem` are `#N/A`.
+* `SHEET`/`SHEETS` accept a reference (sheet of its first area; areas on several sheets are `#VALUE!`), `SHEET` also a sheet name
+  (case-insensitive; other values and unknown names `#N/A`); `SHEETS(text)` is `#N/A`. Three-dimensional references
+  (`Sheet1:Sheet2!A1`) are not parsed, so `SHEET(Sheet1:Sheet2!A1)` and `SHEETS(Sheet1:Sheet2!A1)` (1 and 2 in Excel) are not supported
+  and have no corpus case.
+* Residue: `CELL("format",J20)` in J20 itself (Excel: not circular; Open365 treats the reference as a dependency), 2 cases.
+
 ## Behaviour measured against Excel
 
 Findings that the corpus now locks in (see the module comments in `crates/calc/src` for details):
+
+
 
 * Number to text: 15 significant digits, positional up to 20 characters (`1E+15` is `1000000000000000`,
   `1E-10` is `0.0000000001`), scientific beyond (`1E+20`, `1.23456789012345E-05`).

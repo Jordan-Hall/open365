@@ -495,7 +495,7 @@ impl Target {
             });
         };
         let rendered = crate::pdf::render(&s.doc, &self.pdf_options)?;
-        crate::pdf::write_pdf(path, &rendered.bytes, overwrite)?;
+        crate::pdf::write_pdf(path, &rendered.bytes, overwrite, &self.pdf_options)?;
         Ok(Outcome {
             effect,
             changed_cells: Vec::new(),

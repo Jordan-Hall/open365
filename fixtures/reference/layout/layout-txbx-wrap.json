@@ -5,9 +5,9 @@
   "precision": "top/left/lastX are screen-quantised (+-0.3 pt); baseline/inkLeft and cell rectangles come from the 600 dpi PDF and are exact",
   "pageCount": 2,
   "cells": [
-    {"page": 1, "x": 360.38, "y": 113.78, "w": 149.57, "h": 112.37},
-    {"page": 1, "x": 72.264, "y": 333.936, "w": 219.7, "h": 52.344},
-    {"page": 1, "x": 72.264, "y": 524.086, "w": 119.57, "h": 82.344}
+    {"page": 1, "x": 360.38, "y": 113.78, "w": 149.57, "h": 112.37, "frame": 0},
+    {"page": 1, "x": 72.264, "y": 333.936, "w": 219.7, "h": 52.344, "frame": 1},
+    {"page": 1, "x": 72.264, "y": 524.086, "w": 119.57, "h": 82.344, "frame": 2}
   ],
   "lines": [
     {"page": 1, "start": 0, "end": 101, "top": 72.0, "left": 72.0, "lastX": 515.4, "baseline": null, "inkLeft": null, "text": "The quick survey of a quiet harbour town begins at dawn, when the fishing boats drift back past the "},
@@ -54,10 +54,10 @@
     {"page": 1, "start": 3159, "end": 3175, "top": 670.8, "left": 72.0, "lastX": 137.4, "baseline": null, "inkLeft": null, "text": "different page.\u000d"},
     {"page": 1, "start": 3175, "end": 3275, "top": 690.0, "left": 72.0, "lastX": 515.4, "baseline": null, "inkLeft": null, "text": "The quick survey of a quiet harbour town begins at dawn, when the fishing boats drift back past the "},
     {"page": 1, "start": 3275, "end": 3373, "top": 703.2, "left": 72.0, "lastX": 503.4, "baseline": null, "inkLeft": null, "text": "lighthouse and the market stalls fold open their striped awnings. Gulls wheel over the quay while "},
-    {"page": 1, "start": 0, "end": 24, "top": 114.0, "left": 367.2, "lastX": 481.2, "baseline": null, "inkLeft": null, "text": "Square wrapped box with ", "story": 5},
-    {"page": 1, "start": 0, "end": 28, "top": 333.6, "left": 79.2, "lastX": 213.6, "baseline": null, "inkLeft": null, "text": "Top and bottom wrapped box.\u000d", "story": 5},
-    {"page": 1, "start": 0, "end": 24, "top": 555.0, "left": -1.0, "lastX": 180.0, "baseline": null, "inkLeft": null, "text": "Square box on the left.\u000d", "story": 5},
-    {"page": 1, "start": 24, "end": 46, "top": 127.2, "left": 367.2, "lastX": 460.2, "baseline": null, "inkLeft": null, "text": "several words inside.\u000d", "story": 5},
+    {"page": 1, "start": 0, "end": 24, "top": 114.0, "left": 367.2, "lastX": 481.2, "baseline": 124.37, "inkLeft": 367.58, "text": "Square wrapped box with ", "story": 5, "frame": 0},
+    {"page": 1, "start": 0, "end": 28, "top": 333.6, "left": -1.0, "lastX": 213.6, "baseline": 344.5, "inkLeft": 79.464, "text": "Top and bottom wrapped box.\u000d", "story": 5, "frame": 1},
+    {"page": 1, "start": 0, "end": 24, "top": 555.0, "left": -1.0, "lastX": 180.0, "baseline": 566.09, "inkLeft": 79.464, "text": "Square box on the left.\u000d", "story": 5, "frame": 2},
+    {"page": 1, "start": 24, "end": 46, "top": 127.2, "left": 367.2, "lastX": 460.2, "baseline": 137.81, "inkLeft": 367.58, "text": "several words inside.\u000d", "story": 5, "frame": 0},
     {"page": 2, "start": 3373, "end": 3472, "top": 72.0, "left": 72.0, "lastX": 516.0, "baseline": 82.58, "inkLeft": 72.024, "text": "merchants argue cheerfully about the price of mackerel, and a baker carries warm loaves across the "},
     {"page": 2, "start": 3472, "end": 3579, "top": 85.2, "left": 72.0, "lastX": 530.4, "baseline": 96.02, "inkLeft": 72.024, "text": "cobbles to the cafe on the corner. By noon the visitors arrive, and the narrow streets fill with the sound "},
     {"page": 2, "start": 3579, "end": 3684, "top": 99.0, "left": 72.0, "lastX": 535.2, "baseline": 109.46, "inkLeft": 72.024, "text": "of voices, bicycle bells and distant music. Typesetting depends on small decisions repeated thousands of "},

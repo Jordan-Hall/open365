@@ -121,8 +121,8 @@ enum Command {
         #[arg(long)]
         include_hidden: bool,
         /// Longest a layout_summary, export_pdf or evaluate_formula call may run, in seconds.
-        /// The work cannot be interrupted, so a call that times out may still finish in the
-        /// background; an export that timed out does not write its file.
+        /// A call that times out is cancelled: layout, the PDF writer and recalculation stop at
+        /// their next check, and an export that timed out leaves no file.
         #[arg(long, default_value_t = 30, value_parser = clap::value_parser!(u64).range(1..=3600))]
         timeout_secs: u64,
     },

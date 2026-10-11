@@ -29,8 +29,8 @@ mod xmlq;
 
 pub use document::{Document, DocumentKind, DroppedItem, HygieneAction};
 pub use drawing::{
-    Align, Drawing, EMU_PER_POINT, HorizontalRelativeFrom, ImagePart, Position,
-    VerticalRelativeFrom, WrapSide, WrapType,
+    Align, Drawing, EMU_PER_POINT, HorizontalRelativeFrom, ImagePart, Position, TextBox,
+    TextBoxAnchor, VerticalRelativeFrom, WrapSide, WrapType,
 };
 pub use error::DocxError;
 pub use flatten::{FlatBlocks, SDT_END, SDT_START, flatten_content_controls, is_sdt_marker};
@@ -40,7 +40,7 @@ pub use layout_props::{
 };
 pub use model::{
     Block, Body, Break, BreakKind, Cell, DocChild, DocumentRoot, Group, Inline, Paragraph, Row,
-    RowChild, Run, RunContent, Table, TableChild,
+    RowChild, Run, RunContent, Sdt, SdtChild, SdtContent, Table, TableChild,
 };
 pub use notes::{Note, NoteKind};
 pub use numbering::{

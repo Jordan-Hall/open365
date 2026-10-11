@@ -1,16 +1,17 @@
-//! Bounded run time for the tools whose work cannot be interrupted: layout, the PDF writer and
-//! the formula engine have no cancellation hook, so the work runs on a worker thread and the
-//! caller waits at most the configured deadline.
+//! Bounded run time for the slow tools: layout, the PDF writer and the formula engine run on a
+//! worker thread and the caller waits at most the configured deadline.
 //!
-//! A timeout is reported to the agent, but the worker thread is not killed: it may still run to
-//! the end in the background and then drops its result. The one place where a late finish could
-//! have an effect, the PDF file write, checks a cancellation flag the caller sets on timeout.
+//! Each request owns a cancellation flag. On a timeout the caller sets it, and the long loops of
+//! layout pagination, the PDF writer and recalculation check it and stop. The PDF file write
+//! removes a file the request created. The thread itself is not killed: it ends at its next
+//! check, so a single step that never checks can still run to its end, and its result is dropped.
 
-use std::sync::mpsc;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, mpsc};
 use std::thread;
 use std::time::{Duration, SystemTime};
 
-use open365_commands::{Evaluated, FormulaEngine, Target};
+use open365_commands::{CommandError, Evaluated, FormulaEngine, Target};
 
 use crate::views;
 
@@ -24,23 +25,29 @@ pub(crate) enum BoundedError {
     Failed,
 }
 
-/// Runs `work` on a new thread and waits up to `deadline` for its result.
+/// Runs `work` on a new thread and waits up to `deadline` for its result. `work` gets the
+/// request's cancellation flag, which is set when the deadline passes.
 pub(crate) fn run<T, F>(deadline: Duration, work: F) -> Result<T, BoundedError>
 where
     T: Send + 'static,
-    F: FnOnce() -> T + Send + 'static,
+    F: FnOnce(Arc<AtomicBool>) -> T + Send + 'static,
 {
+    let cancel = Arc::new(AtomicBool::new(false));
+    let token = Arc::clone(&cancel);
     let (tx, rx) = mpsc::channel();
     thread::Builder::new()
         .name("open365-mcp-worker".to_owned())
         .stack_size(WORKER_STACK)
         .spawn(move || {
-            let _ = tx.send(work());
+            let _ = tx.send(work(token));
         })
         .map_err(|_| BoundedError::Failed)?;
     match rx.recv_timeout(deadline) {
         Ok(v) => Ok(v),
-        Err(mpsc::RecvTimeoutError::Timeout) => Err(BoundedError::TimedOut),
+        Err(mpsc::RecvTimeoutError::Timeout) => {
+            cancel.store(true, Ordering::Relaxed);
+            Err(BoundedError::TimedOut)
+        }
         Err(mpsc::RecvTimeoutError::Disconnected) => Err(BoundedError::Failed),
     }
 }
@@ -72,7 +79,8 @@ struct Job {
     row: u32,
     col: u32,
     formula: Option<String>,
-    reply: mpsc::Sender<Result<Evaluated, String>>,
+    cancel: Arc<AtomicBool>,
+    reply: mpsc::Sender<Result<Evaluated, CommandError>>,
 }
 
 /// A thread that owns a copy of one workbook and its calculation engine, built once and reused
@@ -105,20 +113,26 @@ impl EvalWorker {
         row: u32,
         col: u32,
         formula: Option<String>,
-    ) -> Result<Result<Evaluated, String>, BoundedError> {
+    ) -> Result<Result<Evaluated, CommandError>, BoundedError> {
         let (reply, answer) = mpsc::channel();
+        let cancel = Arc::new(AtomicBool::new(false));
         self.jobs
             .send(Job {
                 sheet,
                 row,
                 col,
                 formula,
+                cancel: Arc::clone(&cancel),
                 reply,
             })
             .map_err(|_| BoundedError::Failed)?;
         match answer.recv_timeout(deadline) {
             Ok(v) => Ok(v),
-            Err(mpsc::RecvTimeoutError::Timeout) => Err(BoundedError::TimedOut),
+            Err(mpsc::RecvTimeoutError::Timeout) => {
+                // The job stops at its next check and the worker keeps its engine.
+                cancel.store(true, Ordering::Relaxed);
+                Err(BoundedError::TimedOut)
+            }
             Err(mpsc::RecvTimeoutError::Disconnected) => Err(BoundedError::Failed),
         }
     }
@@ -130,28 +144,40 @@ fn serve(bytes: &[u8], hidden: bool, jobs: &mpsc::Receiver<Job>) {
         Err(e) => {
             let message = e.to_string();
             for job in jobs {
-                let _ = job.reply.send(Err(message.clone()));
+                let _ = job.reply.send(Err(CommandError::Formula(message.clone())));
             }
             return;
         }
     };
     let Some(wb) = target.xlsx() else { return };
-    let mut engine = {
-        let keep = views::visibility_filter(wb, hidden);
-        FormulaEngine::build(wb, &keep)
-    };
+    // Built by the first job that gets to run, under that job's cancellation flag. A build
+    // that is cancelled leaves `None` and the next job builds again.
+    let mut engine: Option<FormulaEngine> = None;
     for job in jobs {
+        if job.cancel.load(Ordering::Relaxed) {
+            let _ = job.reply.send(Err(CommandError::Cancelled));
+            continue;
+        }
         let keep = views::visibility_filter(wb, hidden);
-        let result = engine
-            .evaluate(
-                wb,
-                job.sheet,
-                job.row,
-                job.col,
-                job.formula.as_deref(),
-                &keep,
-            )
-            .map_err(|e| e.to_string());
+        if engine.is_none() {
+            match FormulaEngine::build_cancellable(wb, &keep, &job.cancel) {
+                Ok(e) => engine = Some(e),
+                Err(e) => {
+                    let _ = job.reply.send(Err(e));
+                    continue;
+                }
+            }
+        }
+        let Some(engine) = engine.as_mut() else {
+            continue;
+        };
+        let result = engine.evaluate_cancellable(
+            wb,
+            (job.sheet, job.row, job.col),
+            job.formula.as_deref(),
+            &keep,
+            &job.cancel,
+        );
         let _ = job.reply.send(result);
     }
 }

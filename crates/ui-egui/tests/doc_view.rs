@@ -692,3 +692,57 @@ fn pictures_in_headers_and_footers_resolve_through_their_own_part() {
     }
     eprintln!("templates with furniture pictures checked: {checked}");
 }
+
+/// Paragraphs inside block-level content controls are addressable: a layout line's
+/// `paragraph` is the `Document::paragraph` index, typing changes that paragraph, and the saved
+/// file reopens with the edit (`layout-sdt`).
+#[test]
+fn typing_in_a_block_content_control_edits_that_paragraph() {
+    let mut h = open("docx/layout-sdt.docx");
+    focus(&mut h);
+    let count = h.state().target.docx().expect("docx").paragraph_count();
+    // The layout never addresses a paragraph past the document's.
+    let lines: Vec<(usize, String)> = h
+        .state()
+        .view
+        .layout()
+        .lines()
+        .map(|(_, l)| (l.paragraph, l.text.to_string()))
+        .collect();
+    assert!(lines.iter().all(|(p, _)| *p < count));
+    let (para, _) = lines
+        .iter()
+        .find(|(_, t)| t.starts_with("Block control paragraph"))
+        .cloned()
+        .expect("line of the control paragraph");
+    assert_eq!(
+        h.state().target.docx().and_then(|d| d.paragraph_text(para)),
+        Some("Block control paragraph".to_owned())
+    );
+    h.state_mut().view.set_caret(DocPos::new(para, 5));
+    h.event(Event::Text("Z".to_owned()));
+    h.run();
+    assert_eq!(
+        h.state().target.docx().and_then(|d| d.paragraph_text(para)),
+        Some("BlockZ control paragraph".to_owned())
+    );
+    let others: Vec<String> = (0..count)
+        .filter(|i| *i != para)
+        .filter_map(|i| h.state().target.docx().and_then(|d| d.paragraph_text(i)))
+        .collect();
+    assert!(others.iter().all(|t| !t.contains('Z')));
+    let saved = h.state_mut().target.snapshot_bytes().expect("save");
+    let reopened = Target::open_docx(&saved).expect("reopen");
+    assert_eq!(
+        reopened.docx().and_then(|d| d.paragraph_text(para)),
+        Some("BlockZ control paragraph".to_owned())
+    );
+    // The control is still a control: the paragraph stays inside the w:sdt.
+    let doc = reopened.docx().expect("docx");
+    assert!(
+        doc.body()
+            .blocks
+            .iter()
+            .any(|b| matches!(b, open365_docx::Block::Sdt(_)))
+    );
+}

@@ -981,3 +981,42 @@ fn info_and_logic_functions() {
     );
     assert_eq!(eval_in(&mut e, "ROWS(A1:C3)*10+COLUMNS(A1:C3)"), n(33.0));
 }
+
+#[test]
+fn cell_info_sheet_functions() {
+    use crate::{CellStyle, HAlign};
+    let mut e = engine_with(&[("A1", n(10.0)), ("A2", t("txt"))]);
+    e.add_sheet("Sheet2");
+    e.set_cell_style(
+        crate::test_support::SHEET,
+        1,
+        1,
+        CellStyle {
+            number_format: Some("0.00".into()),
+            halign: HAlign::Right,
+            locked: false,
+        },
+    );
+    assert_eq!(eval_in(&mut e, "=CELL(\"address\",B3)"), t("$B$3"));
+    assert_eq!(eval_in(&mut e, "=CELL(\"format\",A1)"), t("F2"));
+    assert_eq!(eval_in(&mut e, "=CELL(\"protect\",A1)"), n(0.0));
+    assert_eq!(eval_in(&mut e, "=CELL(\"type\",A2)"), t("l"));
+    assert_eq!(eval_in(&mut e, "=CELL(\"prefix\",A2)"), t("'"));
+    assert_eq!(eval_in(&mut e, "=CELL(\"row\",B3:C4)"), n(3.0));
+    assert_eq!(
+        eval_in(&mut e, "=CELL(\"nope\",A1)"),
+        err(crate::ErrorKind::Value)
+    );
+    assert_eq!(eval_in(&mut e, "=INFO(\"recalc\")"), t("Automatic"));
+    assert_eq!(
+        eval_in(&mut e, "=INFO(\"memavail\")"),
+        err(crate::ErrorKind::NA)
+    );
+    assert_eq!(eval_in(&mut e, "=SHEET(\"sheet2\")"), n(2.0));
+    assert_eq!(eval_in(&mut e, "=SHEET()"), n(1.0));
+    assert_eq!(eval_in(&mut e, "=SHEETS()"), n(2.0));
+    assert_eq!(
+        eval_in(&mut e, "=SHEET(\"nope\")"),
+        err(crate::ErrorKind::NA)
+    );
+}

@@ -1252,11 +1252,7 @@ fn slow_tools_report_a_timeout_and_a_late_export_writes_nothing() {
     let x = r.open(&xlsx);
     let (v, err) = r.call("layout_summary", json!({"document": d}));
     assert!(err && v["status"] == "timeout", "{v}");
-    assert!(
-        v["error"]
-            .as_str()
-            .is_some_and(|e| e.contains("background"))
-    );
+    assert!(v["error"].as_str().is_some_and(|e| e.contains("cancelled")));
     let (v, err) = r.call("export_pdf", json!({"document": d, "path": "late.pdf"}));
     assert!(err && v["status"] == "timeout", "{v}");
     let (v, err) = r.call(
