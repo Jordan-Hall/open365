@@ -356,3 +356,283 @@ reason = "TANH below |x| = 1 differs from Excel by 1-4 ulp in about a third of r
 [[difference]]
 id = "mathfit_powbig.t166"
 reason = "x^-5000 with x = 0.944267: Excel's repeated-squaring result is 229 ulp from Open365's right-to-left binary exponentiation (which is exact in all 600 other integer-power probes); the cause is unknown."
+
+[[difference]]
+id = "el_asinh.t023"
+reason = "ASINH for |x| below 1e-3: Excel is one ulp of sqrt(x^2+1) away from ln(x+sqrt(x^2+1)) evaluated in doubles (3 of about 50 small arguments); cause unknown."
+
+[[difference]]
+id = "el_asinh.t086"
+reason = "ASINH for |x| below 1e-3: Excel is one ulp of sqrt(x^2+1) away from ln(x+sqrt(x^2+1)) evaluated in doubles (3 of about 50 small arguments); cause unknown."
+
+[[difference]]
+id = "el_asinh.t110"
+reason = "ASINH for |x| below 1e-3: Excel is one ulp of sqrt(x^2+1) away from ln(x+sqrt(x^2+1)) evaluated in doubles (3 of about 50 small arguments); cause unknown."
+
+[[difference]]
+id = "el_acoth.t015"
+reason = "ACOTH is within 1 to 4 ulps of Excel (Open365: ln((x+1)/(x-1))/2 with the quotient held in double-double, 106 of 130 random cases exact); Excel is not correctly rounded and its algorithm is not identified."
+
+[[difference]]
+id = "el_acoth.t016"
+reason = "ACOTH is within 1 to 4 ulps of Excel (Open365: ln((x+1)/(x-1))/2 with the quotient held in double-double, 106 of 130 random cases exact); Excel is not correctly rounded and its algorithm is not identified."
+
+[[difference]]
+id = "el_acoth.t020"
+reason = "ACOTH is within 1 to 4 ulps of Excel (Open365: ln((x+1)/(x-1))/2 with the quotient held in double-double, 106 of 130 random cases exact); Excel is not correctly rounded and its algorithm is not identified."
+
+[[difference]]
+id = "el_acoth.t022"
+reason = "ACOTH is within 1 to 4 ulps of Excel (Open365: ln((x+1)/(x-1))/2 with the quotient held in double-double, 106 of 130 random cases exact); Excel is not correctly rounded and its algorithm is not identified."
+
+[[difference]]
+id = "el_acoth.t023"
+reason = "ACOTH is within 1 to 4 ulps of Excel (Open365: ln((x+1)/(x-1))/2 with the quotient held in double-double, 106 of 130 random cases exact); Excel is not correctly rounded and its algorithm is not identified."
+
+[[difference]]
+id = "el_acoth.t027"
+reason = "ACOTH is within 1 to 4 ulps of Excel (Open365: ln((x+1)/(x-1))/2 with the quotient held in double-double, 106 of 130 random cases exact); Excel is not correctly rounded and its algorithm is not identified."
+
+[[difference]]
+id = "el_acoth.t030"
+reason = "ACOTH is within 1 to 4 ulps of Excel (Open365: ln((x+1)/(x-1))/2 with the quotient held in double-double, 106 of 130 random cases exact); Excel is not correctly rounded and its algorithm is not identified."
+
+[[difference]]
+id = "el_acoth.t034"
+reason = "ACOTH is within 1 to 4 ulps of Excel (Open365: ln((x+1)/(x-1))/2 with the quotient held in double-double, 106 of 130 random cases exact); Excel is not correctly rounded and its algorithm is not identified."
+
+[[difference]]
+id = "el_acoth.t036"
+reason = "ACOTH is within 1 to 4 ulps of Excel (Open365: ln((x+1)/(x-1))/2 with the quotient held in double-double, 106 of 130 random cases exact); Excel is not correctly rounded and its algorithm is not identified."
+
+[[difference]]
+id = "el_acoth.t041"
+reason = "ACOTH is within 1 to 4 ulps of Excel (Open365: ln((x+1)/(x-1))/2 with the quotient held in double-double, 106 of 130 random cases exact); Excel is not correctly rounded and its algorithm is not identified."
+
+[[difference]]
+id = "el_acoth.t045"
+reason = "ACOTH is within 1 to 4 ulps of Excel (Open365: ln((x+1)/(x-1))/2 with the quotient held in double-double, 106 of 130 random cases exact); Excel is not correctly rounded and its algorithm is not identified."
+
+[[difference]]
+id = "el_acoth.t046"
+reason = "ACOTH is within 1 to 4 ulps of Excel (Open365: ln((x+1)/(x-1))/2 with the quotient held in double-double, 106 of 130 random cases exact); Excel is not correctly rounded and its algorithm is not identified."
+
+[[difference]]
+id = "el_acoth.t051"
+reason = "ACOTH is within 1 to 4 ulps of Excel (Open365: ln((x+1)/(x-1))/2 with the quotient held in double-double, 106 of 130 random cases exact); Excel is not correctly rounded and its algorithm is not identified."
+
+[[difference]]
+id = "el_acoth.t054"
+reason = "ACOTH is within 1 to 4 ulps of Excel (Open365: ln((x+1)/(x-1))/2 with the quotient held in double-double, 106 of 130 random cases exact); Excel is not correctly rounded and its algorithm is not identified."
+
+[[difference]]
+id = "el_acoth.t063"
+reason = "ACOTH is within 1 to 4 ulps of Excel (Open365: ln((x+1)/(x-1))/2 with the quotient held in double-double, 106 of 130 random cases exact); Excel is not correctly rounded and its algorithm is not identified."
+
+[[difference]]
+id = "el_acoth.t066"
+reason = "ACOTH is within 1 to 4 ulps of Excel (Open365: ln((x+1)/(x-1))/2 with the quotient held in double-double, 106 of 130 random cases exact); Excel is not correctly rounded and its algorithm is not identified."
+
+[[difference]]
+id = "el_acoth.t074"
+reason = "ACOTH is within 1 to 4 ulps of Excel (Open365: ln((x+1)/(x-1))/2 with the quotient held in double-double, 106 of 130 random cases exact); Excel is not correctly rounded and its algorithm is not identified."
+
+[[difference]]
+id = "el_acoth.t083"
+reason = "ACOTH is within 1 to 4 ulps of Excel (Open365: ln((x+1)/(x-1))/2 with the quotient held in double-double, 106 of 130 random cases exact); Excel is not correctly rounded and its algorithm is not identified."
+
+[[difference]]
+id = "el_acoth.t091"
+reason = "ACOTH is within 1 to 4 ulps of Excel (Open365: ln((x+1)/(x-1))/2 with the quotient held in double-double, 106 of 130 random cases exact); Excel is not correctly rounded and its algorithm is not identified."
+
+[[difference]]
+id = "el_acoth.t095"
+reason = "ACOTH is within 1 to 4 ulps of Excel (Open365: ln((x+1)/(x-1))/2 with the quotient held in double-double, 106 of 130 random cases exact); Excel is not correctly rounded and its algorithm is not identified."
+
+[[difference]]
+id = "el_acoth.t111"
+reason = "ACOTH is within 1 to 4 ulps of Excel (Open365: ln((x+1)/(x-1))/2 with the quotient held in double-double, 106 of 130 random cases exact); Excel is not correctly rounded and its algorithm is not identified."
+
+[[difference]]
+id = "el_acoth.t125"
+reason = "ACOTH is within 1 to 4 ulps of Excel (Open365: ln((x+1)/(x-1))/2 with the quotient held in double-double, 106 of 130 random cases exact); Excel is not correctly rounded and its algorithm is not identified."
+
+[[difference]]
+id = "el_acoth.t127"
+reason = "ACOTH is within 1 to 4 ulps of Excel (Open365: ln((x+1)/(x-1))/2 with the quotient held in double-double, 106 of 130 random cases exact); Excel is not correctly rounded and its algorithm is not identified."
+
+[[difference]]
+id = "el_acoth.t129"
+reason = "ACOTH is within 1 to 4 ulps of Excel (Open365: ln((x+1)/(x-1))/2 with the quotient held in double-double, 106 of 130 random cases exact); Excel is not correctly rounded and its algorithm is not identified."
+
+[[difference]]
+id = "el_acoth.t136"
+reason = "ACOTH is within 1 to 4 ulps of Excel (Open365: ln((x+1)/(x-1))/2 with the quotient held in double-double, 106 of 130 random cases exact); Excel is not correctly rounded and its algorithm is not identified."
+
+[[difference]]
+id = "el_coth.t013"
+reason = "COTH is 1/TANH and inherits the TANH difference below |x| = 1 (see the SINH/TANH entries, algorithm unknown); one case at |x| = 13.3 is one ulp off."
+
+[[difference]]
+id = "el_coth.t018"
+reason = "COTH is 1/TANH and inherits the TANH difference below |x| = 1 (see the SINH/TANH entries, algorithm unknown); one case at |x| = 13.3 is one ulp off."
+
+[[difference]]
+id = "el_coth.t023"
+reason = "COTH is 1/TANH and inherits the TANH difference below |x| = 1 (see the SINH/TANH entries, algorithm unknown); one case at |x| = 13.3 is one ulp off."
+
+[[difference]]
+id = "el_coth.t028"
+reason = "COTH is 1/TANH and inherits the TANH difference below |x| = 1 (see the SINH/TANH entries, algorithm unknown); one case at |x| = 13.3 is one ulp off."
+
+[[difference]]
+id = "el_coth.t053"
+reason = "COTH is 1/TANH and inherits the TANH difference below |x| = 1 (see the SINH/TANH entries, algorithm unknown); one case at |x| = 13.3 is one ulp off."
+
+[[difference]]
+id = "el_coth.t066"
+reason = "COTH is 1/TANH and inherits the TANH difference below |x| = 1 (see the SINH/TANH entries, algorithm unknown); one case at |x| = 13.3 is one ulp off."
+
+[[difference]]
+id = "el_coth.t068"
+reason = "COTH is 1/TANH and inherits the TANH difference below |x| = 1 (see the SINH/TANH entries, algorithm unknown); one case at |x| = 13.3 is one ulp off."
+
+[[difference]]
+id = "el_coth.t076"
+reason = "COTH is 1/TANH and inherits the TANH difference below |x| = 1 (see the SINH/TANH entries, algorithm unknown); one case at |x| = 13.3 is one ulp off."
+
+[[difference]]
+id = "el_coth.t081"
+reason = "COTH is 1/TANH and inherits the TANH difference below |x| = 1 (see the SINH/TANH entries, algorithm unknown); one case at |x| = 13.3 is one ulp off."
+
+[[difference]]
+id = "el_coth.t090"
+reason = "COTH is 1/TANH and inherits the TANH difference below |x| = 1 (see the SINH/TANH entries, algorithm unknown); one case at |x| = 13.3 is one ulp off."
+
+[[difference]]
+id = "el_coth.t094"
+reason = "COTH is 1/TANH and inherits the TANH difference below |x| = 1 (see the SINH/TANH entries, algorithm unknown); one case at |x| = 13.3 is one ulp off."
+
+[[difference]]
+id = "el_coth.t096"
+reason = "COTH is 1/TANH and inherits the TANH difference below |x| = 1 (see the SINH/TANH entries, algorithm unknown); one case at |x| = 13.3 is one ulp off."
+
+[[difference]]
+id = "el_coth.t099"
+reason = "COTH is 1/TANH and inherits the TANH difference below |x| = 1 (see the SINH/TANH entries, algorithm unknown); one case at |x| = 13.3 is one ulp off."
+
+[[difference]]
+id = "el_coth.t100"
+reason = "COTH is 1/TANH and inherits the TANH difference below |x| = 1 (see the SINH/TANH entries, algorithm unknown); one case at |x| = 13.3 is one ulp off."
+
+[[difference]]
+id = "el_coth.t106"
+reason = "COTH is 1/TANH and inherits the TANH difference below |x| = 1 (see the SINH/TANH entries, algorithm unknown); one case at |x| = 13.3 is one ulp off."
+
+[[difference]]
+id = "el_coth.t112"
+reason = "COTH is 1/TANH and inherits the TANH difference below |x| = 1 (see the SINH/TANH entries, algorithm unknown); one case at |x| = 13.3 is one ulp off."
+
+[[difference]]
+id = "el_coth.t114"
+reason = "COTH is 1/TANH and inherits the TANH difference below |x| = 1 (see the SINH/TANH entries, algorithm unknown); one case at |x| = 13.3 is one ulp off."
+
+[[difference]]
+id = "el_coth.t115"
+reason = "COTH is 1/TANH and inherits the TANH difference below |x| = 1 (see the SINH/TANH entries, algorithm unknown); one case at |x| = 13.3 is one ulp off."
+
+[[difference]]
+id = "el_coth.t117"
+reason = "COTH is 1/TANH and inherits the TANH difference below |x| = 1 (see the SINH/TANH entries, algorithm unknown); one case at |x| = 13.3 is one ulp off."
+
+[[difference]]
+id = "el_coth.t118"
+reason = "COTH is 1/TANH and inherits the TANH difference below |x| = 1 (see the SINH/TANH entries, algorithm unknown); one case at |x| = 13.3 is one ulp off."
+
+[[difference]]
+id = "el_coth.t142"
+reason = "COTH is 1/TANH and inherits the TANH difference below |x| = 1 (see the SINH/TANH entries, algorithm unknown); one case at |x| = 13.3 is one ulp off."
+
+[[difference]]
+id = "el_csch.t010"
+reason = "CSCH is 1/SINH and inherits the SINH difference below |x| = 1 (algorithm unknown)."
+
+[[difference]]
+id = "el_csch.t012"
+reason = "CSCH is 1/SINH and inherits the SINH difference below |x| = 1 (algorithm unknown)."
+
+[[difference]]
+id = "el_csch.t020"
+reason = "CSCH is 1/SINH and inherits the SINH difference below |x| = 1 (algorithm unknown)."
+
+[[difference]]
+id = "el_csch.t021"
+reason = "CSCH is 1/SINH and inherits the SINH difference below |x| = 1 (algorithm unknown)."
+
+[[difference]]
+id = "el_csch.t023"
+reason = "CSCH is 1/SINH and inherits the SINH difference below |x| = 1 (algorithm unknown)."
+
+[[difference]]
+id = "el_csch.t026"
+reason = "CSCH is 1/SINH and inherits the SINH difference below |x| = 1 (algorithm unknown)."
+
+[[difference]]
+id = "el_csch.t040"
+reason = "CSCH is 1/SINH and inherits the SINH difference below |x| = 1 (algorithm unknown)."
+
+[[difference]]
+id = "el_csch.t047"
+reason = "CSCH is 1/SINH and inherits the SINH difference below |x| = 1 (algorithm unknown)."
+
+[[difference]]
+id = "el_csch.t048"
+reason = "CSCH is 1/SINH and inherits the SINH difference below |x| = 1 (algorithm unknown)."
+
+[[difference]]
+id = "el_csch.t049"
+reason = "CSCH is 1/SINH and inherits the SINH difference below |x| = 1 (algorithm unknown)."
+
+[[difference]]
+id = "el_csch.t061"
+reason = "CSCH is 1/SINH and inherits the SINH difference below |x| = 1 (algorithm unknown)."
+
+[[difference]]
+id = "el_csch.t093"
+reason = "CSCH is 1/SINH and inherits the SINH difference below |x| = 1 (algorithm unknown)."
+
+[[difference]]
+id = "el_csch.t108"
+reason = "CSCH is 1/SINH and inherits the SINH difference below |x| = 1 (algorithm unknown)."
+
+[[difference]]
+id = "el_csch.t113"
+reason = "CSCH is 1/SINH and inherits the SINH difference below |x| = 1 (algorithm unknown)."
+
+[[difference]]
+id = "el_csch.t123"
+reason = "CSCH is 1/SINH and inherits the SINH difference below |x| = 1 (algorithm unknown)."
+
+[[difference]]
+id = "el_sec.t019"
+reason = "SEC: Excel is not 1/COS rounded; for 4 of 130 arguments the last digit differs (3 below 1.2e-5, one at 1.54); cause unknown."
+
+[[difference]]
+id = "el_sec.t033"
+reason = "SEC: Excel is not 1/COS rounded; for 4 of 130 arguments the last digit differs (3 below 1.2e-5, one at 1.54); cause unknown."
+
+[[difference]]
+id = "el_sec.t051"
+reason = "SEC: Excel is not 1/COS rounded; for 4 of 130 arguments the last digit differs (3 below 1.2e-5, one at 1.54); cause unknown."
+
+[[difference]]
+id = "el_sec.t059"
+reason = "SEC: Excel is not 1/COS rounded; for 4 of 130 arguments the last digit differs (3 below 1.2e-5, one at 1.54); cause unknown."
+
+[[difference]]
+id = "el_sech.t007"
+reason = "SECH: one case differs in the last digit (1/COSH, x = 8.4); cause unknown."
+
+[[difference]]
+id = "fn_seriessum.t068"
+reason = "SERIESSUM: the last digit of a six-term sum differs; Excel evaluates the powers or the summation in another order."

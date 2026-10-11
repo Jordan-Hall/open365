@@ -180,6 +180,29 @@ fn ln_dd(x: f64) -> Dd {
     sum.scale(2.0).add(LN2.mul_f(f64::from(e)))
 }
 
+/// `ln` of a double-double argument `hi + lo` (finite, positive).
+fn ln_of_dd(x: Dd) -> Dd {
+    ln_dd(x.hi).add(Dd::from(x.lo / x.hi))
+}
+
+/// `acoth(a) = ln((a + 1) / (a - 1)) / 2` for `a > 1`, with the quotient held in double-double (106 of 130 random
+/// cases are exact; the others are within a few ulps, Excel's own error is not understood).
+pub fn acoth_magnitude(a: f64) -> f64 {
+    let q = two_sum(a, 1.0).div(two_sum(a, -1.0));
+    ln_of_dd(q).scale(0.5).to_f64()
+}
+
+/// Excel's `ATANH` for `|x| < 1`: `ln((1 + x) / (1 - x)) / 2`, and `x + x^3 / 3` where that loses the argument.
+pub fn atanh_formula(x: f64) -> f64 {
+    if x.abs() <= ATANH_SERIES_UP_TO {
+        return x + x * x * x / 3.0;
+    }
+    0.5 * ln((1.0 + x) / (1.0 - x))
+}
+
+/// Measured: the series is exact up to 1e-4 and the logarithm form matches from 1.37e-4 (no probe between).
+const ATANH_SERIES_UP_TO: f64 = 1e-4;
+
 /// Natural logarithm, correctly rounded (the C library result for zero, negative and non-finite `x`).
 pub fn ln(x: f64) -> f64 {
     if x == 1.0 || !(x > 0.0 && x.is_finite()) {

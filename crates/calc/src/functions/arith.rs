@@ -196,17 +196,21 @@ fn count_arg(ctx: &EvalContext<'_>, arg: &Arg) -> Res<f64> {
     if n < 0.0 { Err(ErrorKind::Num) } else { Ok(n) }
 }
 
+/// `n!` for a whole `n` in 0..=170, multiplied from the top down as Excel does (the order changes the last digit for
+/// n >= 23). Larger values are `#NUM!`.
+fn factorial(n: f64) -> Res<f64> {
+    if n > 170.0 {
+        return Err(ErrorKind::Num);
+    }
+    Ok((2..=n as u32).rev().fold(1.0, |acc, i| acc * f64::from(i)))
+}
+
 pub(super) fn fact(ctx: &EvalContext<'_>, args: &[Arg]) -> Res<Value> {
     arity(args, 1, 1)?;
     if num_arg(ctx, &args[0])? < 0.0 {
         return Err(ErrorKind::Num);
     }
-    let n = count_arg(ctx, &args[0])?;
-    if n > 170.0 {
-        return Err(ErrorKind::Num);
-    }
-    // Excel multiplies from the top down; the order changes the last digit for n >= 23.
-    number((2..=n as u32).rev().fold(1.0, |acc, i| acc * f64::from(i)))
+    number(factorial(count_arg(ctx, &args[0])?)?)
 }
 
 pub(super) fn combin(ctx: &EvalContext<'_>, args: &[Arg]) -> Res<Value> {
@@ -242,7 +246,7 @@ pub(super) fn permut(ctx: &EvalContext<'_>, args: &[Arg]) -> Res<Value> {
 }
 
 /// Number parameter of the old Analysis ToolPak functions, which refuse booleans.
-fn strict_num(ctx: &EvalContext<'_>, arg: &Arg) -> Res<f64> {
+pub(super) fn strict_num(ctx: &EvalContext<'_>, arg: &Arg) -> Res<f64> {
     if matches!(ctx.scalar(arg), Value::Bool(_)) {
         return Err(ErrorKind::Value);
     }

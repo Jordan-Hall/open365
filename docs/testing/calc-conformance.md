@@ -5,7 +5,7 @@ never needs Excel.
 
 | File | Role |
 |---|---|
-| `fixtures/calc/conformance.json` | The corpus: 29,868 cases. Edited by hand or by script; one case per line. |
+| `fixtures/calc/conformance.json` | The corpus: 33,165 cases. Edited by hand or by script; one case per line. |
 | `tools/office/calc-oracle.ps1` | Local-only tool. Runs every case in Excel over COM and writes the results. |
 | `fixtures/reference/calc/conformance-results.json` | Excel's answers, committed. Includes Excel version, build and decimal separator. |
 | `fixtures/calc/known-differences.toml` | Cases where Open365 intentionally or temporarily differs, each with a reason. |
@@ -66,7 +66,7 @@ forms; the corpus has no case for them.
 
 ## Current state
 
-29,868 cases, 29,780 pass, 88 known differences listed in `known-differences.toml` (44 older ones and 44 from the `mathfit_` probes).
+33,165 cases, 33,007 pass, 158 known differences listed in `known-differences.toml` (44 older ones, 44 from the `mathfit_` probes and 70 from the second math batch).
 Older entries: the `**` parse quirk, XLOOKUP array results (no spill), a
 few undocumented Excel quirks, large COMBIN, variance accumulation order, accounting fill, `DB` last period and two `IFERROR`
 over arrays of references. New entries: SINH/TANH below |x| = 1 (last digits) and one `x^-5000` case. The test also fails for a
@@ -263,7 +263,17 @@ cells hold full-precision doubles, generator `gen_mathfit.py` kept outside the r
   `10^n` is the correctly rounded power, `10^-n` its reciprocal (`POWER(10,308)` is exactly `1E+308`).
 * `x^y`, fractional `y`: `exp(y ln x)` with correctly rounded `ln` and `exp`; for negative `y` it is `1 / exp(-y ln x)`
   (240 of 240; plain `exp(y ln x)` is right for 86%). `y = 0.5` is `sqrt`.
-* Not implemented (no worksheet function yet): `ASINH`, `ACOSH`, `ATANH`, `COT` and the other reciprocal functions.
+* Second math batch (groups `el_*` and `fn_*`, `crates/calc/src/functions/mathx.rs`): `SQRTPI` is `sqrt(x * PI())` (exact); `ACOSH` is
+  `ln(x + sqrt(x*x - 1))` and `ASINH` is the sign times `ln(|x| + sqrt(x*x + 1))` (3 of 130 differ below 1e-3), `ATANH` is
+  `0.5 * ln((1+x)/(1-x))` with the series `x + x^3/3` for `|x| <= 1e-4` (probed at 20 decades), `ACOT` is `atan(1/x)` for `x > 0`, `atan(1/x) + PI()`
+  for `x < 0` and `PI()/2` at 0 (exact, `PI()/2 - atan(x)` is not), `ACOTH` is within 1 to 4 ulps (25 known differences).
+  `COT`, `CSC`, `SEC` are the reciprocals of `TAN`, `SIN`, `COS` (the 64-bit pi reduction applies, `#DIV/0!` for zero, 4 `SEC` cases differ in the last
+  digit), `SECH` and `CSCH` return 0 where `COSH`/`SINH` overflow, `COTH` is `1/TANH`; `CSCH`/`COTH` inherit the SINH/TANH difference below 1.
+  `FACTDOUBLE` (top-down product), `SQRTPI`, `SERIESSUM` are Analysis ToolPak style (booleans are `#VALUE!`). `SERIESSUM` adds nothing for a negative base with a
+  fractional power and gives `#NUM!` for base 0 with a power <= 0. `BASE(n, radix, min_length)`: `n < 2^53`, an explicit `min_length` of 0 gives `""` for 0.
+  `DECIMAL` sums exact integers (a `0x` prefix is accepted for radix 16, leading spaces too). `ARABIC` reads right to left (a letter below the largest so far is
+  subtracted: `IIX` is 8, `IC` 99), trims spaces, accepts a leading minus, numbers are `#VALUE!`. `ROMAN` forms 0 to 4 follow the classic table walk (`TRUE` is 0, `FALSE` is 4).
+* Not implemented: the special-function distributions (see `calc-coverage.md` for what was measured).
 
 ## Locale (ADR-011), arrays of references, long text
 
