@@ -12,7 +12,8 @@ use open365_opc::PartName;
 
 use crate::DocxError;
 use crate::layout_props::{
-    LayoutFmt, ParagraphMark, ParagraphProps, RunLayoutProps, TabOp, resolve_tabs, tab_ops,
+    LayoutFmt, ParagraphBorders, ParagraphMark, ParagraphProps, RunLayoutProps, TabOp,
+    resolve_tabs, tab_ops,
 };
 use crate::model::{Paragraph, Run};
 use crate::numbering::{NumPr, StyleNumPr};
@@ -189,6 +190,7 @@ struct ParaFmt {
     contextual_spacing: Option<bool>,
     suppress_auto_hyphens: Option<bool>,
     tab_ops: Vec<TabOp>,
+    borders: ParagraphBorders,
 }
 
 fn twips(value: Option<&str>) -> Option<f32> {
@@ -218,6 +220,7 @@ impl ParaFmt {
                 "contextualSpacing" => fmt.contextual_spacing = Some(on_off(e)),
                 "suppressAutoHyphens" => fmt.suppress_auto_hyphens = Some(on_off(e)),
                 "tabs" => fmt.tab_ops.extend(tab_ops(e)),
+                "pBdr" => fmt.borders = ParagraphBorders::from_element(e),
                 "spacing" => {
                     fmt.before = twips(e.head.attr_w("before")).or(fmt.before);
                     fmt.after = twips(e.head.attr_w("after")).or(fmt.after);
@@ -271,6 +274,7 @@ impl ParaFmt {
         put(&mut self.contextual_spacing, other.contextual_spacing);
         put(&mut self.suppress_auto_hyphens, other.suppress_auto_hyphens);
         self.tab_ops.extend(other.tab_ops.iter().copied());
+        self.borders.overlay(&other.borders);
     }
 }
 
@@ -687,6 +691,7 @@ impl Styles {
             contextual_spacing: fmt.contextual_spacing.unwrap_or(false),
             suppress_auto_hyphens: fmt.suppress_auto_hyphens.unwrap_or(false),
             tabs: resolve_tabs(&fmt.tab_ops),
+            borders: fmt.borders.visible(),
         }
     }
 

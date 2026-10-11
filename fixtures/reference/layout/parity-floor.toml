@@ -36,6 +36,18 @@ total = 3
 matched = 5
 total = 22
 
+[fixtures.layout-caps]
+matched = 32
+total = 87
+
+[fixtures.layout-caps-chars]
+matched = 39
+total = 39
+
+[fixtures.layout-caps-sizes]
+matched = 13
+total = 27
+
 [fixtures.layout-fn-basic]
 matched = 97
 total = 101
@@ -121,15 +133,27 @@ matched = 17
 total = 17
 
 [fixtures.layout-mixed-sizes]
-matched = 1
+matched = 10
 total = 12
 
 [fixtures.layout-pagination]
-matched = 381
+matched = 382
 total = 383
 
+[fixtures.layout-pbdr-edges]
+matched = 58
+total = 58
+
+[fixtures.layout-pbdr-groups]
+matched = 47
+total = 47
+
+[fixtures.layout-pbdr-styles]
+matched = 40
+total = 50
+
 [fixtures.layout-sizes]
-matched = 160
+matched = 162
 total = 221
 
 [fixtures.layout-table-basic]
@@ -216,8 +240,20 @@ total = 3
 matched = 22
 total = 22
 
+[system.layout-caps]
+matched = 87
+total = 87
+
+[system.layout-caps-chars]
+matched = 39
+total = 39
+
+[system.layout-caps-sizes]
+matched = 27
+total = 27
+
 [system.layout-face-multiple]
-matched = 61
+matched = 66
 total = 66
 
 [system.layout-face-typo]
@@ -323,6 +359,18 @@ total = 12
 [system.layout-pagination]
 matched = 383
 total = 383
+
+[system.layout-pbdr-edges]
+matched = 58
+total = 58
+
+[system.layout-pbdr-groups]
+matched = 47
+total = 47
+
+[system.layout-pbdr-styles]
+matched = 40
+total = 50
 
 [system.layout-sizes]
 matched = 221

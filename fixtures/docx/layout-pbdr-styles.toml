@@ -1,0 +1,5 @@
+feature = "layout-pbdr-styles"
+made_with = "Microsoft Word 16.0.20430 (Windows)"
+author = "project member"
+expect_dropped = []
+notes = "top and bottom borders in the solid line styles (dotted and dashed ones draw as many pictures) and widths"

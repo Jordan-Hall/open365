@@ -1,0 +1,5 @@
+feature = "layout-caps-chars"
+made_with = "Microsoft Word 16.0.20430 (Windows)"
+author = "project member"
+expect_dropped = []
+notes = "small caps on lower-case letters next to spaces, digits, capitals and punctuation, 36 and 20 pt"

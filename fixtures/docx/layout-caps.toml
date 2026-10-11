@@ -1,0 +1,5 @@
+feature = "layout-caps"
+made_with = "Microsoft Word 16.0.20430 (Windows)"
+author = "project member"
+expect_dropped = []
+notes = "all caps and small caps: right-aligned probes at sizes 8 to 36 in Calibri and Cambria, mixed-case and wrapped paragraphs"

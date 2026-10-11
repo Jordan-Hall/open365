@@ -950,6 +950,152 @@ try {
     [void](Add-Float 2 $PNG_BLUE 80 40 5 1 400 1 200)
   }
 
+  # Probe: all caps and small caps. Right-aligned lower-case probes expose the width of the capitals (the PDF
+  # first-ink x is exact), so the small-cap size factor can be fitted; wrapped paragraphs check line breaks.
+  L-Fixture 'layout-caps' 'layout-caps' 'all caps and small caps: right-aligned probes at sizes 8 to 36 in Calibri and Cambria, mixed-case and wrapped paragraphs' {
+    Init-Doc 0
+    foreach ($fn in 'Calibri', 'Cambria') {
+      foreach ($sz in 8, 10, 11, 12, 14, 18, 24, 36) {
+        $n = $fn; $z = [single]$sz
+        L-Para 'nnnnnnnnnn' { param($f) $f.Alignment = 2 } { param($f) $f.Name = $n; $f.Size = $z; $f.SmallCaps = 1 }
+        L-Para 'nnnnnnnnnn' { param($f) $f.Alignment = 2 } { param($f) $f.Name = $n; $f.Size = $z; $f.AllCaps = 1 }
+        L-Para 'Hello World 123' { param($f) $f.Alignment = 2 } { param($f) $f.Name = $n; $f.Size = $z; $f.SmallCaps = 1 }
+        L-Para 'Hello World 123' { param($f) $f.Alignment = 2 } { param($f) $f.Name = $n; $f.Size = $z; $f.AllCaps = 1 }
+      }
+    }
+    L-Para $A $null { param($f) $f.SmallCaps = 1 }
+    L-Para $B $null { param($f) $f.AllCaps = 1 }
+    L-Para $A $null { param($f) $f.Name = 'Cambria'; $f.Size = 12; $f.SmallCaps = 1 }
+    L-Para $B $null { param($f) $f.Name = 'Cambria'; $f.Size = 13; $f.AllCaps = 1 }
+    L-Para 'Mixed Case Words With Digits 2024 and a few punctuation marks, like these: (one) [two] "three".' { param($f) $f.Alignment = 3 } { param($f) $f.SmallCaps = 1 }
+  }
+
+  # Probe: which characters small caps shrinks. Right-aligned 36 pt strings put the width of each character class in
+  # the PDF first-ink x.
+  L-Fixture 'layout-caps-chars' 'layout-caps-chars' 'small caps on lower-case letters next to spaces, digits, capitals and punctuation, 36 and 20 pt' {
+    Init-Doc 0
+    foreach ($sz in 36, 20) {
+      foreach ($t in 'n n', 'N n', 'n N', 'N N', 'n 1', '1 n', 'n1', '1n', 'n.', '.n', 'n,n', '1 1', 'nn  nn', 'n-n', 'n' + [string][char]0xE9 + 'n', ('n' + $VT + 'n')) {
+        $z = [single]$sz
+        L-Para $t { param($f) $f.Alignment = 2 } { param($f) $f.Size = $z; $f.SmallCaps = 1 }
+      }
+    }
+  }
+
+  # Probe: the small-cap size rule over more font sizes (0.8 x size, nearest half point?).
+  L-Fixture 'layout-caps-sizes' 'layout-caps-sizes' 'small caps width at 9 to 72 pt, including half-point sizes, in Calibri and Cambria' {
+    Init-Doc 0
+    foreach ($fn in 'Calibri', 'Cambria') {
+      foreach ($sz in 9, 9.5, 10.5, 13, 15, 16, 20, 22, 26, 28, 40, 48, 72) {
+        $n = $fn; $z = [single]$sz
+        L-Para 'nnnnnnnn' { param($f) $f.Alignment = 2 } { param($f) $f.Name = $n; $f.Size = $z; $f.SmallCaps = 1 }
+      }
+    }
+  }
+
+  # Paragraph borders. WdBorderType: top -1, left -2, bottom -3, right -4, horizontal (between) -5.
+  # LineWidth constants (WdLineWidth): 0.25pt 2, 0.5 4, 0.75 6, 1 8, 1.5 12, 2.25 18, 3 24, 4.5 36, 6 48.
+  function PBorder($f, $side, $style, $width, $space) {
+    $b = $f.Borders.Item($side); $b.LineStyle = $style; try { $b.LineWidth = $width } catch {}; $b.Color = 0
+    switch ($side) { -1 { $f.Borders.DistanceFromTop = $space } -2 { $f.Borders.DistanceFromLeft = $space } -3 { $f.Borders.DistanceFromBottom = $space } -4 { $f.Borders.DistanceFromRight = $space } }
+  }
+
+  # Probe: how much one border edge adds to the paragraph's extent. Marker, bordered one-line paragraph, marker: the
+  # baseline pitches before and after the paragraph give the space above and below.
+  L-Fixture 'layout-pbdr-edges' 'layout-pbdr-edges' 'single-line paragraphs with one border edge (top, bottom, left, right) of 0.5 to 3 pt and 0 to 31 pt distance, between markers' {
+    Init-Doc 0
+    foreach ($e in @(-1, -3)) {
+      foreach ($c in @(@(4, 0), @(4, 4), @(12, 1), @(24, 0), @(24, 24), @(4, 31), @(48, 3))) {
+        $sd = $e; $w = $c[0]; $sp = $c[1]
+        Marker
+        L-Para 'Border edge probe' { param($f) PBorder $f $sd 1 $w $sp }
+      }
+    }
+    Marker
+    foreach ($e in @(-2, -4)) {
+      foreach ($c in @(@(4, 0), @(12, 6), @(24, 24))) {
+        $sd = $e; $w = $c[0]; $sp = $c[1]
+        L-Para 'Border side probe' { param($f) PBorder $f $sd 1 $w $sp; $f.Alignment = 2 }
+        L-Para 'Border side probe' { param($f) PBorder $f $sd 1 $w $sp; $f.Alignment = 0 }
+      }
+    }
+    Marker
+    L-Para $A { param($f) PBorder $f -2 1 12 6; PBorder $f -4 1 12 6 }
+    L-Para $A { param($f) PBorder $f -2 1 4 0; PBorder $f -4 1 24 24; $f.LeftIndent = 36 }
+    L-Para $A
+  }
+
+  # Probe: border styles (the extent of double, triple and thin-thick rules).
+  L-Fixture 'layout-pbdr-styles' 'layout-pbdr-styles' 'top and bottom borders in the solid line styles (dotted and dashed ones draw as many pictures) and widths' {
+    Init-Doc 0
+    foreach ($st in 1, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17) {
+      foreach ($w in 4, 12) {
+        $ls = $st; $lw = $w
+        Marker
+        L-Para 'Border style probe' { param($f) PBorder $f -1 $ls $lw 2; PBorder $f -3 $ls $lw 2 }
+      }
+    }
+    Marker
+  }
+
+  # Probe: borders between consecutive paragraphs. Identical borders form one box; the between rule, spacing and
+  # differing borders decide how much the edges add.
+  L-Fixture 'layout-pbdr-groups' 'layout-pbdr-groups' 'consecutive paragraphs with identical and differing borders, between rules, spacing before and after' {
+    Init-Doc 0
+    function Box($f, $w, $sp) { foreach ($sd in -1, -2, -3, -4) { PBorder $f $sd 1 $w $sp } }
+    # The between rule exists only on a range of several paragraphs: set it on the last $n paragraphs typed.
+    function Between($n, $w, $sp) {
+      $d = $script:doc; $c = $d.Paragraphs.Count
+      $r = $d.Range($d.Paragraphs.Item($c - $n).Range.Start, $d.Paragraphs.Item($c - 1).Range.End)
+      $b = $r.Borders.Item(-5); $b.LineStyle = 1; $b.LineWidth = $w; $b.Color = 0
+    }
+    # a: three identical boxes, no between rule
+    Marker
+    1..3 | ForEach-Object { L-Para "Group a $_" { param($f) Box $f 8 2 } }
+    # b: with a between rule
+    Marker
+    1..3 | ForEach-Object { L-Para "Group b $_" { param($f) Box $f 8 2 } }
+    Between 3 4 1
+    # c: identical boxes with space before and after
+    Marker
+    1..3 | ForEach-Object { L-Para "Group c $_" { param($f) Box $f 8 2; $f.SpaceBefore = 6; $f.SpaceAfter = 10 } }
+    # d: between rule plus spacing
+    Marker
+    1..3 | ForEach-Object { L-Para "Group d $_" { param($f) Box $f 8 2; $f.SpaceBefore = 6; $f.SpaceAfter = 10 } }
+    Between 3 12 3
+    # e: widths differ
+    Marker
+    L-Para 'Group e 1' { param($f) Box $f 8 2 }
+    L-Para 'Group e 2' { param($f) Box $f 12 2 }
+    # f: distances differ
+    Marker
+    L-Para 'Group f 1' { param($f) Box $f 8 2 }
+    L-Para 'Group f 2' { param($f) Box $f 8 4 }
+    # g: indents differ
+    Marker
+    L-Para 'Group g 1' { param($f) Box $f 8 2 }
+    L-Para 'Group g 2' { param($f) Box $f 8 2; $f.LeftIndent = 18 }
+    # h: alignment differs
+    Marker
+    L-Para 'Group h 1' { param($f) Box $f 8 2 }
+    L-Para 'Group h 2' { param($f) Box $f 8 2; $f.Alignment = 1 }
+    # i: two boxes separated by an unbordered paragraph
+    Marker
+    L-Para 'Group i 1' { param($f) Box $f 8 2; $f.SpaceAfter = 6 }
+    L-Para 'Group i plain'
+    L-Para 'Group i 2' { param($f) Box $f 8 2; $f.SpaceBefore = 6 }
+    # j: top and bottom only, spacing inside the group
+    Marker
+    1..3 | ForEach-Object { L-Para "Group j $_" { param($f) PBorder $f -1 1 8 3; PBorder $f -3 1 8 3; $f.SpaceBefore = 8; $f.SpaceAfter = 8 } }
+    # k: top only
+    Marker
+    1..3 | ForEach-Object { L-Para "Group k $_" { param($f) PBorder $f -1 1 8 3; $f.SpaceAfter = 5 } }
+    # l: two-line paragraphs in a box
+    Marker
+    1..2 | ForEach-Object { L-Para ("Group l $_ first line" + $VT + "second line") { param($f) Box $f 8 2 } }
+    Marker
+  }
+
 } finally {
   if ($word) {
     try { $word.UserName = $oldUser; $word.UserInitials = $oldInit; $word.Options.UseLocalUserInfo = $oldLocal } catch {}

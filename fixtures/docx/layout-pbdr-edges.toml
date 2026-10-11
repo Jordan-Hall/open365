@@ -1,0 +1,5 @@
+feature = "layout-pbdr-edges"
+made_with = "Microsoft Word 16.0.20430 (Windows)"
+author = "project member"
+expect_dropped = []
+notes = "single-line paragraphs with one border edge (top, bottom, left, right) of 0.5 to 3 pt and 0 to 31 pt distance, between markers"

@@ -33,7 +33,8 @@ pub use drawing::{
 };
 pub use error::DocxError;
 pub use layout_props::{
-    Ligatures, ParagraphMark, ParagraphProps, RunLayoutProps, TabKind, TabLeader, TabStop,
+    Ligatures, ParagraphBorders, ParagraphMark, ParagraphProps, RunLayoutProps, TabKind, TabLeader,
+    TabStop,
 };
 pub use model::{
     Block, Body, Break, BreakKind, Cell, DocChild, DocumentRoot, Group, Inline, Paragraph, Row,

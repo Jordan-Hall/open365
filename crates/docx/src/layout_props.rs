@@ -4,7 +4,9 @@
 
 use crate::props::RunProps;
 use crate::styles::EffectiveRun;
+use crate::table::Border;
 use crate::xml::{RawXml, XmlElement};
+use crate::xmlq::on_off;
 
 /// Alignment kind of a tab stop (`w:tab` `w:val`, ECMA-376 Part 1 §17.3.1.37, ST_TabJc).
 /// `clear` is not a kind: it removes an inherited stop.
@@ -116,7 +118,7 @@ pub(crate) fn resolve_tabs(ops: &[TabOp]) -> Vec<TabStop> {
 ///
 /// Absent-property defaults follow ECMA-376 Part 1: `widowControl` is on (§17.3.1.44),
 /// every other flag is off.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct ParagraphProps {
     /// `w:widowControl`, §17.3.1.44. Default true.
     pub widow_control: bool,
@@ -132,6 +134,84 @@ pub struct ParagraphProps {
     pub suppress_auto_hyphens: bool,
     /// Effective custom tab stops (§17.3.1.38), sorted by position, `clear` applied.
     pub tabs: Vec<TabStop>,
+    /// Effective paragraph borders (`w:pBdr`, §17.3.1.24); a side without a visible border is
+    /// `None`.
+    pub borders: ParagraphBorders,
+}
+
+/// The borders of a paragraph (`w:pBdr`, ECMA-376 Part 1 §17.3.1.24). `size` is in points
+/// ([`Border::width`]), `space` the gap between text and rule in points.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct ParagraphBorders {
+    pub top: Option<Border>,
+    pub bottom: Option<Border>,
+    pub left: Option<Border>,
+    pub right: Option<Border>,
+    /// Drawn between consecutive paragraphs that share identical borders (`w:between`).
+    pub between: Option<Border>,
+    /// Vertical rule beside a group of paragraphs (`w:bar`).
+    pub bar: Option<Border>,
+}
+
+impl ParagraphBorders {
+    pub fn is_empty(&self) -> bool {
+        self.top.is_none()
+            && self.bottom.is_none()
+            && self.left.is_none()
+            && self.right.is_none()
+            && self.between.is_none()
+            && self.bar.is_none()
+    }
+
+    pub(crate) fn from_element(e: &XmlElement) -> Self {
+        let get = |names: &[&str]| {
+            e.children
+                .iter()
+                .filter_map(RawXml::as_element)
+                .find(|c| names.iter().any(|n| c.head.is_w(n)))
+                .map(Border::from_element)
+        };
+        Self {
+            top: get(&["top"]),
+            bottom: get(&["bottom"]),
+            left: get(&["left", "start"]),
+            right: get(&["right", "end"]),
+            between: get(&["between"]),
+            bar: get(&["bar"]),
+        }
+    }
+
+    /// `top` over `self` side by side; a stated `nil` border stays until [`Self::visible`].
+    pub(crate) fn overlay(&mut self, top: &Self) {
+        fn put(slot: &mut Option<Border>, value: &Option<Border>) {
+            if value.is_some() {
+                slot.clone_from(value);
+            }
+        }
+        put(&mut self.top, &top.top);
+        put(&mut self.bottom, &top.bottom);
+        put(&mut self.left, &top.left);
+        put(&mut self.right, &top.right);
+        put(&mut self.between, &top.between);
+        put(&mut self.bar, &top.bar);
+    }
+
+    /// Drops `nil` and `none` sides, which only existed to override an inherited border.
+    pub(crate) fn visible(mut self) -> Self {
+        for side in [
+            &mut self.top,
+            &mut self.bottom,
+            &mut self.left,
+            &mut self.right,
+            &mut self.between,
+            &mut self.bar,
+        ] {
+            if side.as_ref().is_some_and(|b| !b.is_visible()) {
+                *side = None;
+            }
+        }
+        self
+    }
 }
 
 impl Default for ParagraphProps {
@@ -144,6 +224,7 @@ impl Default for ParagraphProps {
             contextual_spacing: false,
             suppress_auto_hyphens: false,
             tabs: Vec::new(),
+            borders: ParagraphBorders::default(),
         }
     }
 }
@@ -196,6 +277,11 @@ pub struct RunLayoutProps {
     pub spacing_twips: i32,
     /// `w:w`, §17.3.2.43: horizontal scale in percent (1..=600).
     pub scale_percent: u32,
+    /// `w:caps`, §17.3.2.5: show lower-case letters as capitals. Default false.
+    pub caps: bool,
+    /// `w:smallCaps`, §17.3.2.33: show lower-case letters as reduced capitals. Default false;
+    /// `caps` wins when both are set.
+    pub small_caps: bool,
 }
 
 impl Default for RunLayoutProps {
@@ -206,6 +292,8 @@ impl Default for RunLayoutProps {
             position_half_points: 0,
             spacing_twips: 0,
             scale_percent: 100,
+            caps: false,
+            small_caps: false,
         }
     }
 }
@@ -237,6 +325,8 @@ pub(crate) struct LayoutFmt {
     pub position: Option<i32>,
     pub spacing: Option<i32>,
     pub scale: Option<u32>,
+    pub caps: Option<bool>,
+    pub small_caps: Option<bool>,
 }
 
 impl LayoutFmt {
@@ -253,6 +343,8 @@ impl LayoutFmt {
             position: int("position"),
             spacing: int("spacing"),
             scale: int("w").and_then(|v| u32::try_from(v).ok()),
+            caps: props.any_w_element("caps").map(on_off),
+            small_caps: props.any_w_element("smallCaps").map(on_off),
         }
     }
 
@@ -267,6 +359,8 @@ impl LayoutFmt {
         put(&mut self.position, other.position);
         put(&mut self.spacing, other.spacing);
         put(&mut self.scale, other.scale);
+        put(&mut self.caps, other.caps);
+        put(&mut self.small_caps, other.small_caps);
     }
 
     pub(crate) fn finish(self) -> RunLayoutProps {
@@ -277,6 +371,8 @@ impl LayoutFmt {
             position_half_points: self.position.unwrap_or(d.position_half_points),
             spacing_twips: self.spacing.unwrap_or(d.spacing_twips),
             scale_percent: self.scale.unwrap_or(d.scale_percent),
+            caps: self.caps.unwrap_or(d.caps),
+            small_caps: self.small_caps.unwrap_or(d.small_caps),
         }
     }
 }

@@ -25,6 +25,9 @@ pub(crate) struct CellMeta {
     pub header_row: bool,
     pub fill: Option<[u8; 3]>,
     pub borders: CellBorders,
+    /// Top and bottom cell margins (`w:tblCellMar`, `w:tcMar`).
+    pub pad_top: f64,
+    pub pad_bottom: f64,
 }
 
 /// The border drawn at a cell edge: the first level that states one decides.
@@ -455,6 +458,8 @@ pub(crate) fn layout_table(b: &mut Builder<'_>, table: &Table, avail: f64) -> Ta
                 row_span: c.row_span,
                 header_row,
                 fill,
+                pad_top: pad.top,
+                pad_bottom: pad.bottom,
                 borders: CellBorders {
                     top,
                     bottom,

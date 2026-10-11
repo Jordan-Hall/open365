@@ -78,7 +78,7 @@ pub struct Border {
 }
 
 impl Border {
-    fn from_element(e: &XmlElement) -> Self {
+    pub(crate) fn from_element(e: &XmlElement) -> Self {
         Self {
             style: e.head.attr_w("val").unwrap_or("nil").to_owned(),
             width: int(e.head.attr_w("sz")).map_or(0.0, |s| s as f64 / 8.0),

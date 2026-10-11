@@ -483,3 +483,77 @@ fn fixtures_expose_typed_properties() {
             .any(|p| p.keep_next || p.keep_lines || p.page_break_before)
     );
 }
+
+#[test]
+fn caps_and_small_caps_resolve_through_styles_and_direct_formatting() {
+    let styles = styles_xml(
+        r#"<w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/></w:style>
+<w:style w:type="paragraph" w:styleId="Caps"><w:name w:val="Caps"/><w:basedOn w:val="Normal"/><w:rPr><w:caps/></w:rPr></w:style>
+<w:style w:type="paragraph" w:styleId="Small"><w:name w:val="Small"/><w:basedOn w:val="Caps"/><w:rPr><w:caps w:val="0"/><w:smallCaps/></w:rPr></w:style>"#,
+    );
+    let body = r#"<w:p><w:r><w:t>plain</w:t></w:r></w:p>
+<w:p><w:pPr><w:pStyle w:val="Caps"/></w:pPr><w:r><w:t>caps</w:t></w:r></w:p>
+<w:p><w:pPr><w:pStyle w:val="Small"/></w:pPr><w:r><w:t>small</w:t></w:r></w:p>
+<w:p><w:pPr><w:pStyle w:val="Small"/></w:pPr><w:r><w:rPr><w:smallCaps w:val="0"/></w:rPr><w:t>off</w:t></w:r></w:p>"#;
+    let doc = doc_with(body, Some(&styles), None);
+    let s = doc.styles().unwrap();
+    let flags = |i: usize| {
+        let l = s.effective_run_layout(doc.paragraph(i).unwrap(), first_run(&doc, i));
+        (l.caps, l.small_caps)
+    };
+    assert_eq!(flags(0), (false, false));
+    assert_eq!(flags(1), (true, false));
+    assert_eq!(
+        flags(2),
+        (false, true),
+        "child switches caps off, small caps on"
+    );
+    assert_eq!(flags(3), (false, false), "direct w:val=0 wins");
+}
+
+#[test]
+fn paragraph_borders_resolve_through_defaults_style_chain_and_direct() {
+    let styles = styles_xml(
+        r#"<w:docDefaults><w:pPrDefault><w:pPr><w:pBdr><w:left w:val="single" w:sz="4" w:space="2" w:color="FF0000"/></w:pBdr></w:pPr></w:pPrDefault></w:docDefaults>
+<w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/></w:style>
+<w:style w:type="paragraph" w:styleId="Boxed"><w:name w:val="Boxed"/><w:basedOn w:val="Normal"/><w:pPr><w:pBdr><w:top w:val="single" w:sz="8" w:space="4" w:color="auto"/><w:bottom w:val="double" w:sz="6" w:space="1" w:color="00FF00"/><w:between w:val="single" w:sz="4" w:space="1" w:color="auto"/><w:bar w:val="single" w:sz="12" w:space="3" w:color="0000FF"/></w:pBdr></w:pPr></w:style>
+<w:style w:type="paragraph" w:styleId="Child"><w:name w:val="Child"/><w:basedOn w:val="Boxed"/><w:pPr><w:pBdr><w:bottom w:val="nil"/><w:right w:val="single" w:sz="16" w:space="10"/></w:pBdr></w:pPr></w:style>"#,
+    );
+    let body = r#"<w:p/>
+<w:p><w:pPr><w:pStyle w:val="Boxed"/></w:pPr></w:p>
+<w:p><w:pPr><w:pStyle w:val="Child"/></w:pPr></w:p>
+<w:p><w:pPr><w:pStyle w:val="Child"/><w:pBdr><w:top w:val="none"/></w:pBdr></w:pPr></w:p>"#;
+    let doc = doc_with(body, Some(&styles), None);
+    let s = doc.styles().unwrap();
+    let borders = |i: usize| s.paragraph_flow_props(doc.paragraph(i).unwrap()).borders;
+
+    let plain = borders(0);
+    let left = plain.left.as_ref().unwrap();
+    assert_eq!(
+        (left.width, left.space, left.color),
+        (0.5, 2.0, Some([255, 0, 0]))
+    );
+    assert!(plain.top.is_none() && plain.between.is_none() && plain.bar.is_none());
+
+    let boxed = borders(1);
+    let top = boxed.top.as_ref().unwrap();
+    assert_eq!((top.width, top.space, top.color), (1.0, 4.0, None));
+    let bottom = boxed.bottom.as_ref().unwrap();
+    assert_eq!((bottom.style.as_str(), bottom.width), ("double", 0.75));
+    assert_eq!(boxed.between.as_ref().unwrap().width, 0.5);
+    assert_eq!(boxed.bar.as_ref().unwrap().width, 1.5);
+    assert!(boxed.left.is_some(), "document default side survives");
+
+    let child = borders(2);
+    assert!(
+        child.bottom.is_none(),
+        "nil in the child removes the inherited side"
+    );
+    assert_eq!(child.right.as_ref().unwrap().width, 2.0);
+    assert!(child.top.is_some() && child.bar.is_some());
+
+    assert!(
+        borders(3).top.is_none(),
+        "direct none removes the style's side"
+    );
+}

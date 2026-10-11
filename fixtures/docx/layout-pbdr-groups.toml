@@ -1,0 +1,5 @@
+feature = "layout-pbdr-groups"
+made_with = "Microsoft Word 16.0.20430 (Windows)"
+author = "project member"
+expect_dropped = []
+notes = "consecutive paragraphs with identical and differing borders, between rules, spacing before and after"

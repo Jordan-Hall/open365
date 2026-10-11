@@ -30,6 +30,27 @@ Units are points. Baselines come from Word's 600 dpi PDF and sit on a 0.24 pt gr
 | A table style's cell borders `left` and `right` name the region's outer edges; the edges between cells use `insideV`. A header row with `insideV` nil has no vertical borders between its cells. | `layout-table-flow` |
 | The empty paragraph after a nested table at the end of a cell takes no height. | `layout-table-flow` |
 
+## Caps and small caps (`para.rs`)
+
+| Rule | Evidence |
+|---|---|
+| `w:caps` shapes the capitals of the text at the run's size; clusters map back to the original characters. | `layout-caps` |
+| `w:smallCaps` shows lower-case letters and spaces as capitals of `round(0.8 x size, nearest 0.5 pt)` (8 -> 6.5, 10 -> 8, 11 -> 9, 12 -> 9.5, 14 -> 11, 18 -> 14.5, 24 -> 19, 36 -> 29, and 13 other sizes). Capitals, digits and punctuation keep the full size. The line is sized for the full font. | `layout-caps`, `layout-caps-sizes`, `layout-caps-chars` |
+
+## Paragraph borders (`para.rs`, `flow.rs`)
+
+| Rule | Evidence |
+|---|---|
+| A top or bottom border adds its extent plus `w:space` to the paragraph: above the first line (after the space before), below the last line (before the space after). Left and right borders hang outside the text and change neither position nor wrapping. | `layout-pbdr-edges` |
+| Extent of a rule: single, dotted and dashed styles the width; double 3x; triple 5x; thin-thick and thick-thin small gap width + 1.5 pt; thin-thick-thin small gap width + 3 pt; medium gap 2x; large gap width + 2.4 pt (thin-thick-thin 2x + 3 pt). Approximate for the large gaps (the layout-pbdr-styles drift is under 1.2 pt per paragraph). | `layout-pbdr-styles` |
+| Consecutive paragraphs with identical `pBdr` and identical left and right indents form one box: the top edge once, the bottom edge once, nothing between unless `w:between` is set, then `width + 2 x space` is added to the usual gap (the larger of space after and before). Alignment, width, distance or indent differences end the group. | `layout-pbdr-groups` |
+| Word draws a rule as a filled rectangle: its outer left edge lies `space + 1.42` pt left of the text and its right edge `space + 1.65` pt right of it; the space before and after sit outside the box. Not yet exposed on `Line` or a box type. | PDF rectangles of `layout-pbdr-*` |
+
+## Multiple spacing at a page end
+
+A line under multiple spacing above 1 stays on the page when its text (ascent and descent) fits,
+even if the extra spacing below it does not (`layout-face-multiple`, Arial 10 pt, multiple 2.0).
+
 ## Pictures (`float.rs`, `flow.rs`)
 
 Inline and floating placements match `layout-img-inline`, `layout-img-none`, `layout-img-square` and
@@ -37,8 +58,12 @@ Inline and floating placements match `layout-img-inline`, `layout-img-none`, `la
 
 ## Not matched yet
 
-- Cell padding (`tblCellMar` top and bottom): Word's clip rectangle is the cell inset vertically by the padding
-  (`layout-table-basic`, 4 cells); the engine reports the full cell and counts the padding twice with space after.
+- Cell padding (`tblCellMar` top and bottom): in `layout-table-basic` Word's clip rectangle is the cell inset
+  vertically by the padding (4 cells; they still differ by 0.10 pt in x), but in the template corpus the same
+  inset breaks more cells than it fixes, so `CellBox::pad_top` and `pad_bottom` are reported and the parity test
+  compares the full box.
+- Paragraph borders inside table cells, headers, footers and notes (only the main flow applies them), the box
+  geometry for drawing, `w:bar`, and borders across a page break.
 - Auto-fit tables wider than the text area (`layout-table-width`, 4 lines and cells).
 - The zero-height line of the empty paragraph after a nested table (`layout-table-flow`, 1 line).
 - Contextual spacing (`layout-indents-spacing`, 7 lines) and the Caladea/Cambria vertical metric difference in bundled mode.

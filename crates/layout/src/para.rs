@@ -50,6 +50,166 @@ pub(crate) struct RunStyle {
     pub scale: f64,
     /// A note reference mark.
     pub superscript: bool,
+    /// Size the line metrics come from: [`Self::size`], except for the reduced capitals of
+    /// small caps, which sit on a line sized for the full-size font.
+    pub metric_size: f64,
+    /// `w:caps` or `w:smallCaps`.
+    pub case: CaseMode,
+}
+
+/// How a run's lower-case letters are shown.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum CaseMode {
+    Normal,
+    /// `w:caps`: capitals of the run's size.
+    Caps,
+    /// `w:smallCaps`: capitals of [`small_cap_size`].
+    SmallCaps,
+}
+
+/// Size of the reduced capitals of small caps: 0.8 of the font size, rounded to the nearest half
+/// point. Measured with layout-caps (Calibri and Cambria, 8 to 36 pt): the PDF font sizes are
+/// 6.5, 8, 9, 9.5, 11, 14.5, 19 and 29 pt for 8, 10, 11, 12, 14, 18, 24 and 36 pt text.
+pub(crate) fn small_cap_size(size: f64) -> f64 {
+    (size * 2.0 * 0.8).round().max(1.0) / 2.0
+}
+
+/// The capital a lower-case letter stands for, when it has exactly one.
+fn capital(c: char) -> Option<char> {
+    let mut up = c.to_uppercase();
+    match (up.next(), up.next()) {
+        (Some(u), None) => Some(u),
+        _ => None,
+    }
+}
+
+/// Height a border takes: Word draws the composite styles with several rules, so their extent is
+/// a multiple of `w:sz` plus fixed gaps. Fitted to layout-pbdr-styles (single rules and the
+/// dotted and dashed ones take the width; double 3x, triple 5x; the thin and thick pairs and
+/// triples a width plus 1.5, 3 or 2.4 pt, the medium-gap pair twice the width).
+fn border_extent(b: &open365_docx::Border) -> f64 {
+    if !b.is_visible() {
+        return 0.0;
+    }
+    let w = b.width;
+    match b.style.as_str() {
+        "double" => 3.0 * w,
+        "triple" => 5.0 * w,
+        "thinThickSmallGap" | "thickThinSmallGap" => w + 1.5,
+        "thinThickThinSmallGap" => w + 3.0,
+        "thinThickMediumGap" | "thickThinMediumGap" => 2.0 * w,
+        "thinThickThinMediumGap" => 3.0 * w,
+        "thinThickLargeGap" | "thickThinLargeGap" => w + 2.4,
+        "thinThickThinLargeGap" => 2.0 * w + 3.0,
+        _ => w,
+    }
+}
+
+impl ParaLayout {
+    /// Height the top border and its distance from the text add above the first line.
+    pub(crate) fn border_top(&self) -> f64 {
+        self.flow
+            .borders
+            .top
+            .as_ref()
+            .map_or(0.0, |b| border_extent(b) + b.space)
+    }
+
+    /// Height the bottom border and its distance from the text add below the last line.
+    pub(crate) fn border_bottom(&self) -> f64 {
+        self.flow
+            .borders
+            .bottom
+            .as_ref()
+            .map_or(0.0, |b| border_extent(b) + b.space)
+    }
+
+    /// Height of the between rule and its distance on both sides, inside a group.
+    pub(crate) fn between_extent(&self) -> f64 {
+        self.flow
+            .borders
+            .between
+            .as_ref()
+            .map_or(0.0, |b| border_extent(b) + 2.0 * b.space)
+    }
+
+    /// Whether `next` continues this paragraph's border group: borders present and identical,
+    /// and the same left and right indents (alignment does not matter; layout-pbdr-groups).
+    pub(crate) fn joins(&self, next: &Self) -> bool {
+        !self.flow.borders.is_empty()
+            && self.flow.borders == next.flow.borders
+            && self.props.indent_left_pt == next.props.indent_left_pt
+            && self.props.indent_right_pt == next.props.indent_right_pt
+    }
+}
+
+/// A stretch of a span shaped on its own.
+struct Piece {
+    range: Range<usize>,
+    style: usize,
+    /// Shape the capitals of the text, not the text itself.
+    upper: bool,
+}
+
+/// Splits `range` of `text` into the stretches `w:caps` and `w:smallCaps` shape separately:
+/// all of it as capitals, or the lower-case letters and the spaces as reduced capitals between
+/// the other characters at full size (digits, punctuation and capitals are not reduced:
+/// layout-caps-chars). Reduced styles are added to `styles` once per base style.
+fn case_pieces(
+    text: &str,
+    range: &Range<usize>,
+    style: usize,
+    styles: &mut Vec<RunStyle>,
+    reduced: &mut HashMap<usize, usize>,
+) -> Vec<Piece> {
+    match styles[style].case {
+        CaseMode::Normal => vec![Piece {
+            range: range.clone(),
+            style,
+            upper: false,
+        }],
+        CaseMode::Caps => vec![Piece {
+            range: range.clone(),
+            style,
+            upper: true,
+        }],
+        CaseMode::SmallCaps => {
+            let small = *reduced.entry(style).or_insert_with(|| {
+                let mut st = styles[style].clone();
+                st.size = small_cap_size(st.size);
+                st.case = CaseMode::Normal;
+                styles.push(st);
+                styles.len() - 1
+            });
+            let mut pieces: Vec<Piece> = Vec::new();
+            for (i, c) in text[range.clone()].char_indices() {
+                let lower = c == ' ' || capital(c).is_some_and(|u| u != c);
+                let at = range.start + i;
+                match pieces.last_mut() {
+                    Some(p) if p.upper == lower => p.range.end = at + c.len_utf8(),
+                    _ => pieces.push(Piece {
+                        range: at..at + c.len_utf8(),
+                        style: if lower { small } else { style },
+                        upper: lower,
+                    }),
+                }
+            }
+            pieces
+        }
+    }
+}
+
+/// `text` with every character that has one capital replaced by it, and for every byte of the
+/// result the byte offset of its character in `text`.
+fn capitals(text: &str) -> (String, Vec<u32>) {
+    let mut out = String::with_capacity(text.len());
+    let mut back = Vec::with_capacity(text.len());
+    for (i, c) in text.char_indices() {
+        let u = capital(c).unwrap_or(c);
+        out.push(u);
+        back.extend(std::iter::repeat_n(i as u32, u.len_utf8()));
+    }
+    (out, back)
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -127,6 +287,10 @@ pub(crate) struct LineBox {
     pub xs: Vec<f64>,
     /// True when the line ends with a page break; the next line starts a page.
     pub page_break_after: bool,
+    /// Spacing below the text of the line that a page need not have room for: a multiple above
+    /// one adds `(m - 1)` font heights under the descent, and Word keeps the line on the page
+    /// when its text fits (layout-face-multiple).
+    pub slack: f64,
 }
 
 /// What line breaking needs besides the atoms, so that a paragraph can be broken again when
@@ -312,6 +476,14 @@ fn style_from(ctx: &Context<'_>, er: &EffectiveRun, lay: &RunLayoutProps) -> Run
         spacing: f64::from(lay.spacing_pt()),
         scale: f64::from(lay.scale_percent) / 100.0,
         superscript: false,
+        metric_size: f64::from(er.size_half_points) / 2.0,
+        case: if lay.caps {
+            CaseMode::Caps
+        } else if lay.small_caps {
+            CaseMode::SmallCaps
+        } else {
+            CaseMode::Normal
+        },
     }
 }
 
@@ -402,6 +574,8 @@ impl Collector<'_, '_> {
         let mut st = style_of.clone();
         let half = (st.size * 2.0 * 0.65).round().max(1.0);
         st.size = half / 2.0;
+        st.metric_size = st.size;
+        st.case = CaseMode::Normal;
         st.superscript = true;
         self.styles.push(st);
         let style = self.styles.len() - 1;
@@ -655,7 +829,7 @@ pub(crate) fn layout_paragraph(
     let Collector {
         text,
         spans,
-        styles,
+        mut styles,
         hidden,
         refs,
         separator,
@@ -667,8 +841,8 @@ pub(crate) fn layout_paragraph(
     let mut glyphs: Vec<PlacedGlyphRaw> = Vec::new();
     let mut atoms: Vec<Atom> = Vec::new();
     let mut objects: Vec<ObjectBox> = Vec::new();
+    let mut reduced: HashMap<usize, usize> = HashMap::new();
     for (range, style_idx) in &spans {
-        let st = &styles[*style_idx];
         let seg = &text[range.clone()];
         if seg == OBJECT_CHAR
             && let Some((_, d)) = raw_objects.iter().find(|o| o.0 == range.start)
@@ -693,60 +867,71 @@ pub(crate) fn layout_paragraph(
             });
             continue;
         }
-        let shaped = shape_run(
-            ctx.fonts,
-            &st.chain,
-            seg,
-            ShapeFeatures {
-                kerning: st.kerning,
-                ligatures: true,
-            },
-        );
-        let mut idx = 0;
-        let gl = &shaped.glyphs;
-        while idx < gl.len() {
-            let cluster = gl[idx].cluster as usize;
-            let mut j = idx + 1;
-            while j < gl.len() && gl[j].cluster as usize == cluster {
-                j += 1;
-            }
-            let byte_start = range.start + cluster;
-            let ch = text[byte_start..].chars().next().unwrap_or(' ');
-            let class = match ch {
-                '\t' => AtomClass::Tab,
-                '\u{b}' => AtomClass::LineBreak,
-                '\u{c}' | '\u{e}' => AtomClass::PageBreak,
-                '\r' => AtomClass::Mark,
-                ' ' => AtomClass::Space,
-                _ => AtomClass::Text,
+        for piece in case_pieces(&text, range, *style_idx, &mut styles, &mut reduced) {
+            let st = &styles[piece.style];
+            let (shaped_text, back) = if piece.upper {
+                let (up, back) = capitals(&text[piece.range.clone()]);
+                (std::borrow::Cow::Owned(up), Some(back))
+            } else {
+                (std::borrow::Cow::Borrowed(&text[piece.range.clone()]), None)
             };
-            let gstart = glyphs.len();
-            let mut adv_total = 0.0;
-            if matches!(class, AtomClass::Text | AtomClass::Space) {
-                for g in &gl[idx..j] {
-                    let upem = f64::from(ctx.fonts.face(g.face).units_per_em());
-                    let adv = f64::from(g.x_advance) * st.size / upem * st.scale + st.spacing;
-                    glyphs.push(PlacedGlyphRaw {
-                        face: g.face,
-                        glyph_id: g.glyph_id,
-                        x_offset: f64::from(g.x_offset) * st.size / upem * st.scale,
-                        y_offset: f64::from(g.y_offset) * st.size / upem,
-                        adv,
-                        cluster: g.cluster,
-                    });
-                    adv_total += adv;
+            let shaped = shape_run(
+                ctx.fonts,
+                &st.chain,
+                &shaped_text,
+                ShapeFeatures {
+                    kerning: st.kerning,
+                    ligatures: true,
+                },
+            );
+            // Clusters of capitals point back at the characters they were made from.
+            let source = |c: u32| back.as_ref().map_or(c, |b| b[c as usize]) as usize;
+            let mut idx = 0;
+            let gl = &shaped.glyphs;
+            while idx < gl.len() {
+                let cluster = gl[idx].cluster as usize;
+                let mut j = idx + 1;
+                while j < gl.len() && gl[j].cluster as usize == cluster {
+                    j += 1;
                 }
+                let byte_start = piece.range.start + source(gl[idx].cluster);
+                let ch = text[byte_start..].chars().next().unwrap_or(' ');
+                let class = match ch {
+                    '\t' => AtomClass::Tab,
+                    '\u{b}' => AtomClass::LineBreak,
+                    '\u{c}' | '\u{e}' => AtomClass::PageBreak,
+                    '\r' => AtomClass::Mark,
+                    ' ' => AtomClass::Space,
+                    _ => AtomClass::Text,
+                };
+                let gstart = glyphs.len();
+                let mut adv_total = 0.0;
+                if matches!(class, AtomClass::Text | AtomClass::Space) {
+                    for g in &gl[idx..j] {
+                        let upem = f64::from(ctx.fonts.face(g.face).units_per_em());
+                        let adv = f64::from(g.x_advance) * st.size / upem * st.scale + st.spacing;
+                        glyphs.push(PlacedGlyphRaw {
+                            face: g.face,
+                            glyph_id: g.glyph_id,
+                            x_offset: f64::from(g.x_offset) * st.size / upem * st.scale,
+                            y_offset: f64::from(g.y_offset) * st.size / upem,
+                            adv,
+                            cluster: (byte_start - range.start) as u32,
+                        });
+                        adv_total += adv;
+                    }
+                }
+                atoms.push(Atom {
+                    byte_start,
+                    adv: adv_total,
+                    style: piece.style,
+                    glyphs: gstart..glyphs.len(),
+                    class,
+                    ch,
+                    object: None,
+                });
+                idx = j;
             }
-            atoms.push(Atom {
-                byte_start,
-                adv: adv_total,
-                style: *style_idx,
-                glyphs: gstart..glyphs.len(),
-                class,
-                ch,
-                object: None,
-            });
-            idx = j;
         }
     }
 
@@ -801,7 +986,7 @@ pub(crate) fn layout_paragraph(
         .iter()
         .map(|st| {
             ctx.model
-                .ascent_descent(ctx.fonts.face(st.face).metrics(), st.size)
+                .ascent_descent(ctx.fonts.face(st.face).metrics(), st.metric_size)
         })
         .collect();
     let mut fd = FillData {
@@ -937,6 +1122,7 @@ impl LineBuilder<'_> {
                 lead: 0.0,
                 xs: Vec::new(),
                 page_break_after: false,
+                slack: 0.0,
             });
         }
         lines
@@ -1243,6 +1429,12 @@ impl LineBuilder<'_> {
         );
 
         let last_x = xs.last().copied().unwrap_or(left_edge);
+        let slack = match self.props.line {
+            open365_docx::LineSpacing::Multiple(m) if m > 1.0 => {
+                (height - baseline_off - desc).max(0.0)
+            }
+            _ => 0.0,
+        };
         LineBox {
             start: self.fd.story_of[a0],
             end: self.fd.story_of[end],
@@ -1254,6 +1446,7 @@ impl LineBuilder<'_> {
             lead: 0.0,
             xs,
             page_break_after,
+            slack,
         }
     }
 }

@@ -1,0 +1,5 @@
+feature = "layout-caps-sizes"
+made_with = "Microsoft Word 16.0.20430 (Windows)"
+author = "project member"
+expect_dropped = []
+notes = "small caps width at 9 to 72 pt, including half-point sizes, in Calibri and Cambria"

@@ -29,6 +29,8 @@ fn cell_box(x: f64, y: f64, width: f64, height: f64, meta: CellMeta, table_base:
         header_row: meta.header_row,
         fill: meta.fill,
         borders: meta.borders,
+        pad_top: meta.pad_top,
+        pad_bottom: meta.pad_bottom,
     }
 }
 
@@ -251,11 +253,12 @@ impl PageBuild {
 }
 
 /// How many of `heights` fit starting at `y0` above `bottom`.
-fn lines_fitting(heights: impl Iterator<Item = f64>, y0: f64, bottom: f64) -> usize {
+/// Each item is a line's height and the part of it (spacing below the text) that need not fit.
+fn lines_fitting(heights: impl Iterator<Item = (f64, f64)>, y0: f64, bottom: f64) -> usize {
     let mut y = y0;
     let mut k = 0;
-    for h in heights {
-        if y + h > bottom + EPS {
+    for (h, slack) in heights {
+        if y + h - slack > bottom + EPS {
             break;
         }
         y += h;
@@ -307,7 +310,7 @@ fn lines_fitting_notes(
         }
         let has2 = has || any;
         let total = nh + add + if has2 { n.sep } else { 0.0 };
-        if y + l.height + total > n.frame_bottom + EPS {
+        if y + l.height - l.slack + total > n.frame_bottom + EPS {
             // A single long footnote may start here and go on in the next page's notes.
             if let [id] = ids[..] {
                 let lines = n.env.notes.line_count(n.section, id);
@@ -361,7 +364,11 @@ fn decide(
     let (raw, split) = match notes {
         Some(nt) => lines_fitting_notes(para, lines, y0, nt),
         None => (
-            lines_fitting(lines.iter().map(|l| l.lead + l.height), y0, bottom),
+            lines_fitting(
+                lines.iter().map(|l| (l.lead + l.height, l.slack)),
+                y0,
+                bottom,
+            ),
             None,
         ),
     };
@@ -1335,8 +1342,24 @@ pub(crate) fn paginate<'a>(
                 // Word does not add space after and space before; the larger one separates.
                 after.max(before)
             };
-            let y0 = pg.page.y + gap(&pg.page);
             let at_top = !pg.page.has_content();
+            // Paragraph borders (layout-pbdr-*): a group of paragraphs with identical borders has
+            // its top edge above the first and its bottom edge below the last; a between rule
+            // separates the paragraphs inside.
+            let joined_prev =
+                !at_top && p > 0 && items[p - 1].para().is_some_and(|q| q.joins(para));
+            let joined_next = items
+                .get(p + 1)
+                .and_then(FlowItem::para)
+                .is_some_and(|q| para.joins(q));
+            let border_above = if !first_segment {
+                0.0
+            } else if joined_prev {
+                para.between_extent()
+            } else {
+                para.border_top()
+            };
+            let y0 = pg.page.y + gap(&pg.page) + border_above;
             // Floating pictures change the lines: break them again around the pictures.
             let around = has_anchor || pg.page.floats.iter().any(|f| f.y1 > y0 - EPS);
             let dynamic = around.then(|| {
@@ -1449,6 +1472,9 @@ pub(crate) fn paginate<'a>(
                     pg.page.images.push(a.image.clone());
                     pg.page.floats.extend(a.float);
                 }
+            }
+            if end_atom >= n_atoms && !joined_next {
+                y += para.border_bottom();
             }
             pg.page.y = y;
             from_atom = end_atom;

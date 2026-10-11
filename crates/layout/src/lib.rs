@@ -273,6 +273,10 @@ pub struct CellBox {
     /// Fill colour (shading resolved to a solid colour), `None` for no fill.
     pub fill: Option<[u8; 3]>,
     pub borders: CellBorders,
+    /// Top and bottom cell margins in points. The box is the cell as laid out; Word's PDF clips
+    /// the cell's content to the box inset by these (`layout-table-basic`).
+    pub pad_top: f64,
+    pub pad_bottom: f64,
 }
 
 /// Lines `from..to` of footnote `id`, placed on one page. A footnote that does not fit goes on
