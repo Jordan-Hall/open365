@@ -236,6 +236,63 @@ impl DocumentRoot {
     }
 }
 
+/// The children of a `w:sdt`'s `w:sdtContent`, when `raw` is a content control.
+fn sdt_content_children(raw: &RawXml) -> Option<Vec<RawXml>> {
+    let RawXml::Element(sdt) = raw else {
+        return None;
+    };
+    if !sdt.head.is_w("sdt") {
+        return None;
+    }
+    let content = sdt
+        .children
+        .iter()
+        .filter_map(RawXml::as_element)
+        .find(|c| c.head.is_w("sdtContent"))?;
+    Some(content.children.clone())
+}
+
+impl Block {
+    /// The blocks inside a block-level content control (`w:sdt`), read-only and typed on the
+    /// fly; `None` when this block is not one. The paragraphs are not addressable by
+    /// [`Body::paragraphs`].
+    pub fn sdt_content(&self) -> Option<Vec<Block>> {
+        match self {
+            Self::Raw(raw) => sdt_content_children(raw).map(blocks_from),
+            _ => None,
+        }
+    }
+}
+
+impl Block {
+    /// The raw children of a content control's `w:sdtContent`.
+    pub(crate) fn sdt_content_raw(&self) -> Option<Vec<RawXml>> {
+        match self {
+            Self::Raw(raw) => sdt_content_children(raw),
+            _ => None,
+        }
+    }
+
+    /// A `w:tc` element as a cell.
+    pub(crate) fn into_cell(self) -> Option<Cell> {
+        match self {
+            Self::Raw(RawXml::Element(e)) if e.head.is_w("tc") => Some(Cell::from_xml(e)),
+            _ => None,
+        }
+    }
+}
+
+impl Inline {
+    /// The inline content of an inline content control (`w:sdt`), read-only and typed on
+    /// the fly; `None` when this is not one.
+    pub fn sdt_content(&self) -> Option<Vec<Inline>> {
+        match self {
+            Self::Raw(raw) => sdt_content_children(raw).map(|c| inlines_from(c.into_iter())),
+            _ => None,
+        }
+    }
+}
+
 impl Body {
     fn from_xml(e: XmlElement) -> Self {
         Self {

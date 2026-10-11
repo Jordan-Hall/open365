@@ -1,0 +1,5 @@
+feature = "layout-txbx-basic"
+made_with = "Microsoft Word 16.0.20430 (Windows)"
+author = "project member"
+expect_dropped = []
+notes = "floating text boxes: default and custom insets, top/middle/bottom anchor, two paragraphs, shape-to-fit-text, no word wrap"

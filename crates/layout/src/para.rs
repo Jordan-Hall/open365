@@ -761,7 +761,16 @@ impl Collector<'_, '_> {
                     self.hide(1);
                 }
                 Inline::Group(g) => self.inlines(&g.content),
-                Inline::Raw(_) => {}
+                Inline::Raw(_) if open365_docx::is_sdt_marker(inline) => self.hide(1),
+                Inline::Raw(_) => {
+                    // A content control: its start and end each count as one story character
+                    // (`layout-sdt`), the content lays out like plain content.
+                    if let Some(content) = inline.sdt_content() {
+                        self.hide(1);
+                        self.inlines(&content);
+                        self.hide(1);
+                    }
+                }
             }
         }
     }

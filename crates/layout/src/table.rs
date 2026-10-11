@@ -173,8 +173,7 @@ impl TableLayout {
 /// Width of a border that is set: its line width when drawn, 0 for `nil`/`none`. `None` when
 /// the level states no border at all.
 fn border_width(b: &Option<Border>) -> Option<f64> {
-    b.as_ref()
-        .map(|b| if b.is_visible() { b.width } else { 0.0 })
+    b.as_ref().map(crate::para::border_extent)
 }
 
 struct Prev {

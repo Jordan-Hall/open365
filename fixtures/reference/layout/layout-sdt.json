@@ -1,0 +1,30 @@
+{
+  "source": "fixtures/docx/layout-sdt.docx",
+  "oracle": "Microsoft Word 16.0 (16.0.20430), Print Layout, tools/office/word-layout-oracle.ps1",
+  "units": "points; page and top/left/baseline measured from the page top-left corner; start/end are UTF-16 offsets in the main story",
+  "precision": "top/left/lastX are screen-quantised (+-0.3 pt); baseline/inkLeft and cell rectangles come from the 600 dpi PDF and are exact",
+  "pageCount": 1,
+  "cells": [
+    {"page": 1, "x": 72.024, "y": 260.23, "w": 234.1, "h": 19.44},
+    {"page": 1, "x": 306.12, "y": 260.23, "w": 234.1, "h": 19.44},
+    {"page": 1, "x": 72.024, "y": 279.676, "w": 234.1, "h": 19.464},
+    {"page": 1, "x": 306.12, "y": 279.676, "w": 234.1, "h": 19.464}
+  ],
+  "lines": [
+    {"page": 1, "start": 0, "end": 38, "top": 72.0, "left": 72.0, "lastX": 236.4, "baseline": 82.58, "inkLeft": 72.024, "text": "Alpha beta gamma delta epsilon zeta\u000d"},
+    {"page": 1, "start": 38, "end": 139, "top": 91.2, "left": 72.0, "lastX": 515.4, "baseline": 102.02, "inkLeft": 72.024, "text": "The quick survey of a quiet harbour town begins at dawn, when the fishing boats drift back past the "},
+    {"page": 1, "start": 139, "end": 241, "top": 104.4, "left": 72.0, "lastX": 520.2, "baseline": 115.46, "inkLeft": 72.024, "text": "lighthouse and the market stalls fold open their striped awnings. Gulls wheel over the quay while me\u000d"},
+    {"page": 1, "start": 241, "end": 267, "top": 124.2, "left": 72.0, "lastX": 178.2, "baseline": 134.93, "inkLeft": 72.024, "text": "Block control paragraph\u000d"},
+    {"page": 1, "start": 267, "end": 332, "top": 144.0, "left": 72.0, "lastX": 335.4, "baseline": 154.37, "inkLeft": 72.024, "text": "Empty inline control follows: Click or tap here to enter text.\u000d"},
+    {"page": 1, "start": 332, "end": 363, "top": 163.2, "left": 72.0, "lastX": 192.6, "baseline": 173.81, "inkLeft": 72.024, "text": "Two adjacent controls here\u000d"},
+    {"page": 1, "start": 363, "end": 408, "top": 182.4, "left": 72.0, "lastX": 264.6, "baseline": 193.25, "inkLeft": 72.024, "text": "Nested control paragraph with some words\u000d"},
+    {"page": 1, "start": 408, "end": 432, "top": 202.2, "left": 72.0, "lastX": 168.6, "baseline": 212.71, "inkLeft": 72.024, "text": "Block control line one\u000d"},
+    {"page": 1, "start": 432, "end": 456, "top": 221.4, "left": 72.0, "lastX": 168.6, "baseline": 232.15, "inkLeft": 72.024, "text": "Block control line two\u000d"},
+    {"page": 1, "start": 456, "end": 481, "top": 240.6, "left": 72.0, "lastX": 176.4, "baseline": 251.59, "inkLeft": 72.024, "text": "After the block controls\u000d"},
+    {"page": 1, "start": 481, "end": 495, "top": 270.79, "left": 77.304, "lastX": null, "baseline": 270.79, "inkLeft": 77.304, "text": "Cell one words", "cell": true},
+    {"page": 1, "start": 498, "end": 512, "top": 270.79, "left": 311.4, "lastX": null, "baseline": 270.79, "inkLeft": 311.4, "text": "Cell two words", "cell": true},
+    {"page": 1, "start": 514, "end": 530, "top": 290.26, "left": 77.304, "lastX": null, "baseline": 290.26, "inkLeft": 77.304, "text": "Cell three words", "cell": true},
+    {"page": 1, "start": 531, "end": 562, "top": 290.26, "left": 311.4, "lastX": null, "baseline": 290.26, "inkLeft": 311.4, "text": "Click or tap here to enter text", "cell": true},
+    {"page": 1, "start": 567, "end": 568, "top": 299.4, "left": 72.0, "lastX": 72.0, "baseline": 309.7, "inkLeft": 72.024, "text": "\u000d"}
+  ]
+}

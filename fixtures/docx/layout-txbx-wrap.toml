@@ -1,0 +1,5 @@
+feature = "layout-txbx-wrap"
+made_with = "Microsoft Word 16.0.20430 (Windows)"
+author = "project member"
+expect_dropped = []
+notes = "body text wrapping around square, top-and-bottom and no-wrap text boxes"

@@ -1169,6 +1169,97 @@ try {
     L-Para 'Closing paragraph'
   }
 
+  # Probe: content controls (w:sdt), inline and block, with and without placeholder text. Word counts the
+  # start and end of a control as one story character each; the oracle shows where lines fall.
+  L-Fixture 'layout-sdt' 'layout-sdt' 'inline and block content controls, placeholder text, adjacent and nested controls, a control in a table cell' {
+    Init-Doc 6
+    $d = $script:doc
+    function CC($par, $from, $len, $type) {
+      $ps = $d.Paragraphs.Item($par).Range.Start
+      $d.ContentControls.Add($type, $d.Range($ps + $from, $ps + $from + $len))
+    }
+    L-Para 'Alpha beta gamma delta epsilon zeta'
+    L-Para ($A.Substring(0, 200))
+    L-Para 'Block control paragraph'
+    L-Para 'Empty inline control follows: '
+    L-Para 'Two adjacent controls here'
+    L-Para 'Nested control paragraph with some words'
+    L-Para 'Block control line one'
+    L-Para 'Block control line two'
+    L-Para 'After the block controls'
+    $null = CC 1 6 10 1
+    $null = CC 2 30 120 0
+    $r = $d.Paragraphs.Item(3).Range; $null = $d.ContentControls.Add(0, $r)
+    $ps = $d.Paragraphs.Item(4).Range.End - 1
+    $d.Range($ps, $ps).InsertAfter('pending')
+    $e = $d.ContentControls.Add(1, $d.Range($ps, $ps + 7))
+    $e.Range.Text = ''
+    $null = CC 5 4 8 0
+    $null = CC 5 15 8 0
+    $o = CC 6 0 30 0
+    $psn = $d.Paragraphs.Item(6).Range.Start
+    $null = $d.ContentControls.Add(1, $d.Range($psn + 8, $psn + 15))
+    $r = $d.Range($d.Paragraphs.Item(7).Range.Start, $d.Paragraphs.Item(8).Range.End); $null = $d.ContentControls.Add(0, $r)
+    $s = $script:word.Selection; [void]$s.EndKey(6)
+    $t = $d.Tables.Add($s.Range, 2, 2)
+    $t.Cell(1, 1).Range.Text = 'Cell one words'
+    $t.Cell(1, 2).Range.Text = 'Cell two words'
+    $t.Cell(2, 1).Range.Text = 'Cell three words'
+    $t.Cell(2, 2).Range.Text = 'Cell four'
+    $cr = $t.Cell(1, 1).Range; $cr.MoveEnd(1, -1) | Out-Null
+    $null = $d.ContentControls.Add(1, $d.Range($cr.Start + 5, $cr.Start + 9))
+    $cr = $t.Cell(2, 2).Range; $cr.MoveEnd(1, -1) | Out-Null
+    $e2 = $d.ContentControls.Add(1, $d.Range($cr.Start, $cr.End))
+    $e2.Range.Text = ''
+  }
+
+  # Floating text box anchored in paragraph $pi: page-relative position, WdWrapType $wrap, text frame insets (points) and
+  # vertical anchor (1 top, 3 middle, 4 bottom).
+  function Add-TextBox($pi, $x, $y, $w, $h, $text, $wrap = 3, $anchor = 1, $ins = $null, $auto = 0, $wordWrap = -1) {
+    $r = $script:doc.Paragraphs.Item($pi).Range; $r.Collapse(1)
+    $sh = $script:doc.Shapes.AddTextbox(1, [single]$x, [single]$y, [single]$w, [single]$h, $r)
+    $sh.WrapFormat.Type = $wrap
+    $sh.RelativeHorizontalPosition = 1; $sh.RelativeVerticalPosition = 1
+    $sh.Left = [single]$x; $sh.Top = [single]$y
+    $sh.Line.Visible = 0
+    $tf = $sh.TextFrame
+    if ($ins) { $tf.MarginLeft = $ins[0]; $tf.MarginTop = $ins[1]; $tf.MarginRight = $ins[2]; $tf.MarginBottom = $ins[3] }
+    $tf.TextRange.Text = $text
+    $tf2 = $sh.TextFrame
+    $tf2.VerticalAnchor = $anchor
+    $tf2.WordWrap = $wordWrap
+    $tf2.AutoSize = $auto
+    $sh.Left = [single]$x; $sh.Top = [single]$y; $sh.Width = [single]$w
+    if (-not $auto) { $sh.Height = [single]$h }
+    $sh
+  }
+
+  # Probe: text boxes (wps:wsp with w:txbxContent) placed on the page: insets, anchors, autofit and no wrap.
+  L-Fixture 'layout-txbx-basic' 'layout-txbx-basic' 'floating text boxes: default and custom insets, top/middle/bottom anchor, two paragraphs, shape-to-fit-text, no word wrap' {
+    Init-Doc 6
+    L-Para 'Body paragraph one anchors the boxes.'
+    L-Para 'Body paragraph two stays on the page.'
+    $null = Add-TextBox 1 72 200 200 60 'Alpha box text that wraps inside the box and runs on.'
+    $null = Add-TextBox 1 300 200 200 90 'Beta box text centred vertically in the frame.' 3 3
+    $null = Add-TextBox 1 72 320 200 90 'Gamma box text hugging the bottom edge of the frame.' 3 4 @(0, 10, 3, 4)
+    $d3 = Add-TextBox 1 300 320 200 100 'Delta first paragraph.' 3 1
+    $d3.TextFrame.TextRange.InsertParagraphAfter()
+    $d3.TextFrame.TextRange.InsertAfter('Delta second paragraph in fourteen points and centred.')
+    $d3.TextFrame.TextRange.Paragraphs.Item(2).Range.Font.Size = 14
+    $d3.TextFrame.TextRange.Paragraphs.Item(2).Format.Alignment = 1
+    $null = Add-TextBox 1 72 460 150 30 'Epsilon grows to fit the text it holds because the shape resizes.' 3 1 $null 1
+    $null = Add-TextBox 1 300 460 100 30 'Zeta never wraps and runs past the right edge of the box.' 3 1 $null 0 0
+  }
+
+  # Probe: body text wrapped around text boxes (square left and right, top and bottom, behind).
+  L-Fixture 'layout-txbx-wrap' 'layout-txbx-wrap' 'body text wrapping around square, top-and-bottom and no-wrap text boxes' {
+    Init-Doc 6
+    1..6 | ForEach-Object { L-Para ($A + ' ' + $B) }
+    $null = Add-TextBox 1 360 110 150 120 'Square wrapped box with several words inside.' 0 1
+    $null = Add-TextBox 3 72 330 220 60 'Top and bottom wrapped box.' 4 1
+    $null = Add-TextBox 4 72 520 120 90 'Square box on the left.' 0 3
+  }
+
 } finally {
   if ($word) {
     try { $word.UserName = $oldUser; $word.UserInitials = $oldInit; $word.Options.UseLocalUserInfo = $oldLocal } catch {}

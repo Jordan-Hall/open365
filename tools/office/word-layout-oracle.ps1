@@ -234,7 +234,12 @@ function Walk-Table($t, $out, $seen, $tab) {
       $rg = $p.Range; $s = [int]$rg.Start
       if ($seen.ContainsKey($s)) { continue }
       $seen[$s] = 1
-      $out.Add(@{ start = $s; text = (([string]$rg.Text) -replace '[\r\a]+$', ''); used = 0; lines = 0; tab = $tab })
+      # Content controls: Word counts the start and the end of each as one story character, but Range.Text has neither,
+      # so a text index maps to the story offset through the marker positions (sorted).
+      $marks = New-Object System.Collections.Generic.List[int]
+      foreach ($cc in $rg.ContentControls) { foreach ($mk in ([int]$cc.Range.Start - 1), [int]$cc.Range.End) { if ($mk -ge $s -and $mk -lt [int]$rg.End) { $marks.Add($mk) } } }
+      $marks.Sort()
+      $out.Add(@{ start = $s; text = (([string]$rg.Text) -replace '[\r\a]+$', ''); used = 0; lines = 0; tab = $tab; marks = $marks.ToArray() })
     }
   }
   foreach ($n in $t.Tables) { Walk-Table $n $out $seen $tab }
@@ -383,6 +388,7 @@ function Ref-Layout($f) {
             if (-not $hit) { $warn += "page ${pi}: table row '$t' matches no paragraph"; continue }
             if (-not $repeat) { $hit.used = $off + $t.Length; $hit.lines++ }
             $st = $hit.start + $off
+            if ($off -gt 0) { foreach ($mk in $hit.marks) { if ($mk -le $st) { $st++ } else { break } } }
             $lines.Add([ordered]@{ page = $pi; start = $st; end = $st + $t.Length; top = $row.y; left = $row.x; lastX = $null; baseline = $row.y; inkLeft = $row.x; text = $t; cell = $true; repeat = $repeat })
           }
         }

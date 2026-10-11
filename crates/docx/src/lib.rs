@@ -12,6 +12,7 @@ mod document;
 mod drawing;
 mod edit;
 mod error;
+mod flatten;
 mod layout_props;
 mod model;
 mod notes;
@@ -32,6 +33,7 @@ pub use drawing::{
     VerticalRelativeFrom, WrapSide, WrapType,
 };
 pub use error::DocxError;
+pub use flatten::{FlatBlocks, SDT_END, SDT_START, flatten_content_controls, is_sdt_marker};
 pub use layout_props::{
     Ligatures, ParagraphBorders, ParagraphMark, ParagraphProps, RunLayoutProps, TabKind, TabLeader,
     TabStop,

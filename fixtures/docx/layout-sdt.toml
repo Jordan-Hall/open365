@@ -1,0 +1,5 @@
+feature = "layout-sdt"
+made_with = "Microsoft Word 16.0.20430 (Windows)"
+author = "project member"
+expect_dropped = []
+notes = "inline and block content controls, placeholder text, adjacent and nested controls, a control in a table cell"

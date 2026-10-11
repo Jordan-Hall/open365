@@ -17,7 +17,7 @@
 
 use std::sync::Arc;
 
-use open365_docx::{Block, Document, NoteKind};
+use open365_docx::{Block, Document, NoteKind, flatten_content_controls};
 use open365_text::FontLibrary;
 
 use crate::build::{UnitLayout, build_unit};
@@ -59,6 +59,8 @@ pub struct IncrementalLayout {
     layout: Layout,
     state: Option<State>,
     labels: Vec<Option<ListLabel>>,
+    /// Layout index of each addressable paragraph, when block-level content controls shift them.
+    addressable: Option<Vec<usize>>,
     stats: UpdateStats,
 }
 
@@ -81,11 +83,17 @@ pub struct UpdateStats {
 
 /// The list label of every paragraph in document order (tables included).
 pub(crate) fn all_labels(doc: &Document) -> Vec<Option<ListLabel>> {
+    all_labels_in(doc, &doc.body().blocks)
+}
+
+/// The list label of every paragraph of `blocks` (the body, or the body with its content
+/// controls unwrapped).
+fn all_labels_in(doc: &Document, blocks: &[Block]) -> Vec<Option<ListLabel>> {
     let Some(labeler) = Labeler::new(doc) else {
         return Vec::new();
     };
     let mut items = Vec::new();
-    collect_items(&doc.body().blocks, &mut items);
+    collect_items(blocks, &mut items);
     let mut state = NumberingState::default();
     items
         .iter()
@@ -113,6 +121,10 @@ impl IncrementalLayout {
 
     /// The list label text of paragraph `index` (document order, tables included).
     pub fn list_label(&self, index: usize) -> Option<&str> {
+        let index = match &self.addressable {
+            Some(map) => *map.get(index)?,
+            None => index,
+        };
         self.labels
             .get(index)
             .and_then(Option::as_ref)
@@ -178,10 +190,28 @@ impl IncrementalLayout {
                     .push(format!("columns are ignored (section {i})"));
             }
         }
-        let labels = all_labels(doc);
-        let mut blocks: Vec<&Block> = doc
-            .body()
-            .blocks
+        // Block-level content controls are unwrapped: their paragraphs are laid out in place.
+        // `Section::end_paragraph` counts the addressable paragraphs only.
+        let flat = flatten_content_controls(&doc.body().blocks);
+        let body_blocks: &[Block] = flat.as_ref().map_or(&doc.body().blocks, |f| &f.blocks);
+        let section_ends: Vec<Option<usize>> = doc_sections
+            .iter()
+            .map(|s| {
+                s.end_paragraph.map(|p| {
+                    flat.as_ref()
+                        .map_or(p, |f| f.addressable.get(p).copied().unwrap_or(usize::MAX))
+                })
+            })
+            .collect();
+        if flat.is_some() {
+            layout.notes.push(
+                "block-level content controls: Line::paragraph counts their paragraphs, which                  Document::paragraph does not address"
+                    .to_owned(),
+            );
+        }
+        self.addressable = flat.as_ref().map(|f| f.addressable.clone());
+        let labels = all_labels_in(doc, body_blocks);
+        let mut blocks: Vec<&Block> = body_blocks
             .iter()
             .filter(|b| !matches!(b, Block::Raw(_)))
             .collect();
@@ -295,7 +325,7 @@ impl IncrementalLayout {
             );
             if i < body_n
                 && matches!(block, Block::Paragraph(_))
-                && doc_sections.get(section).and_then(|s| s.end_paragraph) == Some(para)
+                && section_ends.get(section).copied().flatten() == Some(para)
             {
                 section += 1;
             }

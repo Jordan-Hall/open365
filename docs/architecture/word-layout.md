@@ -29,6 +29,7 @@ Units are points. Baselines come from Word's 600 dpi PDF and sit on a 0.24 pt gr
 | The inset of a cell is half the wider border that meets at its grid line **in its own row**, not in the whole table. | `layout-table-flow` (header row) |
 | A table style's cell borders `left` and `right` name the region's outer edges; the edges between cells use `insideV`. A header row with `insideV` nil has no vertical borders between its cells. | `layout-table-flow` |
 | The empty paragraph after a nested table at the end of a cell takes no height. | `layout-table-flow` |
+| A composite cell border (`thickThinSmallGap`, `double`, ...) takes its full extent (`border_extent`) in the half-border inset of the cell, not only its `w:sz`: the first row of a masthead table with a 3 pt `thickThinSmallGap` top border sits 1.5 pt lower in Word than with `w:sz`. Corpus evidence only (+41 lines in one template, 1385 -> 1426 of 8118, no fixture changed); no probe fixture yet. | corpus |
 
 ## Caps and small caps (`para.rs`)
 
@@ -58,6 +59,19 @@ even if the extra spacing below it does not (`layout-face-multiple`, Arial 10 pt
 Inline and floating placements match `layout-img-inline`, `layout-img-none`, `layout-img-square` and
 `layout-img-tb` to the picture tolerance. Wrap distances and anchor positions have no dedicated probe yet.
 
+## Content controls (`w:sdt`; `para.rs`, `incremental.rs`, `crates/docx/src/flatten.rs`)
+
+| Rule | Evidence |
+|---|---|
+| A content control, inline or block, lays out like plain content: its `w:sdtContent` is part of the line, a placeholder (`showingPlcHdr`) is ordinary text in the control. The typed model keeps the control as raw XML, so layout reads it through `Inline::sdt_content` and `Block::sdt_content`; `flatten_content_controls` unwraps block-level controls (also in cells and rows). | `layout-sdt` (19 of 19) |
+| The start and the end of each control count as one story character each (`Range.Start`, line ranges, the next paragraph's start): `Alpha beta ...` with one inline control is 36 + 2 characters; a block control around one paragraph adds 2; nested and adjacent controls add 2 each. A line that begins at the paragraph start of a control begins on the start character. | `layout-sdt` |
+| In table cells the oracle reads text from the PDF and used `paragraph start + text index` for a line, which ignores the control characters; the oracle now adds them (`marks` in `Walk-Table`). | `layout-sdt`, corpus |
+
+Text boxes (measured with COM, not implemented): a text box is a `wdTextRectangle` of `StoryType` 5 whose offsets start at 0
+in its own story (one story per box, listed by `StoryRanges(5)` in anchor order); Word clips the box text in its PDF, so the oracle reports
+the frame as a cell rectangle and the lines carry no baseline (`layout-txbx-basic`, `layout-txbx-wrap`: lines `top` and `left` only).
+Inset defaults, anchors, autofit and wrap-none are in those references; the engine does not draw the boxes yet.
+
 ## Not matched yet
 
 - Cell padding (`tblCellMar` top and bottom): in `layout-table-basic` Word's clip rectangle is the cell inset
@@ -68,8 +82,7 @@ Inline and floating placements match `layout-img-inline`, `layout-img-none`, `la
   after a 4 pt space and of some bottom rules: Word rounds from the snapped baseline of the previous or last line, not from
   the exact bottom), groups, cells, indents and page breaks (`layout-pbdr-groups`, `-ctx`, `-pages`) are only partly
   matched (see `rules-floor.toml`); `w:bar`, hanging-indent left edges, the vertical order of thin and thick bars in
-  side rules and the box across a page break are unverified. Text boxes (`wps`, `wpg`, VML) and content controls
-  (`w:sdt`) are not started.
+  side rules and the box across a page break are unverified. Text boxes (`wps`, `wpg`, VML) are not started (probes `layout-txbx-*` have references only).
 - Auto-fit tables wider than the text area (`layout-table-width`, 4 lines and cells).
 - The zero-height line of the empty paragraph after a nested table (`layout-table-flow`, 1 line).
 - Contextual spacing (`layout-indents-spacing`, 7 lines) and the Caladea/Cambria vertical metric difference in bundled mode.
