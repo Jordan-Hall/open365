@@ -1,0 +1,2713 @@
+{
+  "source": "fixtures/xlsx/grid-cf.xlsx",
+  "sheets": [
+    {
+      "name": "Rules",
+      "visible": -1,
+      "usedRange": "A1:AP13",
+      "truncatedAt2000": false,
+      "cells": {
+        "A1": {
+          "value2": "cellIs >50",
+          "text": "cellIs >50",
+          "formula": null
+        },
+        "B1": {
+          "value2": "cellIs between",
+          "text": "cellIs between",
+          "formula": null
+        },
+        "C1": {
+          "value2": "cellIs =45 numFmt",
+          "text": "cellIs =45 numFmt",
+          "formula": null
+        },
+        "D1": {
+          "value2": "cellIs <=21",
+          "text": "cellIs <=21",
+          "formula": null
+        },
+        "E1": {
+          "value2": "cellIs notBetween",
+          "text": "cellIs notBetween",
+          "formula": null
+        },
+        "F1": {
+          "value2": "expr own+col A",
+          "text": "expr own+col A",
+          "formula": null
+        },
+        "G1": {
+          "value2": "expr banding",
+          "text": "expr banding",
+          "formula": null
+        },
+        "H1": {
+          "value2": "top 3",
+          "text": "top 3",
+          "formula": null
+        },
+        "I1": {
+          "value2": "bottom 25 pct",
+          "text": "bottom 25 pct",
+          "formula": null
+        },
+        "J1": {
+          "value2": "above avg",
+          "text": "above avg",
+          "formula": null
+        },
+        "K1": {
+          "value2": "below or eq avg",
+          "text": "below or eq avg",
+          "formula": null
+        },
+        "L1": {
+          "value2": "above 1 stddev",
+          "text": "above 1 stddev",
+          "formula": null
+        },
+        "M1": {
+          "value2": "duplicates",
+          "text": "duplicates",
+          "formula": null
+        },
+        "N1": {
+          "value2": "unique",
+          "text": "unique",
+          "formula": null
+        },
+        "O1": {
+          "value2": "contains an",
+          "text": "contains an",
+          "formula": null
+        },
+        "P1": {
+          "value2": "begins ap",
+          "text": "begins ap",
+          "formula": null
+        },
+        "Q1": {
+          "value2": "ends e",
+          "text": "ends e",
+          "formula": null
+        },
+        "R1": {
+          "value2": "not contains an",
+          "text": "not contains an",
+          "formula": null
+        },
+        "S1": {
+          "value2": "blanks",
+          "text": "blanks",
+          "formula": null
+        },
+        "T1": {
+          "value2": "no blanks",
+          "text": "no blanks",
+          "formula": null
+        },
+        "U1": {
+          "value2": "errors",
+          "text": "errors",
+          "formula": null
+        },
+        "V1": {
+          "value2": "no errors",
+          "text": "no errors",
+          "formula": null
+        },
+        "W1": {
+          "value2": "date today",
+          "text": "date today",
+          "formula": null
+        },
+        "X1": {
+          "value2": "date yesterday",
+          "text": "date yesterday",
+          "formula": null
+        },
+        "Y1": {
+          "value2": "date last7Days",
+          "text": "date last7Days",
+          "formula": null
+        },
+        "Z1": {
+          "value2": "date thisWeek",
+          "text": "date thisWeek",
+          "formula": null
+        },
+        "AA1": {
+          "value2": "date lastWeek",
+          "text": "date lastWeek",
+          "formula": null
+        },
+        "AB1": {
+          "value2": "date lastMonth",
+          "text": "date lastMonth",
+          "formula": null
+        },
+        "AC1": {
+          "value2": "date tomorrow",
+          "text": "date tomorrow",
+          "formula": null
+        },
+        "AD1": {
+          "value2": "date nextWeek",
+          "text": "date nextWeek",
+          "formula": null
+        },
+        "AE1": {
+          "value2": "date nextMonth",
+          "text": "date nextMonth",
+          "formula": null
+        },
+        "AF1": {
+          "value2": "date thisMonth",
+          "text": "date thisMonth",
+          "formula": null
+        },
+        "AG1": {
+          "value2": "scale 2",
+          "text": "scale 2",
+          "formula": null
+        },
+        "AH1": {
+          "value2": "scale 3",
+          "text": "scale 3",
+          "formula": null
+        },
+        "AI1": {
+          "value2": "scale 3 custom",
+          "text": "scale 3 custom",
+          "formula": null
+        },
+        "AJ1": {
+          "value2": "data bar",
+          "text": "data bar",
+          "formula": null
+        },
+        "AK1": {
+          "value2": "icons 3",
+          "text": "icons 3",
+          "formula": null
+        },
+        "AL1": {
+          "value2": "icons 5",
+          "text": "icons 5",
+          "formula": null
+        },
+        "AM1": {
+          "value2": "two rules merge",
+          "text": "two rules merge",
+          "formula": null
+        },
+        "AN1": {
+          "value2": "stopIfTrue",
+          "text": "stopIfTrue",
+          "formula": null
+        },
+        "AO1": {
+          "value2": "dxf date numFmt",
+          "text": "dxf date numFmt",
+          "formula": null
+        },
+        "AP1": {
+          "value2": "dxf pct numFmt",
+          "text": "dxf pct numFmt",
+          "formula": null
+        },
+        "A2": {
+          "value2": 12.0,
+          "text": "12",
+          "formula": null
+        },
+        "B2": {
+          "value2": 12.0,
+          "text": "12",
+          "formula": null
+        },
+        "C2": {
+          "value2": 12.0,
+          "text": "12",
+          "formula": null
+        },
+        "D2": {
+          "value2": 12.0,
+          "text": "12",
+          "formula": null
+        },
+        "E2": {
+          "value2": 12.0,
+          "text": "12",
+          "formula": null
+        },
+        "F2": {
+          "value2": 12.0,
+          "text": "12",
+          "formula": null
+        },
+        "G2": {
+          "value2": 12.0,
+          "text": "12",
+          "formula": null
+        },
+        "H2": {
+          "value2": 12.0,
+          "text": "12",
+          "formula": null
+        },
+        "I2": {
+          "value2": 12.0,
+          "text": "12",
+          "formula": null
+        },
+        "J2": {
+          "value2": 12.0,
+          "text": "12",
+          "formula": null
+        },
+        "K2": {
+          "value2": 12.0,
+          "text": "12",
+          "formula": null
+        },
+        "L2": {
+          "value2": 12.0,
+          "text": "12",
+          "formula": null
+        },
+        "M2": {
+          "value2": 12.0,
+          "text": "12",
+          "formula": null
+        },
+        "N2": {
+          "value2": 12.0,
+          "text": "12",
+          "formula": null
+        },
+        "O2": {
+          "value2": "apple",
+          "text": "apple",
+          "formula": null
+        },
+        "P2": {
+          "value2": "apple",
+          "text": "apple",
+          "formula": null
+        },
+        "Q2": {
+          "value2": "apple",
+          "text": "apple",
+          "formula": null
+        },
+        "R2": {
+          "value2": "apple",
+          "text": "apple",
+          "formula": null
+        },
+        "S2": {
+          "value2": "apple",
+          "text": "apple",
+          "formula": null
+        },
+        "T2": {
+          "value2": "apple",
+          "text": "apple",
+          "formula": null
+        },
+        "U2": {
+          "value2": 1.0,
+          "text": "1",
+          "formula": null
+        },
+        "V2": {
+          "value2": 1.0,
+          "text": "1",
+          "formula": null
+        },
+        "W2": {
+          "value2": 46266.0,
+          "text": "2026-09-01",
+          "formula": null
+        },
+        "X2": {
+          "value2": 46266.0,
+          "text": "2026-09-01",
+          "formula": null
+        },
+        "Y2": {
+          "value2": 46266.0,
+          "text": "2026-09-01",
+          "formula": null
+        },
+        "Z2": {
+          "value2": 46266.0,
+          "text": "2026-09-01",
+          "formula": null
+        },
+        "AA2": {
+          "value2": 46266.0,
+          "text": "2026-09-01",
+          "formula": null
+        },
+        "AB2": {
+          "value2": 46266.0,
+          "text": "2026-09-01",
+          "formula": null
+        },
+        "AC2": {
+          "value2": 46266.0,
+          "text": "2026-09-01",
+          "formula": null
+        },
+        "AD2": {
+          "value2": 46266.0,
+          "text": "2026-09-01",
+          "formula": null
+        },
+        "AE2": {
+          "value2": 46266.0,
+          "text": "2026-09-01",
+          "formula": null
+        },
+        "AF2": {
+          "value2": 46266.0,
+          "text": "2026-09-01",
+          "formula": null
+        },
+        "AG2": {
+          "value2": 12.0,
+          "text": "12",
+          "formula": null
+        },
+        "AH2": {
+          "value2": 12.0,
+          "text": "12",
+          "formula": null
+        },
+        "AI2": {
+          "value2": 12.0,
+          "text": "12",
+          "formula": null
+        },
+        "AJ2": {
+          "value2": 12.0,
+          "text": "12",
+          "formula": null
+        },
+        "AK2": {
+          "value2": 12.0,
+          "text": "12",
+          "formula": null
+        },
+        "AL2": {
+          "value2": 12.0,
+          "text": "12",
+          "formula": null
+        },
+        "AM2": {
+          "value2": 12.0,
+          "text": "12",
+          "formula": null
+        },
+        "AN2": {
+          "value2": 12.0,
+          "text": "12",
+          "formula": null
+        },
+        "AO2": {
+          "value2": 43520.0,
+          "text": "February '19",
+          "formula": null
+        },
+        "AP2": {
+          "value2": 0.1,
+          "text": "0.1",
+          "formula": null
+        },
+        "A3": {
+          "value2": 87.0,
+          "text": "87",
+          "formula": null
+        },
+        "B3": {
+          "value2": 87.0,
+          "text": "87",
+          "formula": null
+        },
+        "C3": {
+          "value2": 87.0,
+          "text": "87",
+          "formula": null
+        },
+        "D3": {
+          "value2": 87.0,
+          "text": "87",
+          "formula": null
+        },
+        "E3": {
+          "value2": 87.0,
+          "text": "87",
+          "formula": null
+        },
+        "F3": {
+          "value2": 87.0,
+          "text": "87",
+          "formula": null
+        },
+        "G3": {
+          "value2": 87.0,
+          "text": "87",
+          "formula": null
+        },
+        "H3": {
+          "value2": 87.0,
+          "text": "87",
+          "formula": null
+        },
+        "I3": {
+          "value2": 87.0,
+          "text": "87",
+          "formula": null
+        },
+        "J3": {
+          "value2": 87.0,
+          "text": "87",
+          "formula": null
+        },
+        "K3": {
+          "value2": 87.0,
+          "text": "87",
+          "formula": null
+        },
+        "L3": {
+          "value2": 87.0,
+          "text": "87",
+          "formula": null
+        },
+        "M3": {
+          "value2": 87.0,
+          "text": "87",
+          "formula": null
+        },
+        "N3": {
+          "value2": 87.0,
+          "text": "87",
+          "formula": null
+        },
+        "O3": {
+          "value2": "banana",
+          "text": "banana",
+          "formula": null
+        },
+        "P3": {
+          "value2": "banana",
+          "text": "banana",
+          "formula": null
+        },
+        "Q3": {
+          "value2": "banana",
+          "text": "banana",
+          "formula": null
+        },
+        "R3": {
+          "value2": "banana",
+          "text": "banana",
+          "formula": null
+        },
+        "S3": {
+          "value2": "banana",
+          "text": "banana",
+          "formula": null
+        },
+        "T3": {
+          "value2": "banana",
+          "text": "banana",
+          "formula": null
+        },
+        "U3": {
+          "value2": -2146826281,
+          "text": "#DIV/0!",
+          "formula": "=1/0"
+        },
+        "V3": {
+          "value2": -2146826281,
+          "text": "#DIV/0!",
+          "formula": "=1/0"
+        },
+        "W3": {
+          "value2": 46276.0,
+          "text": "2026-09-11",
+          "formula": null
+        },
+        "X3": {
+          "value2": 46276.0,
+          "text": "2026-09-11",
+          "formula": null
+        },
+        "Y3": {
+          "value2": 46276.0,
+          "text": "2026-09-11",
+          "formula": null
+        },
+        "Z3": {
+          "value2": 46276.0,
+          "text": "2026-09-11",
+          "formula": null
+        },
+        "AA3": {
+          "value2": 46276.0,
+          "text": "2026-09-11",
+          "formula": null
+        },
+        "AB3": {
+          "value2": 46276.0,
+          "text": "2026-09-11",
+          "formula": null
+        },
+        "AC3": {
+          "value2": 46276.0,
+          "text": "2026-09-11",
+          "formula": null
+        },
+        "AD3": {
+          "value2": 46276.0,
+          "text": "2026-09-11",
+          "formula": null
+        },
+        "AE3": {
+          "value2": 46276.0,
+          "text": "2026-09-11",
+          "formula": null
+        },
+        "AF3": {
+          "value2": 46276.0,
+          "text": "2026-09-11",
+          "formula": null
+        },
+        "AG3": {
+          "value2": 87.0,
+          "text": "87",
+          "formula": null
+        },
+        "AH3": {
+          "value2": 87.0,
+          "text": "87",
+          "formula": null
+        },
+        "AI3": {
+          "value2": 87.0,
+          "text": "87",
+          "formula": null
+        },
+        "AJ3": {
+          "value2": 87.0,
+          "text": "87",
+          "formula": null
+        },
+        "AK3": {
+          "value2": 87.0,
+          "text": "87",
+          "formula": null
+        },
+        "AL3": {
+          "value2": 87.0,
+          "text": "87",
+          "formula": null
+        },
+        "AM3": {
+          "value2": 87.0,
+          "text": "87",
+          "formula": null
+        },
+        "AN3": {
+          "value2": 87.0,
+          "text": "87",
+          "formula": null
+        },
+        "AO3": {
+          "value2": 43890.0,
+          "text": "February '20",
+          "formula": null
+        },
+        "AP3": {
+          "value2": 0.256,
+          "text": "0.256",
+          "formula": null
+        },
+        "A4": {
+          "value2": 45.0,
+          "text": "45",
+          "formula": null
+        },
+        "B4": {
+          "value2": 45.0,
+          "text": "45",
+          "formula": null
+        },
+        "C4": {
+          "value2": 45.0,
+          "text": "45.00x",
+          "formula": null
+        },
+        "D4": {
+          "value2": 45.0,
+          "text": "45",
+          "formula": null
+        },
+        "E4": {
+          "value2": 45.0,
+          "text": "45",
+          "formula": null
+        },
+        "F4": {
+          "value2": 45.0,
+          "text": "45",
+          "formula": null
+        },
+        "G4": {
+          "value2": 45.0,
+          "text": "45",
+          "formula": null
+        },
+        "H4": {
+          "value2": 45.0,
+          "text": "45",
+          "formula": null
+        },
+        "I4": {
+          "value2": 45.0,
+          "text": "45",
+          "formula": null
+        },
+        "J4": {
+          "value2": 45.0,
+          "text": "45",
+          "formula": null
+        },
+        "K4": {
+          "value2": 45.0,
+          "text": "45",
+          "formula": null
+        },
+        "L4": {
+          "value2": 45.0,
+          "text": "45",
+          "formula": null
+        },
+        "M4": {
+          "value2": 45.0,
+          "text": "45",
+          "formula": null
+        },
+        "N4": {
+          "value2": 45.0,
+          "text": "45",
+          "formula": null
+        },
+        "O4": {
+          "value2": "Cherry",
+          "text": "Cherry",
+          "formula": null
+        },
+        "P4": {
+          "value2": "Cherry",
+          "text": "Cherry",
+          "formula": null
+        },
+        "Q4": {
+          "value2": "Cherry",
+          "text": "Cherry",
+          "formula": null
+        },
+        "R4": {
+          "value2": "Cherry",
+          "text": "Cherry",
+          "formula": null
+        },
+        "S4": {
+          "value2": "Cherry",
+          "text": "Cherry",
+          "formula": null
+        },
+        "T4": {
+          "value2": "Cherry",
+          "text": "Cherry",
+          "formula": null
+        },
+        "U4": {
+          "value2": "x",
+          "text": "x",
+          "formula": null
+        },
+        "V4": {
+          "value2": "x",
+          "text": "x",
+          "formula": null
+        },
+        "W4": {
+          "value2": 46298.0,
+          "text": "2026-10-03",
+          "formula": null
+        },
+        "X4": {
+          "value2": 46298.0,
+          "text": "2026-10-03",
+          "formula": null
+        },
+        "Y4": {
+          "value2": 46298.0,
+          "text": "2026-10-03",
+          "formula": null
+        },
+        "Z4": {
+          "value2": 46298.0,
+          "text": "2026-10-03",
+          "formula": null
+        },
+        "AA4": {
+          "value2": 46298.0,
+          "text": "2026-10-03",
+          "formula": null
+        },
+        "AB4": {
+          "value2": 46298.0,
+          "text": "2026-10-03",
+          "formula": null
+        },
+        "AC4": {
+          "value2": 46298.0,
+          "text": "2026-10-03",
+          "formula": null
+        },
+        "AD4": {
+          "value2": 46298.0,
+          "text": "2026-10-03",
+          "formula": null
+        },
+        "AE4": {
+          "value2": 46298.0,
+          "text": "2026-10-03",
+          "formula": null
+        },
+        "AF4": {
+          "value2": 46298.0,
+          "text": "2026-10-03",
+          "formula": null
+        },
+        "AG4": {
+          "value2": 45.0,
+          "text": "45",
+          "formula": null
+        },
+        "AH4": {
+          "value2": 45.0,
+          "text": "45",
+          "formula": null
+        },
+        "AI4": {
+          "value2": 45.0,
+          "text": "45",
+          "formula": null
+        },
+        "AJ4": {
+          "value2": 45.0,
+          "text": "45",
+          "formula": null
+        },
+        "AK4": {
+          "value2": 45.0,
+          "text": "45",
+          "formula": null
+        },
+        "AL4": {
+          "value2": 45.0,
+          "text": "45",
+          "formula": null
+        },
+        "AM4": {
+          "value2": 45.0,
+          "text": "45",
+          "formula": null
+        },
+        "AN4": {
+          "value2": 45.0,
+          "text": "45",
+          "formula": null
+        },
+        "AO4": {
+          "value2": 44704.0,
+          "text": "May '22",
+          "formula": null
+        },
+        "AP4": {
+          "value2": 0.5,
+          "text": "50.0%",
+          "formula": null
+        },
+        "A5": {
+          "value2": 3.0,
+          "text": "3",
+          "formula": null
+        },
+        "B5": {
+          "value2": 3.0,
+          "text": "3",
+          "formula": null
+        },
+        "C5": {
+          "value2": 3.0,
+          "text": "3",
+          "formula": null
+        },
+        "D5": {
+          "value2": 3.0,
+          "text": "3",
+          "formula": null
+        },
+        "E5": {
+          "value2": 3.0,
+          "text": "3",
+          "formula": null
+        },
+        "F5": {
+          "value2": 3.0,
+          "text": "3",
+          "formula": null
+        },
+        "G5": {
+          "value2": 3.0,
+          "text": "3",
+          "formula": null
+        },
+        "H5": {
+          "value2": 3.0,
+          "text": "3",
+          "formula": null
+        },
+        "I5": {
+          "value2": 3.0,
+          "text": "3",
+          "formula": null
+        },
+        "J5": {
+          "value2": 3.0,
+          "text": "3",
+          "formula": null
+        },
+        "K5": {
+          "value2": 3.0,
+          "text": "3",
+          "formula": null
+        },
+        "L5": {
+          "value2": 3.0,
+          "text": "3",
+          "formula": null
+        },
+        "M5": {
+          "value2": 3.0,
+          "text": "3",
+          "formula": null
+        },
+        "N5": {
+          "value2": 3.0,
+          "text": "3",
+          "formula": null
+        },
+        "O5": {
+          "value2": "grape",
+          "text": "grape",
+          "formula": null
+        },
+        "P5": {
+          "value2": "grape",
+          "text": "grape",
+          "formula": null
+        },
+        "Q5": {
+          "value2": "grape",
+          "text": "grape",
+          "formula": null
+        },
+        "R5": {
+          "value2": "grape",
+          "text": "grape",
+          "formula": null
+        },
+        "S5": {
+          "value2": "grape",
+          "text": "grape",
+          "formula": null
+        },
+        "T5": {
+          "value2": "grape",
+          "text": "grape",
+          "formula": null
+        },
+        "U5": {
+          "value2": -2146826246,
+          "text": "#N/A",
+          "formula": "=NA()"
+        },
+        "V5": {
+          "value2": -2146826246,
+          "text": "#N/A",
+          "formula": "=NA()"
+        },
+        "W5": {
+          "value2": 46299.0,
+          "text": "2026-10-04",
+          "formula": null
+        },
+        "X5": {
+          "value2": 46299.0,
+          "text": "2026-10-04",
+          "formula": null
+        },
+        "Y5": {
+          "value2": 46299.0,
+          "text": "2026-10-04",
+          "formula": null
+        },
+        "Z5": {
+          "value2": 46299.0,
+          "text": "2026-10-04",
+          "formula": null
+        },
+        "AA5": {
+          "value2": 46299.0,
+          "text": "2026-10-04",
+          "formula": null
+        },
+        "AB5": {
+          "value2": 46299.0,
+          "text": "2026-10-04",
+          "formula": null
+        },
+        "AC5": {
+          "value2": 46299.0,
+          "text": "2026-10-04",
+          "formula": null
+        },
+        "AD5": {
+          "value2": 46299.0,
+          "text": "2026-10-04",
+          "formula": null
+        },
+        "AE5": {
+          "value2": 46299.0,
+          "text": "2026-10-04",
+          "formula": null
+        },
+        "AF5": {
+          "value2": 46299.0,
+          "text": "2026-10-04",
+          "formula": null
+        },
+        "AG5": {
+          "value2": 3.0,
+          "text": "3",
+          "formula": null
+        },
+        "AH5": {
+          "value2": 3.0,
+          "text": "3",
+          "formula": null
+        },
+        "AI5": {
+          "value2": 3.0,
+          "text": "3",
+          "formula": null
+        },
+        "AJ5": {
+          "value2": 3.0,
+          "text": "3",
+          "formula": null
+        },
+        "AK5": {
+          "value2": 3.0,
+          "text": "3",
+          "formula": null
+        },
+        "AL5": {
+          "value2": 3.0,
+          "text": "3",
+          "formula": null
+        },
+        "AM5": {
+          "value2": 3.0,
+          "text": "3",
+          "formula": null
+        },
+        "AN5": {
+          "value2": 3.0,
+          "text": "3",
+          "formula": null
+        },
+        "AO5": {
+          "value2": 44741.0,
+          "text": "June '22",
+          "formula": null
+        },
+        "AP5": {
+          "value2": 0.75,
+          "text": "75.0%",
+          "formula": null
+        },
+        "A6": {
+          "value2": 66.0,
+          "text": "66",
+          "formula": null
+        },
+        "B6": {
+          "value2": 66.0,
+          "text": "66",
+          "formula": null
+        },
+        "C6": {
+          "value2": 66.0,
+          "text": "66",
+          "formula": null
+        },
+        "D6": {
+          "value2": 66.0,
+          "text": "66",
+          "formula": null
+        },
+        "E6": {
+          "value2": 66.0,
+          "text": "66",
+          "formula": null
+        },
+        "F6": {
+          "value2": 66.0,
+          "text": "66",
+          "formula": null
+        },
+        "G6": {
+          "value2": 66.0,
+          "text": "66",
+          "formula": null
+        },
+        "H6": {
+          "value2": 66.0,
+          "text": "66",
+          "formula": null
+        },
+        "I6": {
+          "value2": 66.0,
+          "text": "66",
+          "formula": null
+        },
+        "J6": {
+          "value2": 66.0,
+          "text": "66",
+          "formula": null
+        },
+        "K6": {
+          "value2": 66.0,
+          "text": "66",
+          "formula": null
+        },
+        "L6": {
+          "value2": 66.0,
+          "text": "66",
+          "formula": null
+        },
+        "M6": {
+          "value2": 66.0,
+          "text": "66",
+          "formula": null
+        },
+        "N6": {
+          "value2": 66.0,
+          "text": "66",
+          "formula": null
+        },
+        "O6": {
+          "value2": "pineapple",
+          "text": "pineapple",
+          "formula": null
+        },
+        "P6": {
+          "value2": "pineapple",
+          "text": "pineapple",
+          "formula": null
+        },
+        "Q6": {
+          "value2": "pineapple",
+          "text": "pineapple",
+          "formula": null
+        },
+        "R6": {
+          "value2": "pineapple",
+          "text": "pineapple",
+          "formula": null
+        },
+        "S6": {
+          "value2": "pineapple",
+          "text": "pineapple",
+          "formula": null
+        },
+        "T6": {
+          "value2": "pineapple",
+          "text": "pineapple",
+          "formula": null
+        },
+        "U6": {
+          "value2": 5.0,
+          "text": "5",
+          "formula": null
+        },
+        "V6": {
+          "value2": 5.0,
+          "text": "5",
+          "formula": null
+        },
+        "W6": {
+          "value2": 46300.0,
+          "text": "2026-10-05",
+          "formula": null
+        },
+        "X6": {
+          "value2": 46300.0,
+          "text": "2026-10-05",
+          "formula": null
+        },
+        "Y6": {
+          "value2": 46300.0,
+          "text": "2026-10-05",
+          "formula": null
+        },
+        "Z6": {
+          "value2": 46300.0,
+          "text": "2026-10-05",
+          "formula": null
+        },
+        "AA6": {
+          "value2": 46300.0,
+          "text": "2026-10-05",
+          "formula": null
+        },
+        "AB6": {
+          "value2": 46300.0,
+          "text": "2026-10-05",
+          "formula": null
+        },
+        "AC6": {
+          "value2": 46300.0,
+          "text": "2026-10-05",
+          "formula": null
+        },
+        "AD6": {
+          "value2": 46300.0,
+          "text": "2026-10-05",
+          "formula": null
+        },
+        "AE6": {
+          "value2": 46300.0,
+          "text": "2026-10-05",
+          "formula": null
+        },
+        "AF6": {
+          "value2": 46300.0,
+          "text": "2026-10-05",
+          "formula": null
+        },
+        "AG6": {
+          "value2": 66.0,
+          "text": "66",
+          "formula": null
+        },
+        "AH6": {
+          "value2": 66.0,
+          "text": "66",
+          "formula": null
+        },
+        "AI6": {
+          "value2": 66.0,
+          "text": "66",
+          "formula": null
+        },
+        "AJ6": {
+          "value2": 66.0,
+          "text": "66",
+          "formula": null
+        },
+        "AK6": {
+          "value2": 66.0,
+          "text": "66",
+          "formula": null
+        },
+        "AL6": {
+          "value2": 66.0,
+          "text": "66",
+          "formula": null
+        },
+        "AM6": {
+          "value2": 66.0,
+          "text": "66",
+          "formula": null
+        },
+        "AN6": {
+          "value2": 66.0,
+          "text": "66",
+          "formula": null
+        },
+        "AO6": {
+          "value2": 44778.0,
+          "text": "August '22",
+          "formula": null
+        },
+        "AP6": {
+          "value2": 1.0,
+          "text": "100.0%",
+          "formula": null
+        },
+        "A7": {
+          "value2": 50.0,
+          "text": "50",
+          "formula": null
+        },
+        "B7": {
+          "value2": 50.0,
+          "text": "50",
+          "formula": null
+        },
+        "C7": {
+          "value2": 50.0,
+          "text": "50",
+          "formula": null
+        },
+        "D7": {
+          "value2": 50.0,
+          "text": "50",
+          "formula": null
+        },
+        "E7": {
+          "value2": 50.0,
+          "text": "50",
+          "formula": null
+        },
+        "F7": {
+          "value2": 50.0,
+          "text": "50",
+          "formula": null
+        },
+        "G7": {
+          "value2": 50.0,
+          "text": "50",
+          "formula": null
+        },
+        "H7": {
+          "value2": 50.0,
+          "text": "50",
+          "formula": null
+        },
+        "I7": {
+          "value2": 50.0,
+          "text": "50",
+          "formula": null
+        },
+        "J7": {
+          "value2": 50.0,
+          "text": "50",
+          "formula": null
+        },
+        "K7": {
+          "value2": 50.0,
+          "text": "50",
+          "formula": null
+        },
+        "L7": {
+          "value2": 50.0,
+          "text": "50",
+          "formula": null
+        },
+        "M7": {
+          "value2": 50.0,
+          "text": "50",
+          "formula": null
+        },
+        "N7": {
+          "value2": 50.0,
+          "text": "50",
+          "formula": null
+        },
+        "O7": {
+          "value2": "Orange",
+          "text": "Orange",
+          "formula": null
+        },
+        "P7": {
+          "value2": "Orange",
+          "text": "Orange",
+          "formula": null
+        },
+        "Q7": {
+          "value2": "Orange",
+          "text": "Orange",
+          "formula": null
+        },
+        "R7": {
+          "value2": "Orange",
+          "text": "Orange",
+          "formula": null
+        },
+        "S7": {
+          "value2": "Orange",
+          "text": "Orange",
+          "formula": null
+        },
+        "T7": {
+          "value2": "Orange",
+          "text": "Orange",
+          "formula": null
+        },
+        "U7": {
+          "value2": -2146826252,
+          "text": "#NUM!",
+          "formula": "=SQRT(-1)"
+        },
+        "V7": {
+          "value2": -2146826252,
+          "text": "#NUM!",
+          "formula": "=SQRT(-1)"
+        },
+        "W7": {
+          "value2": 46305.0,
+          "text": "2026-10-10",
+          "formula": null
+        },
+        "X7": {
+          "value2": 46305.0,
+          "text": "2026-10-10",
+          "formula": null
+        },
+        "Y7": {
+          "value2": 46305.0,
+          "text": "2026-10-10",
+          "formula": null
+        },
+        "Z7": {
+          "value2": 46305.0,
+          "text": "2026-10-10",
+          "formula": null
+        },
+        "AA7": {
+          "value2": 46305.0,
+          "text": "2026-10-10",
+          "formula": null
+        },
+        "AB7": {
+          "value2": 46305.0,
+          "text": "2026-10-10",
+          "formula": null
+        },
+        "AC7": {
+          "value2": 46305.0,
+          "text": "2026-10-10",
+          "formula": null
+        },
+        "AD7": {
+          "value2": 46305.0,
+          "text": "2026-10-10",
+          "formula": null
+        },
+        "AE7": {
+          "value2": 46305.0,
+          "text": "2026-10-10",
+          "formula": null
+        },
+        "AF7": {
+          "value2": 46305.0,
+          "text": "2026-10-10",
+          "formula": null
+        },
+        "AG7": {
+          "value2": 50.0,
+          "text": "50",
+          "formula": null
+        },
+        "AH7": {
+          "value2": 50.0,
+          "text": "50",
+          "formula": null
+        },
+        "AI7": {
+          "value2": 50.0,
+          "text": "50",
+          "formula": null
+        },
+        "AJ7": {
+          "value2": 50.0,
+          "text": "50",
+          "formula": null
+        },
+        "AK7": {
+          "value2": 50.0,
+          "text": "50",
+          "formula": null
+        },
+        "AL7": {
+          "value2": 50.0,
+          "text": "50",
+          "formula": null
+        },
+        "AM7": {
+          "value2": 50.0,
+          "text": "50",
+          "formula": null
+        },
+        "AN7": {
+          "value2": 50.0,
+          "text": "50",
+          "formula": null
+        },
+        "AO7": {
+          "value2": 44963.0,
+          "text": "February '23",
+          "formula": null
+        },
+        "AP7": {
+          "value2": 0.01,
+          "text": "0.01",
+          "formula": null
+        },
+        "A8": {
+          "value2": 21.0,
+          "text": "21",
+          "formula": null
+        },
+        "B8": {
+          "value2": 21.0,
+          "text": "21",
+          "formula": null
+        },
+        "C8": {
+          "value2": 21.0,
+          "text": "21",
+          "formula": null
+        },
+        "D8": {
+          "value2": 21.0,
+          "text": "21",
+          "formula": null
+        },
+        "E8": {
+          "value2": 21.0,
+          "text": "21",
+          "formula": null
+        },
+        "F8": {
+          "value2": 21.0,
+          "text": "21",
+          "formula": null
+        },
+        "G8": {
+          "value2": 21.0,
+          "text": "21",
+          "formula": null
+        },
+        "H8": {
+          "value2": 21.0,
+          "text": "21",
+          "formula": null
+        },
+        "I8": {
+          "value2": 21.0,
+          "text": "21",
+          "formula": null
+        },
+        "J8": {
+          "value2": 21.0,
+          "text": "21",
+          "formula": null
+        },
+        "K8": {
+          "value2": 21.0,
+          "text": "21",
+          "formula": null
+        },
+        "L8": {
+          "value2": 21.0,
+          "text": "21",
+          "formula": null
+        },
+        "M8": {
+          "value2": 21.0,
+          "text": "21",
+          "formula": null
+        },
+        "N8": {
+          "value2": 21.0,
+          "text": "21",
+          "formula": null
+        },
+        "O8": {
+          "value2": "anna",
+          "text": "anna",
+          "formula": null
+        },
+        "P8": {
+          "value2": "anna",
+          "text": "anna",
+          "formula": null
+        },
+        "Q8": {
+          "value2": "anna",
+          "text": "anna",
+          "formula": null
+        },
+        "R8": {
+          "value2": "anna",
+          "text": "anna",
+          "formula": null
+        },
+        "S8": {
+          "value2": "anna",
+          "text": "anna",
+          "formula": null
+        },
+        "T8": {
+          "value2": "anna",
+          "text": "anna",
+          "formula": null
+        },
+        "U8": {
+          "value2": 7.0,
+          "text": "7",
+          "formula": null
+        },
+        "V8": {
+          "value2": 7.0,
+          "text": "7",
+          "formula": null
+        },
+        "W8": {
+          "value2": 46306.0,
+          "text": "2026-10-11",
+          "formula": null
+        },
+        "X8": {
+          "value2": 46306.0,
+          "text": "2026-10-11",
+          "formula": null
+        },
+        "Y8": {
+          "value2": 46306.0,
+          "text": "2026-10-11",
+          "formula": null
+        },
+        "Z8": {
+          "value2": 46306.0,
+          "text": "2026-10-11",
+          "formula": null
+        },
+        "AA8": {
+          "value2": 46306.0,
+          "text": "2026-10-11",
+          "formula": null
+        },
+        "AB8": {
+          "value2": 46306.0,
+          "text": "2026-10-11",
+          "formula": null
+        },
+        "AC8": {
+          "value2": 46306.0,
+          "text": "2026-10-11",
+          "formula": null
+        },
+        "AD8": {
+          "value2": 46306.0,
+          "text": "2026-10-11",
+          "formula": null
+        },
+        "AE8": {
+          "value2": 46306.0,
+          "text": "2026-10-11",
+          "formula": null
+        },
+        "AF8": {
+          "value2": 46306.0,
+          "text": "2026-10-11",
+          "formula": null
+        },
+        "AG8": {
+          "value2": 21.0,
+          "text": "21",
+          "formula": null
+        },
+        "AH8": {
+          "value2": 21.0,
+          "text": "21",
+          "formula": null
+        },
+        "AI8": {
+          "value2": 21.0,
+          "text": "21",
+          "formula": null
+        },
+        "AJ8": {
+          "value2": 21.0,
+          "text": "21",
+          "formula": null
+        },
+        "AK8": {
+          "value2": 21.0,
+          "text": "21",
+          "formula": null
+        },
+        "AL8": {
+          "value2": 21.0,
+          "text": "21",
+          "formula": null
+        },
+        "AM8": {
+          "value2": 21.0,
+          "text": "21",
+          "formula": null
+        },
+        "AN8": {
+          "value2": 21.0,
+          "text": "21",
+          "formula": null
+        },
+        "AO8": {
+          "value2": 45000.0,
+          "text": "March '23",
+          "formula": null
+        },
+        "AP8": {
+          "value2": 0.333,
+          "text": "0.333",
+          "formula": null
+        },
+        "A9": {
+          "value2": 99.0,
+          "text": "99",
+          "formula": null
+        },
+        "B9": {
+          "value2": 99.0,
+          "text": "99",
+          "formula": null
+        },
+        "C9": {
+          "value2": 99.0,
+          "text": "99",
+          "formula": null
+        },
+        "D9": {
+          "value2": 99.0,
+          "text": "99",
+          "formula": null
+        },
+        "E9": {
+          "value2": 99.0,
+          "text": "99",
+          "formula": null
+        },
+        "F9": {
+          "value2": 99.0,
+          "text": "99",
+          "formula": null
+        },
+        "G9": {
+          "value2": 99.0,
+          "text": "99",
+          "formula": null
+        },
+        "H9": {
+          "value2": 99.0,
+          "text": "99",
+          "formula": null
+        },
+        "I9": {
+          "value2": 99.0,
+          "text": "99",
+          "formula": null
+        },
+        "J9": {
+          "value2": 99.0,
+          "text": "99",
+          "formula": null
+        },
+        "K9": {
+          "value2": 99.0,
+          "text": "99",
+          "formula": null
+        },
+        "L9": {
+          "value2": 99.0,
+          "text": "99",
+          "formula": null
+        },
+        "M9": {
+          "value2": 99.0,
+          "text": "99",
+          "formula": null
+        },
+        "N9": {
+          "value2": 99.0,
+          "text": "99",
+          "formula": null
+        },
+        "U9": {
+          "value2": 8.0,
+          "text": "8",
+          "formula": null
+        },
+        "V9": {
+          "value2": 8.0,
+          "text": "8",
+          "formula": null
+        },
+        "W9": {
+          "value2": 46307.0,
+          "text": "2026-10-12",
+          "formula": null
+        },
+        "X9": {
+          "value2": 46307.0,
+          "text": "2026-10-12",
+          "formula": null
+        },
+        "Y9": {
+          "value2": 46307.0,
+          "text": "2026-10-12",
+          "formula": null
+        },
+        "Z9": {
+          "value2": 46307.0,
+          "text": "2026-10-12",
+          "formula": null
+        },
+        "AA9": {
+          "value2": 46307.0,
+          "text": "2026-10-12",
+          "formula": null
+        },
+        "AB9": {
+          "value2": 46307.0,
+          "text": "2026-10-12",
+          "formula": null
+        },
+        "AC9": {
+          "value2": 46307.0,
+          "text": "2026-10-12",
+          "formula": null
+        },
+        "AD9": {
+          "value2": 46307.0,
+          "text": "2026-10-12",
+          "formula": null
+        },
+        "AE9": {
+          "value2": 46307.0,
+          "text": "2026-10-12",
+          "formula": null
+        },
+        "AF9": {
+          "value2": 46307.0,
+          "text": "2026-10-12",
+          "formula": null
+        },
+        "AG9": {
+          "value2": 99.0,
+          "text": "99",
+          "formula": null
+        },
+        "AH9": {
+          "value2": 99.0,
+          "text": "99",
+          "formula": null
+        },
+        "AI9": {
+          "value2": 99.0,
+          "text": "99",
+          "formula": null
+        },
+        "AJ9": {
+          "value2": 99.0,
+          "text": "99",
+          "formula": null
+        },
+        "AK9": {
+          "value2": 99.0,
+          "text": "99",
+          "formula": null
+        },
+        "AL9": {
+          "value2": 99.0,
+          "text": "99",
+          "formula": null
+        },
+        "AM9": {
+          "value2": 99.0,
+          "text": "99",
+          "formula": null
+        },
+        "AN9": {
+          "value2": 99.0,
+          "text": "99",
+          "formula": null
+        },
+        "AO9": {
+          "value2": 45037.0,
+          "text": "April '23",
+          "formula": null
+        },
+        "AP9": {
+          "value2": 0.9,
+          "text": "90.0%",
+          "formula": null
+        },
+        "A10": {
+          "value2": 45.0,
+          "text": "45",
+          "formula": null
+        },
+        "B10": {
+          "value2": 45.0,
+          "text": "45",
+          "formula": null
+        },
+        "C10": {
+          "value2": 45.0,
+          "text": "45.00x",
+          "formula": null
+        },
+        "D10": {
+          "value2": 45.0,
+          "text": "45",
+          "formula": null
+        },
+        "E10": {
+          "value2": 45.0,
+          "text": "45",
+          "formula": null
+        },
+        "F10": {
+          "value2": 45.0,
+          "text": "45",
+          "formula": null
+        },
+        "G10": {
+          "value2": 45.0,
+          "text": "45",
+          "formula": null
+        },
+        "H10": {
+          "value2": 45.0,
+          "text": "45",
+          "formula": null
+        },
+        "I10": {
+          "value2": 45.0,
+          "text": "45",
+          "formula": null
+        },
+        "J10": {
+          "value2": 45.0,
+          "text": "45",
+          "formula": null
+        },
+        "K10": {
+          "value2": 45.0,
+          "text": "45",
+          "formula": null
+        },
+        "L10": {
+          "value2": 45.0,
+          "text": "45",
+          "formula": null
+        },
+        "M10": {
+          "value2": 45.0,
+          "text": "45",
+          "formula": null
+        },
+        "N10": {
+          "value2": 45.0,
+          "text": "45",
+          "formula": null
+        },
+        "O10": {
+          "value2": "APPLE pie",
+          "text": "APPLE pie",
+          "formula": null
+        },
+        "P10": {
+          "value2": "APPLE pie",
+          "text": "APPLE pie",
+          "formula": null
+        },
+        "Q10": {
+          "value2": "APPLE pie",
+          "text": "APPLE pie",
+          "formula": null
+        },
+        "R10": {
+          "value2": "APPLE pie",
+          "text": "APPLE pie",
+          "formula": null
+        },
+        "S10": {
+          "value2": "APPLE pie",
+          "text": "APPLE pie",
+          "formula": null
+        },
+        "T10": {
+          "value2": "APPLE pie",
+          "text": "APPLE pie",
+          "formula": null
+        },
+        "U10": {
+          "value2": -2146826281,
+          "text": "#DIV/0!",
+          "formula": "=1/0"
+        },
+        "V10": {
+          "value2": -2146826281,
+          "text": "#DIV/0!",
+          "formula": "=1/0"
+        },
+        "W10": {
+          "value2": 46308.0,
+          "text": "2026-10-13",
+          "formula": null
+        },
+        "X10": {
+          "value2": 46308.0,
+          "text": "2026-10-13",
+          "formula": null
+        },
+        "Y10": {
+          "value2": 46308.0,
+          "text": "2026-10-13",
+          "formula": null
+        },
+        "Z10": {
+          "value2": 46308.0,
+          "text": "2026-10-13",
+          "formula": null
+        },
+        "AA10": {
+          "value2": 46308.0,
+          "text": "2026-10-13",
+          "formula": null
+        },
+        "AB10": {
+          "value2": 46308.0,
+          "text": "2026-10-13",
+          "formula": null
+        },
+        "AC10": {
+          "value2": 46308.0,
+          "text": "2026-10-13",
+          "formula": null
+        },
+        "AD10": {
+          "value2": 46308.0,
+          "text": "2026-10-13",
+          "formula": null
+        },
+        "AE10": {
+          "value2": 46308.0,
+          "text": "2026-10-13",
+          "formula": null
+        },
+        "AF10": {
+          "value2": 46308.0,
+          "text": "2026-10-13",
+          "formula": null
+        },
+        "AG10": {
+          "value2": 45.0,
+          "text": "45",
+          "formula": null
+        },
+        "AH10": {
+          "value2": 45.0,
+          "text": "45",
+          "formula": null
+        },
+        "AI10": {
+          "value2": 45.0,
+          "text": "45",
+          "formula": null
+        },
+        "AJ10": {
+          "value2": 45.0,
+          "text": "45",
+          "formula": null
+        },
+        "AK10": {
+          "value2": 45.0,
+          "text": "45",
+          "formula": null
+        },
+        "AL10": {
+          "value2": 45.0,
+          "text": "45",
+          "formula": null
+        },
+        "AM10": {
+          "value2": 45.0,
+          "text": "45",
+          "formula": null
+        },
+        "AN10": {
+          "value2": 45.0,
+          "text": "45",
+          "formula": null
+        },
+        "AO10": {
+          "value2": 45074.0,
+          "text": "May '23",
+          "formula": null
+        },
+        "AP10": {
+          "value2": 0.05,
+          "text": "0.05",
+          "formula": null
+        },
+        "A11": {
+          "value2": 74.0,
+          "text": "74",
+          "formula": null
+        },
+        "B11": {
+          "value2": 74.0,
+          "text": "74",
+          "formula": null
+        },
+        "C11": {
+          "value2": 74.0,
+          "text": "74",
+          "formula": null
+        },
+        "D11": {
+          "value2": 74.0,
+          "text": "74",
+          "formula": null
+        },
+        "E11": {
+          "value2": 74.0,
+          "text": "74",
+          "formula": null
+        },
+        "F11": {
+          "value2": 74.0,
+          "text": "74",
+          "formula": null
+        },
+        "G11": {
+          "value2": 74.0,
+          "text": "74",
+          "formula": null
+        },
+        "H11": {
+          "value2": 74.0,
+          "text": "74",
+          "formula": null
+        },
+        "I11": {
+          "value2": 74.0,
+          "text": "74",
+          "formula": null
+        },
+        "J11": {
+          "value2": 74.0,
+          "text": "74",
+          "formula": null
+        },
+        "K11": {
+          "value2": 74.0,
+          "text": "74",
+          "formula": null
+        },
+        "L11": {
+          "value2": 74.0,
+          "text": "74",
+          "formula": null
+        },
+        "M11": {
+          "value2": 74.0,
+          "text": "74",
+          "formula": null
+        },
+        "N11": {
+          "value2": 74.0,
+          "text": "74",
+          "formula": null
+        },
+        "O11": {
+          "value2": "kiwi",
+          "text": "kiwi",
+          "formula": null
+        },
+        "P11": {
+          "value2": "kiwi",
+          "text": "kiwi",
+          "formula": null
+        },
+        "Q11": {
+          "value2": "kiwi",
+          "text": "kiwi",
+          "formula": null
+        },
+        "R11": {
+          "value2": "kiwi",
+          "text": "kiwi",
+          "formula": null
+        },
+        "S11": {
+          "value2": "kiwi",
+          "text": "kiwi",
+          "formula": null
+        },
+        "T11": {
+          "value2": "kiwi",
+          "text": "kiwi",
+          "formula": null
+        },
+        "U11": {
+          "value2": 10.0,
+          "text": "10",
+          "formula": null
+        },
+        "V11": {
+          "value2": 10.0,
+          "text": "10",
+          "formula": null
+        },
+        "W11": {
+          "value2": 46314.0,
+          "text": "2026-10-19",
+          "formula": null
+        },
+        "X11": {
+          "value2": 46314.0,
+          "text": "2026-10-19",
+          "formula": null
+        },
+        "Y11": {
+          "value2": 46314.0,
+          "text": "2026-10-19",
+          "formula": null
+        },
+        "Z11": {
+          "value2": 46314.0,
+          "text": "2026-10-19",
+          "formula": null
+        },
+        "AA11": {
+          "value2": 46314.0,
+          "text": "2026-10-19",
+          "formula": null
+        },
+        "AB11": {
+          "value2": 46314.0,
+          "text": "2026-10-19",
+          "formula": null
+        },
+        "AC11": {
+          "value2": 46314.0,
+          "text": "2026-10-19",
+          "formula": null
+        },
+        "AD11": {
+          "value2": 46314.0,
+          "text": "2026-10-19",
+          "formula": null
+        },
+        "AE11": {
+          "value2": 46314.0,
+          "text": "2026-10-19",
+          "formula": null
+        },
+        "AF11": {
+          "value2": 46314.0,
+          "text": "2026-10-19",
+          "formula": null
+        },
+        "AG11": {
+          "value2": 74.0,
+          "text": "74",
+          "formula": null
+        },
+        "AH11": {
+          "value2": 74.0,
+          "text": "74",
+          "formula": null
+        },
+        "AI11": {
+          "value2": 74.0,
+          "text": "74",
+          "formula": null
+        },
+        "AJ11": {
+          "value2": 74.0,
+          "text": "74",
+          "formula": null
+        },
+        "AK11": {
+          "value2": 74.0,
+          "text": "74",
+          "formula": null
+        },
+        "AL11": {
+          "value2": 74.0,
+          "text": "74",
+          "formula": null
+        },
+        "AM11": {
+          "value2": 74.0,
+          "text": "74",
+          "formula": null
+        },
+        "AN11": {
+          "value2": 74.0,
+          "text": "74",
+          "formula": null
+        },
+        "AO11": {
+          "value2": 45296.0,
+          "text": "January '24",
+          "formula": null
+        },
+        "AP11": {
+          "value2": 0.6,
+          "text": "60.0%",
+          "formula": null
+        },
+        "A12": {
+          "value2": 8.0,
+          "text": "8",
+          "formula": null
+        },
+        "B12": {
+          "value2": 8.0,
+          "text": "8",
+          "formula": null
+        },
+        "C12": {
+          "value2": 8.0,
+          "text": "8",
+          "formula": null
+        },
+        "D12": {
+          "value2": 8.0,
+          "text": "8",
+          "formula": null
+        },
+        "E12": {
+          "value2": 8.0,
+          "text": "8",
+          "formula": null
+        },
+        "F12": {
+          "value2": 8.0,
+          "text": "8",
+          "formula": null
+        },
+        "G12": {
+          "value2": 8.0,
+          "text": "8",
+          "formula": null
+        },
+        "H12": {
+          "value2": 8.0,
+          "text": "8",
+          "formula": null
+        },
+        "I12": {
+          "value2": 8.0,
+          "text": "8",
+          "formula": null
+        },
+        "J12": {
+          "value2": 8.0,
+          "text": "8",
+          "formula": null
+        },
+        "K12": {
+          "value2": 8.0,
+          "text": "8",
+          "formula": null
+        },
+        "L12": {
+          "value2": 8.0,
+          "text": "8",
+          "formula": null
+        },
+        "M12": {
+          "value2": 8.0,
+          "text": "8",
+          "formula": null
+        },
+        "N12": {
+          "value2": 8.0,
+          "text": "8",
+          "formula": null
+        },
+        "O12": {
+          "value2": "band",
+          "text": "band",
+          "formula": null
+        },
+        "P12": {
+          "value2": "band",
+          "text": "band",
+          "formula": null
+        },
+        "Q12": {
+          "value2": "band",
+          "text": "band",
+          "formula": null
+        },
+        "R12": {
+          "value2": "band",
+          "text": "band",
+          "formula": null
+        },
+        "S12": {
+          "value2": "band",
+          "text": "band",
+          "formula": null
+        },
+        "T12": {
+          "value2": "band",
+          "text": "band",
+          "formula": null
+        },
+        "U12": {
+          "value2": 11.0,
+          "text": "11",
+          "formula": null
+        },
+        "V12": {
+          "value2": 11.0,
+          "text": "11",
+          "formula": null
+        },
+        "W12": {
+          "value2": 46326.0,
+          "text": "2026-10-31",
+          "formula": null
+        },
+        "X12": {
+          "value2": 46326.0,
+          "text": "2026-10-31",
+          "formula": null
+        },
+        "Y12": {
+          "value2": 46326.0,
+          "text": "2026-10-31",
+          "formula": null
+        },
+        "Z12": {
+          "value2": 46326.0,
+          "text": "2026-10-31",
+          "formula": null
+        },
+        "AA12": {
+          "value2": 46326.0,
+          "text": "2026-10-31",
+          "formula": null
+        },
+        "AB12": {
+          "value2": 46326.0,
+          "text": "2026-10-31",
+          "formula": null
+        },
+        "AC12": {
+          "value2": 46326.0,
+          "text": "2026-10-31",
+          "formula": null
+        },
+        "AD12": {
+          "value2": 46326.0,
+          "text": "2026-10-31",
+          "formula": null
+        },
+        "AE12": {
+          "value2": 46326.0,
+          "text": "2026-10-31",
+          "formula": null
+        },
+        "AF12": {
+          "value2": 46326.0,
+          "text": "2026-10-31",
+          "formula": null
+        },
+        "AG12": {
+          "value2": 8.0,
+          "text": "8",
+          "formula": null
+        },
+        "AH12": {
+          "value2": 8.0,
+          "text": "8",
+          "formula": null
+        },
+        "AI12": {
+          "value2": 8.0,
+          "text": "8",
+          "formula": null
+        },
+        "AJ12": {
+          "value2": 8.0,
+          "text": "8",
+          "formula": null
+        },
+        "AK12": {
+          "value2": 8.0,
+          "text": "8",
+          "formula": null
+        },
+        "AL12": {
+          "value2": 8.0,
+          "text": "8",
+          "formula": null
+        },
+        "AM12": {
+          "value2": 8.0,
+          "text": "8",
+          "formula": null
+        },
+        "AN12": {
+          "value2": 8.0,
+          "text": "8",
+          "formula": null
+        },
+        "AO12": {
+          "value2": 45740.0,
+          "text": "March '25",
+          "formula": null
+        },
+        "AP12": {
+          "value2": 0.45,
+          "text": "45.0%",
+          "formula": null
+        },
+        "A13": {
+          "value2": 30.0,
+          "text": "30",
+          "formula": null
+        },
+        "B13": {
+          "value2": 30.0,
+          "text": "30",
+          "formula": null
+        },
+        "C13": {
+          "value2": 30.0,
+          "text": "30",
+          "formula": null
+        },
+        "D13": {
+          "value2": 30.0,
+          "text": "30",
+          "formula": null
+        },
+        "E13": {
+          "value2": 30.0,
+          "text": "30",
+          "formula": null
+        },
+        "F13": {
+          "value2": 30.0,
+          "text": "30",
+          "formula": null
+        },
+        "G13": {
+          "value2": 30.0,
+          "text": "30",
+          "formula": null
+        },
+        "H13": {
+          "value2": 30.0,
+          "text": "30",
+          "formula": null
+        },
+        "I13": {
+          "value2": 30.0,
+          "text": "30",
+          "formula": null
+        },
+        "J13": {
+          "value2": 30.0,
+          "text": "30",
+          "formula": null
+        },
+        "K13": {
+          "value2": 30.0,
+          "text": "30",
+          "formula": null
+        },
+        "L13": {
+          "value2": 30.0,
+          "text": "30",
+          "formula": null
+        },
+        "M13": {
+          "value2": 30.0,
+          "text": "30",
+          "formula": null
+        },
+        "N13": {
+          "value2": 30.0,
+          "text": "30",
+          "formula": null
+        },
+        "O13": {
+          "value2": "ban",
+          "text": "ban",
+          "formula": null
+        },
+        "P13": {
+          "value2": "ban",
+          "text": "ban",
+          "formula": null
+        },
+        "Q13": {
+          "value2": "ban",
+          "text": "ban",
+          "formula": null
+        },
+        "R13": {
+          "value2": "ban",
+          "text": "ban",
+          "formula": null
+        },
+        "S13": {
+          "value2": "ban",
+          "text": "ban",
+          "formula": null
+        },
+        "T13": {
+          "value2": "ban",
+          "text": "ban",
+          "formula": null
+        },
+        "U13": {
+          "value2": 12.0,
+          "text": "12",
+          "formula": null
+        },
+        "V13": {
+          "value2": 12.0,
+          "text": "12",
+          "formula": null
+        },
+        "W13": {
+          "value2": 46346.0,
+          "text": "2026-11-20",
+          "formula": null
+        },
+        "X13": {
+          "value2": 46346.0,
+          "text": "2026-11-20",
+          "formula": null
+        },
+        "Y13": {
+          "value2": 46346.0,
+          "text": "2026-11-20",
+          "formula": null
+        },
+        "Z13": {
+          "value2": 46346.0,
+          "text": "2026-11-20",
+          "formula": null
+        },
+        "AA13": {
+          "value2": 46346.0,
+          "text": "2026-11-20",
+          "formula": null
+        },
+        "AB13": {
+          "value2": 46346.0,
+          "text": "2026-11-20",
+          "formula": null
+        },
+        "AC13": {
+          "value2": 46346.0,
+          "text": "2026-11-20",
+          "formula": null
+        },
+        "AD13": {
+          "value2": 46346.0,
+          "text": "2026-11-20",
+          "formula": null
+        },
+        "AE13": {
+          "value2": 46346.0,
+          "text": "2026-11-20",
+          "formula": null
+        },
+        "AF13": {
+          "value2": 46346.0,
+          "text": "2026-11-20",
+          "formula": null
+        },
+        "AG13": {
+          "value2": 30.0,
+          "text": "30",
+          "formula": null
+        },
+        "AH13": {
+          "value2": 30.0,
+          "text": "30",
+          "formula": null
+        },
+        "AI13": {
+          "value2": 30.0,
+          "text": "30",
+          "formula": null
+        },
+        "AJ13": {
+          "value2": 30.0,
+          "text": "30",
+          "formula": null
+        },
+        "AK13": {
+          "value2": 30.0,
+          "text": "30",
+          "formula": null
+        },
+        "AL13": {
+          "value2": 30.0,
+          "text": "30",
+          "formula": null
+        },
+        "AM13": {
+          "value2": 30.0,
+          "text": "30",
+          "formula": null
+        },
+        "AN13": {
+          "value2": 30.0,
+          "text": "30",
+          "formula": null
+        },
+        "AO13": {
+          "value2": 46480.0,
+          "text": "April '27",
+          "formula": null
+        },
+        "AP13": {
+          "value2": 0.8,
+          "text": "80.0%",
+          "formula": null
+        }
+      }
+    }
+  ]
+}

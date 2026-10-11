@@ -130,6 +130,34 @@ pub enum Command {
         last: u32,
         points: f64,
     },
+    /// Hides columns `first..=last`; their stored widths are kept (Excel's `Hidden = True`).
+    HideColumns {
+        sheet: usize,
+        first: u32,
+        last: u32,
+    },
+    /// Shows columns `first..=last`. A column without a width of its own gets
+    /// `default_width` (stored characters), else the default for the workbook's default font
+    /// at 96 dpi.
+    UnhideColumns {
+        sheet: usize,
+        first: u32,
+        last: u32,
+        #[serde(default)]
+        default_width: Option<f64>,
+    },
+    /// Hides rows `first..=last`; their stored heights are kept.
+    HideRows {
+        sheet: usize,
+        first: u32,
+        last: u32,
+    },
+    /// Shows the hidden rows of `first..=last`.
+    UnhideRows {
+        sheet: usize,
+        first: u32,
+        last: u32,
+    },
     Save {
         path: PathBuf,
     },
@@ -180,6 +208,10 @@ impl Command {
             Self::XlsxSetCellFormula { .. } => "xlsx_set_cell_formula",
             Self::SetColumnWidth { .. } => "set_column_width",
             Self::SetRowHeight { .. } => "set_row_height",
+            Self::HideColumns { .. } => "hide_columns",
+            Self::UnhideColumns { .. } => "unhide_columns",
+            Self::HideRows { .. } => "hide_rows",
+            Self::UnhideRows { .. } => "unhide_rows",
             Self::Save { .. } => "save",
             Self::ExportPdf { .. } => "export_pdf",
         }

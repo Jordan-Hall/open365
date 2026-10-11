@@ -404,6 +404,56 @@ impl Target {
                     Vec::new(),
                 ))
             }
+            (Content::Xlsx(x), Command::HideColumns { sheet, first, last }) => {
+                let before = x.workbook.hide_columns(*sheet, *first, *last)?;
+                Ok((
+                    Inverse::Columns {
+                        sheet: *sheet,
+                        before,
+                    },
+                    Vec::new(),
+                ))
+            }
+            (
+                Content::Xlsx(x),
+                Command::UnhideColumns {
+                    sheet,
+                    first,
+                    last,
+                    default_width,
+                },
+            ) => {
+                let before = x
+                    .workbook
+                    .unhide_columns(*sheet, *first, *last, *default_width)?;
+                Ok((
+                    Inverse::Columns {
+                        sheet: *sheet,
+                        before,
+                    },
+                    Vec::new(),
+                ))
+            }
+            (Content::Xlsx(x), Command::HideRows { sheet, first, last }) => {
+                let before = x.workbook.hide_rows(*sheet, *first, *last)?;
+                Ok((
+                    Inverse::RowHeights {
+                        sheet: *sheet,
+                        before,
+                    },
+                    Vec::new(),
+                ))
+            }
+            (Content::Xlsx(x), Command::UnhideRows { sheet, first, last }) => {
+                let before = x.workbook.unhide_rows(*sheet, *first, *last)?;
+                Ok((
+                    Inverse::RowHeights {
+                        sheet: *sheet,
+                        before,
+                    },
+                    Vec::new(),
+                ))
+            }
             (content, command) => Err(CommandError::WrongTarget {
                 command: command.name(),
                 target: match content {

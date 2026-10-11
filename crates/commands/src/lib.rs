@@ -11,6 +11,7 @@
 //! back to reopening the original bytes and replaying the remaining commands.
 
 mod command;
+mod conditional;
 mod error;
 mod eval;
 mod pdf;
@@ -19,6 +20,7 @@ mod template;
 mod xlsx_state;
 
 pub use command::{CellEntry, CellRef, Command, CommandLog, EffectClass, Outcome};
+pub use conditional::{CfEffect, ConditionalFormats, DataBarEffect, IconEffect};
 pub use error::CommandError;
 pub use eval::{
     EvalValue, Evaluated, FormulaEngine, MAX_FORMULA_CHARS, MAX_RESULT_DIM, MAX_RESULT_TEXT,

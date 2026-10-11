@@ -38,7 +38,7 @@ impl Rgb {
         ((self.b as u32) << 16) | ((self.g as u32) << 8) | self.r as u32
     }
 
-    fn from_hex(s: &str) -> Option<Self> {
+    pub(crate) fn from_hex(s: &str) -> Option<Self> {
         let s = s.trim();
         let s = if s.len() == 8 { &s[2..] } else { s };
         if s.len() != 6 {
@@ -75,7 +75,7 @@ impl Color {
         tint: 0.0,
     };
 
-    fn parse(e: &XmlElement) -> Self {
+    pub(crate) fn parse(e: &XmlElement) -> Self {
         let h = &e.head;
         let tint = h
             .attr("tint")
@@ -415,7 +415,7 @@ pub enum FillPattern {
 }
 
 impl FillPattern {
-    fn parse(v: &str) -> Self {
+    pub(crate) fn parse(v: &str) -> Self {
         match v {
             "solid" => Self::Solid,
             "mediumGray" => Self::MediumGray,
@@ -584,7 +584,7 @@ impl Default for BorderEdge {
 }
 
 impl BorderEdge {
-    fn parse(e: &XmlElement) -> Self {
+    pub(crate) fn parse(e: &XmlElement) -> Self {
         Self {
             style: e
                 .head

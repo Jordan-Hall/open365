@@ -15,6 +15,7 @@
 //! `t` attribute of a valueless cell is only kept when it is not the type its value
 //! implies.
 
+mod conditional;
 mod error;
 mod fast;
 mod format;
@@ -27,6 +28,9 @@ mod styles;
 mod workbook;
 mod xml;
 
+pub use conditional::{
+    CellIsOp, CfBlock, CfKind, CfRule, Cfvo, CfvoKind, Dxf, DxfBorder, DxfFill, DxfFont, TimePeriod,
+};
 pub use error::XlsxError;
 pub use format::{
     Alignment, Border, BorderEdge, BorderStyle, CellFormat, Color, ColorSource, Fill, FillPattern,

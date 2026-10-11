@@ -6,6 +6,7 @@ use open365_opc::{
 };
 
 use crate::XlsxError;
+use crate::geometry::{BASE_DPI, GridMetrics};
 use crate::parts::{self, HygieneAction};
 use crate::refs::{MAX_COL, MAX_ROW};
 use crate::sheet::{
@@ -523,7 +524,8 @@ impl Workbook {
 
     /// Sets the stored width (characters, padding included; 0..=255) of columns
     /// `first..=last` and returns the previous `cols` state for [`Self::restore_columns`].
-    /// Only that sheet's part changes.
+    /// A width of 0 hides the columns (as in Excel) and a positive width shows them; every
+    /// column at once sets the sheet's default width. Only that sheet's part changes.
     pub fn set_column_width(
         &mut self,
         sheet: usize,
@@ -536,9 +538,44 @@ impl Workbook {
                 "column width {width} is outside 0..={MAX_COLUMN_WIDTH}"
             )));
         }
+        self.edit_columns(sheet, |ws| ws.set_column_width(first, last, width))
+    }
+
+    /// Hides columns `first..=last`; their stored widths are kept.
+    pub fn hide_columns(
+        &mut self,
+        sheet: usize,
+        first: u32,
+        last: u32,
+    ) -> Result<ColumnsSnapshot, XlsxError> {
+        self.edit_columns(sheet, |ws| ws.hide_columns(first, last))
+    }
+
+    /// Shows columns `first..=last`. A column that has no width of its own (or width 0) gets
+    /// the sheet's default width, `default_width` when given, else the default for the
+    /// workbook's default font at 96 dpi (the width Excel stores on such a machine).
+    pub fn unhide_columns(
+        &mut self,
+        sheet: usize,
+        first: u32,
+        last: u32,
+        default_width: Option<f64>,
+    ) -> Result<ColumnsSnapshot, XlsxError> {
+        let metrics = GridMetrics::for_styles(&self.styles, BASE_DPI);
+        self.edit_columns(sheet, |ws| {
+            let width = default_width.unwrap_or_else(|| ws.default_column_width(metrics));
+            ws.unhide_columns(first, last, width)
+        })
+    }
+
+    fn edit_columns(
+        &mut self,
+        sheet: usize,
+        edit: impl FnOnce(&mut Worksheet) -> Result<(), XlsxError>,
+    ) -> Result<ColumnsSnapshot, XlsxError> {
         let ws = self.worksheet_mut(sheet)?;
         let before = ws.columns_snapshot();
-        if let Err(e) = ws.set_column_width(first, last, width) {
+        if let Err(e) = edit(ws) {
             ws.restore_columns(&before);
             return Err(e);
         }
@@ -558,7 +595,9 @@ impl Workbook {
     }
 
     /// Sets the height in points (0..=409) of rows `first..=last` and returns the previous
-    /// state for [`Self::restore_row_heights`]. Only that sheet's part changes.
+    /// state for [`Self::restore_row_heights`]. A height of 0 hides the rows and a positive
+    /// height shows them; every row at once sets the sheet's default row height. Only that
+    /// sheet's part changes.
     pub fn set_row_height(
         &mut self,
         sheet: usize,
@@ -571,14 +610,49 @@ impl Workbook {
                 "row height {points} is outside 0..={MAX_ROW_HEIGHT}"
             )));
         }
+        self.edit_rows(sheet, first, last, |ws| {
+            ws.set_row_height(first, last, points)
+        })
+    }
+
+    /// Hides rows `first..=last`; their stored heights are kept.
+    pub fn hide_rows(
+        &mut self,
+        sheet: usize,
+        first: u32,
+        last: u32,
+    ) -> Result<RowHeightsSnapshot, XlsxError> {
+        self.edit_rows(sheet, first, last, |ws| ws.hide_rows(first, last))
+    }
+
+    /// Shows the hidden rows of `first..=last`.
+    pub fn unhide_rows(
+        &mut self,
+        sheet: usize,
+        first: u32,
+        last: u32,
+    ) -> Result<RowHeightsSnapshot, XlsxError> {
+        self.edit_rows(sheet, first, last, |ws| ws.unhide_rows(first, last))
+    }
+
+    fn edit_rows(
+        &mut self,
+        sheet: usize,
+        first: u32,
+        last: u32,
+        edit: impl FnOnce(&mut Worksheet) -> Result<(), XlsxError>,
+    ) -> Result<RowHeightsSnapshot, XlsxError> {
         let ws = self.worksheet_mut(sheet)?;
         if first < 1 || last < first || last > MAX_ROW {
             return Err(XlsxError::UnsupportedEdit(format!(
                 "row range {first}..={last} is outside 1..={MAX_ROW}"
             )));
         }
-        let before = ws.row_heights_snapshot(first, last.min(first.saturating_add(16_384)));
-        ws.set_row_height(first, last, points)?;
+        let before = ws.row_heights_snapshot(first, last);
+        if let Err(e) = edit(ws) {
+            ws.restore_row_heights(&before);
+            return Err(e);
+        }
         self.sheets[sheet].dirty = true;
         Ok(before)
     }

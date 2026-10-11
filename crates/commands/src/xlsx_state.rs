@@ -239,7 +239,7 @@ pub(crate) fn build_engine(wb: &Workbook, keep: &dyn Fn(usize, u32, u32) -> bool
     engine
 }
 
-fn to_calc_value(v: &CellValue) -> Value {
+pub(crate) fn to_calc_value(v: &CellValue) -> Value {
     match v {
         CellValue::Empty => Value::Empty,
         CellValue::Number(n) => Value::Number(*n),

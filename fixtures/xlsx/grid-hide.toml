@@ -1,0 +1,5 @@
+feature = "grid-hide"
+made_with = "Microsoft Excel 20430 (Windows)"
+author = "project member"
+expect_dropped = []
+notes = "before-state for hide, unhide and select-all size edits: custom, default, hidden and zero-sized columns and rows"

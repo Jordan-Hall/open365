@@ -63,7 +63,7 @@ fn a_range_inside_a_col_splits_it_and_keeps_every_other_attribute() {
         cols_of(&text),
         "<cols>\
 <col min=\"1\" max=\"3\" width=\"9\" style=\"3\" hidden=\"1\" bestFit=\"1\" outlineLevel=\"2\"/>\
-<col min=\"4\" max=\"5\" width=\"30\" style=\"3\" hidden=\"1\" bestFit=\"1\" outlineLevel=\"2\" customWidth=\"1\"/>\
+<col min=\"4\" max=\"5\" width=\"30\" style=\"3\" bestFit=\"1\" outlineLevel=\"2\" customWidth=\"1\"/>\
 <col min=\"6\" max=\"10\" width=\"9\" style=\"3\" hidden=\"1\" bestFit=\"1\" outlineLevel=\"2\"/>\
 </cols>"
     );
@@ -148,7 +148,7 @@ fn row_height_sets_ht_and_custom_height_and_keeps_the_rest() {
     let text = sheet_text(&mut wb);
     assert!(
         text.contains(
-            "<row r=\"1\" spans=\"1:2\" s=\"4\" customFormat=\"1\" hidden=\"1\" ht=\"33.75\" thickBot=\"1\" customHeight=\"1\">"
+            "<row r=\"1\" spans=\"1:2\" s=\"4\" customFormat=\"1\" ht=\"33.75\" thickBot=\"1\" customHeight=\"1\">"
         ),
         "{text}"
     );
@@ -217,7 +217,9 @@ fn limits_and_ranges_are_validated_without_changing_anything() {
     assert!(wb.set_column_width(0, 1, 16_385, 5.0).is_err());
     assert!(wb.set_row_height(0, 0, 1, 5.0).is_err());
     assert!(wb.set_row_height(0, 1, 1_048_577, 5.0).is_err());
-    assert!(wb.set_row_height(0, 1, 1_048_576, 5.0).is_err());
+    // Every row at once is the sheet default (Excel's select-all), not an error.
+    assert!(wb.set_row_height(0, 1, 1_048_576, 5.0).is_ok());
+    assert!(wb.set_row_height(0, 1, 20_000, 5.0).is_err());
     assert!(matches!(
         wb.set_column_width(3, 1, 1, 5.0),
         Err(XlsxError::SheetOutOfRange { .. })

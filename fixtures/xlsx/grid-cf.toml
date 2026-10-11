@@ -1,0 +1,5 @@
+feature = "grid-cf"
+made_with = "Microsoft Excel 20430 (Windows)"
+author = "project member"
+expect_dropped = []
+notes = "one column of twelve values per conditional-format rule type: cellIs, expression, top10, aboveAverage, duplicate/unique, text, blanks, errors, timePeriod, colorScale, dataBar, iconSet, priority, stopIfTrue and dxf number formats"

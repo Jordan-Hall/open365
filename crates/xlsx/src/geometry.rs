@@ -581,3 +581,18 @@ impl SheetGeometry {
         }
     }
 }
+
+impl Worksheet {
+    /// The stored width (characters, padding included) of a column the sheet gives no width:
+    /// `defaultColWidth`, else the width `baseColWidth` characters take for `metrics`, kept to
+    /// the 1/256 steps Excel stores. This is the width Excel writes when it unhides a column
+    /// that was hidden without one (`fixtures/reference/xlsx/grid-hide`).
+    pub fn default_column_width(&self, metrics: GridMetrics) -> f64 {
+        let format = self.sheet_format();
+        if let Some(w) = format.default_col_width {
+            return w;
+        }
+        let px = metrics.default_col_px(&format);
+        (f64::from(px) / f64::from(metrics.mdw) * 256.0).floor() / 256.0
+    }
+}

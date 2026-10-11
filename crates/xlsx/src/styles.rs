@@ -3,6 +3,7 @@
 use std::collections::HashMap;
 
 use crate::XlsxError;
+use crate::conditional::Dxf;
 use crate::format::{CellFormat, Color, FormatTables, Rgb, Theme};
 use crate::xml::{self, XmlElement};
 
@@ -59,6 +60,8 @@ pub struct Styles {
     xf_num_fmt: Vec<u32>,
     tables: FormatTables,
     theme: Theme,
+    /// `dxfs/dxf` entries, by `dxfId`.
+    dxfs: Vec<Dxf>,
 }
 
 impl Styles {
@@ -98,12 +101,29 @@ impl Styles {
             })
             .unwrap_or_default();
         let tables = FormatTables::parse(&parsed.root);
+        let lookup = |id: u32| {
+            num_fmts
+                .get(&id)
+                .cloned()
+                .or_else(|| builtin_number_format(id).map(str::to_owned))
+        };
+        let dxfs = parsed
+            .root
+            .child_main("dxfs")
+            .map(|d| {
+                d.elements()
+                    .filter(|e| e.head.is_main("dxf"))
+                    .map(|e| Dxf::parse(e, &lookup))
+                    .collect()
+            })
+            .unwrap_or_default();
         Ok(Self {
             parsed: Some((parsed.prolog, parsed.root, parsed.epilogue)),
             num_fmts,
             xf_num_fmt,
             tables,
             theme: Theme::default(),
+            dxfs,
         })
     }
 
@@ -170,6 +190,11 @@ impl Styles {
     /// A colour with theme, palette and tint applied. Automatic colours are black.
     pub fn resolve_color(&self, color: &Color) -> Rgb {
         crate::format::resolve(color, &self.theme, &self.tables.palette)
+    }
+
+    /// The differential format `dxfId` (conditional formatting), when the sheet has it.
+    pub fn dxf(&self, id: u32) -> Option<&Dxf> {
+        self.dxfs.get(usize::try_from(id).ok()?)
     }
 
     /// Custom number formats declared in the style sheet, by id.

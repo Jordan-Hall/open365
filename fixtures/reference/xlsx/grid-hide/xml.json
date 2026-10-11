@@ -1,0 +1,73 @@
+{
+  "source": "fixtures/xlsx/grid-hide.xlsx",
+  "oracle": "Microsoft Excel via COM: XML of sheetFormatPr, cols and row start tags after the scenario edit, SaveCopyAs",
+  "excel_build": "20430",
+  "scenarios": {
+    "Hide": {
+      "sheetFormatPr": "<sheetFormatPr defaultRowHeight=\"14.4\" x14ac:dyDescent=\"0.3\"/>",
+      "cols": "<cols><col min=\"2\" max=\"2\" width=\"20.77734375\" hidden=\"1\" customWidth=\"1\"/><col min=\"3\" max=\"3\" width=\"0\" hidden=\"1\" customWidth=\"1\"/><col min=\"4\" max=\"4\" width=\"12.77734375\" hidden=\"1\" customWidth=\"1\"/><col min=\"5\" max=\"5\" width=\"0\" hidden=\"1\" customWidth=\"1\"/></cols>",
+      "rows": [
+      "<row r=\"1\" spans=\"1:5\" x14ac:dyDescent=\"0.3\">",
+      "<row r=\"3\" spans=\"1:5\" hidden=\"1\" x14ac:dyDescent=\"0.3\">",
+      "<row r=\"4\" spans=\"1:5\" ht=\"30\" hidden=\"1\" customHeight=\"1\" x14ac:dyDescent=\"0.3\"/>",
+      "<row r=\"5\" spans=\"1:5\" x14ac:dyDescent=\"0.3\">",
+      "<row r=\"6\" spans=\"1:5\" hidden=\"1\" x14ac:dyDescent=\"0.3\"/>",
+      "<row r=\"7\" spans=\"1:5\" x14ac:dyDescent=\"0.3\">"
+      ]
+    },
+    "Zero": {
+      "sheetFormatPr": "<sheetFormatPr defaultRowHeight=\"14.4\" x14ac:dyDescent=\"0.3\"/>",
+      "cols": "<cols><col min=\"2\" max=\"2\" width=\"20.77734375\" hidden=\"1\" customWidth=\"1\"/><col min=\"6\" max=\"6\" width=\"0\" hidden=\"1\" customWidth=\"1\"/></cols>",
+      "rows": [
+      "<row r=\"1\" spans=\"1:5\" x14ac:dyDescent=\"0.3\">",
+      "<row r=\"3\" spans=\"1:5\" hidden=\"1\" x14ac:dyDescent=\"0.3\">",
+      "<row r=\"4\" spans=\"1:5\" ht=\"30\" hidden=\"1\" customHeight=\"1\" x14ac:dyDescent=\"0.3\"/>",
+      "<row r=\"5\" spans=\"1:5\" x14ac:dyDescent=\"0.3\">",
+      "<row r=\"6\" spans=\"1:5\" hidden=\"1\" x14ac:dyDescent=\"0.3\"/>",
+      "<row r=\"7\" spans=\"1:5\" x14ac:dyDescent=\"0.3\">"
+      ]
+    },
+    "Unhide": {
+      "sheetFormatPr": "<sheetFormatPr defaultRowHeight=\"14.4\" x14ac:dyDescent=\"0.3\"/>",
+      "cols": "<cols><col min=\"2\" max=\"2\" width=\"20.77734375\" customWidth=\"1\"/><col min=\"3\" max=\"4\" width=\"8.88671875\" customWidth=\"1\"/></cols>",
+      "rows": [
+      "<row r=\"1\" spans=\"1:5\" x14ac:dyDescent=\"0.3\">",
+      "<row r=\"3\" spans=\"1:5\" x14ac:dyDescent=\"0.3\">",
+      "<row r=\"4\" spans=\"1:5\" ht=\"30\" customHeight=\"1\" x14ac:dyDescent=\"0.3\"/>",
+      "<row r=\"5\" spans=\"1:5\" x14ac:dyDescent=\"0.3\">",
+      "<row r=\"7\" spans=\"1:5\" x14ac:dyDescent=\"0.3\">"
+      ]
+    },
+    "AllRows": {
+      "sheetFormatPr": "<sheetFormatPr defaultRowHeight=\"25.05\" customHeight=\"1\" x14ac:dyDescent=\"0.3\"/>",
+      "cols": "",
+      "rows": [
+      "<row r=\"1\" spans=\"1:5\" ht=\"25.05\" customHeight=\"1\" x14ac:dyDescent=\"0.3\">",
+      "<row r=\"3\" spans=\"1:5\" ht=\"25.05\" customHeight=\"1\" x14ac:dyDescent=\"0.3\">",
+      "<row r=\"5\" spans=\"1:5\" ht=\"25.05\" customHeight=\"1\" x14ac:dyDescent=\"0.3\">",
+      "<row r=\"7\" spans=\"1:5\" ht=\"25.05\" customHeight=\"1\" x14ac:dyDescent=\"0.3\">"
+      ]
+    },
+    "AllCols": {
+      "sheetFormatPr": "<sheetFormatPr defaultColWidth=\"15.77734375\" defaultRowHeight=\"14.4\" x14ac:dyDescent=\"0.3\"/>",
+      "cols": "",
+      "rows": [
+      "<row r=\"1\" spans=\"1:5\" x14ac:dyDescent=\"0.3\">",
+      "<row r=\"3\" spans=\"1:5\" x14ac:dyDescent=\"0.3\">",
+      "<row r=\"5\" spans=\"1:5\" x14ac:dyDescent=\"0.3\">",
+      "<row r=\"7\" spans=\"1:5\" x14ac:dyDescent=\"0.3\">"
+      ]
+    },
+    "SetVisible": {
+      "sheetFormatPr": "<sheetFormatPr defaultRowHeight=\"14.4\" x14ac:dyDescent=\"0.3\"/>",
+      "cols": "<cols><col min=\"2\" max=\"3\" width=\"12.77734375\" customWidth=\"1\"/></cols>",
+      "rows": [
+      "<row r=\"1\" spans=\"1:5\" x14ac:dyDescent=\"0.3\">",
+      "<row r=\"3\" spans=\"1:5\" ht=\"19.95\" customHeight=\"1\" x14ac:dyDescent=\"0.3\">",
+      "<row r=\"4\" spans=\"1:5\" ht=\"19.95\" customHeight=\"1\" x14ac:dyDescent=\"0.3\"/>",
+      "<row r=\"5\" spans=\"1:5\" x14ac:dyDescent=\"0.3\">",
+      "<row r=\"7\" spans=\"1:5\" x14ac:dyDescent=\"0.3\">"
+      ]
+    }
+  }
+}

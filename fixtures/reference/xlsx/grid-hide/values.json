@@ -1,0 +1,203 @@
+{
+  "source": "fixtures/xlsx/grid-hide.xlsx",
+  "sheets": [
+    {
+      "name": "Hide",
+      "visible": -1,
+      "usedRange": "A1:E7",
+      "truncatedAt2000": false,
+      "cells": {
+        "A1": {
+          "value2": "Hide",
+          "text": "Hide",
+          "formula": null
+        },
+        "E1": {
+          "value2": "e1",
+          "text": "e1",
+          "formula": null
+        },
+        "A3": {
+          "value2": "r3",
+          "text": "r3",
+          "formula": null
+        },
+        "A5": {
+          "value2": "r5",
+          "text": "r5",
+          "formula": null
+        },
+        "A7": {
+          "value2": "r7",
+          "text": "r7",
+          "formula": null
+        }
+      }
+    },
+    {
+      "name": "Zero",
+      "visible": -1,
+      "usedRange": "A1:E7",
+      "truncatedAt2000": false,
+      "cells": {
+        "A1": {
+          "value2": "Zero",
+          "text": "Zero",
+          "formula": null
+        },
+        "E1": {
+          "value2": "e1",
+          "text": "e1",
+          "formula": null
+        },
+        "A3": {
+          "value2": "r3",
+          "text": "r3",
+          "formula": null
+        },
+        "A5": {
+          "value2": "r5",
+          "text": "r5",
+          "formula": null
+        },
+        "A7": {
+          "value2": "r7",
+          "text": "r7",
+          "formula": null
+        }
+      }
+    },
+    {
+      "name": "Unhide",
+      "visible": -1,
+      "usedRange": "A1:E7",
+      "truncatedAt2000": false,
+      "cells": {
+        "A1": {
+          "value2": "Unhide",
+          "text": "Unhide",
+          "formula": null
+        },
+        "E1": {
+          "value2": "e1",
+          "text": "e1",
+          "formula": null
+        },
+        "A3": {
+          "value2": "r3",
+          "text": "r3",
+          "formula": null
+        },
+        "A5": {
+          "value2": "r5",
+          "text": "r5",
+          "formula": null
+        },
+        "A7": {
+          "value2": "r7",
+          "text": "r7",
+          "formula": null
+        }
+      }
+    },
+    {
+      "name": "AllRows",
+      "visible": -1,
+      "usedRange": "A1:E7",
+      "truncatedAt2000": false,
+      "cells": {
+        "A1": {
+          "value2": "AllRows",
+          "text": "AllRows",
+          "formula": null
+        },
+        "E1": {
+          "value2": "e1",
+          "text": "e1",
+          "formula": null
+        },
+        "A3": {
+          "value2": "r3",
+          "text": "r3",
+          "formula": null
+        },
+        "A5": {
+          "value2": "r5",
+          "text": "r5",
+          "formula": null
+        },
+        "A7": {
+          "value2": "r7",
+          "text": "r7",
+          "formula": null
+        }
+      }
+    },
+    {
+      "name": "AllCols",
+      "visible": -1,
+      "usedRange": "A1:E7",
+      "truncatedAt2000": false,
+      "cells": {
+        "A1": {
+          "value2": "AllCols",
+          "text": "AllCols",
+          "formula": null
+        },
+        "E1": {
+          "value2": "e1",
+          "text": "e1",
+          "formula": null
+        },
+        "A3": {
+          "value2": "r3",
+          "text": "r3",
+          "formula": null
+        },
+        "A5": {
+          "value2": "r5",
+          "text": "r5",
+          "formula": null
+        },
+        "A7": {
+          "value2": "r7",
+          "text": "r7",
+          "formula": null
+        }
+      }
+    },
+    {
+      "name": "SetVisible",
+      "visible": -1,
+      "usedRange": "A1:E7",
+      "truncatedAt2000": false,
+      "cells": {
+        "A1": {
+          "value2": "SetVisible",
+          "text": "SetVisible",
+          "formula": null
+        },
+        "E1": {
+          "value2": "e1",
+          "text": "e1",
+          "formula": null
+        },
+        "A3": {
+          "value2": "r3",
+          "text": "r3",
+          "formula": null
+        },
+        "A5": {
+          "value2": "r5",
+          "text": "r5",
+          "formula": null
+        },
+        "A7": {
+          "value2": "r7",
+          "text": "r7",
+          "formula": null
+        }
+      }
+    }
+  ]
+}

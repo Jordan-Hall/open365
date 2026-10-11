@@ -105,6 +105,10 @@ pub struct FormulaEngine {
 }
 
 impl FormulaEngine {
+    pub(crate) fn engine(&self) -> &Engine {
+        &self.engine
+    }
+
     pub fn build(wb: &Workbook, keep: &dyn Fn(usize, u32, u32) -> bool) -> Self {
         Self {
             engine: build_engine(wb, keep),
