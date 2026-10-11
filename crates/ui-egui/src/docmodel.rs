@@ -8,7 +8,8 @@
 use std::sync::Arc;
 
 use open365_docx::{
-    Alignment, Document, EffectiveParagraph, Inline, Paragraph, RunContent, Styles,
+    Alignment, Document, EffectiveParagraph, Inline, Paragraph, RawXml, RunContent, RunPropItem,
+    Styles,
 };
 
 /// Font used when a document has no styles part and the run names no font.
@@ -78,9 +79,21 @@ pub struct Span {
     pub style: SpanStyle,
 }
 
+/// A stretch of a paragraph with its own proofing language (`w:lang`, or `w:noProof`), in characters.
+/// Text outside every stretch uses the document default.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LangRun {
+    pub start: usize,
+    pub end: usize,
+    /// BCP-47 tag, or `None` for text that is not proofed.
+    pub lang: Option<String>,
+}
+
 /// One paragraph as the view needs it.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct ParaModel {
+    /// Runs that set their own proofing language or switch proofing off.
+    pub langs: Vec<LangRun>,
     /// Text as laid out: tabs become an em space so one character stays one character.
     pub text: String,
     pub char_len: usize,
@@ -220,6 +233,12 @@ fn collect(content: &[Inline], p: &Paragraph, styles: Option<&Styles>, model: &m
                 }
                 let end = model.text.chars().count();
                 if end > start {
+                    if let Some(lang) = run_lang(run) {
+                        match model.langs.last_mut() {
+                            Some(last) if last.end == start && last.lang == lang => last.end = end,
+                            _ => model.langs.push(LangRun { start, end, lang }),
+                        }
+                    }
                     match model.spans.last_mut() {
                         Some(last) if last.end == start && last.style == style => last.end = end,
                         _ => model.spans.push(Span { start, end, style }),
@@ -230,6 +249,31 @@ fn collect(content: &[Inline], p: &Paragraph, styles: Option<&Styles>, model: &m
             Inline::Raw(_) => {}
         }
     }
+}
+
+/// The proofing language a run sets itself: `Some(Some(tag))` for `w:lang`, `Some(None)` when `w:noProof`
+/// switches proofing off, `None` when the run inherits.
+fn run_lang(run: &open365_docx::Run) -> Option<Option<String>> {
+    let mut lang = None;
+    for item in run.props.items() {
+        let (RunPropItem::Known(_, e) | RunPropItem::Raw(RawXml::Element(e))) = item else {
+            continue;
+        };
+        if e.head.is_w("noProof")
+            && e.head.attr_w("val") != Some("0")
+            && e.head.attr_w("val") != Some("false")
+        {
+            return Some(None);
+        }
+        if e.head.is_w("lang")
+            && let Some(v) = e.head.attr_w("val")
+            && v != "x-none"
+            && v != "zxx"
+        {
+            lang = Some(Some(v.to_owned()));
+        }
+    }
+    lang
 }
 
 fn parse_color(s: &str) -> Option<[u8; 3]> {

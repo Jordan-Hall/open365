@@ -8,7 +8,8 @@
 //! Excel 16.0 (groups `besseli`..`bessely`): `BESSELI`, `BESSELK` and `BESSELY` are bit-identical to this model,
 //! and so is `BESSELJ` below 8. `BESSELJ` from 8 on differs: Excel's `J0` asymptotic series has the coefficient
 //! `-0.1098628267e-2` where the published one is `-0.1098628627e-2` (used here, found by regression on 100 values),
-//! and its `J1` series carries an error of 8E-6 at x = 8 that decays like `x^-6.5` (coefficients not identified).
+//! and its `J1` series carries an error of 8E-6 at x = 8 that decays like `x^-6.5`. A least-squares fit of the last three `J1` coefficients to the 35 direct `BESSELJ(x,1)` values removes
+//! that error (residual 1E-10) but makes 18 `n >= 2` cases worse, so the published constants stay.
 //! The constants are the published approximation constants, not Excel code.
 
 // The coefficients are Excel's truncated approximation constants (0.636619772 is *not* 2/pi): they must stay as is.

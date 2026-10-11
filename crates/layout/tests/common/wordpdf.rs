@@ -488,6 +488,10 @@ pub fn read_pages(data: &[u8]) -> Vec<WordPage> {
         let mut size = 0.0;
         let mut font: Option<&Font> = None;
         let mut leading = 0.0;
+        // Character spacing (`Tc`), word spacing (`Tw`) and horizontal scale (`Tz`) belong to the
+        // graphics state, so `q` / `Q` save and restore them.
+        let (mut tc, mut tw, mut tz) = (0.0, 0.0, 1.0);
+        let mut saved: Vec<(f64, f64, f64)> = Vec::new();
         for t in toks {
             let Tok::Op(op) = &t else {
                 stack.push(t);
@@ -520,6 +524,15 @@ pub fn read_pages(data: &[u8]) -> Vec<WordPage> {
                         leading = -nums[nums.len() - 1];
                     }
                 }
+                "q" => saved.push((tc, tw, tz)),
+                "Q" => {
+                    if let Some(s) = saved.pop() {
+                        (tc, tw, tz) = s;
+                    }
+                }
+                "Tc" => tc = nums.last().copied().unwrap_or(tc),
+                "Tw" => tw = nums.last().copied().unwrap_or(tw),
+                "Tz" => tz = nums.last().map_or(tz, |n| n / 100.0),
                 "TL" => leading = nums.last().copied().unwrap_or(leading),
                 "T*" => ty -= leading,
                 "BT" => {
@@ -530,7 +543,7 @@ pub fn read_pages(data: &[u8]) -> Vec<WordPage> {
                     if let Some(f) = font {
                         for item in &stack {
                             match item {
-                                Tok::Num(n) => tx -= n / 1000.0 * size,
+                                Tok::Num(n) => tx -= n / 1000.0 * size * tz,
                                 Tok::Hex(b) | Tok::Lit(b) => {
                                     for code in b.chunks(f.width_bytes) {
                                         let c =
@@ -554,7 +567,12 @@ pub fn read_pages(data: &[u8]) -> Vec<WordPage> {
                                                 size,
                                             });
                                         }
-                                        tx += w / 1000.0 * size;
+                                        let word = if f.width_bytes == 1 && c == 32 {
+                                            tw
+                                        } else {
+                                            0.0
+                                        };
+                                        tx += (w / 1000.0 * size + tc + word) * tz;
                                     }
                                 }
                                 _ => {}

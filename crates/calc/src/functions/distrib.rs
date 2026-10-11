@@ -489,6 +489,62 @@ pub(super) fn chisq_inv(ctx: &EvalContext<'_>, args: &[Arg]) -> Res<Value> {
     out(gamma_quantile(p, df / 2.0, false)? * 2.0)
 }
 
+/// Largest accepted `-log10 p` of `CHISQ.INV.RT` for df 1 to 43 (index df - 1), measured on Excel 16.0 in steps of 0.1
+/// (0.05 for df 1, 0.25 for df 41 to 43): beyond it Excel answers `#NUM!` (its iteration gives up). df 2 and df above 43 never fail down to
+/// `p = 1E-307`. The rule behind the table is not identified (the edge is smooth in df from 13 up, irregular from 9 to 12).
+const CHISQ_RT_LIMIT: [f64; 43] = [
+    16.05,
+    f64::INFINITY,
+    20.9,
+    27.6,
+    35.2,
+    43.6,
+    52.7,
+    62.3,
+    72.3,
+    81.4,
+    87.5,
+    90.5,
+    94.5,
+    99.4,
+    104.7,
+    110.2,
+    116.0,
+    121.8,
+    127.7,
+    133.8,
+    139.9,
+    146.1,
+    152.38,
+    158.72,
+    165.1,
+    171.59,
+    178.13,
+    184.77,
+    191.51,
+    198.3,
+    205.29,
+    212.23,
+    219.37,
+    226.61,
+    234.0,
+    241.61,
+    249.27,
+    257.23,
+    265.39,
+    273.8,
+    282.5,
+    291.75,
+    302.75,
+];
+
+fn chisq_rt_fails(p: f64, df: f64) -> bool {
+    if !(1.0..=43.0).contains(&df) {
+        return false;
+    }
+    -p.log10() > CHISQ_RT_LIMIT[df as usize - 1] + 0.05
+}
+
 pub(super) fn chisq_inv_rt(ctx: &EvalContext<'_>, args: &[Arg]) -> Res<Value> {
     let [p, df] = nums::<2>(ctx, args)?;
     let df = chi_df(df)?;
@@ -497,6 +553,9 @@ pub(super) fn chisq_inv_rt(ctx: &EvalContext<'_>, args: &[Arg]) -> Res<Value> {
     }
     if p == 1.0 {
         return out(0.0);
+    }
+    if chisq_rt_fails(p, df) {
+        return Err(NUM);
     }
     out(gamma_quantile(p, df / 2.0, true)? * 2.0)
 }

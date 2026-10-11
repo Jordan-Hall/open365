@@ -131,7 +131,7 @@ fn stdio_round_trip_is_read_only_by_default() {
     let tools = m.rpc("tools/list", json!({}));
     assert_eq!(
         tools["result"]["tools"].as_array().expect("tools").len(),
-        17
+        22
     );
 
     let (open, err) = m.call("open_document", json!({"path": "f.xlsx"}));
@@ -308,7 +308,7 @@ fn the_modern_transcript_replays_against_the_real_binary() {
     assert_eq!(replies[0]["result"]["supportedVersions"][0], "2026-07-28");
     assert_eq!(
         replies[1]["result"]["tools"].as_array().map(Vec::len),
-        Some(17)
+        Some(22)
     );
     assert!(replies[2]["result"]["contents"][0]["text"].is_string());
     assert_eq!(replies[3]["result"]["isError"], true);

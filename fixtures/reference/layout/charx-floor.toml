@@ -52,7 +52,7 @@ agree = 84
 total = 84
 
 [fixtures.layout-caps]
-agree = 1016
+agree = 1019
 total = 2136
 
 [fixtures.layout-caps-chars]
@@ -60,7 +60,7 @@ agree = 74
 total = 74
 
 [fixtures.layout-caps-sizes]
-agree = 122
+agree = 119
 total = 208
 
 [fixtures.layout-cols-balance]
@@ -80,7 +80,7 @@ agree = 2570
 total = 2580
 
 [fixtures.layout-cols-footnote]
-agree = 1446
+agree = 2212
 total = 2224
 
 [fixtures.layout-cols-four]
@@ -324,7 +324,7 @@ agree = 6377
 total = 6790
 
 [fixtures.layout-justify]
-agree = 88618
+agree = 94403
 total = 109900
 
 [fixtures.layout-keep]
@@ -420,7 +420,7 @@ agree = 1489
 total = 1510
 
 [fixtures.layout-tabs]
-agree = 561
+agree = 788
 total = 892
 
 [fixtures.layout-tblp-allow]
@@ -512,7 +512,7 @@ agree = 31
 total = 31
 
 [system.fields]
-agree = 76
+agree = 352
 total = 353
 
 [system.footnotes-endnotes]
@@ -556,7 +556,7 @@ agree = 84
 total = 84
 
 [system.layout-caps]
-agree = 2066
+agree = 2076
 total = 2136
 
 [system.layout-caps-chars]
@@ -564,7 +564,7 @@ agree = 74
 total = 74
 
 [system.layout-caps-sizes]
-agree = 198
+agree = 206
 total = 208
 
 [system.layout-cols-balance]
@@ -584,7 +584,7 @@ agree = 2570
 total = 2580
 
 [system.layout-cols-footnote]
-agree = 1446
+agree = 2212
 total = 2224
 
 [system.layout-cols-four]
@@ -840,7 +840,7 @@ agree = 6641
 total = 6790
 
 [system.layout-justify]
-agree = 95819
+agree = 101519
 total = 109900
 
 [system.layout-keep]
@@ -848,7 +848,7 @@ agree = 14009
 total = 14009
 
 [system.layout-lists-formats]
-agree = 3808
+agree = 3816
 total = 3862
 
 [system.layout-lists-multilevel]
@@ -860,7 +860,7 @@ agree = 703
 total = 773
 
 [system.layout-lists-suff]
-agree = 1959
+agree = 1990
 total = 2015
 
 [system.layout-marks]
@@ -940,7 +940,7 @@ agree = 1489
 total = 1510
 
 [system.layout-tabs]
-agree = 582
+agree = 872
 total = 892
 
 [system.layout-tblp-allow]

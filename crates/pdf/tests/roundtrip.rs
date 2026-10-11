@@ -61,7 +61,11 @@ fn glyph_positions_and_text_round_trip() {
             // A line can be several marked-content sequences (list label, hyperlinks).
             let mut next = 0;
             for line in &want {
-                let flat: Vec<_> = line.runs.iter().flat_map(|r| r.glyphs.iter()).collect();
+                let mut flat: Vec<_> = line.runs.iter().flat_map(|r| r.glyphs.iter()).collect();
+                // A line with tab leaders is written in x order (as Word's is).
+                if flat.iter().any(|g| line.leader_char(g).is_some()) {
+                    flat.sort_by(|a, b| a.x.total_cmp(&b.x));
+                }
                 let mut pdf_glyphs = Vec::new();
                 while pdf_glyphs.len() < flat.len() && next < got.len() {
                     pdf_glyphs.extend(got[next].glyphs.iter().cloned());
@@ -90,7 +94,11 @@ fn glyph_positions_and_text_round_trip() {
                         ));
                     }
                     glyphs_total += 1;
+                    // Tab leaders are text in the PDF, as in Word's (the dots copy out), but not part of the
+                    // paragraph's own characters: this check leaves them out, and
+                    // `tests/word_text.rs` checks the extracted text with them against Word's PDF.
                     if !g_is_mark(line, g)
+                        && line.leader_char(g).is_none()
                         && let Some(t) = infos[&p.font].to_unicode.get(&p.gid)
                     {
                         text.push_str(t);

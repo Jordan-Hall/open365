@@ -1,11 +1,11 @@
-rev	0	Property	Author A	2026-10-11T15:20:00Z	bold target
-rev	1	Property	Author A	2026-10-11T15:20:00Z	Italic
-rev	2	Property	Author A	2026-10-11T15:20:00Z	underline
-rev	3	Property	Author A	2026-10-11T15:20:00Z	size
-rev	4	ParagraphProperty	Author A	2026-10-11T15:20:00Z	Centred later paragraph.
-rev	5	ParagraphProperty	Author A	2026-10-11T15:20:00Z	Heading candidate line.
-rev	6	Property	Author A	2026-10-11T15:20:00Z	Colour
-rev	7	Property	Author A	2026-10-11T15:20:00Z	strike
+rev	0	Property	Author A	2026-10-11T18:21:00Z	bold target
+rev	1	Property	Author A	2026-10-11T18:21:00Z	Italic
+rev	2	Property	Author A	2026-10-11T18:21:00Z	underline
+rev	3	Property	Author A	2026-10-11T18:21:00Z	size
+rev	4	ParagraphProperty	Author A	2026-10-11T18:21:00Z	Centred later paragraph.
+rev	5	ParagraphProperty	Author A	2026-10-11T18:21:00Z	Heading candidate line.
+rev	6	Property	Author A	2026-10-11T18:21:00Z	Colour
+rev	7	Property	Author A	2026-10-11T18:21:00Z	strike
 para	markup	0	Plain words with bold target here.	0	Normal	0	B0I0U0S22x17;B1I0U0S22x11;B0I0U0S22x6
 para	markup	1	Italic and underline and size targets.	0	Normal	0	B0I1U0S22x6;B0I0U0S22x5;B0I0U1S22x9;B0I0U0S22x5;B0I0U0S36x4;B0I0U0S22x9
 para	markup	2	Centred later paragraph.	1	Normal	0	B0I0U0S22x24

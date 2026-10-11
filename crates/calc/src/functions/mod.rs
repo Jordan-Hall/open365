@@ -18,6 +18,7 @@ mod distrib_test;
 mod distribdd;
 mod dynarray;
 mod engineering;
+mod ets;
 mod finance;
 mod finbond;
 mod info;
@@ -197,6 +198,13 @@ static TABLE: &[(&str, Func)] = &[
     ("COVAR", Func::Res(statsx::covar)),
     ("COVARIANCE.P", Func::Res(statsx::covar)),
     ("COVARIANCE.S", Func::Res(statsx::covariance_s)),
+    ("FORECAST.ETS", Func::Res(ets::forecast_ets)),
+    ("FORECAST.ETS.CONFINT", Func::Res(ets::forecast_ets_confint)),
+    (
+        "FORECAST.ETS.SEASONALITY",
+        Func::Res(ets::forecast_ets_seasonality),
+    ),
+    ("FORECAST.ETS.STAT", Func::Res(ets::forecast_ets_stat)),
     ("FORECAST", Func::Res(statsx::forecast)),
     ("FORECAST.LINEAR", Func::Res(statsx::forecast)),
     // distributions
@@ -605,6 +613,7 @@ pub fn lookup(name: &str) -> Option<&'static Func> {
 /// implicit intersection (the array parameters of `INDEX` and `XLOOKUP`, every parameter of `SUMPRODUCT`).
 pub(crate) fn is_array_param(name: &str, index: usize) -> bool {
     if statsx::takes_arrays(name, index)
+        || ets::takes_arrays(name, index)
         || distrib_test::takes_arrays(name, index)
         || matrix::takes_arrays(name, index)
     {
@@ -947,6 +956,8 @@ static LIFTING: &[(&str, Lifting)] = &[
             ..ALWAYS
         },
     ),
+    ("FORECAST.ETS", lift(only_first)),
+    ("FORECAST.ETS.CONFINT", lift(only_first)),
     ("FORECAST", lift(only_first)),
     ("FORECAST.LINEAR", lift(only_first)),
     ("TRIMMEAN", lift(only_second)),

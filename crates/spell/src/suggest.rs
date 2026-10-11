@@ -25,10 +25,88 @@ impl Default for SuggestOptions {
 /// Words longer than this only get the cheap stages.
 const LONG_WORD: usize = 40;
 
+/// Candidates gathered before ranking.
+const POOL_LIMIT: usize = 40;
+/// The edit-distance fallback runs when fewer candidates than this were found.
+const NGRAM_BELOW: usize = 3;
+/// Closest stems that also get inflected forms in the edit-distance fallback.
+const DERIVE_STEMS: usize = 6;
+const DERIVE_SUFFIXES: [&str; 9] = ["s", "es", "d", "ed", "ing", "ly", "er", "ers", "al"];
+
+const STAGE_CASE: u8 = 0;
+const STAGE_REP: u8 = 1;
+const STAGE_MAP: u8 = 2;
+const STAGE_SWAP: u8 = 3;
+const STAGE_SWAP2: u8 = 4;
+const STAGE_FARSWAP: u8 = 5;
+const STAGE_KEY: u8 = 6;
+const STAGE_EXTRA: u8 = 8;
+const STAGE_MISSING: u8 = 9;
+const STAGE_MOVED: u8 = 10;
+const STAGE_WRONG: u8 = 11;
+const STAGE_DOUBLED: u8 = 12;
+const STAGE_SPLIT: u8 = 13;
+const STAGE_HYPHEN: u8 = 14;
+const STAGE_NGRAM: u8 = 15;
+const NUM_STAGES: usize = 16;
+
+/// Number of numeric features per candidate.
+const NUM_FEATURES: usize = 21;
+
+/// Everything gathered for one misspelling before ranking.
+struct Pool {
+    kind: CaseKind,
+    original: String,
+    /// Candidate text and the stage that produced it, in discovery order.
+    entries: Vec<(String, u8)>,
+    /// The lower-cased input.
+    typed: Vec<char>,
+}
+
+/// Linear ranking model fitted against Word's suggestion order (pairwise logistic regression over
+/// `fixtures/spell/word-refs-*.tsv`; method and holdout numbers in `docs/architecture/adr-spell.md`).
+/// Feature order is that of `Dictionary::features`; the stage bias is indexed by `STAGE_*`.
+#[rustfmt::skip]
+const WEIGHTS: [f32; NUM_FEATURES] = [-3.135, -0.386, 1.736, 0.044, -1.803, -2.073, 0.376, 0.071, -0.777, -2.67, -0.253, 0.149, -0.437, 0.619, 0.195, -1.736, 0.0, -0.867, -1.447, 0.0, 0.452];
+#[rustfmt::skip]
+const STAGE_BIAS: [f32; NUM_STAGES] = [0.448, -0.557, 0.0, 1.82, 0.687, 0.537, 1.313, 0.0, -0.484, 0.259, 0.499, -1.666, 0.0, -1.736, 0.0, -1.12];
+
+fn score(features: &[f32; NUM_FEATURES], stage: u8) -> f32 {
+    let dot: f32 = features.iter().zip(&WEIGHTS).map(|(f, w)| f * w).sum();
+    dot + STAGE_BIAS[usize::from(stage).min(NUM_STAGES - 1)]
+}
+
+/// A rough consonant skeleton: sounds that Word treats alike (`c`/`k`/`q`, `s`/`z`, `ph`/`f`)
+/// are folded together; vowels, `h` and `w` after the first letter and repeats are dropped.
+fn skeleton(word: &[char]) -> Vec<char> {
+    let mut out: Vec<char> = Vec::with_capacity(word.len());
+    for (i, &c) in word.iter().enumerate() {
+        let next = word.get(i + 1).copied();
+        let folded = match c {
+            'c' if matches!(next, Some('e' | 'i' | 'y')) => 's',
+            'c' | 'q' => 'k',
+            'z' => 's',
+            'v' => 'f',
+            'p' if next == Some('h') => 'f',
+            other => other,
+        };
+        if i > 0 && matches!(folded, 'a' | 'e' | 'i' | 'o' | 'u' | 'y' | 'h' | 'w') {
+            continue;
+        }
+        if out.last() != Some(&folded) {
+            out.push(folded);
+        }
+    }
+    out
+}
+
 struct Collector<'d> {
     dict: &'d Dictionary,
     original: String,
     out: Vec<String>,
+    /// Generation stage of each entry of `out` (`STAGE_*`).
+    stages: Vec<u8>,
+    stage: u8,
     seen: HashSet<String>,
     limit: usize,
     compounds: usize,
@@ -37,6 +115,11 @@ struct Collector<'d> {
 impl Collector<'_> {
     fn full(&self) -> bool {
         self.out.len() >= self.limit
+    }
+
+    fn push(&mut self, form: String) {
+        self.out.push(form);
+        self.stages.push(self.stage);
     }
 
     /// Proposes a candidate; it is kept only if the dictionary accepts it.
@@ -54,12 +137,12 @@ impl Collector<'_> {
             }
             let forms: Option<Vec<String>> = parts.iter().map(|p| self.valid_form(p)).collect();
             if let Some(forms) = forms {
-                self.out.push(forms.join(" "));
+                self.push(forms.join(" "));
             }
             return;
         }
         if let Some(form) = self.valid_form(candidate) {
-            self.out.push(form);
+            self.push(form);
         }
     }
 
@@ -100,9 +183,16 @@ impl Dictionary {
     /// passed through `OCONV`.
     #[must_use]
     pub fn suggest(&self, word: &str, options: &SuggestOptions) -> Vec<String> {
+        match self.pool(word, options) {
+            Some(pool) => self.rank(&pool, options.max_suggestions),
+            None => Vec::new(),
+        }
+    }
+
+    fn pool(&self, word: &str, options: &SuggestOptions) -> Option<Pool> {
         let typed = self.normalize(&word.replace('\u{2019}', "'"));
         if typed.is_empty() || options.max_suggestions == 0 || self.spell(&typed) {
-            return Vec::new();
+            return None;
         }
         let kind = self.caser.kind(&typed);
         let working = match kind {
@@ -113,8 +203,10 @@ impl Dictionary {
             dict: self,
             original: working.clone(),
             out: Vec::new(),
+            stages: Vec::new(),
+            stage: STAGE_CASE,
             seen: HashSet::new(),
-            limit: options.max_suggestions.saturating_mul(2),
+            limit: POOL_LIMIT.max(options.max_suggestions.saturating_mul(4)),
             compounds: 0,
         };
         let chars: Vec<char> = working.chars().collect();
@@ -128,44 +220,141 @@ impl Dictionary {
                 col.offer(&variant);
             }
         }
+        col.stage = STAGE_REP;
         self.rep_stage(&working, &mut col);
         if chars.len() <= LONG_WORD {
+            col.stage = STAGE_MAP;
             self.map_stage(&working, &mut col);
             self.edit_stage(&chars, &mut col);
             if !self.aff.no_split_sugs {
+                col.stage = STAGE_SPLIT;
                 self.split_stage(&chars, &mut col);
             }
         } else {
+            col.stage = STAGE_EXTRA;
             self.delete_stage(&chars, &mut col);
         }
-        if col.out.len() < 3 && chars.len() <= LONG_WORD {
+        if col.out.len() < NGRAM_BELOW && chars.len() <= LONG_WORD {
+            col.stage = STAGE_NGRAM;
             self.ngram_stage(&chars, &mut col);
         }
-        self.finish(col.out, kind, word, options.max_suggestions)
+        let Collector { out, stages, .. } = col;
+        Some(Pool {
+            kind,
+            original: word.to_owned(),
+            entries: out.into_iter().zip(stages).collect(),
+            typed: chars,
+        })
+    }
+
+    /// Ranks a candidate pool with the fitted model and returns the best `max` suggestions.
+    fn rank(&self, pool: &Pool, max: usize) -> Vec<String> {
+        let mut scored: Vec<(f32, usize, String)> = pool
+            .entries
+            .iter()
+            .enumerate()
+            .map(|(seq, (text, stage))| {
+                let f = self.features(pool, text, *stage, seq);
+                (score(&f, *stage), seq, text.clone())
+            })
+            .collect();
+        scored.sort_by(|a, b| b.0.total_cmp(&a.0).then(a.1.cmp(&b.1)));
+        let raw = scored.into_iter().map(|(_, _, t)| t).collect();
+        self.finish(raw, pool.kind, &pool.original, max)
+    }
+
+    /// Candidates for `word` with the feature vector the ranking model sees for each
+    /// (candidate text, numeric features, then the stage id as the last element). Development
+    /// tooling for fitting the ranking weights; not a stable interface.
+    #[doc(hidden)]
+    #[must_use]
+    pub fn suggest_pool(&self, word: &str) -> Vec<(String, Vec<f32>)> {
+        let Some(pool) = self.pool(word, &SuggestOptions::default()) else {
+            return Vec::new();
+        };
+        pool.entries
+            .iter()
+            .enumerate()
+            .map(|(seq, (text, stage))| {
+                let mut f = self.features(&pool, text, *stage, seq).to_vec();
+                f.push(f32::from(*stage));
+                (self.recase(text, pool.kind), f)
+            })
+            .collect()
+    }
+
+    fn recase(&self, suggestion: &str, kind: CaseKind) -> String {
+        let cased = match kind {
+            CaseKind::Upper => self.caser.upper(suggestion),
+            CaseKind::Title if suggestion.chars().next().is_some_and(char::is_lowercase) => {
+                self.caser.capitalize_first(suggestion)
+            }
+            _ => suggestion.to_owned(),
+        };
+        self.output_convert(&cased)
+    }
+
+    /// Numeric features of one candidate (see `WEIGHTS`).
+    fn features(&self, pool: &Pool, raw: &str, stage: u8, seq: usize) -> [f32; NUM_FEATURES] {
+        let typed = &pool.typed;
+        let lowered = self.caser.lower(raw);
+        let cand: Vec<char> = lowered.chars().filter(|c| *c != ' ' && *c != '-').collect();
+        let n = typed.len().max(cand.len()).max(1);
+        let distance = bounded_distance(typed, &cand, 4).unwrap_or(5);
+        let prefix = typed.iter().zip(&cand).take_while(|(a, b)| a == b).count();
+        let suffix = typed
+            .iter()
+            .rev()
+            .zip(cand.iter().rev())
+            .take_while(|(a, b)| a == b)
+            .count();
+        let skel_t = skeleton(typed);
+        let skel_c = skeleton(&cand);
+        let skel_dist = bounded_distance(&skel_t, &skel_c, 3).unwrap_or(4);
+        let mut sorted_t = typed.clone();
+        let mut sorted_c = cand.clone();
+        sorted_t.sort_unstable();
+        sorted_c.sort_unstable();
+        let flags = self
+            .words
+            .get(raw)
+            .or_else(|| self.words.get(lowered.as_str()))
+            .map(|e| e.iter().map(|f| f.iter().count()).max().unwrap_or(0));
+        let first_upper = raw.chars().next().is_some_and(char::is_uppercase);
+        let typed_apostrophe = typed.contains(&'\'');
+        let typed_ascii = typed.iter().all(char::is_ascii);
+        let b = |x: bool| f32::from(u8::from(x));
+        [
+            distance as f32,
+            typed.len().abs_diff(cand.len()) as f32,
+            b(typed.first() == cand.first()),
+            b(typed.last() == cand.last()),
+            prefix as f32 / n as f32,
+            suffix as f32 / n as f32,
+            bigram_dice(typed, &cand) as f32 / 1000.0,
+            b(skel_t == skel_c),
+            skel_dist as f32,
+            b(first_upper && pool.kind == CaseKind::Lower),
+            b(raw.contains('\'') && !typed_apostrophe),
+            cand.len() as f32 / 10.0,
+            b(flags.is_some()),
+            flags.map_or(0.0, |c| (c as f32).ln_1p()),
+            b(raw.ends_with('s')),
+            b(raw.contains(' ')),
+            b(raw.contains('-')),
+            seq as f32 / POOL_LIMIT as f32,
+            b(sorted_t == sorted_c),
+            b(typed_ascii && !raw.is_ascii()),
+            b(stage == STAGE_NGRAM && cand.len() > typed.len()),
+        ]
     }
 
     /// Restores the input's capitalisation, applies `OCONV` and removes duplicates.
     fn finish(&self, raw: Vec<String>, kind: CaseKind, original: &str, max: usize) -> Vec<String> {
         let mut seen = HashSet::new();
         let mut out = Vec::new();
-        // Word keeps proper nouns (`Ola`) behind ordinary words when the user typed lower case.
-        let raw = if kind == CaseKind::Lower {
-            let (plain, proper): (Vec<String>, Vec<String>) = raw
-                .into_iter()
-                .partition(|s| !s.chars().next().is_some_and(char::is_uppercase));
-            plain.into_iter().chain(proper).collect()
-        } else {
-            raw
-        };
         for suggestion in raw {
-            let cased = match kind {
-                CaseKind::Upper => self.caser.upper(&suggestion),
-                CaseKind::Title if suggestion.chars().next().is_some_and(char::is_lowercase) => {
-                    self.caser.capitalize_first(&suggestion)
-                }
-                _ => suggestion,
-            };
-            let converted = self.output_convert(&cased);
+            let converted = self.recase(&suggestion, kind);
             if converted != original && seen.insert(converted.clone()) {
                 out.push(converted);
                 if out.len() == max {
@@ -253,6 +442,7 @@ impl Dictionary {
             .collect();
 
         // Adjacent transpositions, and the double swaps of 4 and 5 letter words.
+        col.stage = STAGE_SWAP;
         for i in 0..n.saturating_sub(1) {
             let mut c = w.to_vec();
             c.swap(i, i + 1);
@@ -263,6 +453,7 @@ impl Dictionary {
             5 => &[(0, 3), (1, 3)],
             _ => &[],
         };
+        col.stage = STAGE_SWAP2;
         for &(a, b) in double_swaps {
             let mut c = w.to_vec();
             c.swap(a, a + 1);
@@ -270,6 +461,7 @@ impl Dictionary {
             offer(col, &c);
         }
         // Longer-range transpositions.
+        col.stage = STAGE_FARSWAP;
         for i in 0..n {
             for j in (i + 2)..n.min(i + 5) {
                 let mut c = w.to_vec();
@@ -278,6 +470,7 @@ impl Dictionary {
             }
         }
         // Neighbouring keys and wrong-case letters.
+        col.stage = STAGE_KEY;
         let neighbours = self.key_neighbours();
         for i in 0..n {
             for &other in neighbours.get(&w[i]).map_or(&[][..], Vec::as_slice) {
@@ -295,8 +488,10 @@ impl Dictionary {
             }
         }
         // Extra letter.
+        col.stage = STAGE_EXTRA;
         self.delete_stage(w, col);
         // Missing letter.
+        col.stage = STAGE_MISSING;
         for i in 0..=n {
             for &t in &tries {
                 let mut c = w.to_vec();
@@ -308,6 +503,7 @@ impl Dictionary {
             }
         }
         // Letter in the wrong place.
+        col.stage = STAGE_MOVED;
         for i in 0..n {
             for j in 0..n {
                 if j == i || j.abs_diff(i) < 2 || j.abs_diff(i) > 10 {
@@ -320,6 +516,7 @@ impl Dictionary {
             }
         }
         // Wrong letter.
+        col.stage = STAGE_WRONG;
         for i in 0..n {
             for &t in &tries {
                 if t != w[i] {
@@ -333,6 +530,7 @@ impl Dictionary {
             }
         }
         // A doubled pair of letters (`vacacation`).
+        col.stage = STAGE_DOUBLED;
         for i in 0..n.saturating_sub(4) {
             if w[i] == w[i + 2] && w[i + 1] == w[i + 3] && w[i] == w[i + 4] {
                 let mut c = w.to_vec();
@@ -371,7 +569,9 @@ impl Dictionary {
             {
                 let hyphenated = format!("{l}-{r}");
                 if col.seen.insert(hyphenated.clone()) && !col.full() {
-                    col.out.push(hyphenated);
+                    col.stage = STAGE_HYPHEN;
+                    col.push(hyphenated);
+                    col.stage = STAGE_SPLIT;
                 }
             }
         }
@@ -382,22 +582,38 @@ impl Dictionary {
         let n = w.len();
         let max_dist = (n / 3).clamp(1, 3);
         let index = self.ngram_index.get_or_init(|| NgramIndex::build(self));
-        let mut found: Vec<(usize, usize, &str)> = Vec::new();
+        let mut found: Vec<(usize, usize, String)> = Vec::new();
         for len in n.saturating_sub(max_dist)..=(n + max_dist) {
             for &at in index.by_len.get(len).map_or(&[][..], Vec::as_slice) {
                 let (stem, lowered) = &index.stems[at as usize];
                 if let Some(distance) = bounded_distance(w, lowered, max_dist) {
-                    found.push((distance, 1000 - bigram_dice(w, lowered), stem));
+                    found.push((distance, 1000 - bigram_dice(w, lowered), stem.to_string()));
                 }
             }
         }
+        found.sort_unstable();
+        // Typos in inflected words ("accomadated") sit near the stem, not the inflected form, so
+        // also try the closest stems with common endings and keep the forms that really exist.
+        let mut derived: Vec<(usize, usize, String)> = Vec::new();
+        for (_, dice, stem) in found.iter().take(DERIVE_STEMS) {
+            for suffix in DERIVE_SUFFIXES {
+                let form = format!("{stem}{suffix}");
+                let form_chars: Vec<char> = form.chars().collect();
+                if let Some(distance) = bounded_distance(w, &form_chars, max_dist)
+                    && self.spell(&form)
+                {
+                    derived.push((distance, *dice, form));
+                }
+            }
+        }
+        found.extend(derived);
         found.sort_unstable();
         let wanted = col.out.len() + self.aff.max_ngram_sugs;
         for (_, _, stem) in found {
             if col.out.len() >= wanted || col.full() {
                 break;
             }
-            col.offer(stem);
+            col.offer(&stem);
         }
     }
 }

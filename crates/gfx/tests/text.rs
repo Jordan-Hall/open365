@@ -103,6 +103,7 @@ fn subpixel_bins_spread_a_stem_across_columns() {
         hinting: Hinting::None,
         subpixel_bins: 4,
         lcd: false,
+        ..TextOptions::default()
     });
     let f = font(&mut assets);
     let id = glyph_id("l");

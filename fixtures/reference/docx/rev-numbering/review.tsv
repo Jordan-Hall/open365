@@ -1,6 +1,6 @@
-rev	0	ParagraphProperty	Author A	2026-10-11T15:20:00Z	First list item.
-rev	1	ParagraphProperty	Author A	2026-10-11T15:20:00Z	Second list item.
-rev	2	ParagraphProperty	Author A	2026-10-11T15:20:00Z	Bullet item.
+rev	0	ParagraphProperty	Author A	2026-10-11T18:21:00Z	First list item.
+rev	1	ParagraphProperty	Author A	2026-10-11T18:21:00Z	Second list item.
+rev	2	ParagraphProperty	Author A	2026-10-11T18:21:00Z	Bullet item.
 para	markup	0	First list item.	0	List Paragraph	3	B0I0U0S22x16
 para	markup	1	Second list item.	0	List Paragraph	3	B0I0U0S22x17
 para	markup	2	Bullet item.	0	List Paragraph	2	B0I0U0S22x12

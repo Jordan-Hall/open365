@@ -79,3 +79,13 @@ Threat context is T4 in `docs/security/threat-model.md`: a prompt-injected agent
 - **No `no-egress` label handling**, per-session scopes, or CoWorker parity yet; no resources or prompts (tools only).
 - **Partial apply.** A command that fails mid-call leaves earlier commands of the same call applied in the open document (the error says how many). Nothing reaches disk until `save_as`.
 - The server cannot undo; there is no undo tool yet.
+
+## Sharing tools (ADR-013 Stage 0)
+
+`share_send_copy`, `share_send_pdf`, `share_sanitize_copy` (scope `export`; replacing a file needs
+`overwrite: true` and the operator's confirmation), `share_inspect` (read-only) and `share_os_sheet`
+(egress: scope `execute-external`, granted only by the operator, plus confirmation). Paths are
+fenced. The open document and its file are never changed; the document's own path is refused.
+`share_sanitize_copy` takes `remove`: `comments`, `tracked_changes`, `hidden_text`, `properties`,
+`personal_info`. Hidden sheets, rows and columns of a workbook cannot be removed. These commands are
+refused inside `apply_commands`. Inspector output quotes the document and is untrusted data.

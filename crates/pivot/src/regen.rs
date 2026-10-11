@@ -37,6 +37,8 @@ struct FieldPlan {
     /// Items in shared order; the flag is `u` (not in the source any more).
     items: Vec<(Value, bool)>,
     index: HashMap<ItemKey, usize>,
+    /// Calculated items (`f="1"`): they sit in the shared items without cache records.
+    calc: std::collections::HashSet<ItemKey>,
 }
 
 fn plain(e: &XmlElement, local: &str, attrs: &[(&str, String)]) -> XmlElement {
@@ -291,6 +293,96 @@ fn set_items_list(root: &mut XmlElement, local: &str, after: &[&str], elements: 
 /// Regenerates the cache definition, records and pivot table of `p` for the refreshed source.
 /// `None` when the pivot has something this writer does not model (grouped or calculated fields
 /// and items, a source that is not a worksheet range, no records part).
+/// Rewrites the item positions (`x/@v`) of the user formats after the field items changed:
+/// an old position becomes its item's new position, an item that is gone is dropped, and a
+/// format that selected only gone items is removed.
+fn remap_formats(root: &mut XmlElement, posmap: &[Vec<Option<usize>>]) {
+    let Some(formats) = root
+        .children
+        .iter_mut()
+        .filter_map(RawXml::as_element_mut)
+        .find(|e| e.head.is_main("formats"))
+    else {
+        return;
+    };
+    formats.children.retain_mut(|node| {
+        let Some(format) = node.as_element_mut() else {
+            return true;
+        };
+        let Some(area) = format
+            .children
+            .iter_mut()
+            .filter_map(RawXml::as_element_mut)
+            .find(|e| e.head.is_main("pivotArea"))
+        else {
+            return true;
+        };
+        let Some(refs) = area
+            .children
+            .iter_mut()
+            .filter_map(RawXml::as_element_mut)
+            .find(|e| e.head.is_main("references"))
+        else {
+            return true;
+        };
+        for r in refs
+            .children
+            .iter_mut()
+            .filter_map(RawXml::as_element_mut)
+            .filter(|e| e.head.is_main("reference"))
+        {
+            let Some(fld) = r
+                .head
+                .attr("field")
+                .and_then(|v| v.trim().parse::<usize>().ok())
+            else {
+                continue;
+            };
+            let Some(map) = posmap.get(fld).filter(|m| !m.is_empty()) else {
+                continue;
+            };
+            let had_items = r.children.iter().any(|c| c.as_element().is_some());
+            r.children.retain_mut(|c| {
+                let Some(x) = c.as_element_mut().filter(|e| e.head.is_main("x")) else {
+                    return true;
+                };
+                let old = x
+                    .head
+                    .attr("v")
+                    .and_then(|v| v.trim().parse::<usize>().ok())
+                    .unwrap_or(0);
+                match map.get(old).copied().flatten() {
+                    Some(new) => {
+                        // Excel writes the position explicitly in format references (a
+                        // `v="0"` stays), and leaves a bare `<x/>` alone.
+                        if new != old || x.head.attr("v").is_some() {
+                            x.head.set_attr("v", &new.to_string());
+                        }
+                        true
+                    }
+                    None => false,
+                }
+            });
+            let left = r
+                .children
+                .iter()
+                .filter(|c| c.as_element().is_some())
+                .count();
+            if had_items && left == 0 {
+                return false;
+            }
+            if r.head.attr("count").is_some() {
+                r.head.set_attr("count", &left.to_string());
+            }
+        }
+        true
+    });
+    if formats.head.attr("count").is_some() {
+        let n = formats.elements().count();
+        formats.head.set_attr("count", &n.to_string());
+    }
+}
+
 pub(crate) fn regenerate(
     p: &SheetPivot,
     data: &Dataset,
@@ -301,7 +393,6 @@ pub(crate) fn regenerate(
     let table = &p.table;
     let old_records = p.records.as_ref()?;
     if !matches!(cache.source, CacheSource::Worksheet { .. })
-        || !cache.calculated_items.is_empty()
         || cache.fields.iter().any(|f| f.group.is_some())
         || data.columns.len() != cache.fields.len()
         || table.fields.len() != cache.fields.len()
@@ -359,11 +450,26 @@ pub(crate) fn regenerate(
             date: cf.contains_date,
             items: Vec::new(),
             index: HashMap::new(),
+            calc: cache
+                .calculated_items
+                .iter()
+                .filter(|c| c.field == fi)
+                .filter_map(|c| cf.item_values().get(c.item as usize))
+                .map(ItemKey::of)
+                .collect(),
         };
         if shared {
             for v in data.columns[fi].iter().take(rows) {
                 let k = ItemKey::of(v);
                 if !plan.index.contains_key(&k) {
+                    plan.index.insert(k, plan.items.len());
+                    plan.items.push((v.clone(), false));
+                }
+            }
+            // Calculated items follow the items of the source (in their stored order).
+            for v in cf.item_values() {
+                let k = ItemKey::of(v);
+                if plan.calc.contains(&k) && !plan.index.contains_key(&k) {
                     plan.index.insert(k, plan.items.len());
                     plan.items.push((v.clone(), false));
                 }
@@ -436,7 +542,13 @@ pub(crate) fn regenerate(
                 si.children = plan
                     .items
                     .iter()
-                    .map(|(v, u)| RawXml::Element(value_element(&vproto, v, plan.date, *u)))
+                    .map(|(v, u)| {
+                        let mut e = value_element(&vproto, v, plan.date, *u);
+                        if plan.calc.contains(&ItemKey::of(v)) {
+                            e.head.attrs.push(Attr::plain("f", "1"));
+                        }
+                        RawXml::Element(e)
+                    })
                     .collect();
             }
             match idx {
@@ -444,6 +556,67 @@ pub(crate) fn regenerate(
                 None => cf.children.insert(0, RawXml::Element(si)),
             }
             fi += 1;
+        }
+    }
+
+    // Calculated items point at their shared item: the new index.
+    if let Some(list) = cache_xml
+        .root
+        .children
+        .iter_mut()
+        .filter_map(RawXml::as_element_mut)
+        .find(|e| e.head.is_main("calculatedItems"))
+    {
+        for ci in list
+            .children
+            .iter_mut()
+            .filter_map(RawXml::as_element_mut)
+            .filter(|e| e.head.is_main("calculatedItem"))
+        {
+            let Some(r) = ci
+                .children
+                .iter_mut()
+                .filter_map(RawXml::as_element_mut)
+                .find(|e| e.head.is_main("pivotArea"))
+                .and_then(|a| {
+                    a.children
+                        .iter_mut()
+                        .filter_map(RawXml::as_element_mut)
+                        .find(|e| e.head.is_main("references"))
+                })
+                .and_then(|r| {
+                    r.children
+                        .iter_mut()
+                        .filter_map(RawXml::as_element_mut)
+                        .find(|e| e.head.is_main("reference"))
+                })
+            else {
+                continue;
+            };
+            let field = r
+                .head
+                .attr("field")
+                .and_then(|v| v.trim().parse::<usize>().ok());
+            let Some(x) = r
+                .children
+                .iter_mut()
+                .filter_map(RawXml::as_element_mut)
+                .find(|e| e.head.is_main("x"))
+            else {
+                continue;
+            };
+            let old = x
+                .head
+                .attr("v")
+                .and_then(|v| v.trim().parse::<usize>().ok())
+                .unwrap_or(0);
+            let new = field.and_then(|f| {
+                let key = ItemKey::of(cache.fields.get(f)?.item_values().get(old)?);
+                plans.get(f)?.index.get(&key).copied()
+            });
+            if let Some(new) = new {
+                x.head.set_attr("v", &new.to_string());
+            }
         }
     }
 
@@ -621,6 +794,7 @@ pub(crate) fn regenerate(
                 }
             }
         }
+        remap_formats(root, &posmap);
         let row_els = axis_elements(&proto, &grid.row_items, &grid.row_levels, &posmap);
         set_items_list(root, "rowItems", &["rowFields", "pivotFields"], row_els);
         let col_els = axis_elements(&proto, &grid.col_items, &grid.col_levels, &posmap);
@@ -637,4 +811,36 @@ pub(crate) fn regenerate(
         records: rec_xml.to_bytes(),
         table: new_table.to_bytes(),
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const XML: &str = r#"<pivotTableDefinition xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><formats count="3"><format dxfId="1"><pivotArea dataOnly="0" labelOnly="1" outline="0"><references count="1"><reference field="0" count="1"><x v="2"/></reference></references></pivotArea></format><format dxfId="2"><pivotArea dataOnly="0" labelOnly="1" outline="0"><references count="2"><reference field="0" count="1"><x/></reference><reference field="1" count="1"><x v="1"/></reference></references></pivotArea></format><format dxfId="3"><pivotArea type="all" outline="0"/></format></formats></pivotTableDefinition>"#;
+
+    fn formats_after(posmap: &[Vec<Option<usize>>]) -> String {
+        let mut x = open365_xlsx::parse_xml(XML.as_bytes()).expect("parses");
+        remap_formats(&mut x.root, posmap);
+        String::from_utf8(x.to_bytes()).expect("utf8")
+    }
+
+    #[test]
+    fn format_item_positions_follow_the_items() {
+        // Field 0: a new item came first, so 0 -> 1, 2 -> 3. Field 1 is unchanged.
+        let out = formats_after(&[vec![Some(1), Some(2), Some(3)], vec![Some(0), Some(1)]]);
+        assert!(out.contains(r#"<x v="3"/>"#), "{out}");
+        assert!(out.contains(r#"<x v="1"/>"#), "{out}");
+        assert!(out.contains(r#"type="all""#), "whole-table format kept");
+        assert!(out.contains(r#"<formats count="3">"#));
+    }
+
+    #[test]
+    fn formats_of_a_removed_item_are_dropped() {
+        // Old item 2 of field 0 is gone: its format goes, the others keep working.
+        let out = formats_after(&[vec![Some(0), Some(1), None], vec![Some(0), Some(1)]]);
+        assert!(!out.contains(r#"dxfId="1""#), "{out}");
+        assert!(out.contains(r#"dxfId="2""#), "{out}");
+        assert!(out.contains(r#"<formats count="2">"#), "{out}");
+    }
 }

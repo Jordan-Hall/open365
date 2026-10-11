@@ -3,6 +3,7 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::layout_props::VertAlign;
 use crate::xml::{ElementHead, RawXml, XmlElement, is_w_ns};
 
 /// A set of run-property changes. `None` leaves a property alone; `Some` sets it, so
@@ -26,11 +27,21 @@ pub struct RunPropsPatch {
     /// Font family name, applied to the ASCII, high-ANSI, complex-script and East Asian slots.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub font: Option<String>,
+    /// `w:vertAlign`; `Baseline` writes an explicit `baseline` that overrides the style.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub vert_align: Option<VertAlign>,
 }
 
 impl RunPropsPatch {
     pub fn is_empty(&self) -> bool {
         *self == Self::default()
+    }
+
+    pub fn vert_align(value: VertAlign) -> Self {
+        Self {
+            vert_align: Some(value),
+            ..Self::default()
+        }
     }
 
     pub fn bold(value: bool) -> Self {
@@ -412,6 +423,13 @@ impl RunProps {
         });
     }
 
+    /// Sets `w:vertAlign` (`baseline` is written explicitly).
+    pub fn set_vert_align(&mut self, value: VertAlign, owner: &ElementHead) {
+        self.upsert(RunPropKind::VertAlign, owner, |element| {
+            element.head.set_attr_w("val", value.as_str());
+        });
+    }
+
     /// Applies every property set in `patch`.
     pub fn apply(&mut self, patch: &RunPropsPatch, owner: &ElementHead) {
         if let Some(v) = patch.bold {
@@ -434,6 +452,9 @@ impl RunProps {
         }
         if let Some(v) = &patch.font {
             self.set_font(v, owner);
+        }
+        if let Some(v) = patch.vert_align {
+            self.set_vert_align(v, owner);
         }
     }
 

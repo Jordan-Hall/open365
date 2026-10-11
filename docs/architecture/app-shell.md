@@ -217,3 +217,49 @@ minimal (no templates, no Account/Options/Share), most tabs are present but disa
   completion although `TextEditState` held (1, 7) before it and the pointer was removed, so the next letter lands at index 0. It
   also resets on idle frames. The cause was not found in the text edit code; a cut-back-and-set-caret workaround did not help, so the
   shell is unchanged. Real window not checked.
+
+## Update 2026-10-11 (combo caret, tile fonts, Excel UIA staleness, spell command)
+- Combo caret bug, ROOT CAUSE FOUND: not `TextEditState`. `Galley::clamp_cursor` clamps every cursor to the glyphs of the laid-out
+  row, and this workspace builds egui without default fonts, so a headless harness with no font has glyph-less rows and resets
+  the cursor to index 0 on the frame after every edit (a bare `egui::TextEdit` does it too). With `fonts::install` in the rig the
+  selection (typed part .. completed suffix) survives idle frames and the next letter continues the completion. Fix is in
+  `tests/combo.rs` (rig installs the UI font; two new tests). The shell code needed no change. Real window not run by us.
+- Cell Styles tiles: `Tile.font: Option<TileFont { family, fake_bold, fake_italic }>`; `GridView::preview_face(name, bold, italic)`
+  registers the real face (system font, else bundled Carlito/Caladea) through the grid's `FontBook` and returns the egui family
+  (one pass later; until then the UI family with the weight faked by overstrike and the slant by egui). `menu.rs` draws the tile
+  text with that family. Test: `cell_style_tiles_show_the_style_look` area in `apps/sheets/src/format_tests.rs`.
+- Excel narrow chrome, measurement: the UI Automation rectangles of Name Box, formula bar and sheet-tab control are STALE (they keep
+  the first layout's rectangles at every width, also when the elements are found again for every reading), so re-finding does not
+  fix it. `ribbon-oracle.ps1 -ChromeWidths` now records, for Excel, the visible Win32 child windows (`EXCEL;` Name Box host,
+  `ComboBox`, `EXCEL<` formula bar, `XLDESK`, `NUIScrollbar`, `XLCTL` split handle) and two colour-run rows through the sheet tab card
+  and underline (`tabs`), schema 3. Spot readings at 125 % (window width -> formula bar width, tab strip end, XLCTL x, horizontal
+  scrollbar): Name Box host stays 274 u and the combo 125 u at every width; the formula bar is `win - 292`; the sheet-tab strip ends at
+  about `0.6 * client - 15` (XLCTL x = 1123 at 1900, 763 at 1300, 583 at 1000, 463 at 800, 373 at 650, 313 at 550, 271 at 480, 227 at 407); the
+  horizontal scroll bar starts 40 px right of that and ends at the vertical scroll bar; at 407 the Sheet1 tab no longer fits and is
+  not drawn (only the scroll and add buttons stay). The existing layout already follows the first two (Name Box fixed, field
+  right-anchored). `tests/chrome.rs` accepts schema 2 or 3. The full 1 px Excel re-sweep was started into the scratch folder and is
+  NOT yet committed to `fixtures/reference/ui/`; the committed `excel-chrome-responsive.json` is still the stale schema 2 file.
+  Excel sweep (61 widths, 3352 checks) now replays with 0 misses. Rules: search box pins at x=501 (`pin_x`) and is shown from
+  client width 1032 u (box fits beside the user widget; below it the 58 u button, title keeps the rest); the Sheet1 tab is
+  clipped to `split_x - tab.x - 74` u (card = tab - 11 u) and dropped once the card is <= 20 u.
+- Spell: command `DocxCorrectWord { para, start, end, expected, replacement }` (Destructive; fails closed with
+  `CommandError::Proofing` when the paragraph no longer holds `expected` at `start..end`, or the replacement has a line break; one
+  undo step; `tests/correct_word.rs`). Open: squiggle painting, `w:lang` spans, the right-click menu (5 suggestions, Ignore All, Add to
+  Dictionary) in Writer and the Sheets cell editor, and the Word squiggle measurement (colour and geometry stay unmeasured).
+
+
+## Update 2026-10-11 (Excel narrow chrome, spell squiggles)
+- Excel narrow chrome in `layout.rs`: formula bar `win - 292` (always to the pane edge), Name Box fixed, `Layout.sheet_split`
+  (Excel's XLCTL, x = floor(0.6 * pane - 15) u, 40 u wide) and `Layout.hscroll` (from split + 40 u to 23 u before the pane edge).
+  Sheet1 is dropped when its right edge passes the split (hidden at 407); Add Sheet then moves to Sheet1's x (assumption, unmeasured).
+  `shell.rs sheet_bar` follows the split. `tests/chrome.rs` replays the Win32 child rectangles and the Sheet1 card.
+  The full 1 px re-sweep (1900..407) did NOT finish (about 35 min, no output; the oracle writes only at the end), so it was stopped.
+  `fixtures/reference/ui/excel-chrome-responsive.json` is now a schema 3 file with only 3 widths (1900, 1000, 407).
+  Open: re-run `ribbon-oracle.ps1 -App Excel -ChromeOnly -ChromeWidths 1900..407:25` (or :1) and commit; the horizontal scroll bar
+  rect is in the layout but the grid still draws its own egui scroll bars.
+- Spell: `crates/ui-egui/src/proofing.rs` (`ProofState`, async `ProofWorker`, squiggle, menu data). `w:lang`/`w:noProof` runs come
+  from `docmodel::LangRun`; default language en-GB. Writer: squiggles in `paint_page`, right-click menu (<= 5 suggestions, Ignore All,
+  Add to Dictionary) replaces through `DocxCorrectWord`. Sheets: the same in the cell editor text box (formulas are not checked).
+  Squiggle measured with `fixtures/reference/ui/word-squiggle.json` (own Word instance): triangle wave, period 6 px, height 4 rows,
+  independent of zoom, `ff4a4a` on the dark theme (light colour unmeasured), top about baseline + 0.109 em - 1 px.
+  Open: user dictionary is in memory unless the app calls `ProofState::set_user_dictionary_path`.

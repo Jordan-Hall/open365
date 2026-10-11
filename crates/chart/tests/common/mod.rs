@@ -70,3 +70,22 @@ impl TextMeasure for CarlitoMeasure {
         font.size_pt * f64::from(m.hhea_ascent + m.hhea_descent + m.hhea_line_gap) / em
     }
 }
+
+/// A generated corpus recorded from Excel by `tools/office/make-chart-corpus.ps1`; `None` when
+/// the file has not been recorded yet.
+pub fn scale_corpus(file: &str) -> Option<Vec<serde_json::Value>> {
+    let path = repo_root()
+        .join("fixtures/reference/xlsx/chart-scale")
+        .join(file);
+    let text = std::fs::read_to_string(&path).ok()?;
+    let doc: serde_json::Value = serde_json::from_str(&text).expect("valid JSON");
+    Some(doc["cases"].as_array().expect("cases").clone())
+}
+
+pub fn f64s(v: &serde_json::Value) -> Vec<f64> {
+    v.as_array()
+        .expect("array")
+        .iter()
+        .map(|x| x.as_f64().expect("number"))
+        .collect()
+}

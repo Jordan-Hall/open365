@@ -40,15 +40,29 @@ pub fn verify_password_sync(hash: &str, pw: &str) -> bool {
         .is_ok_and(|p| Argon2::default().verify_password(pw.as_bytes(), &p).is_ok())
 }
 
-pub async fn hash_password(st: &AppState, pw: String) -> ApiResult<String> {
-    let cfg = st.cfg.clone();
-    tokio::task::spawn_blocking(move || hash_password_sync(&cfg, &pw))
+/// Runs argon2 on the blocking pool behind a semaphore, so that a flood of sign-ins queues instead of exhausting
+/// memory (each hash needs 19 MiB) or every core.
+async fn with_permit<R: Send + 'static>(
+    st: &AppState,
+    f: impl FnOnce() -> R + Send + 'static,
+) -> ApiResult<R> {
+    let _permit = st
+        .argon_sem
+        .acquire()
         .await
-        .map_err(|_| ApiError::Internal)?
+        .map_err(|_| ApiError::Internal)?;
+    tokio::task::spawn_blocking(f)
+        .await
+        .map_err(|_| ApiError::Internal)
 }
 
-pub async fn verify_password(hash: String, pw: String) -> bool {
-    tokio::task::spawn_blocking(move || verify_password_sync(&hash, &pw))
+pub async fn hash_password(st: &AppState, pw: String) -> ApiResult<String> {
+    let cfg = st.cfg.clone();
+    with_permit(st, move || hash_password_sync(&cfg, &pw)).await?
+}
+
+pub async fn verify_password(st: &AppState, hash: String, pw: String) -> bool {
+    with_permit(st, move || verify_password_sync(&hash, &pw))
         .await
         .unwrap_or(false)
 }
@@ -71,6 +85,17 @@ fn clean_email(e: &str) -> ApiResult<String> {
     } else {
         Err(ApiError::BadRequest("invalid_email"))
     }
+}
+
+/// The value of cookie `name`, if present.
+fn cookie_value(headers: &HeaderMap, name: &str) -> Option<String> {
+    let prefix = format!("{name}=");
+    headers
+        .get_all(COOKIE)
+        .iter()
+        .filter_map(|v| v.to_str().ok())
+        .flat_map(|v| v.split(';'))
+        .find_map(|c| c.trim().strip_prefix(&prefix).map(str::to_string))
 }
 
 fn credential(headers: &HeaderMap) -> Option<String> {
@@ -193,52 +218,24 @@ pub struct LoginReq {
     tenant: String,
     email: String,
     password: String,
+    /// Six-digit code, required when the account has TOTP enabled.
+    totp: Option<String>,
+    /// A single-use recovery code, instead of `totp`.
+    recovery_code: Option<String>,
+    /// Return the session token in the body (for non-browser clients). Browsers get an HttpOnly cookie only.
+    #[serde(default)]
+    bearer: bool,
 }
 
-pub async fn login(
-    State(st): State<AppState>,
-    ClientIp(ip): ClientIp,
-    Json(req): Json<LoginReq>,
+/// Creates a session for `user_id` and builds the sign-in response: always the cookie, the token in the body only
+/// when `bearer` was asked for.
+pub async fn issue_session(
+    st: &AppState,
+    tenant_id: String,
+    user_id: String,
+    method: &'static str,
+    bearer: bool,
 ) -> ApiResult<Response> {
-    let email = req.email.trim().to_lowercase();
-    let slug = req.tenant.trim().to_lowercase();
-    let key = format!("login:{ip}:{slug}:{email}");
-    if st.limiter.blocked(&key, st.cfg.login_fail_rate) {
-        return Err(ApiError::RateLimited);
-    }
-    let (s2, e2) = (slug.clone(), email.clone());
-    let found: Option<(String, String, String)> = st
-        .run(move |_, c| {
-            Ok(c.query_row(
-                "SELECT t.id, u.id, u.password_hash FROM users u JOIN tenants t ON t.id = u.tenant_id
-                 WHERE t.slug = ?1 AND u.email = ?2 AND u.disabled = 0",
-                params![s2, e2],
-                |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
-            )
-            .optional()?)
-        })
-        .await?;
-    let hash = found
-        .as_ref()
-        .map_or_else(|| st.dummy_hash.clone(), |f| f.2.clone());
-    let ok = verify_password(hash, req.password).await && found.is_some();
-    let Some((tenant_id, user_id, _)) = found.filter(|_| ok) else {
-        st.limiter.hit(&key, st.cfg.login_fail_rate);
-        let detail = format!("tenant={slug}");
-        st.run(move |inner, c| {
-            audit::append(
-                c,
-                &inner.audit,
-                audit::SYSTEM_TENANT,
-                &email,
-                "login.failed",
-                &slug,
-                &detail,
-            )
-        })
-        .await?;
-        return Err(ApiError::Unauthorized("invalid_credentials"));
-    };
     let token = new_token();
     let th = sha256_hex(token.as_bytes());
     let ttl = st.cfg.session_ttl_secs;
@@ -250,18 +247,196 @@ pub async fn login(
             "INSERT INTO sessions (token_hash, tenant_id, user_id, created_at, expires_at) VALUES (?1, ?2, ?3, ?4, ?5)",
             params![th, t2, u2, t, t + ttl],
         )?;
-        audit::append(&tx, &inner.audit, &t2, &u2, "login", &u2, "local")?;
+        audit::append(&tx, &inner.audit, &t2, &u2, "login", &u2, method)?;
         tx.commit()?;
         Ok(())
     })
     .await?;
     let cookie =
         format!("{COOKIE_NAME}={token}; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age={ttl}");
-    let mut res = Json(
-        json!({ "token": token, "tenant_id": tenant_id, "user_id": user_id, "expires_in": ttl }),
-    )
-    .into_response();
+    let mut body = json!({ "tenant_id": tenant_id, "user_id": user_id, "expires_in": ttl });
+    if bearer {
+        body["token"] = json!(token);
+    }
+    let mut res = Json(body).into_response();
     res.headers_mut().insert(
+        SET_COOKIE,
+        HeaderValue::from_str(&cookie).map_err(|_| ApiError::Internal)?,
+    );
+    Ok(res)
+}
+
+/// Records a failed sign-in on the tenant's own audit chain when the tenant is known, else on the system chain.
+pub(crate) async fn login_failed(
+    st: &AppState,
+    tenant: Option<String>,
+    why: &'static str,
+    email: String,
+    slug: String,
+    ip: String,
+) -> ApiResult<()> {
+    st.run(move |inner, c| {
+        let chain = tenant.as_deref().unwrap_or(audit::SYSTEM_TENANT);
+        let detail = format!("{why} tenant={slug} ip={ip}");
+        audit::append(
+            c,
+            &inner.audit,
+            chain,
+            &email,
+            "login.failed",
+            &slug,
+            &detail,
+        )
+    })
+    .await
+}
+
+struct LoginRow {
+    tenant_id: String,
+    user: Option<(String, String, Option<String>, bool, i64)>,
+}
+
+pub async fn login(
+    State(st): State<AppState>,
+    ClientIp(ip): ClientIp,
+    headers: HeaderMap,
+    Json(req): Json<LoginReq>,
+) -> ApiResult<Response> {
+    // Bound every attacker-chosen string before it is used as a key or stored.
+    if req.email.len() > 254 + 16 || req.tenant.len() > 64 || req.password.len() > MAX_PASSWORD * 4
+    {
+        return Err(ApiError::BadRequest("invalid_input"));
+    }
+    let email = req.email.trim().to_lowercase();
+    let slug = req.tenant.trim().to_lowercase();
+    if email.len() > 254 || slug.len() > 40 {
+        return Err(ApiError::BadRequest("invalid_input"));
+    }
+    // Count the attempt BEFORE the expensive check: concurrent guesses cannot all slip past a check-then-act gap.
+    let ipk = crate::ratelimit::ip_key(&ip);
+    st.limiter
+        .hit(&format!("loginip:{ipk}"), st.cfg.login_ip_rate)
+        .await
+        .into_result()?;
+    // Per address AND account, with lockout and backoff: an attacker can only lock their own pair, never the owner.
+    let key = format!("login:{ipk}:{slug}:{email}");
+    st.limiter
+        .hit_backoff(&key, st.cfg.login_fail_rate)
+        .await
+        .into_result()?;
+    // Distributed guessing: a looser count across all addresses. It binds only addresses and devices that are not
+    // known for this account (an address that signed in before, or a browser with the signed known-device cookie),
+    // so it cannot be used to lock the owner out. It is counted BEFORE the password check and cleared on success,
+    // so concurrent guesses cannot overshoot it.
+    let acct = format!("{slug}:{email}");
+    let acct_key = format!("loginacct:{acct}");
+    let device_cookie = st.limiter.store().device_cookie_name(&acct);
+    let device_ok = cookie_value(&headers, &device_cookie)
+        .is_some_and(|t| st.limiter.store().device_valid(&acct, &t, now()));
+    let known = device_ok || st.limiter.is_known(&acct, &ipk).await;
+    if !known {
+        st.limiter
+            .hit(&acct_key, st.cfg.login_account_rate)
+            .await
+            .into_result()?;
+    }
+    let (s2, e2) = (slug.clone(), email.clone());
+    let found: Option<LoginRow> = st
+        .run(move |_, c| {
+            let tenant: Option<String> = c
+                .query_row("SELECT id FROM tenants WHERE slug = ?1", [&s2], |r| {
+                    r.get(0)
+                })
+                .optional()?;
+            let Some(tenant_id) = tenant else {
+                return Ok(None);
+            };
+            let user = c
+                .query_row(
+                    "SELECT id, password_hash, totp_secret, totp_enabled, totp_last_step FROM users
+                     WHERE tenant_id = ?1 AND email = ?2 AND disabled = 0",
+                    params![tenant_id, e2],
+                    |r| {
+                        Ok((
+                            r.get::<_, String>(0)?,
+                            r.get::<_, String>(1)?,
+                            r.get::<_, Option<String>>(2)?,
+                            r.get::<_, i64>(3)? != 0,
+                            r.get::<_, i64>(4)?,
+                        ))
+                    },
+                )
+                .optional()?;
+            Ok(Some(LoginRow { tenant_id, user }))
+        })
+        .await?;
+    let hash = found
+        .as_ref()
+        .and_then(|f| f.user.as_ref())
+        .map_or_else(|| st.dummy_hash.clone(), |u| u.1.clone());
+    let pw_ok = verify_password(&st, hash, req.password).await;
+    let tenant_known = found.as_ref().map(|f| f.tenant_id.clone());
+    let Some((tenant_id, (user_id, _, totp_secret, totp_on, last_step))) = found
+        .and_then(|f| f.user.map(|u| (f.tenant_id, u)))
+        .filter(|_| pw_ok)
+    else {
+        login_failed(&st, tenant_known, "password", email, slug, ip).await?;
+        return Err(ApiError::Unauthorized("invalid_credentials"));
+    };
+    if totp_on {
+        let stored = totp_secret.unwrap_or_default();
+        let secret = crate::totp::open_secret(&st, &user_id, &stored)?;
+        let recovery = req.recovery_code.as_deref().filter(|c| !c.is_empty());
+        let code = req.totp.as_deref().filter(|c| !c.is_empty());
+        if recovery.is_none() && code.is_none() {
+            return Err(ApiError::Unauthorized("totp_required"));
+        }
+        let accepted = if let Some(rc) = recovery {
+            let (t2, u2, rc) = (tenant_id.clone(), user_id.clone(), rc.to_string());
+            st.run(move |inner, c| {
+                let tx = c.transaction()?;
+                let ok = crate::totp::consume_recovery(&tx, &t2, &u2, &rc)?;
+                if ok {
+                    audit::append(&tx, &inner.audit, &t2, &u2, "totp.recovery_used", &u2, "")?;
+                }
+                tx.commit()?;
+                Ok(ok)
+            })
+            .await?
+        } else {
+            match code.and_then(|c| crate::totp::verify(&secret, c, now(), last_step)) {
+                Some(step) => {
+                    let uid = user_id.clone();
+                    st.run(move |_, c| {
+                        // Atomic: a code can be used once, even by two concurrent requests.
+                        Ok(c.execute(
+                            "UPDATE users SET totp_last_step = ?1 WHERE id = ?2 AND totp_last_step < ?1",
+                            params![step, uid],
+                        )? == 1)
+                    })
+                    .await?
+                }
+                None => false,
+            }
+        };
+        if !accepted {
+            login_failed(&st, Some(tenant_id), "totp", email, slug, ip).await?;
+            return Err(ApiError::Unauthorized("invalid_code"));
+        }
+    }
+    st.limiter.reset(&key).await;
+    if !known {
+        st.limiter.reset(&acct_key).await;
+    }
+    st.limiter.note_success(&acct, &ipk).await;
+    let mut res = issue_session(&st, tenant_id, user_id, "local", req.bearer).await?;
+    // Remember this browser for the account: HttpOnly, `__Host-` (Secure, host-only, Path=/), signed, 30 days.
+    let token = st.limiter.store().device_token(&acct, now());
+    let cookie = format!(
+        "{device_cookie}={token}; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age={}",
+        crate::ratelimit::DEVICE_TTL_SECS
+    );
+    res.headers_mut().append(
         SET_COOKIE,
         HeaderValue::from_str(&cookie).map_err(|_| ApiError::Internal)?,
     );

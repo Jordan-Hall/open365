@@ -109,7 +109,7 @@ Deviation: Stage 1 uses `rusqlite` instead of `sqlx`. With SQLite as the only ba
   3. "Send a copy": Attachment, PDF, Copy file (Stage 0).
   4. "Manage access" list: people and links, role dropdowns, Stop sharing, owner first.
 - Full keyboard order, Esc closes, AccessKit labels, "Link copied" announced. Tabler icons: `link`, `copy`, `mail`, `file-type-pdf`, `settings`, `users`, `lock`, `clock`.
-- New links default to **view** (deliberately safer than Office's reported edit default).
+- New links default to **edit**, matching Office (owner decision, 2026-10-11). The default lives in the client's Share dialog. The server has no implicit scope: every create-link request names its scope (`links.rs` rejects a missing or unknown scope), so the API never widens access silently.
 
 ## 6. Acceptance criteria and test plan
 
@@ -143,6 +143,33 @@ Evidence that would change this:
 - Live Microsoft pages differ from section 1: update the checklist first.
 - The CRDT spike fails on table or range-move conflicts: reconsider OT for those structures.
 - Operators reject a bundled server: ship a library plus container recipe.
+
+## 8. Implementation status (Stage 1 server, `crates/server`, 2026-10-11)
+Done and tested (`cargo test -p open365-server`; end-to-end test starts the binary over TLS with a self-signed certificate made at test time):
+- Hardening: per-route time limits (30 s, 300 s for uploads), JSON body limit 64 KiB separate from the upload limit, bounded audit fields, bounded rate-limit memory, argon2 behind a semaphore, per-address limit on every sign-in, attempts counted before verification (no concurrency bypass), per-link upload rate and hourly byte budget, blobs written and fsynced before the database lock, HSTS when TLS is served, private file modes on Unix.
+- Trusted proxies (`OPEN365_TRUSTED_PROXIES`, default none): `X-Forwarded-For` is read from the right and only through trusted peers.
+- Failed sign-ins go to the tenant's audit chain when the tenant exists, else the system chain `-`.
+- Soft delete, restore, purge, ownership transfer (owner only; previous owner stays editor), all audited; the `specific` audience (named people in the same tenant).
+- AC1.7 OIDC (feature `oidc`, on by default): Authorization Code with PKCE (S256), single-use hashed state, nonce, exact issuer, JWKS cache with one rate-limited refresh, RS256 and ES256 only, issuer from configuration only, https required except a loopback test issuer, discovery endpoints limited to the issuer host plus listed hosts, egress client refuses private and link-local addresses, no redirects, no automatic account creation. Tested against an in-process mock issuer (ES256).
+- TOTP for local accounts with single-use steps and admin reset.
+- AC1.9 backup and restore: `backup` (VACUUM INTO snapshot while running, plus blobs) and `restore` (integrity check, blob hashes, audit chains), with a restore test; `audit-verify` verifies every chain including `-`.
+- Property tests for token shape, names, rights, scopes, audit chain edits, TOTP window and proxy resolution.
+
+Added 2026-10-11 (second pass):
+- TOTP secrets encrypted at rest with XChaCha20-Poly1305 (RustCrypto `chacha20poly1305` 0.11, MIT OR Apache-2.0) under a server key kept outside the data directory; key ids and `rotate-secrets` for rotation; backups hold ciphertext only; plaintext rows are sealed at start-up. Ten single-use recovery codes stored as SHA-256 (`recovery_code` at sign-in, regenerated with a current code).
+- Slowloris: HTTP/1 header-read timeout (default 10 s), HTTP/2 keep-alive timeouts, global and per-address connection limits (`serve.rs`, trusted proxies exempt from the per-address cap).
+- RS256 verification has a known-answer test (key and signature made by an independent implementation) plus forgery cases.
+- `gc-blobs` removes blob files no version refers to (age-gated, re-checked before delete; re-uploads refresh file age).
+- Typed client `open365_server::api::SharingClient` (password with TOTP or recovery code, OIDC device-style hand-off, upload/update with `base_version`, links, ACL, access list) with an integration test over a loopback socket; HTTP reference in `docs/api/sharing-api.md` (hand-written; utoipa not adopted, to avoid a macro dependency on every handler).
+- OIDC login-CSRF fix: the flow is bound to the starting browser by a cookie (hash stored, constant-time match in the callback), and a native hand-off completes only after the person confirms, in that browser, the short code the app shows (RFC 8628 style).
+
+Added 2026-10-11 (third pass):
+- Rate limits are persistent sliding windows in SQLite (survive restart, shared per data directory, hashed keys, fail closed), per address (IPv6 by /64, trusted-proxy `X-Forwarded-For`), per address+account, per account across addresses (binds only addresses never seen signing in, so it cannot lock the owner out), per link and per user; `Retry-After` on every 429; lockout with doubling backoff keyed on address+account, never account alone. Covers sign-in, TOTP, link password, unknown-link lookups, uploads and link creation. Trade-off: users behind one NAT address share that address's lockout.
+- `KeyProvider` (`src/keys.rs`): `file` (as before), `env` and `command` (JSON argv, no shell, timeout, output cap, stderr discarded) for an external KMS or vault; keys have ids, the current (last) key writes, older keys read; `rotate-secrets` re-wraps TOTP secrets, `key-status` shows which key ids are still in use. Audit rows are never re-signed (tamper evidence), so an audit key id stays listed while its rows exist.
+
+Security review fixes (2026-10-11): known-device cookie (`__Host-`, HMAC, bound to the account) so an owner on a new address is not held back by the account-wide cap; account cap and link-failure counts taken before the work and cleared on success (no concurrent overshoot); limiter in its own `ratelimit.db`, used through the blocking pool; audit verification rejects a key downgrade within a chain; limiter keys are HMACs under a server-derived key (the file is pseudonymous, not anonymous); key command runs with a cleared environment, a bound on `wait`, and process-tree kill; the current key is named explicitly (`OPEN365_*_KEY_CURRENT`) and must be the last entry; `X-Forwarded-For` entries with ports are accepted.
+
+Open: the rate limiter does not yet cover a multi-node deployment sharing one database over a network file system (it needs SQLite on a local disk); the desktop Share dialog does not call the client yet; the confirm page is minimal HTML without localisation; key material is not zeroized in memory; no native KMS client (the `command` provider calls the operator's own tool); the SSRF suite covers the egress client and OIDC discovery only (no webhooks or federation exist); the `for_user_server` client policy (private networks allowed, https required off loopback) is meant for user-typed server addresses only.
 
 ## Sources (retrieved 2026-10-11)
 The four Microsoft pages in section 1, and the repository documents in the header. No web check of axum, Yrs, Loro, Nextcloud, oCIS, MinIO or SeaweedFS licensing was done; those statements are unverified.

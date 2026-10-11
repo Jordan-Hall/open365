@@ -94,17 +94,18 @@ pub struct RenderParams {
 }
 
 impl RenderParams {
-    /// Ink-mass fit to Office text at Segoe UI 9 pt / 14 dip, 125 % scale, `Hinting::Normal`
-    /// (`examples/fit_text.rs`, 2026-10-11, one machine). Light ink (white tab labels on a dark
-    /// background, grayscale) matches Office's total ink at gamma 0.65. Dark ink (cell text on
-    /// white, ClearType, LCD path) matches at gamma 2.50. Per-pixel residual against the capture is
-    /// still about 29 levels RMS because glyph advances and hinting differ; not yet within the
-    /// 1 px bar. Dark-ink grayscale was not captured and shares the LCD value.
+    /// Per-pixel fit to Office text at 125 % scale (`examples/fit_text.rs`, 2026-10-11, one
+    /// machine, Office in the dark theme). Hinting `Normal`, integer advances and integer ppem (GDI
+    /// style), LCD filter `Soft`. Light ink (white labels on `#090909`, grayscale): gamma 0.8, RMS
+    /// 14 levels. Dark ink LCD (cell text, Segoe UI 9 pt and 11 pt): gamma 1.4, RMS 19 to 23. Dark
+    /// ink grayscale in the drawing layer (text box) uses natural advances and fits gamma 2.0
+    /// (RMS 20) but shares `text_gamma` with LCD, so 1.4 is used; light-theme chrome ink is not
+    /// measured. Not within the 1 px bar: hinting differs from Office's.
     pub fn office_fitted() -> Self {
         Self {
-            text_gamma: 2.5,
+            text_gamma: 1.4,
             text_contrast: 0.0,
-            text_gamma_light: 0.65,
+            text_gamma_light: 0.8,
             text_contrast_light: 0.0,
         }
     }

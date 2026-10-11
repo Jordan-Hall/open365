@@ -19,6 +19,7 @@ mod find;
 mod format;
 mod merge;
 mod pdf;
+mod share;
 mod structure;
 mod target;
 mod template;
@@ -41,8 +42,12 @@ pub use format::{
     LineSpec, NumberFormatSpec, RangeRef, RotationSpec, UnderlineKind, VAlign,
 };
 pub use merge::{MergeMode, merge_discards, merge_plan};
-pub use open365_docx::{Alignment, DocPos, RunPropsPatch, TabAlign};
-pub use open365_pdf::PdfMetadata;
+pub use open365_docx::{Alignment, DocPos, RunPropsPatch, TabAlign, VertAlign};
+pub use open365_pdf::{Conformance, PdfMetadata};
 pub use pdf::PdfOptions;
+pub use share::{
+    HiddenItem, HiddenKind, HiddenReport, SHARE_TEMP_PREFIX, Sanitized, inspect_bytes,
+    remove_share_temp, sanitize_bytes, sweep_share_temp,
+};
 pub use target::{Target, apply};
 pub use template::template_output_extension;

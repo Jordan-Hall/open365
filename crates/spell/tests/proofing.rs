@@ -253,3 +253,11 @@ fn proofing_is_shareable_between_threads() {
         }
     });
 }
+
+#[test]
+fn word_defaults_cover_file_paths_urls_mixed_digits_and_acronyms() {
+    let proofing = Proofing::new();
+    let unc = "||server|shre|xqz.doc,".replace('|', "\\");
+    let text = format!("see www.exmple.com or file:///C:/xqz/abc.txt or {unc} COVID19 H2O ok2 teh");
+    assert_eq!(flagged(&proofing, &text, "en-US"), ["teh"]);
+}

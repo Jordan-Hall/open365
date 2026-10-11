@@ -176,6 +176,31 @@ fn every_command_runs_through_the_cli() {
                 "xlsx"
             };
             let out = scratch.root(&format!("{name}-{ext}.{ext}"));
+            if let Some(sub) = name.strip_prefix("share_") {
+                // The share commands have their own subcommands.
+                let input = fixture(fx);
+                let pdf = scratch.root(&format!("{name}.pdf"));
+                let extra: Vec<&str> = match sub {
+                    "send_copy" => vec!["send-copy", p(&input), "--to", p(&out)],
+                    "send_pdf" => vec!["send-pdf", p(&input), "--to", p(&pdf)],
+                    "inspect" => vec!["inspect", p(&input)],
+                    "sanitize_copy" => vec![
+                        "sanitize-copy",
+                        p(&input),
+                        "--to",
+                        p(&out),
+                        "--remove",
+                        "comments",
+                    ],
+                    "os_sheet" => vec!["os-sheet", p(&input), p(&input), "--allow-destructive"],
+                    other => panic!("unknown share command {other}"),
+                };
+                let mut full = vec!["share"];
+                full.extend(extra);
+                full.push("--json");
+                check(&open365(&full), "share");
+                continue;
+            }
             let mut args = c["example"].clone();
             let obj = args.as_object_mut().expect("example object");
             obj.remove("command");

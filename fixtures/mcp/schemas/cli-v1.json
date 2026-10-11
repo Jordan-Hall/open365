@@ -44,6 +44,20 @@
         }
       }
     },
+    "share": {
+      "type": "object",
+      "required": ["input", "command", "effect", "notes"],
+      "properties": {
+        "input": {"type": "string"},
+        "command": {"type": "string"},
+        "effect": {"type": "string"},
+        "written_to": {"type": ["string", "null"]},
+        "bytes_written": {"type": "integer"},
+        "pages": {"type": "integer"},
+        "notes": {"type": "array", "items": {"type": "string"}},
+        "report": {}
+      }
+    },
     "run": {
       "type": "object",
       "required": ["input", "dry_run", "commands"],

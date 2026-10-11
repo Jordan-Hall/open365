@@ -677,6 +677,18 @@ impl Lister {
         atoms.extend(inner.filter(|&a| own.is_some() && self.atom_family[a] == own));
         self.atom_span[id] = span;
         let (author, date, rid) = revision_attrs(head);
+        // Word lists vertically stacked merges by one author as one revision.
+        if kind == RevisionKind::CellMerged
+            && let Some(prev) = self.out.last_mut()
+            && prev.kind == RevisionKind::CellMerged
+            && prev.author == author
+        {
+            prev.atoms.extend(atoms);
+            prev.last_paragraph = prev.last_paragraph.max(span.1);
+            prev.text.push_str(&text);
+            self.prev = None;
+            return;
+        }
         let index = self.out.len();
         self.out.push(Revision {
             index,
@@ -1013,7 +1025,31 @@ fn list_cells(row: &Row, l: &mut Lister) {
         counts.push(n);
         at += n;
     }
+    // Word resolves the first cell's insertion or deletion of a row whose every cell carries the
+    // same one together with the whole row (measured: accepting the first of three cell
+    // deletions removes the row, accepting the second removes only its own cell).
+    let row_kind = {
+        let mut kinds = cells.iter().map(|c| {
+            let pr = cell_tc_pr(c)?;
+            let mut it = CELL_MARKS
+                .iter()
+                .filter(|(local, _, _)| child_el(pr, local).is_some())
+                .map(|(_, _, kind)| *kind);
+            let kind = it.next()?;
+            it.next().is_none().then_some(kind)
+        });
+        let first = kinds.next().flatten();
+        first.filter(|k| {
+            matches!(k, RevisionKind::CellInserted | RevisionKind::CellDeleted)
+                && cells.len() > 1
+                && kinds.all(|o| o == Some(*k))
+        })
+    };
+    let mut rest_start = None;
     for (k, cell) in cells.iter().enumerate() {
+        if k == 1 {
+            rest_start = Some(l.out.len());
+        }
         let marks: Vec<(usize, RevisionKind, &ElementHead)> = cell_tc_pr(cell)
             .map(|pr| {
                 CELL_MARKS
@@ -1027,12 +1063,22 @@ fn list_cells(row: &Row, l: &mut Lister) {
         let first = l.atom;
         list_blocks(&cell.blocks, l, true);
         let last = l.atom;
-        let from = if k > 0 { starts[k - 1] } else { starts[k] };
-        // The range runs to the end of the row (measured on three-cell rows).
+        let from = starts[0];
+        // The range covers the whole row (measured: any paragraph of the row reaches it).
         let to = at.saturating_sub(1).max(starts[k]);
         for (id, kind, head) in marks {
             l.cell_revision(id, kind, head, (from, to), first..last, cell_text(cell));
         }
+    }
+    if let (Some(kind), Some(rest)) = (row_kind, rest_start)
+        && let Some(head) = l.out[..rest].iter().rposition(|r| r.kind == kind)
+    {
+        let extra: Vec<usize> = l.out[rest..]
+            .iter()
+            .filter(|r| r.kind == kind)
+            .flat_map(|r| r.atoms.iter().copied())
+            .collect();
+        l.out[head].atoms.extend(extra);
     }
 }
 
@@ -1557,6 +1603,14 @@ fn remove_cells(row: &mut Row, drop: &[usize]) {
                 .find(|c| matches!(c, RawXml::Element(e) if e.head.is_w("tcW")))
         {
             tcw.head.set_attr_w("w", &(w + hw).to_string());
+        }
+        // A continuation cell that no longer matches the cell above in extent is not merged
+        // any more (measured: Word shows it as a cell of its own).
+        if let Some(i) = pr.children.iter().position(|c| {
+            matches!(c, RawXml::Element(e) if e.head.is_w("vMerge")
+                && e.head.attr_w("val") != Some("restart"))
+        }) {
+            pr.children.remove(i);
         }
         if span + heir_span > 1 {
             let total = (span + heir_span).to_string();

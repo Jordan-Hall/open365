@@ -70,6 +70,26 @@ impl CommandSpec {
                 cli: "open365 run export_pdf",
                 mcp: "export_pdf",
             },
+            "share_send_copy" => Route {
+                cli: "open365 share send-copy",
+                mcp: "share_send_copy",
+            },
+            "share_send_pdf" => Route {
+                cli: "open365 share send-pdf",
+                mcp: "share_send_pdf",
+            },
+            "share_inspect" => Route {
+                cli: "open365 share inspect",
+                mcp: "share_inspect",
+            },
+            "share_sanitize_copy" => Route {
+                cli: "open365 share sanitize-copy",
+                mcp: "share_sanitize_copy",
+            },
+            "share_os_sheet" => Route {
+                cli: "open365 share os-sheet",
+                mcp: "share_os_sheet",
+            },
             _ => Route {
                 cli: "open365 run",
                 mcp: "apply_commands",
@@ -241,18 +261,6 @@ pub const COMMANDS: &[CommandSpec] = &[
         example: || json!({"command": "set_row_height", "sheet": 0, "first": 2, "last": 2, "points": 40.0}),
     },
     CommandSpec {
-        name: "auto_fit_columns",
-        domain: Domain::Xlsx,
-        summary: "Store measured auto-fit widths as (column, characters) pairs; the caller measures the text.",
-        example: || json!({"command": "auto_fit_columns", "sheet": 0, "columns": [[2, 14.5], [3, 9.0]]}),
-    },
-    CommandSpec {
-        name: "auto_fit_rows",
-        domain: Domain::Xlsx,
-        summary: "Store measured auto-fit heights as (row, points) pairs (0..=409.5); the caller measures the text.",
-        example: || json!({"command": "auto_fit_rows", "sheet": 0, "rows": [[2, 30.0], [5, 15.75]]}),
-    },
-    CommandSpec {
         name: "insert_rows",
         domain: Domain::Xlsx,
         summary: "Insert blank rows before a row; formulas that point at the sheet are rewritten.",
@@ -381,6 +389,60 @@ pub const COMMANDS: &[CommandSpec] = &[
         domain: Domain::Docx,
         summary: "Lay a DOCX out and write it as a tagged PDF (effect export).",
         example: || json!({"command": "export_pdf", "path": "export.pdf", "overwrite": false}),
+    },
+    CommandSpec {
+        name: "docx_correct_word",
+        domain: Domain::Docx,
+        summary: "Replace a flagged misspelled word; fails without changes when the paragraph no longer holds the expected word there (destructive).",
+        example: || {
+            json!({"command": "docx_correct_word", "para": 0, "start": 0, "end": 5,
+                "expected": "First", "replacement": "Frist"})
+        },
+    },
+    CommandSpec {
+        name: "auto_fit_columns",
+        domain: Domain::Xlsx,
+        summary: "Store measured auto-fit widths for (1-based column, width) pairs, as AutoFit Column Width does.",
+        example: || json!({"command": "auto_fit_columns", "sheet": 0, "columns": [[1, 12.5]]}),
+    },
+    CommandSpec {
+        name: "auto_fit_rows",
+        domain: Domain::Xlsx,
+        summary: "Store measured auto-fit heights for (1-based row, points) pairs, as AutoFit Row Height does.",
+        example: || json!({"command": "auto_fit_rows", "sheet": 0, "rows": [[1, 18.0]]}),
+    },
+    CommandSpec {
+        name: "share_send_copy",
+        domain: Domain::Any,
+        summary: "Write a copy of the document, as it is now, to a new file (or a temporary folder) for an attachment; never the document's own file (effect export).",
+        example: || json!({"command": "share_send_copy", "path": "attachment.docx", "overwrite": false}),
+    },
+    CommandSpec {
+        name: "share_send_pdf",
+        domain: Domain::Docx,
+        summary: "Write the document as a PDF to send, through the PDF export (effect export).",
+        example: || json!({"command": "share_send_pdf", "path": "attachment.pdf", "overwrite": false}),
+    },
+    CommandSpec {
+        name: "share_inspect",
+        domain: Domain::Any,
+        summary: "List comments, tracked changes, hidden text, properties and author names a copy would carry (effect read).",
+        example: || json!({"command": "share_inspect"}),
+    },
+    CommandSpec {
+        name: "share_sanitize_copy",
+        domain: Domain::Any,
+        summary: "Write a copy without the chosen content: comments, tracked_changes, hidden_text, properties, personal_info; the original is unchanged (effect export).",
+        example: || {
+            json!({"command": "share_sanitize_copy", "path": "clean.docx", "overwrite": false,
+                "remove": ["comments", "tracked_changes", "personal_info"]})
+        },
+    },
+    CommandSpec {
+        name: "share_os_sheet",
+        domain: Domain::Any,
+        summary: "Build the request for the operating system share sheet for a file; the app performs the share (effect egress).",
+        example: || json!({"command": "share_os_sheet", "path": "attachment.docx"}),
     },
 ];
 

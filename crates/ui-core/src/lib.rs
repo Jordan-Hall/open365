@@ -31,11 +31,11 @@ pub use geom::{DeviceRect, Point, Rect, Scale};
 pub use input::{Emit, ImeInput, InputEvent, Key, Modifiers, PointerButton};
 pub use keytips::{KeyTips, Tip, TipOutcome};
 pub use paint::PaintLayers;
-pub use settings::PlatformSettings;
+pub use settings::{OsLocale, PlatformSettings, os_locale};
 pub use textedit::{Composition, TextEdit};
 pub use theme::{Theme, ThemeKind, Token};
 pub use tree::{
-    Content, Extent, Layout, Look, MenuItem, MenuState, Node, NodeId, ScrollState, TabItem, Tree,
-    Widget,
+    Content, Extent, LIST_ROW_FONT_H, LIST_ROW_SIZE_H, Layout, Look, MENU_DETAIL_H, MENU_HEADING_H,
+    MENU_ROW_H, MenuItem, MenuState, Node, NodeId, ScrollState, TabItem, Tree, Widget,
 };
 pub use ui::{TOOLTIP_DELAY, TooltipState, Ui};

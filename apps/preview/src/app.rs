@@ -27,6 +27,7 @@ struct Handler {
     last_title_click: Option<Instant>,
     /// A workbook named on the command line (Sheets).
     open: Option<std::path::PathBuf>,
+    kind: AppKind,
 }
 
 impl Handler {
@@ -72,7 +73,23 @@ impl Handler {
 impl UiHandler for Handler {
     fn init(&mut self, ui: &mut Ui, cx: &mut Cx<'_>) {
         self.shell.init(ui);
-        if let Some(path) = self.open.take() {
+        if self.kind == AppKind::Writer {
+            let mut pane = match self.open.take() {
+                Some(path) => crate::doc::WriterPane::open(&path).unwrap_or_else(|e| {
+                    eprintln!("cannot open {}: {e}", path.display());
+                    crate::doc::WriterPane::blank()
+                }),
+                None => crate::doc::WriterPane::blank(),
+            };
+            pane.use_system_fonts();
+            pane.set_clipboard(Box::new(open365_ui_host::SystemClipboard::new()));
+            self.shell.set_writer(ui, pane);
+        } else {
+            self.shell.set_locale(ui, crate::sheet::barfmt::os_locale());
+        }
+        if self.kind == AppKind::Sheets
+            && let Some(path) = self.open.take()
+        {
             match crate::sheet::SheetModel::open(&path) {
                 Ok(model) => self.shell.set_sheet(ui, model),
                 Err(e) => eprintln!("cannot open {}: {e}", path.display()),
@@ -185,10 +202,7 @@ pub fn run(kind: AppKind) -> Result<(), HostError> {
     let mut cfg = AdapterConfig::new(f.primary);
     cfg.font_index = f.index;
     cfg.fallbacks = f.fallbacks;
-    cfg.text_options = Some(TextOptions {
-        lcd: !grayscale,
-        ..TextOptions::default()
-    });
+    cfg.text_options = Some(TextOptions::office(!grayscale));
     cfg.force_scheme = forced.map(|d| {
         if d {
             ColorScheme::Dark
@@ -204,7 +218,8 @@ pub fn run(kind: AppKind) -> Result<(), HostError> {
         shell: Shell::new(kind, dark),
         pointer_phys: (-1.0, -1.0),
         last_title_click: None,
-        open: open.filter(|_| kind == AppKind::Sheets),
+        kind,
+        open,
     };
     open365_ui_host::run(
         HostConfig {

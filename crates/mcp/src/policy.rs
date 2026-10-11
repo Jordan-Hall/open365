@@ -53,6 +53,16 @@ fn risk_of(command: &Command, effect: EffectClass) -> Risk {
             scope: Scope::Export,
             confirm: *overwrite && path.exists(),
         },
+        Command::ShareSendCopy { path, overwrite }
+        | Command::ShareSendPdf { path, overwrite }
+        | Command::ShareSanitizeCopy {
+            path, overwrite, ..
+        } => Risk {
+            effect,
+            scope: Scope::Export,
+            confirm: *overwrite && path.as_deref().is_some_and(Path::exists),
+        },
+        // `share_inspect` is a read; `share_os_sheet` is egress and falls to its class below.
         _ => Risk {
             effect,
             scope: match effect {
@@ -84,8 +94,7 @@ pub fn assess_sequence(scratch: &mut Target, commands: &[Command]) -> Vec<Step> 
         .iter()
         .map(|command| {
             let risk = assess_in(command, scratch);
-            let runnable =
-                !failed && !matches!(command, Command::Save { .. } | Command::ExportPdf { .. });
+            let runnable = !failed && !command.writes_file() && !command.is_share();
             let outcome = runnable.then(|| scratch.apply(command.clone()));
             failed |= matches!(outcome, Some(Err(_)));
             Step { risk, outcome }

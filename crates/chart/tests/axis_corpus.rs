@@ -34,11 +34,10 @@ fn f(v: &Value, key: &str) -> f64 {
     v[key].as_f64().unwrap_or_else(|| panic!("{key}"))
 }
 
-#[test]
-fn value_axis_matches_excel_on_the_generated_corpus() {
-    let doc = load("axes.json");
+/// Replays one recorded corpus; returns (matches, total, differences).
+fn replay(file: &str) -> (usize, usize, Vec<String>) {
+    let doc = load(file);
     let cases = doc["cases"].as_array().expect("cases");
-    assert!(cases.len() >= 300, "corpus size {}", cases.len());
     let (mut ok, mut bad) = (0usize, Vec::new());
     let mut x_ok = 0usize;
     let mut x_total = 0usize;
@@ -92,14 +91,43 @@ fn value_axis_matches_excel_on_the_generated_corpus() {
     }
     let total = cases.len() + x_total;
     eprintln!(
-        "axis corpus: {} of {total} match ({x_ok} of {x_total} scatter X axes)",
+        "{file}: {} of {total} match ({x_ok} of {x_total} scatter X axes)",
         ok + x_ok
     );
+    (ok + x_ok, total, bad)
+}
+
+#[test]
+fn value_axis_matches_excel_on_the_generated_corpus() {
+    let (_, total, bad) = replay("axes.json");
+    assert!(total >= 300, "corpus size {total}");
     assert!(
         bad.is_empty(),
-        "{} of {total} differ:\n{}",
+        "{} of {total} differ:
+{}",
         bad.len(),
-        bad.join("\n")
+        bad.join(
+            "
+"
+        )
+    );
+}
+
+/// `axes-seed7.json` was recorded after the rules were written and is a different random
+/// sweep (`chart-oracle.ps1 -Axes -Seed 7`).
+#[test]
+fn value_axis_matches_excel_on_the_hold_out_sweep() {
+    let (ok, total, bad) = replay("axes-seed7.json");
+    assert!(total >= 300, "corpus size {total}");
+    assert!(
+        bad.is_empty(),
+        "{} of {total} differ ({ok} match):
+{}",
+        bad.len(),
+        bad.join(
+            "
+"
+        )
     );
 }
 

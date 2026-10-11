@@ -12,24 +12,30 @@
 //! See `docs/architecture/charts.md`.
 
 pub mod axis;
+mod build;
 mod data;
 mod display;
+mod edit;
 mod error;
 mod layout;
 mod model;
+mod style;
 
+pub use build::{BuildKind, BuildSeries, ChartBuilder};
 pub use data::{AreaRef, CellLookup, CellSource, NoCells, WorkbookCells, parse_areas, resolve};
 pub use display::{
     ApproxMeasure, DisplayItem, DisplayList, FontSpec, PathCmd, Rect, Rgba, Stroke, TextAnchor,
     TextMeasure, TextRun,
 };
+pub use edit::ScaleEdit;
 pub use error::ChartError;
 pub use layout::{AREA_INSET, DEFAULT_PALETTE, RenderOptions, render, render_preview};
 pub use model::{
     Axis, AxisKind, AxisPos, BarDirection, Chart, ChartGroup, ChartSpace, DEFAULT_TEXT_PT,
-    DEFAULT_TITLE_PT, DataLabels, DataRef, GroupKind, Grouping, Legend, LegendPos, ManualLayout,
-    PlotArea, PointValue, Rgb, Series, Title,
+    DEFAULT_TITLE_PT, DataLabels, DataRef, ErrorBars, GroupKind, Grouping, Legend, LegendPos,
+    ManualLayout, PlotArea, PointValue, Rgb, Series, Title, Trendline, TrendlineKind,
 };
+pub use style::{ChartStyle, ColorStyle, StyleColor};
 
 use open365_xlsx::{GridMetrics, Workbook};
 

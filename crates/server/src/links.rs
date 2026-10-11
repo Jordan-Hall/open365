@@ -12,7 +12,7 @@ use serde_json::{Value, json};
 
 use crate::audit;
 use crate::auth::{authenticate, hash_password, verify_password};
-use crate::docs::{add_version, download_response, load_doc, read_version};
+use crate::docs::{add_version, download_response, load_doc, quota_precheck, read_version};
 use crate::error::{ApiError, ApiResult};
 use crate::perm::{Grant, LinkScope, Rights, rights};
 use crate::util::{ct_eq, new_id, new_token, now, sha256_hex, token_shape_ok};
@@ -27,6 +27,8 @@ pub struct CreateLink {
     audience: String,
     expires_in_secs: Option<i64>,
     password: Option<String>,
+    /// For the `specific` audience: the people (by email, in this tenant) who may open the link.
+    emails: Option<Vec<String>>,
 }
 
 fn default_audience() -> String {
@@ -39,11 +41,31 @@ pub async fn create(
     Path(doc): Path<String>,
     Json(req): Json<CreateLink>,
 ) -> ApiResult<Response> {
+    // Counted before any work: a stolen session cannot mint links without bound.
+    st.limiter
+        .hit(
+            &format!("linkcreate:{}:{}", ctx.tenant_id, ctx.user_id),
+            st.cfg.link_create_rate,
+        )
+        .await
+        .into_result()?;
     let scope = LinkScope::parse(&req.scope).ok_or(ApiError::BadRequest("invalid_scope"))?;
     let audience = match req.audience.as_str() {
-        "anyone" | "org" => req.audience.clone(),
+        "anyone" | "org" | "specific" => req.audience.clone(),
         _ => return Err(ApiError::BadRequest("invalid_audience")),
     };
+    let emails: Vec<String> = req
+        .emails
+        .iter()
+        .flatten()
+        .map(|e| e.trim().to_lowercase())
+        .collect();
+    if (audience == "specific") == emails.is_empty()
+        || emails.len() > 50
+        || emails.iter().any(|e| e.len() > 254)
+    {
+        return Err(ApiError::BadRequest("invalid_emails"));
+    }
     let expires_at = match req.expires_in_secs {
         None => None,
         Some(s) if (1..=st.cfg.max_link_ttl_secs).contains(&s) => Some(now() + s),
@@ -74,6 +96,19 @@ pub async fn create(
                 return Err(ApiError::Forbidden("anyone_links_disabled"));
             }
         }
+        // Named people must be accounts in the caller's own tenant.
+        let mut people = vec![];
+        for e in &emails {
+            let uid: String = c
+                .query_row(
+                    "SELECT id FROM users WHERE tenant_id = ?1 AND email = ?2 AND disabled = 0",
+                    params![ctx.tenant_id, e],
+                    |r| r.get(0),
+                )
+                .optional()?
+                .ok_or(ApiError::BadRequest("unknown_user"))?;
+            people.push(uid);
+        }
         let tx = c.transaction()?;
         tx.execute(
             "INSERT INTO share_links (id, tenant_id, document_id, token_hash, scope, audience, expires_at,
@@ -81,6 +116,12 @@ pub async fn create(
              VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
             params![id2, ctx.tenant_id, d.id, th, scope.as_str(), audience, expires_at, pw_hash, ctx.user_id, now()],
         )?;
+        for uid in &people {
+            tx.execute(
+                "INSERT OR IGNORE INTO share_link_users (link_id, tenant_id, user_id) VALUES (?1, ?2, ?3)",
+                params![id2, ctx.tenant_id, uid],
+            )?;
+        }
         audit::append(
             &tx,
             &inner.audit,
@@ -88,7 +129,7 @@ pub async fn create(
             &ctx.user_id,
             "link.create",
             &d.id,
-            &format!("link={id2} scope={} audience={audience} expires={expires_at:?} password={}", scope.as_str(), pw_hash.is_some()),
+            &format!("link={id2} scope={} audience={audience} expires={expires_at:?} password={} people={}", scope.as_str(), pw_hash.is_some(), people.len()),
         )?;
         tx.commit()?;
         Ok(())
@@ -126,6 +167,20 @@ pub async fn list(
                            "created_at": r.get::<_, i64>(6)?, "revoked_at": r.get::<_, Option<i64>>(7)? }))
             })?
             .collect::<Result<Vec<_>, _>>()?;
+        let mut rows = rows;
+        for row in &mut rows {
+            let id = row["id"].as_str().unwrap_or_default().to_string();
+            let mut s = c.prepare(
+                "SELECT u.email FROM share_link_users l JOIN users u ON u.id = l.user_id AND u.tenant_id = l.tenant_id
+                 WHERE l.link_id = ?1 AND l.tenant_id = ?2 ORDER BY u.email",
+            )?;
+            let emails: Vec<String> = s
+                .query_map(params![id, ctx.tenant_id], |r| r.get(0))?
+                .collect::<Result<_, _>>()?;
+            if row["audience"] == "specific" {
+                row["emails"] = json!(emails);
+            }
+        }
         Ok(Json(json!(rows)))
     })
     .await
@@ -170,6 +225,7 @@ struct Resolved {
     doc_name: String,
     version: i64,
     scope: LinkScope,
+    token_hash: String,
 }
 
 struct Candidate {
@@ -180,17 +236,38 @@ struct Candidate {
 
 const PASSWORD_HEADER: &str = "x-share-password";
 
+/// True when the signed-in caller is one of the people a `specific` link names.
+fn is_named(
+    c: &rusqlite::Connection,
+    res: &Resolved,
+    session: Option<&TenantCtx>,
+) -> ApiResult<bool> {
+    let Some(s) = session.filter(|s| s.tenant_id == res.tenant_id) else {
+        return Ok(false);
+    };
+    Ok(c.query_row(
+        "SELECT EXISTS(SELECT 1 FROM share_link_users WHERE link_id = ?1 AND tenant_id = ?2 AND user_id = ?3)",
+        params![res.id, res.tenant_id, s.user_id],
+        |r| r.get(0),
+    )?)
+}
+
 /// Resolves and authorises a link request. `NotFound` is the single answer for every kind of unusable link.
 async fn resolve(st: &AppState, token: &str, ip: &str, headers: &HeaderMap) -> ApiResult<Resolved> {
     let cfg = &st.cfg;
-    let fail_key = format!("linkfail:{ip}");
-    if !st.limiter.hit(&format!("linkip:{ip}"), cfg.link_ip_rate)
-        || st.limiter.blocked(&fail_key, cfg.link_fail_rate)
-    {
-        return Err(ApiError::RateLimited);
-    }
+    let ipk = crate::ratelimit::ip_key(ip);
+    let fail_key = format!("linkfail:{ipk}");
+    st.limiter
+        .hit(&format!("linkip:{ipk}"), cfg.link_ip_rate)
+        .await
+        .into_result()?;
+    // Every lookup is counted BEFORE it is resolved, so concurrent probes cannot overshoot the limit; a lookup that
+    // reaches a usable link (below) clears the count, so only failures accumulate.
+    st.limiter
+        .hit_backoff(&fail_key, cfg.link_fail_rate)
+        .await
+        .into_result()?;
     if !token_shape_ok(token) {
-        st.limiter.hit(&fail_key, cfg.link_fail_rate);
         return Err(ApiError::NotFound);
     }
     let th = sha256_hex(token.as_bytes());
@@ -218,6 +295,7 @@ async fn resolve(st: &AppState, token: &str, ip: &str, headers: &HeaderMap) -> A
                                 doc_name: r.get(3)?,
                                 version: r.get(4)?,
                                 scope: LinkScope::parse(&r.get::<_, String>(5)?).unwrap_or(LinkScope::ViewNoDownload),
+                                token_hash: th2.clone(),
                             },
                             r.get::<_, String>(6)?,
                             r.get::<_, Option<i64>>(7)?,
@@ -247,6 +325,8 @@ async fn resolve(st: &AppState, token: &str, ip: &str, headers: &HeaderMap) -> A
                 Some("anyone_links_disabled")
             } else if audience == "org" && session.as_ref().is_none_or(|s| s.tenant_id != res.tenant_id) {
                 Some("org_session_required")
+            } else if audience == "specific" && !is_named(c, &res, session.as_ref())? {
+                Some("not_a_named_person")
             } else {
                 None
             };
@@ -259,30 +339,36 @@ async fn resolve(st: &AppState, token: &str, ip: &str, headers: &HeaderMap) -> A
         .await?;
     let cand = match cand {
         Ok(c) => c,
-        Err(e) => {
-            st.limiter.hit(&fail_key, cfg.link_fail_rate);
-            return Err(e);
-        }
+        Err(e) => return Err(e),
     };
-    if !st
-        .limiter
+    st.limiter
         .hit(&format!("linktok:{}", cand.token_hash), cfg.link_token_rate)
-    {
-        return Err(ApiError::RateLimited);
-    }
+        .await
+        .into_result()?;
     if let Some(hash) = cand.password_hash {
-        let pw_key = format!("linkpw:{}", cand.token_hash);
-        if st.limiter.blocked(&pw_key, cfg.link_password_fail_rate) {
-            return Err(ApiError::RateLimited);
-        }
         let given = headers
             .get(PASSWORD_HEADER)
             .and_then(|v| v.to_str().ok())
             .unwrap_or("")
             .to_string();
-        if given.is_empty() || !verify_password(hash, given).await {
-            st.limiter.hit(&pw_key, cfg.link_password_fail_rate);
-            st.limiter.hit(&fail_key, cfg.link_fail_rate);
+        // A missing password is a prompt for one, not a failed guess: it costs nothing and is not counted.
+        if given.is_empty() {
+            st.limiter.reset(&fail_key).await;
+            return Err(ApiError::Unauthorized("password_required"));
+        }
+        // Per link and address, plus a looser per link limit. Counted BEFORE the verification, so concurrent
+        // guesses cannot all pass a check-then-act gap; both are cleared by a correct password.
+        let pw_key = format!("linkpw:{}:{ipk}", cand.token_hash);
+        let tok_key = format!("linkpwtok:{}", cand.token_hash);
+        st.limiter
+            .hit_backoff(&pw_key, cfg.link_password_fail_rate)
+            .await
+            .into_result()?;
+        st.limiter
+            .hit(&tok_key, cfg.link_password_token_rate)
+            .await
+            .into_result()?;
+        if !verify_password(st, hash, given).await {
             let (t, d, id) = (
                 cand.r.tenant_id.clone(),
                 cand.r.document_id.clone(),
@@ -302,7 +388,10 @@ async fn resolve(st: &AppState, token: &str, ip: &str, headers: &HeaderMap) -> A
             .await?;
             return Err(ApiError::Unauthorized("password_required"));
         }
+        st.limiter.reset(&pw_key).await;
+        st.limiter.reset(&tok_key).await;
     }
+    st.limiter.reset(&fail_key).await;
     Ok(cand.r)
 }
 
@@ -409,10 +498,35 @@ pub async fn upload(
     if body.is_empty() {
         return Err(ApiError::BadRequest("empty_body"));
     }
+    // Anonymous writers get a per-link rate and an hourly byte budget, so a leaked edit link cannot fill the quota.
+    st.limiter
+        .hit(&format!("linkup:{}", r.token_hash), st.cfg.link_upload_rate)
+        .await
+        .into_result()?;
+    let by = format!("link:{}", r.id);
+    let (t, by2, size, limit) = (
+        r.tenant_id.clone(),
+        by.clone(),
+        body.len(),
+        st.cfg.link_upload_bytes_per_hour,
+    );
+    st.run(move |_, c| {
+        quota_precheck(c, &t, size)?;
+        link_budget(c, &t, &by2, size, limit)
+    })
+    .await?;
+    // Bytes reach the disk (fsynced) before the database lock is taken.
+    let blob = st.store_blob(&r.tenant_id, body).await?;
     st.run(move |inner, c| {
+        link_budget(
+            c,
+            &r.tenant_id,
+            &by,
+            usize::try_from(blob.1).unwrap_or(usize::MAX),
+            inner.cfg.link_upload_bytes_per_hour,
+        )?;
         let tx = c.transaction()?;
-        let by = format!("link:{}", r.id);
-        let n = add_version(inner, &tx, &r.tenant_id, &r.document_id, &body, &by, None)?;
+        let n = add_version(&tx, &r.tenant_id, &r.document_id, &blob, &by, None)?;
         audit::append(
             &tx,
             &inner.audit,
@@ -426,4 +540,23 @@ pub async fn upload(
         Ok(Json(json!({ "version": n })))
     })
     .await
+}
+
+/// Bytes one link may add in an hour.
+fn link_budget(
+    c: &rusqlite::Connection,
+    tenant: &str,
+    actor: &str,
+    size: usize,
+    limit: i64,
+) -> ApiResult<()> {
+    let used: i64 = c.query_row(
+        "SELECT COALESCE(SUM(size), 0) FROM versions WHERE tenant_id = ?1 AND created_by = ?2 AND created_at > ?3",
+        params![tenant, actor, now() - 3600],
+        |r| r.get(0),
+    )?;
+    if used.saturating_add(i64::try_from(size).unwrap_or(i64::MAX)) > limit {
+        return Err(ApiError::RateLimited(60));
+    }
+    Ok(())
 }

@@ -282,6 +282,38 @@ pub struct RunLayoutProps {
     /// `w:smallCaps`, §17.3.2.33: show lower-case letters as reduced capitals. Default false;
     /// `caps` wins when both are set.
     pub small_caps: bool,
+    /// `w:vertAlign`, §17.3.2.42. Default baseline.
+    pub vert_align: VertAlign,
+}
+
+/// `w:vertAlign`: where a run sits relative to its line's baseline.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum VertAlign {
+    #[default]
+    Baseline,
+    Superscript,
+    Subscript,
+}
+
+impl VertAlign {
+    /// Parse a `w:vertAlign` value; an unknown value is baseline.
+    pub fn parse(value: &str) -> Self {
+        match value.trim() {
+            "superscript" => Self::Superscript,
+            "subscript" => Self::Subscript,
+            _ => Self::Baseline,
+        }
+    }
+
+    /// The `w:val` text.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Baseline => "baseline",
+            Self::Superscript => "superscript",
+            Self::Subscript => "subscript",
+        }
+    }
 }
 
 impl Default for RunLayoutProps {
@@ -294,6 +326,7 @@ impl Default for RunLayoutProps {
             scale_percent: 100,
             caps: false,
             small_caps: false,
+            vert_align: VertAlign::Baseline,
         }
     }
 }
@@ -327,6 +360,7 @@ pub(crate) struct LayoutFmt {
     pub scale: Option<u32>,
     pub caps: Option<bool>,
     pub small_caps: Option<bool>,
+    pub vert_align: Option<VertAlign>,
 }
 
 impl LayoutFmt {
@@ -345,6 +379,9 @@ impl LayoutFmt {
             scale: int("w").and_then(|v| u32::try_from(v).ok()),
             caps: props.any_w_element("caps").map(on_off),
             small_caps: props.any_w_element("smallCaps").map(on_off),
+            vert_align: props
+                .any_w_element("vertAlign")
+                .map(|e| VertAlign::parse(e.head.attr_w("val").unwrap_or_default())),
         }
     }
 
@@ -361,6 +398,7 @@ impl LayoutFmt {
         put(&mut self.scale, other.scale);
         put(&mut self.caps, other.caps);
         put(&mut self.small_caps, other.small_caps);
+        put(&mut self.vert_align, other.vert_align);
     }
 
     pub(crate) fn finish(self) -> RunLayoutProps {
@@ -373,6 +411,7 @@ impl LayoutFmt {
             scale_percent: self.scale.unwrap_or(d.scale_percent),
             caps: self.caps.unwrap_or(d.caps),
             small_caps: self.small_caps.unwrap_or(d.small_caps),
+            vert_align: self.vert_align.unwrap_or(d.vert_align),
         }
     }
 }

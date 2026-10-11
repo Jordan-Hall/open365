@@ -132,6 +132,13 @@ impl Rig {
         v
     }
 
+    /// Runs a tool that must be refused; returns the refusal message.
+    pub fn refused(&mut self, tool: &str, args: Value) -> String {
+        let (v, err) = self.call(tool, args);
+        assert!(err, "expected a refusal, got {v}");
+        v["error"].as_str().expect("error").to_owned()
+    }
+
     pub fn open(&mut self, path: &Path) -> String {
         self.ok("open_document", json!({"path": s(path)}))["document"]
             .as_str()

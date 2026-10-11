@@ -33,6 +33,7 @@ use crate::a11y::{self, RunEntry};
 use crate::docmodel::{ParaModel, SpanStyle, build_models};
 
 use crate::parts;
+use crate::proofing::{ProofState, SpellChoice, SpellTarget};
 
 // The glyph atlas and the key map live next to this file; `lib.rs` need not know them.
 #[path = "glyphs.rs"]
@@ -269,6 +270,10 @@ pub struct DocView {
     pub last_paint_ms: f32,
     /// Rulers (View > Ruler): visibility, colours, the tab kind the corner selects, and a drag in progress.
     ruler: ruler_view::RulerState,
+    /// Spell checking: checks, squiggles and the right-click menu.
+    proof: ProofState,
+    /// The flagged word the open right-click menu is about.
+    spell_menu: Option<SpellTarget>,
 }
 
 impl Default for DocView {
@@ -323,6 +328,102 @@ impl DocView {
             last_layout_ms: 0.0,
             last_paint_ms: 0.0,
             ruler: ruler_view::RulerState::default(),
+            proof: ProofState::new(),
+            spell_menu: None,
+        }
+    }
+
+    /// The speller (language, user dictionary, on/off).
+    pub fn proof_mut(&mut self) -> &mut ProofState {
+        &mut self.proof
+    }
+
+    /// The menu data for a flagged word at `pos`: the word, up to five suggestions.
+    pub fn spell_target_at(&mut self, pos: DocPos) -> Option<SpellTarget> {
+        let model = self.models.get(pos.para)?;
+        self.proof
+            .target_at(pos.para, &model.text, &model.langs, pos.offset)
+    }
+
+    /// Opens the spelling menu for the word at `pos` (what a right click does). True when a flagged word is there.
+    pub fn open_spell_menu(&mut self, pos: DocPos) -> bool {
+        self.spell_menu = self.spell_target_at(pos);
+        self.spell_menu.is_some()
+    }
+
+    /// The word the open spelling menu is about.
+    pub fn spell_menu(&self) -> Option<&SpellTarget> {
+        self.spell_menu.as_ref()
+    }
+
+    /// Carries out a spelling-menu choice: a replacement goes through `DocxCorrectWord` (one undo step).
+    pub fn apply_spell_choice(
+        &mut self,
+        target: &mut Target,
+        spell: &SpellTarget,
+        choice: &SpellChoice,
+    ) {
+        if self.proof.apply_local(spell, choice) {
+            return;
+        }
+        let SpellChoice::Replace(replacement) = choice else {
+            return;
+        };
+        let (para, start, end) = (spell.para, spell.issue.start, spell.issue.end);
+        let command = Command::DocxCorrectWord {
+            para,
+            start,
+            end,
+            expected: spell.issue.word.clone(),
+            replacement: replacement.clone(),
+        };
+        if self.run(target, command).is_some() {
+            self.refresh_para(target, para);
+            self.set_caret(DocPos::new(para, start + replacement.chars().count()));
+        }
+    }
+
+    /// The red wavy underlines of the lines `lo..hi` of a page.
+    fn paint_squiggles(
+        &mut self,
+        painter: &egui::Painter,
+        origin: Pos2,
+        page: usize,
+        lines: std::ops::Range<usize>,
+        ppp: f32,
+    ) {
+        if !self.proof.enabled {
+            return;
+        }
+        let s = self.scale;
+        let first_ri = self.index.page_first[page];
+        let mut by_para: HashMap<usize, Vec<crate::proofing::Issue>> = HashMap::new();
+        for li in lines.clone() {
+            let para = self.engine.layout().pages[page].lines[li].paragraph;
+            if let std::collections::hash_map::Entry::Vacant(v) = by_para.entry(para)
+                && let Some(m) = self.models.get(para)
+            {
+                v.insert(self.proof.issues(para as u64, &m.text, &m.langs));
+            }
+        }
+        for li in lines {
+            let ri = first_ri + li;
+            let line = &self.engine.layout().pages[page].lines[li];
+            let Some(issues) = by_para.get(&line.paragraph).filter(|v| !v.is_empty()) else {
+                continue;
+            };
+            let size = line.runs.first().map_or(11.0, |r| r.size as f32);
+            let y_top = origin.y + line.baseline as f32 * s + size * 0.109 * s - 1.0 / ppp;
+            let geom = self.line_geom(ri);
+            for issue in issues {
+                let (a, b) = (issue.start.max(geom.cs), issue.end.min(geom.ce));
+                if a >= b {
+                    continue;
+                }
+                let x0 = origin.x + geom.xs[a - geom.cs] as f32 * s;
+                let x1 = origin.x + geom.xs[b - geom.cs] as f32 * s;
+                crate::proofing::paint_squiggle(painter, x0, x1, y_top, ppp);
+            }
         }
     }
 
@@ -1641,7 +1742,18 @@ impl DocView {
                 }
                 self.view_h = f64::from(ui.clip_rect().height() / scale);
 
+                self.proof.start(&ctx);
+                self.proof.pump();
                 self.handle_pointer(&ctx, &response, canvas);
+                if response.secondary_clicked()
+                    && let Some(pos) = ctx.input(|i| i.pointer.interact_pos())
+                {
+                    let hit = self.hit_test(canvas, pos);
+                    if self.open_spell_menu(hit) {
+                        self.set_caret(hit);
+                    }
+                }
+                self.spell_context_menu(&response, target);
                 let focused = response.has_focus() || ui.memory(|m| m.has_focus(self.doc_id));
                 self.focused = focused;
                 // egui may run a frame as several passes with the same input events, so
@@ -1720,6 +1832,43 @@ impl DocView {
     }
 
     /// Screen rectangle of the caret.
+    /// The right-click menu of a flagged word: up to five suggestions, Ignore All, Add to Dictionary.
+    fn spell_context_menu(&mut self, response: &egui::Response, target: &mut Target) {
+        let Some(spell) = self.spell_menu.clone() else {
+            return;
+        };
+        let mut choice = None;
+        let shown = response.context_menu(|ui| {
+            for suggestion in &spell.suggestions {
+                if ui
+                    .button(egui::RichText::new(suggestion).strong())
+                    .clicked()
+                {
+                    choice = Some(SpellChoice::Replace(suggestion.clone()));
+                }
+            }
+            if spell.suggestions.is_empty() {
+                ui.add_enabled(false, egui::Button::new("(no spelling suggestions)"));
+            }
+            ui.separator();
+            if ui.button("Ignore All").clicked() {
+                choice = Some(SpellChoice::IgnoreAll);
+            }
+            if ui.button("Add to Dictionary").clicked() {
+                choice = Some(SpellChoice::AddToDictionary);
+            }
+            if choice.is_some() {
+                ui.close();
+            }
+        });
+        if shown.is_none() || choice.is_some() {
+            self.spell_menu = None;
+        }
+        if let Some(choice) = choice {
+            self.apply_spell_choice(target, &spell, &choice);
+        }
+    }
+
     fn caret_rect(&self, canvas: Rect) -> Rect {
         let Some((page, x, top, height)) = self.caret_geom(self.caret) else {
             return Rect::from_min_size(canvas.min, vec2(1.5, 16.0));
@@ -2181,6 +2330,7 @@ impl DocView {
             painter.line_segment([a, b], Stroke::new(width, color));
         }
         self.painted.extend(painted);
+        self.paint_squiggles(painter, origin, page, lo..hi, ppp);
         self.paint_furniture_text(ctx, painter, origin, page, clip);
     }
 

@@ -29,6 +29,7 @@ struct WordStats {
     word_flagged: usize,
     both_flagged: usize,
     top1: usize,
+    word_top1_in_ours_top3: usize,
     word_top1_in_ours_top5: usize,
     ours_top1_in_words_top5: usize,
     set_overlap_top5: f64,
@@ -44,6 +45,7 @@ fn measure_words(tag: &str) -> Option<WordStats> {
         word_flagged: 0,
         both_flagged: 0,
         top1: 0,
+        word_top1_in_ours_top3: 0,
         word_top1_in_ours_top5: 0,
         ours_top1_in_words_top5: 0,
         set_overlap_top5: 0.0,
@@ -85,6 +87,7 @@ fn measure_words(tag: &str) -> Option<WordStats> {
             if let (Some(a), Some(b)) = (ours.first(), theirs.first()) {
                 stats.suggestion_rows += 1;
                 stats.top1 += usize::from(a == b);
+                stats.word_top1_in_ours_top3 += usize::from(ours.iter().take(3).any(|x| x == b));
                 stats.word_top1_in_ours_top5 += usize::from(ours.iter().take(5).any(|x| x == b));
                 stats.ours_top1_in_words_top5 += usize::from(theirs.iter().take(5).any(|x| x == a));
                 let a5: BTreeSet<&str> = ours.iter().take(5).map(String::as_str).collect();
@@ -128,7 +131,7 @@ fn word_verdicts_and_suggestions_agree_with_word() {
         let in_top5 = pct(s.word_top1_in_ours_top5, s.suggestion_rows);
         eprintln!(
             "{tag}: {} words, verdict agreement {:.2}% ({} of {}); Word flags {}, both flag {}; \
-             suggestions over {} words: first equal {:.1}%, Word's first in our top 5 {:.1}%, \
+             suggestions over {} words: first equal {:.1}%, Word's first in our top 3 {:.1}%, top 5 {:.1}%, \
              our first in Word's top 5 {:.1}%, mean top-5 overlap {:.1}%",
             s.total,
             verdict,
@@ -138,6 +141,7 @@ fn word_verdicts_and_suggestions_agree_with_word() {
             s.both_flagged,
             s.suggestion_rows,
             pct(s.top1, s.suggestion_rows),
+            pct(s.word_top1_in_ours_top3, s.suggestion_rows),
             in_top5,
             pct(s.ours_top1_in_words_top5, s.suggestion_rows),
             100.0 * s.set_overlap_top5 / s.suggestion_rows.max(1) as f64,
@@ -145,6 +149,16 @@ fn word_verdicts_and_suggestions_agree_with_word() {
         assert!(
             verdict >= verdict_floor,
             "{tag} verdict agreement {verdict:.2}%"
+        );
+        let first = pct(s.top1, s.suggestion_rows);
+        let in_top3 = pct(s.word_top1_in_ours_top3, s.suggestion_rows);
+        assert!(
+            first >= 88.5 || s.suggestion_rows < 500,
+            "{tag} first-suggestion agreement {first:.1}%"
+        );
+        assert!(
+            in_top3 >= 91.5 || s.suggestion_rows < 500,
+            "{tag} top-3 recall {in_top3:.1}%"
         );
         assert!(
             in_top5 >= top5_floor,

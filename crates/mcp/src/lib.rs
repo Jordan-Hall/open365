@@ -17,6 +17,7 @@ mod server;
 mod tools;
 mod tools_ext;
 mod tools_read;
+mod tools_share;
 pub mod views;
 pub mod views_ext;
 

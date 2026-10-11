@@ -144,7 +144,7 @@ async fn login(e: &Env, slug: &str, email: &str) -> String {
     let r = send(
         e,
         req(Method::POST, "/api/v1/login")
-            .json(json!({"tenant": slug, "email": email, "password": PW})),
+            .json(json!({"tenant": slug, "email": email, "password": PW, "bearer": true})),
     )
     .await;
     assert_eq!(r.status, StatusCode::OK, "{:?}", r.json());
@@ -790,17 +790,16 @@ async fn wrong_password_is_rejected_and_locks_out() {
     .await;
     assert_eq!(right.status, StatusCode::OK);
     assert_eq!(right.body, b"PK\x03\x04 pretend workbook bytes \x00\xff");
-    // Failures so far: 2 (missing and wrong each count). One more, then the link is locked even for the right password.
-    let _ = send(
-        &e,
-        req(Method::GET, format!("/s/{tok}")).hdr("x-share-password", "guess2"),
-    )
-    .await;
-    let _ = send(
-        &e,
-        req(Method::GET, format!("/s/{tok}")).hdr("x-share-password", "guess3"),
-    )
-    .await;
+    // A missing password is a prompt, not a guess; a correct one clears the count. Three wrong guesses (the
+    // limit) then lock the link for this address, even against the right password.
+    for g in ["guess2", "guess3", "guess4"] {
+        let r = send(
+            &e,
+            req(Method::GET, format!("/s/{tok}")).hdr("x-share-password", g),
+        )
+        .await;
+        assert_eq!(r.status, StatusCode::UNAUTHORIZED);
+    }
     let locked = send(
         &e,
         req(Method::GET, format!("/s/{tok}")).hdr("x-share-password", "link-secret-1"),

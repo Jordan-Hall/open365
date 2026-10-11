@@ -55,6 +55,9 @@ pub struct FieldGroup {
     /// `rangePr/@startDate` and `@endDate` as serial numbers.
     pub start_date: Option<f64>,
     pub end_date: Option<f64>,
+    /// `rangePr/@autoStart` and `@autoEnd` (default true): the bound follows the data on refresh.
+    pub auto_start: bool,
+    pub auto_end: bool,
     pub items: Vec<Value>,
 }
 
@@ -147,6 +150,8 @@ impl CacheDefinition {
                         end_date: range
                             .and_then(|r| r.head.attr("endDate"))
                             .and_then(|t| iso_to_serial(t, date1904)),
+                        auto_start: range.is_none_or(|r| attr_bool(r, "autoStart", true)),
+                        auto_end: range.is_none_or(|r| attr_bool(r, "autoEnd", true)),
                         items: g
                             .child_main("groupItems")
                             .map(|gi| {

@@ -87,7 +87,8 @@ pub enum ClusterKind {
     /// Characters of the list label: `text_start..text_end` indexes [`Line::label`]. The story
     /// range is empty.
     Label,
-    /// A drawn rule with no characters of its own (the note separator).
+    /// A drawn glyph with no characters of its own: the note separator, or a tab leader, whose
+    /// character is in `text_start` (see [`Line::leader_char`]).
     Other,
 }
 
@@ -129,6 +130,9 @@ pub struct GlyphRun {
     pub color: Option<[u8; 3]>,
     /// A note reference mark: drawn small and raised, on its own baseline in Word's PDF.
     pub superscript: bool,
+    /// `w:vertAlign` of the run. The glyphs are already shrunk (`size`) and shifted
+    /// (`PlacedGlyph::y_offset`); this tells a consumer why.
+    pub vert_align: open365_docx::VertAlign,
     pub glyphs: Vec<PlacedGlyph>,
 }
 
@@ -221,6 +225,14 @@ impl Line {
         };
         src.get(c.text_start as usize..c.text_end as usize)
             .unwrap_or("")
+    }
+
+    /// The character a tab leader glyph repeats; `None` for any other glyph.
+    pub fn leader_char(&self, g: &PlacedGlyph) -> Option<char> {
+        let c = g.cluster;
+        (c.kind == ClusterKind::Other && c.text_start != 0 && c.text_start == c.text_end)
+            .then(|| char::from_u32(c.text_start))
+            .flatten()
     }
 
     /// X of the first drawn glyph's origin, or of the last character (the paragraph mark Word

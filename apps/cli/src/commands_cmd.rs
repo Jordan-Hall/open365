@@ -106,6 +106,12 @@ fn command_from(args: &RunArgs) -> Result<Command, CliError> {
 
 pub(crate) fn run(args: &RunArgs) -> Result<Report, CliError> {
     let command = command_from(args)?;
+    if command.is_share() {
+        return Err(CliError::Other(format!(
+            "{} is run with `open365 share` (see `open365 share --help`)",
+            command.name()
+        )));
+    }
     let options = Options {
         input: args.input.clone(),
         output: args.output.clone(),

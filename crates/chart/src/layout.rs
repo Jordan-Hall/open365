@@ -93,6 +93,8 @@ struct Resolved {
     values: Vec<Option<f64>>,
     cats: Vec<String>,
     xs: Vec<Option<f64>>,
+    /// Bubble sizes (`c:bubbleSize`).
+    sizes: Vec<Option<f64>>,
     labels: Option<DataLabels>,
     series: Series,
     format_code: Option<String>,
@@ -151,6 +153,14 @@ fn resolve_group<'c>(
             }
             None => (Vec::new(), Vec::new()),
         };
+        let sizes = s
+            .bubble_sizes
+            .as_ref()
+            .map(|d| resolve(d, opts.cells))
+            .unwrap_or_default()
+            .iter()
+            .map(PointValue::number)
+            .collect();
         let name = s
             .name
             .as_ref()
@@ -170,6 +180,7 @@ fn resolve_group<'c>(
             values,
             cats,
             xs,
+            sizes,
             labels: s.data_labels.clone().or_else(|| def.data_labels.clone()),
             series: s.clone(),
             format_code: s.values.as_ref().and_then(|d| d.format_code.clone()),
@@ -251,7 +262,12 @@ fn format_number(v: f64, code: &str, date1904: bool) -> String {
 fn is_cartesian(k: GroupKind) -> bool {
     matches!(
         k,
-        GroupKind::Bar | GroupKind::Line | GroupKind::Area | GroupKind::Scatter
+        GroupKind::Bar
+            | GroupKind::Line
+            | GroupKind::Area
+            | GroupKind::Scatter
+            | GroupKind::Bubble
+            | GroupKind::Stock
     )
 }
 
@@ -459,7 +475,11 @@ pub fn render(
         draw_axes(&mut cv, sc, chart, base_pt, space.date1904);
         draw_cartesian(&mut cv, &groups, sc, base_pt, space.date1904);
     } else {
-        draw_pie(&mut cv, first, inside, base_pt, space.date1904);
+        if first.def.kind == GroupKind::Radar {
+            draw_radar(&mut cv, first, inside);
+        } else {
+            draw_pie(&mut cv, first, inside, base_pt, space.date1904);
+        }
     }
 
     // Title and legend on top.
@@ -479,6 +499,9 @@ pub fn render(
     }
 
     list.items = cv.items;
+    list.value_scale = scales.as_ref().map(|l| l.value);
+    list.x_scale = scales.as_ref().and_then(|l| l.x_scale);
+    list.date_scale = scales.as_ref().and_then(|l| l.date_scale);
     list.plot_inside = inside;
     list.plot_outer = plot_outer;
     list.legend = legend_rect;
@@ -559,7 +582,10 @@ fn legend_entries(groups: &[Group<'_>]) -> Vec<LegendEntry> {
         .map(|(kind, s)| LegendEntry {
             name: s.name.clone(),
             color: s.color,
-            line: matches!(kind, GroupKind::Line | GroupKind::Scatter),
+            line: matches!(
+                kind,
+                GroupKind::Line | GroupKind::Scatter | GroupKind::Stock
+            ),
         })
         .collect()
 }
@@ -651,6 +677,7 @@ struct CartLayout {
     value: AxisScale,
     /// Category-axis scale for scatter; `None` for category axes.
     x_scale: Option<AxisScale>,
+    date_scale: Option<crate::axis::DateScale>,
     categories: usize,
     cross_between_mid: bool,
     value_fmt: String,
@@ -675,7 +702,7 @@ fn all_values(groups: &[Group<'_>]) -> (Extent, Extent) {
     let mut xhi = f64::NEG_INFINITY;
     for g in groups {
         let stacked = matches!(g.def.grouping, Grouping::Stacked | Grouping::PercentStacked)
-            && g.def.kind != GroupKind::Scatter;
+            && !g.def.kind.is_xy();
         if stacked {
             let n = g.series.iter().map(|s| s.values.len()).max().unwrap_or(0);
             for i in 0..n {
@@ -700,7 +727,7 @@ fn all_values(groups: &[Group<'_>]) -> (Extent, Extent) {
                     lo = lo.min(*v);
                     hi = hi.max(*v);
                 }
-                if g.def.kind == GroupKind::Scatter {
+                if g.def.kind.is_xy() {
                     for v in s.xs.iter().flatten() {
                         xlo = xlo.min(*v);
                         xhi = xhi.max(*v);
@@ -725,7 +752,12 @@ fn cartesian_layout(
     let first = &groups[0];
     let horizontal_bars =
         first.def.kind == GroupKind::Bar && first.def.direction == BarDirection::Bar;
-    let scatter = first.def.kind == GroupKind::Scatter;
+    let scatter = first.def.kind.is_xy();
+    let log_narrow = match first.def.kind {
+        GroupKind::Line | GroupKind::Stock => crate::axis::LogNarrow::Half,
+        k if k.is_xy() => crate::axis::LogNarrow::Whole,
+        _ => crate::axis::LogNarrow::Never,
+    };
     let percent = first.def.grouping == Grouping::PercentStacked;
     let axes = &chart.plot_area.axes;
     let val_axis = axes.iter().find(|a| a.kind == AxisKind::Value);
@@ -787,6 +819,12 @@ fn cartesian_layout(
     };
 
     let (yext, xext) = all_values(groups);
+    let log_lo = groups
+        .iter()
+        .flat_map(|g| g.series.iter())
+        .flat_map(|s| s.values.iter().flatten().copied())
+        .filter(|v| *v > 0.0)
+        .fold(None, |a: Option<f64>, v| Some(a.map_or(v, |a| a.min(v))));
     let val_deleted = val_axis.is_some_and(|a| a.deleted);
     let cat_deleted = cat_axis.is_some_and(|a| a.deleted);
     let vfmt = val_axis
@@ -883,21 +921,44 @@ fn cartesian_layout(
         .max(1.0);
         // The last value label is centred on the right edge and overhangs it.
         let mut in_w = base_w;
-        let mut v = pick_scale(val_axis, yext, percent, max_intervals(in_w, true, label_pt));
+        let space = |len: f64| AxisSpace {
+            len,
+            labels_in_plot: false,
+            horizontal: true,
+            font_pt: label_pt,
+            log_narrow,
+        };
+        let mut v = pick_scale(val_axis, yext, log_lo, percent, space(in_w));
         for _ in 0..2 {
             in_w = (base_w - half_label(&v, &vfmt)).max(1.0);
-            v = pick_scale(val_axis, yext, percent, max_intervals(in_w, true, label_pt));
+            v = pick_scale(val_axis, yext, log_lo, percent, space(in_w));
         }
         value = v;
         inside = Rect::new(o.x + cat_w + left_title, o.y, in_w, in_h);
     } else {
-        let in_h = (o.height - cat_h - title_h).max(1.0);
-        value = pick_scale(
-            val_axis,
-            yext,
-            percent,
-            max_intervals(in_h, false, label_pt),
-        );
+        let mut in_h = (o.height - cat_h - title_h).max(1.0);
+        let space = |len: f64, moved: bool| AxisSpace {
+            len,
+            labels_in_plot: moved,
+            horizontal: false,
+            font_pt: label_pt,
+            log_narrow,
+        };
+        let mut v = pick_scale(val_axis, yext, log_lo, percent, space(in_h, false));
+        // Data wholly below the category axis (all negative, or a log axis that reaches below
+        // 1) pull the category labels into the plot, which makes the plot taller.
+        let labels_in_plot = |v: &AxisScale| {
+            if v.log_base.is_some() {
+                v.min < 1.0
+            } else {
+                v.max <= 0.0 && v.min < 0.0
+            }
+        };
+        if labels_in_plot(&v) && !cat_deleted && !scatter {
+            in_h = (o.height - title_h).max(1.0);
+            v = pick_scale(val_axis, yext, log_lo, percent, space(in_h, true));
+        }
+        value = v;
         let mut vw = if val_deleted {
             0.0
         } else {
@@ -944,12 +1005,27 @@ fn cartesian_layout(
     let cross_mid = val_axis
         .and_then(|a| a.cross_between.as_deref())
         .map_or(first.def.kind == GroupKind::Area, |c| c == "midCat");
+    let date_scale = cat_axis
+        .filter(|a| a.kind == AxisKind::Date && !scatter)
+        .and_then(|_| {
+            let xs: Vec<f64> = first
+                .series
+                .iter()
+                .max_by_key(|s| s.xs.len())?
+                .xs
+                .iter()
+                .flatten()
+                .copied()
+                .collect();
+            crate::axis::date_scale(&xs, inside.width, inside.height, label_pt)
+        });
     CartLayout {
         outer: o,
         inside,
         horizontal_bars,
         value,
         x_scale,
+        date_scale,
         categories: n_cat,
         cross_between_mid: cross_mid,
         value_fmt: vfmt,
@@ -966,12 +1042,43 @@ fn cartesian_layout(
     }
 }
 
+/// The plot axis the scale is picked for: its length in points, direction and label size.
+#[derive(Clone, Copy)]
+struct AxisSpace {
+    len: f64,
+    /// Category labels sit inside the plot (log axes that reach below 1).
+    labels_in_plot: bool,
+    horizontal: bool,
+    font_pt: f64,
+    log_narrow: crate::axis::LogNarrow,
+}
+
 fn pick_scale(
     axis: Option<&crate::model::Axis>,
     ext: Option<(f64, f64)>,
+    log_lo: Option<f64>,
     percent: bool,
-    n: u32,
+    space: AxisSpace,
 ) -> AxisScale {
+    let n = max_intervals(space.len, space.horizontal, space.font_pt);
+    if let Some(base) = axis.and_then(|a| a.log_base).filter(|b| *b > 1.0) {
+        let (lo, hi) = (log_lo.unwrap_or(1.0), ext.map_or(1.0, |e| e.1));
+        let mut s = crate::axis::log_scale(
+            lo,
+            hi,
+            base,
+            crate::axis::log_max_intervals(space.len, space.font_pt, space.labels_in_plot),
+            space.log_narrow,
+            crate::axis::log_far_intervals(space.len, space.font_pt),
+        );
+        if let Some(m) = axis.and_then(|a| a.min).filter(|m| *m > 0.0) {
+            s.min = m;
+        }
+        if let Some(m) = axis.and_then(|a| a.max).filter(|m| *m > s.min) {
+            s.max = m;
+        }
+        return s;
+    }
     let ext = if percent { Some((0.0, 1.0)) } else { ext };
     if percent {
         let major = axis.and_then(|a| a.major_unit).unwrap_or_else(|| {
@@ -989,6 +1096,7 @@ fn pick_scale(
             max: axis.and_then(|a| a.max).unwrap_or(1.0),
             major,
             minor: major / 5.0,
+            log_base: None,
         };
     }
     resolve_scale(
@@ -1003,7 +1111,7 @@ fn pick_scale(
 
 fn val_to(l: &CartLayout, v: f64) -> f64 {
     let s = &l.value;
-    let t = ((v - s.min) / (s.max - s.min)).clamp(-0.5, 1.5);
+    let t = s.position(v).clamp(-0.5, 1.5);
     if l.horizontal_bars {
         l.inside.x + t * l.inside.width
     } else {
@@ -1324,7 +1432,7 @@ fn draw_cartesian(
                         }
                     }
                 }
-                GroupKind::Line | GroupKind::Area => {
+                GroupKind::Line | GroupKind::Area | GroupKind::Stock => {
                     let mut pts: Vec<(f64, f64)> = Vec::new();
                     let mut base_pts: Vec<(f64, f64)> = Vec::new();
                     for (i, v) in s.values.iter().enumerate() {
@@ -1380,14 +1488,14 @@ fn draw_cartesian(
                         }
                     }
                 }
-                GroupKind::Scatter => {
+                GroupKind::Scatter | GroupKind::Bubble => {
                     let xs = l.x_scale.unwrap_or(l.value);
                     let mut pts = Vec::new();
                     for (i, v) in s.values.iter().enumerate() {
                         let x = s.xs.get(i).copied().flatten().unwrap_or((i + 1) as f64);
                         let Some(v) = *v else { continue };
                         pts.push((
-                            ins.x + (x - xs.min) / (xs.max - xs.min) * ins.width,
+                            ins.x + xs.position(x).clamp(-0.5, 1.5) * ins.width,
                             val_to(l, v),
                         ));
                     }
@@ -1402,7 +1510,39 @@ fn draw_cartesian(
                     if lines {
                         draw_polyline(cv, &pts, s);
                     }
-                    if s.series.marker.as_deref() != Some("none") {
+                    if def.kind == GroupKind::Bubble {
+                        // The largest bubble spans a quarter of the shorter plot side at 100 %
+                        // (area scaled); unverified against Excel.
+                        let biggest = groups
+                            .iter()
+                            .flat_map(|g| g.series.iter())
+                            .flat_map(|s| s.sizes.iter().flatten().copied())
+                            .fold(0.0, f64::max);
+                        let r_max =
+                            ins.width.min(ins.height) * 0.125 * f64::from(def.bubble_scale) / 100.0;
+                        let mut k = 0;
+                        for (i, v) in s.values.iter().enumerate() {
+                            if v.is_none() {
+                                continue;
+                            }
+                            let size = s.sizes.get(i).copied().flatten().unwrap_or(0.0);
+                            if let (Some(p), true) = (pts.get(k), size > 0.0 && biggest > 0.0) {
+                                let ratio = size / biggest;
+                                let r = r_max
+                                    * if def.size_represents == "w" {
+                                        ratio
+                                    } else {
+                                        ratio.sqrt()
+                                    };
+                                cv.items.push(DisplayItem::Path {
+                                    cmds: circle(p.0, p.1, r),
+                                    fill: Some(Rgba(s.color.0, s.color.1, s.color.2, 180)),
+                                    stroke: None,
+                                });
+                            }
+                            k += 1;
+                        }
+                    } else if s.series.marker.as_deref() != Some("none") {
                         for p in &pts {
                             marker(cv, p.0, p.1, s.color);
                         }
@@ -1413,6 +1553,67 @@ fn draw_cartesian(
         }
     }
     cv.items.push(DisplayItem::PopClip);
+}
+
+/// A radar web: one spoke per category, five rings, one closed polygon per series. Rings use
+/// the automatic axis scale; spoke labels are not drawn (unverified against Excel).
+fn draw_radar(cv: &mut Canvas<'_>, g: &Group<'_>, area: Rect) {
+    let n = g
+        .series
+        .iter()
+        .map(|s| s.values.len().max(s.cats.len()))
+        .max()
+        .unwrap_or(0);
+    if n < 3 {
+        return;
+    }
+    let ext = g
+        .series
+        .iter()
+        .flat_map(|s| s.values.iter().flatten().copied())
+        .fold((0.0f64, 0.0f64), |a, v| (a.0.min(v), a.1.max(v)));
+    let scale = crate::axis::auto_scale(ext.0, ext.1, 10);
+    let (cx, cy) = (area.center_x(), area.center_y());
+    let radius = area.width.min(area.height) / 2.0;
+    let angle =
+        |i: usize| std::f64::consts::TAU * i as f64 / n as f64 - std::f64::consts::FRAC_PI_2;
+    let at = |i: usize, r: f64| (cx + r * angle(i).cos(), cy + r * angle(i).sin());
+    let grid = Stroke::solid(GRID_COLOR, 0.75);
+    let ticks = scale.ticks();
+    for t in ticks.iter().skip(1) {
+        let r = radius * (t - scale.min) / (scale.max - scale.min);
+        let mut cmds = vec![PathCmd::MoveTo(at(0, r).0, at(0, r).1)];
+        cmds.extend((1..n).map(|i| PathCmd::LineTo(at(i, r).0, at(i, r).1)));
+        cmds.push(PathCmd::Close);
+        cv.items.push(DisplayItem::Path {
+            cmds,
+            fill: None,
+            stroke: Some(grid.clone()),
+        });
+    }
+    for i in 0..n {
+        cv.line(cx, cy, at(i, radius).0, at(i, radius).1, grid.clone());
+    }
+    for s in &g.series {
+        let pts: Vec<(f64, f64)> = (0..n)
+            .map(|i| {
+                let v = s.values.get(i).copied().flatten().unwrap_or(scale.min);
+                at(i, radius * (v - scale.min) / (scale.max - scale.min))
+            })
+            .collect();
+        let mut cmds = vec![PathCmd::MoveTo(pts[0].0, pts[0].1)];
+        cmds.extend(pts.iter().skip(1).map(|p| PathCmd::LineTo(p.0, p.1)));
+        cmds.push(PathCmd::Close);
+        let filled = g.def.radar_style.as_deref() == Some("filled");
+        cv.items.push(DisplayItem::Path {
+            cmds,
+            fill: filled.then_some(Rgba(s.color.0, s.color.1, s.color.2, 120)),
+            stroke: Some(Stroke::solid(
+                s.line_color.unwrap_or(s.color),
+                s.series.line_width_pt.unwrap_or(2.25),
+            )),
+        });
+    }
 }
 
 fn draw_polyline(cv: &mut Canvas<'_>, pts: &[(f64, f64)], s: &Resolved) {

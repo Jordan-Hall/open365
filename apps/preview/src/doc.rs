@@ -4,6 +4,20 @@
 use open365_gfx::{Color, Decorations, DrawList, Rect, TextLayoutOptions};
 use open365_ui_core::Ui;
 
+// The Writer document pane (editable, paged) and the egui-free pieces of the egui Writer it
+// shares by path so the paragraph model cannot drift.
+#[path = "../../writer/src/blank.rs"]
+pub mod blank;
+#[path = "../../../crates/ui-egui/src/docmodel.rs"]
+pub mod docmodel;
+#[path = "../../../crates/ui-egui/src/parts.rs"]
+mod parts;
+#[path = "../../../crates/ui-egui/src/ruler.rs"]
+pub mod ruler;
+mod writer;
+
+pub use writer::{CanvasAccess, Format, Nav, PaintStats, PathChooser, Toggle, WriterPane};
+
 use crate::layout::PxRect;
 use crate::palette::Palette;
 use crate::spec::REF_SCALE;
@@ -183,7 +197,26 @@ pub struct SheetView<'a> {
     pub editing: bool,
 }
 
-/// The Sheets canvas: headers, grid lines, cell values and the active cell.
+/// Dashed outline of a rectangle (the fill preview).
+fn dashed(list: &mut DrawList, r: Rect, color: Color, dash: f32) {
+    let mut x = r.x0;
+    while x < r.x1 {
+        let e = (x + dash).min(r.x1);
+        list.fill_rect(Rect::from_edges(x, r.y0, e, r.y0 + 1.0), color);
+        list.fill_rect(Rect::from_edges(x, r.y1 - 1.0, e, r.y1), color);
+        x += dash * 2.0;
+    }
+    let mut y = r.y0;
+    while y < r.y1 {
+        let e = (y + dash).min(r.y1);
+        list.fill_rect(Rect::from_edges(r.x0, y, r.x0 + 1.0, e), color);
+        list.fill_rect(Rect::from_edges(r.x1 - 1.0, y, r.x1, e), color);
+        y += dash * 2.0;
+    }
+}
+
+/// The Sheets canvas: headers, grid lines with the sheet's own column widths and row heights,
+/// cell values, the selected range, the active cell and the resize or fill preview.
 pub fn paint_sheet(
     ui: &mut Ui,
     list: &mut DrawList,
@@ -193,83 +226,76 @@ pub fn paint_sheet(
     header: (i32, i32),
     view: &SheetView<'_>,
 ) {
-    let g = GridGeom::new(area, scale, header);
+    use crate::sheet::{Geo, Gesture};
+    let u = |v: i32| (v as f32 * scale / REF_SCALE).round();
     let model = view.model;
     let top_left = model.top_left;
-    let (active_row, active_col) = model.active;
-    let (row_header_w, col_header_h, col_w, row_h) =
-        (g.row_header_w, g.col_header_h, g.col_w, g.row_h);
+    let g = Geo::new(
+        (
+            area.x as f32,
+            area.y as f32,
+            area.right() as f32,
+            area.bottom() as f32,
+        ),
+        (u(header.0), u(header.1)),
+        scale,
+        model.geometry(),
+        top_left,
+    );
+    let (row_header_w, col_header_h) = (g.row_header_w, g.col_header_h);
+    let (x0, y0, x1, y1) = (g.x0, g.y0, g.x1, g.y1);
+    let (bx, by) = (x0 + row_header_w, y0 + col_header_h);
     list.push_clip(gr(area));
     list.fill_rect(gr(area), pal.cell_bg);
-    let (x0, y0, x1, y1) = (g.x0, g.y0, g.x1, g.y1);
-    list.fill_rect(
-        Rect::from_edges(x0, y0, x1, y0 + col_header_h),
-        pal.grid_header,
-    );
-    list.fill_rect(
-        Rect::from_edges(x0, y0, x0 + row_header_w, y1),
-        pal.grid_header,
-    );
+    list.fill_rect(Rect::from_edges(x0, y0, x1, by), pal.grid_header);
+    list.fill_rect(Rect::from_edges(x0, y0, bx, y1), pal.grid_header);
     let px = 12.0 * scale;
-    let cols = ((x1 - x0 - row_header_w) / col_w).ceil() as usize + 1;
-    let rows = ((y1 - y0 - col_header_h) / row_h).ceil() as usize + 1;
-    // Active cell: header highlight.
-    let (al, at, ar, ab) = g.cell(top_left, active_row, active_col);
-    list.fill_rect(
-        Rect::from_edges(al, y0, ar, y0 + col_header_h),
-        pal.grid_header_selected,
-    );
-    list.fill_rect(
-        Rect::from_edges(x0, at, x0 + row_header_w, ab),
-        pal.grid_header_selected,
-    );
-    list.fill_rect(
-        Rect::from_edges(al, y0 + col_header_h - 2.0, ar, y0 + col_header_h),
-        pal.grid_accent,
-    );
+    // The frozen columns and rows, then the scrolling ones up to one past the edge so a partly
+    // visible one is drawn.
+    let cols = g.drawn_cols();
+    let rows = g.drawn_rows();
+    let (r1, c1, r2, c2) = model.range();
+    // Header highlight for every selected column and row.
+    for &c in cols.iter().filter(|c| (c1..=c2).contains(c)) {
+        let (l, r) = (g.col_left(c).max(g.min_x(c)), g.col_right(c));
+        list.fill_rect(Rect::from_edges(l, y0, r, by), pal.grid_header_selected);
+        list.fill_rect(Rect::from_edges(l, by - 2.0, r, by), pal.grid_accent);
+    }
+    for &r in rows.iter().filter(|r| (r1..=r2).contains(r)) {
+        let (t, b) = (g.row_top(r).max(g.min_y(r)), g.row_bottom(r));
+        list.fill_rect(Rect::from_edges(x0, t, bx, b), pal.grid_header_selected);
+    }
     // Grid lines.
-    for c in 0..=cols {
-        let x = x0 + row_header_w + c as f32 * col_w - 1.0;
-        list.fill_rect(
-            Rect::from_edges(x, y0 + col_header_h, x + 1.0, y1),
-            pal.grid_line,
-        );
-        list.fill_rect(
-            Rect::from_edges(x, y0, x + 1.0, y0 + col_header_h),
-            pal.grid_header_border,
-        );
+    for &c in &cols {
+        let x = g.col_right(c) - 1.0;
+        list.fill_rect(Rect::from_edges(x, g.min_y(1), x + 1.0, y1), pal.grid_line);
+        list.fill_rect(Rect::from_edges(x, y0, x + 1.0, by), pal.grid_header_border);
     }
-    for r in 0..=rows {
-        let y = y0 + col_header_h + r as f32 * row_h - 1.0;
-        list.fill_rect(
-            Rect::from_edges(x0 + row_header_w, y, x1, y + 1.0),
-            pal.grid_line,
-        );
-        list.fill_rect(
-            Rect::from_edges(x0, y, x0 + row_header_w, y + 1.0),
-            pal.grid_header_border,
-        );
+    for &r in &rows {
+        let y = g.row_bottom(r) - 1.0;
+        list.fill_rect(Rect::from_edges(g.min_x(1), y, x1, y + 1.0), pal.grid_line);
+        list.fill_rect(Rect::from_edges(x0, y, bx, y + 1.0), pal.grid_header_border);
     }
-    for c in 0..cols {
-        let name = col_name(top_left.1 as usize - 1 + c);
+    for &c in &cols {
+        let name = col_name(c as usize - 1);
         let w = width(ui, &name, px);
-        let left = x0 + row_header_w + c as f32 * col_w;
-        let base = centred(ui, y0, y0 + col_header_h, px);
+        let (left, right) = (g.col_left(c).max(g.min_x(c)), g.col_right(c));
+        let base = centred(ui, y0, by, px);
         text(
             ui,
             list,
             &name,
-            (left + (col_w - w) / 2.0).floor(),
+            (left + (right - left - w) / 2.0).floor(),
             base,
             px,
             pal.grid_header_text,
         );
     }
-    for r in 0..rows {
-        let name = (top_left.0 as usize + r).to_string();
+    for &r in &rows {
+        let name = r.to_string();
         let w = width(ui, &name, px);
-        let top = y0 + col_header_h + r as f32 * row_h;
-        let base = centred(ui, top, top + row_h, px);
+        let (top, bottom) = (g.row_top(r).max(g.min_y(r)), g.row_bottom(r));
+        let base = centred(ui, top, bottom, px);
         text(
             ui,
             list,
@@ -282,16 +308,15 @@ pub fn paint_sheet(
     }
     // Cell values, clipped to the grid body and to their own cell.
     let cell_px = 15.0 * scale / 1.25;
-    for r in 0..rows {
-        for c in 0..cols {
-            let (row, col) = (top_left.0 + r as u32, top_left.1 + c as u32);
+    for &row in &rows {
+        for &col in &cols {
             if view.editing && (row, col) == model.active {
                 continue;
             }
             let Some((value, numeric)) = model.shown(row, col) else {
                 continue;
             };
-            let (left, top, right, bottom) = g.cell(top_left, row, col);
+            let (left, top, right, bottom) = g.cell(row, col);
             let base = centred(ui, top, bottom, cell_px);
             let w = width(ui, &value, cell_px);
             let tx = if numeric {
@@ -300,8 +325,8 @@ pub fn paint_sheet(
                 left + 4.0 * scale
             };
             list.push_clip(Rect::from_edges(
-                left.max(x0 + row_header_w),
-                top.max(y0 + col_header_h),
+                left.max(g.min_x(col)),
+                top.max(g.min_y(row)),
                 right - 1.0,
                 bottom - 1.0,
             ));
@@ -309,8 +334,80 @@ pub fn paint_sheet(
             list.pop_clip();
         }
     }
-    // Active cell outline.
-    let sel = Rect::from_edges(al - 1.0, at - 1.0, ar, ab);
-    list.rect_outline(sel, 2.0, pal.grid_accent);
+    // The split of frozen panes: a thin dark line along the frozen rows and columns.
+    let (fr, fc) = g.frozen();
+    let split = pal.cell_text.with_opacity(0.55);
+    if fc > 0 {
+        let x = g.scroll_x0() - 1.0;
+        list.fill_rect(Rect::from_edges(x, by, x + 1.0, y1), split);
+    }
+    if fr > 0 {
+        let y = g.scroll_y0() - 1.0;
+        list.fill_rect(Rect::from_edges(bx, y, x1, y + 1.0), split);
+    }
+    // The selected range: a light wash over the body, the active cell left clear.
+    list.push_clip(Rect::from_edges(bx, by, x1, y1));
+    let (rl, rt, rr, rb) = g.range_rect((r1, c1, r2, c2));
+    if (r1, c1) != (r2, c2) {
+        let wash = pal.grid_accent.with_opacity(0.12);
+        let (al, at, ar, ab) = g.cell(model.active.0, model.active.1);
+        for (l, t, r, b) in [
+            (rl, rt, rr, at),
+            (rl, ab, rr, rb),
+            (rl, at, al, ab),
+            (ar, at, rr, ab),
+        ] {
+            if r > l && b > t {
+                list.fill_rect(Rect::from_edges(l, t, r, b), wash);
+            }
+        }
+    }
+    let (al, at, ar, ab) = g.cell(model.active.0, model.active.1);
+    list.rect_outline(
+        Rect::from_edges(al - 1.0, at - 1.0, ar, ab),
+        2.0,
+        pal.grid_accent,
+    );
+    if (r1, c1) != (r2, c2) {
+        list.rect_outline(
+            Rect::from_edges(rl - 1.0, rt - 1.0, rr, rb),
+            2.0,
+            pal.grid_accent,
+        );
+    }
+    // Fill handle at the bottom right corner of the range.
+    let hs = (6.0 * scale / REF_SCALE).round().max(3.0);
+    list.fill_rect(
+        Rect::from_edges(
+            rr - hs / 2.0 - 1.0,
+            rb - hs / 2.0 - 1.0,
+            rr + hs / 2.0 - 1.0,
+            rb + hs / 2.0 - 1.0,
+        ),
+        pal.grid_accent,
+    );
+    // Previews of the gesture in progress.
+    match model.gesture {
+        Some(Gesture::ResizeCol { col, px: w, .. }) => {
+            let x = g.col_left(col) + (w as f32 * scale).round() - 1.0;
+            list.fill_rect(Rect::from_edges(x, y0, x + 1.0, y1), pal.cell_text);
+        }
+        Some(Gesture::ResizeRow { row, px: h, .. }) => {
+            let y = g.row_top(row) + (h as f32 * scale).round() - 1.0;
+            list.fill_rect(Rect::from_edges(x0, y, x1, y + 1.0), pal.cell_text);
+        }
+        Some(Gesture::Fill { to }) => {
+            let (fr1, fc1, fr2, fc2) = (r1.min(to.0), c1.min(to.1), r2.max(to.0), c2.max(to.1));
+            let (l, t, r, b) = g.range_rect((fr1, fc1, fr2, fc2));
+            dashed(
+                list,
+                Rect::from_edges(l, t, r, b),
+                pal.cell_text,
+                4.0 * scale,
+            );
+        }
+        _ => {}
+    }
+    list.pop_clip();
     list.pop_clip();
 }

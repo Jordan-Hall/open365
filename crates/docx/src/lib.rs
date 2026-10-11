@@ -47,7 +47,9 @@ mod track;
 mod xml;
 mod xmlq;
 
-pub use comments::{Comment, CommentAnchor, NewComment, Person};
+pub use comments::{
+    Comment, CommentAnchor, CommentStory, NewComment, Person, StoryAnchor, StoryPos,
+};
 pub use document::{Document, DocumentKind, DroppedItem, HygieneAction};
 pub use drawing::{
     Align, Drawing, EMU_PER_POINT, HorizontalRelativeFrom, ImagePart, Position, TextBox,
@@ -65,7 +67,7 @@ pub use fields_number::{NumberSymbols, format_picture as format_number_picture};
 pub use flatten::{FlatBlocks, SDT_END, SDT_START, flatten_content_controls, is_sdt_marker};
 pub use layout_props::{
     Ligatures, ParagraphBorders, ParagraphMark, ParagraphProps, RunLayoutProps, TabKind, TabLeader,
-    TabStop,
+    TabStop, VertAlign,
 };
 pub use model::{
     Block, Body, Break, BreakKind, Cell, DocChild, DocumentRoot, Group, Inline, Paragraph, Row,

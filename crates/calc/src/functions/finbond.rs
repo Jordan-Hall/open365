@@ -147,6 +147,17 @@ pub(super) fn coupon_date(maturity: i64, k: i64, step: i64, d1904: bool) -> Res<
         .ok_or(ErrorKind::Num)
 }
 
+/// The date `k * step` months before `anchor` with the day clamped to the month length and no end-of-month rule
+/// (`ODDLPRICE`/`ODDLYIELD` step forward from the last interest date this way, measured).
+pub(super) fn clamped_date(anchor: i64, k: i64, step: i64, d1904: bool) -> Res<i64> {
+    let (y, m, d) = ymd(anchor, d1904)?;
+    let total = y * 12 + (m - 1) - k * step;
+    let (ny, nm) = (total.div_euclid(12), total.rem_euclid(12) + 1);
+    ymd_to_serial(ny, nm, d.min(dim(ny, nm)), d1904)
+        .map(|s| s as i64)
+        .ok_or(ErrorKind::Num)
+}
+
 /// The coupon period around the settlement date.
 struct Coupon {
     pcd: i64,

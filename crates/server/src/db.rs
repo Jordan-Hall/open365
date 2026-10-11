@@ -7,7 +7,11 @@ use rusqlite::Connection;
 
 use crate::error::ApiResult;
 
-const MIGRATIONS: &[&str] = &[include_str!("../migrations/001_init.sql")];
+const MIGRATIONS: &[&str] = &[
+    include_str!("../migrations/001_init.sql"),
+    include_str!("../migrations/002_features.sql"),
+    include_str!("../migrations/003_recovery_codes.sql"),
+];
 
 #[derive(Debug)]
 pub struct Db {
@@ -16,6 +20,17 @@ pub struct Db {
 
 impl Db {
     pub fn open(path: &Path) -> ApiResult<Self> {
+        // Create the file private (0600 on Unix) before SQLite opens it; the WAL files follow the main file's mode.
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::OpenOptionsExt;
+            std::fs::OpenOptions::new()
+                .write(true)
+                .create(true)
+                .truncate(false)
+                .mode(0o600)
+                .open(path)?;
+        }
         let mut conn = Connection::open(path)?;
         conn.pragma_update(None, "journal_mode", "WAL")?;
         conn.pragma_update(None, "foreign_keys", "ON")?;

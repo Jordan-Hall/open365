@@ -435,6 +435,7 @@ fn matches_excel() {
     let mut by_category: BTreeMap<String, (u32, u64)> = BTreeMap::new(); // entries, largest ulp distance
     let mut over_budget = Vec::new();
     let mut dump = String::new();
+    let mut dump_unexpected = String::new();
 
     for case in &corpus.cases {
         let expected = answers[case.id.as_str()];
@@ -475,7 +476,7 @@ fn matches_excel() {
                 slot.0 += 1;
             }
             (None, Some(entry)) => {
-                // A nondeterministic case can match by chance; that is not a reason to drop it.
+                // A nondeterministic case can match by chance, so it counts as a pass, not as stale.
                 if entry.category.as_deref() == Some("nondeterministic") {
                     pass += 1;
                 } else {
@@ -513,6 +514,18 @@ fn matches_excel() {
             }
             (Some(detail), None) => {
                 slot.2 += 1;
+                // `OPEN365_DUMP_UNEXPECTED=<file>`: `id<TAB>ulp<TAB>detail` of every unexpected difference, the input for new
+                // known-difference entries.
+                let ulps = outcome
+                    .as_ref()
+                    .ok()
+                    .and_then(|o| mismatch_ulps(expected, o));
+                dump_unexpected.push_str(&format!(
+                    "{}\t{}\t{}\n",
+                    case.id,
+                    ulps.map_or_else(|| "-".to_owned(), |u| u.to_string()),
+                    detail.replace('\n', " ")
+                ));
                 unexpected.push(format!(
                     "{}  {}\n    formula: {}\n    {detail}",
                     case.id,
@@ -532,6 +545,9 @@ fn matches_excel() {
     println!("known differences by category (entries, largest ulp distance):");
     for (category, (entries, ulps)) in &by_category {
         println!("  {category:<18} {entries:>5} {ulps:>12}");
+    }
+    if let Ok(path) = std::env::var("OPEN365_DUMP_UNEXPECTED") {
+        fs::write(path, dump_unexpected).expect("write unexpected-difference dump");
     }
     if let Ok(path) = std::env::var("OPEN365_DUMP_KNOWN") {
         fs::write(path, dump).expect("write known-difference dump");

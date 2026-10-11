@@ -52,6 +52,7 @@ pub fn map_named(k: NamedKey) -> Option<Key> {
         NamedKey::PageDown => Key::PageDown,
         NamedKey::F2 => Key::F2,
         NamedKey::F10 => Key::F10,
+        NamedKey::F12 => Key::F12,
         NamedKey::Alt => Key::Alt,
         NamedKey::Shift => Key::Shift,
         NamedKey::Control => Key::Ctrl,

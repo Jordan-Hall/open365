@@ -44,6 +44,12 @@ pub struct MenuItem {
     /// Access key letter shown underlined in the label.
     pub access: Option<char>,
     pub submenu: Vec<MenuItem>,
+    /// Icon drawn in the cell left of the label.
+    pub icon: Option<open365_gfx::IconId>,
+    /// A group heading: not selectable, drawn as a caption above its group.
+    pub heading: bool,
+    /// A second, dimmer line under the label (a 60 u row).
+    pub detail: Option<String>,
 }
 
 impl MenuItem {
@@ -56,6 +62,40 @@ impl MenuItem {
             separator: false,
             access: None,
             submenu: Vec::new(),
+            icon: None,
+            heading: false,
+            detail: None,
+        }
+    }
+
+    /// A group heading: Office puts one above each group of a gallery or menu.
+    pub fn heading(label: &str) -> Self {
+        Self {
+            heading: true,
+            enabled: false,
+            ..Self::new("", label)
+        }
+    }
+
+    pub fn with_detail(mut self, detail: &str) -> Self {
+        self.detail = Some(detail.into());
+        self
+    }
+
+    /// Height of this row when it follows `prev` (`None` at the top).
+    pub fn height_after(&self, prev: Option<&MenuItem>) -> f32 {
+        if self.separator {
+            MENU_SEP_H
+        } else if self.heading {
+            // 37 u at the top or after a separator, 38 u after an item.
+            match prev {
+                Some(p) if !p.separator => MENU_HEADING_H + 0.8,
+                _ => MENU_HEADING_H,
+            }
+        } else if self.detail.is_some() {
+            MENU_DETAIL_H
+        } else {
+            MENU_ROW_H
         }
     }
 
@@ -64,6 +104,11 @@ impl MenuItem {
             separator: true,
             ..Self::new("", "")
         }
+    }
+
+    pub fn with_icon(mut self, icon: Option<open365_gfx::IconId>) -> Self {
+        self.icon = icon;
+        self
     }
 
     pub fn with_submenu(mut self, items: Vec<MenuItem>) -> Self {
@@ -77,6 +122,13 @@ impl MenuItem {
 /// and inset on every side, text 44 px from the row edge (after a 20 px icon cell).
 pub const MENU_ROW_H: f32 = 28.8;
 pub const MENU_SEP_H: f32 = 2.4;
+/// Group heading (37 u) and an item with a description line (60 u).
+pub const MENU_HEADING_H: f32 = 29.6;
+pub const MENU_DETAIL_H: f32 = 48.0;
+/// Rows of the combo lists Office measures: font names 33 u, font sizes 30 u (menu rows are
+/// [`MENU_ROW_H`]).
+pub const LIST_ROW_FONT_H: f32 = 26.4;
+pub const LIST_ROW_SIZE_H: f32 = 24.0;
 pub const MENU_PAD: f32 = 1.6;
 /// Left edge of the label in a menu row, from the row's own left edge.
 pub const MENU_TEXT_X: f32 = 35.2;
@@ -113,30 +165,28 @@ impl MenuState {
         Some(items)
     }
 
+    /// Row heights of `items`, top to bottom.
+    pub fn heights(items: &[MenuItem]) -> impl Iterator<Item = f32> + '_ {
+        items
+            .iter()
+            .enumerate()
+            .map(|(i, it)| it.height_after(i.checked_sub(1).map(|p| &items[p])))
+    }
+
     /// Height of a panel showing `items`.
     pub fn panel_height(items: &[MenuItem]) -> f32 {
-        MENU_PAD * 2.0
-            + items
-                .iter()
-                .map(|i| if i.separator { MENU_SEP_H } else { MENU_ROW_H })
-                .sum::<f32>()
+        MENU_PAD * 2.0 + Self::heights(items).sum::<f32>()
     }
 
     /// Top of row `index` inside its panel.
     pub fn row_top(items: &[MenuItem], index: usize) -> f32 {
-        MENU_PAD
-            + items
-                .iter()
-                .take(index)
-                .map(|i| if i.separator { MENU_SEP_H } else { MENU_ROW_H })
-                .sum::<f32>()
+        MENU_PAD + Self::heights(items).take(index).sum::<f32>()
     }
 
     /// The row under panel-relative `y`.
     pub fn row_at(items: &[MenuItem], y: f32) -> Option<usize> {
         let mut top = MENU_PAD;
-        for (i, it) in items.iter().enumerate() {
-            let h = if it.separator { MENU_SEP_H } else { MENU_ROW_H };
+        for (i, h) in Self::heights(items).enumerate() {
             if y >= top && y < top + h {
                 return Some(i);
             }
@@ -298,6 +348,15 @@ pub enum Content {
     TextOnly,
 }
 
+/// Row height of an open Dropdown or Combo list.
+pub fn list_row_h(look: &Look) -> f32 {
+    if look.list_row > 0.0 {
+        look.list_row
+    } else {
+        MENU_ROW_H
+    }
+}
+
 /// Appearance beyond what the widget kind implies. All fields are optional so existing code
 /// keeps its look.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -334,6 +393,11 @@ pub struct Look {
     pub bar: Option<(open365_gfx::Color, f32)>,
     /// A drop-down chevron after the label (menu buttons).
     pub chevron: bool,
+    /// A label followed by a pill switch drawn in our own style (`Some(on)`), as the AutoSave
+    /// switch of the title bar.
+    pub switch: Option<bool>,
+    /// Row height of the list a Dropdown or Combo opens, logical units; 0 is [`MENU_ROW_H`].
+    pub list_row: f32,
 }
 
 impl Default for Look {
@@ -358,6 +422,8 @@ impl Default for Look {
             hover_rgb: None,
             bar: None,
             chevron: false,
+            switch: None,
+            list_row: 0.0,
         }
     }
 }
@@ -616,7 +682,7 @@ impl Tree {
                     r.x,
                     r.bottom(),
                     r.w,
-                    items.len() as f32 * MENU_ROW_H + MENU_PAD * 2.0,
+                    items.len() as f32 * list_row_h(&n.look) + MENU_PAD * 2.0,
                 ));
             }
             _ => {}
@@ -791,6 +857,32 @@ mod tests {
 
     fn button(x: f32, y: f32, w: f32, h: f32) -> Node {
         Node::new(Widget::Button { toggled: None }, Rect::new(x, y, w, h))
+    }
+
+    #[test]
+    fn menu_row_heights_follow_the_measured_spec() {
+        // 36 u item, 37 u heading at the top, 38 u after an item, 60 u with a description,
+        // 3 u separator (125 %, logical = u / 1.25).
+        let items = vec![
+            MenuItem::heading("Group"),
+            MenuItem::new("a", "A"),
+            MenuItem::heading("Next"),
+            MenuItem::new("b", "B").with_detail("Describes B"),
+            MenuItem::separator(),
+            MenuItem::heading("After rule"),
+        ];
+        let h: Vec<f32> = MenuState::heights(&items).collect();
+        let u: Vec<f32> = h.iter().map(|v| (v * 1.25).round()).collect();
+        assert_eq!(u, vec![37.0, 36.0, 38.0, 60.0, 3.0, 37.0]);
+        assert!(
+            (MenuState::panel_height(&items) - (MENU_PAD * 2.0 + h.iter().sum::<f32>())).abs()
+                < 1e-4
+        );
+        assert_eq!(MenuState::row_at(&items, MENU_PAD + 1.0), Some(0));
+        assert!(!items[0].enabled && items[0].heading);
+        assert_eq!((LIST_ROW_FONT_H * 1.25).round(), 33.0);
+        assert_eq!((LIST_ROW_SIZE_H * 1.25).round(), 30.0);
+        assert_eq!((MENU_ROW_H * 1.25).round(), 36.0);
     }
 
     #[test]

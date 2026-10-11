@@ -147,6 +147,13 @@ pub struct DisplayList {
     pub plot_outer: Rect,
     pub legend: Option<Rect>,
     pub title: Option<Rect>,
+    /// The resolved value axis scale of a cartesian chart (the Y axis of scatter and bubble).
+    pub value_scale: Option<crate::axis::AxisScale>,
+    /// The resolved X axis scale of a scatter or bubble chart.
+    pub x_scale: Option<crate::axis::AxisScale>,
+    /// The automatic scale of a date category axis (`c:dateAx`) over the first series'
+    /// numeric categories; the points are still laid out as evenly spaced categories.
+    pub date_scale: Option<crate::axis::DateScale>,
 }
 
 /// Measures text. Supply real font metrics for exact layout; [`ApproxMeasure`] needs none.

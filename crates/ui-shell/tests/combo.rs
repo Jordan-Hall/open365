@@ -1,5 +1,10 @@
 //! The editable Font box of both applications: typing, inline auto-complete, Enter commits through the host and
 //! Escape cancels (the same code serves the Font Size box and Sheets' Number Format).
+//!
+//! The rig installs the UI font. egui's `Galley::clamp_cursor` clamps every cursor to the glyphs of the laid-out
+//! row, so a headless harness without a font (this workspace builds egui without its default fonts) has rows with
+//! no glyphs and resets the text cursor to index 0 on the frame after every edit. That was the "next letter lands
+//! at index 0" bug seen after an inline completion: a test-harness artefact, not a `TextEditState` defect.
 
 use egui::{Event, Key, Modifiers, PointerButton, Pos2, pos2, vec2};
 use egui_kittest::Harness;
@@ -40,8 +45,7 @@ impl ShellHost for Host {
                 .collect()
         })
     }
-    /// An empty box: the editor then starts with nothing to replace (headless egui collapses a selection on the
-    /// next frame because no IME owns the text edit, so a select-all start state cannot be observed here).
+    /// An empty box: the editor starts with nothing to replace.
     fn value(&self, id: &str) -> Option<String> {
         (id == ID).then(String::new)
     }
@@ -63,6 +67,7 @@ fn rig(kind: AppKind) -> Rig {
         |ui, (shell, host): &mut (Shell, Host)| shell.show(ui, host),
         (Shell::new(kind, Mode::Dark), Host::default()),
     );
+    open365_ui_shell::fonts::install(&h.ctx);
     h.run();
     h
 }
@@ -183,5 +188,47 @@ fn escape_cancels_without_running_anything() {
         assert!(h.state().1.ran.is_empty(), "{kind:?}");
         assert!(h.state().0.combo_edit().is_none(), "{kind:?}");
         assert!(h.state().1.closed > 0, "{kind:?}");
+    });
+}
+
+#[test]
+fn a_second_letter_continues_the_completion_instead_of_landing_at_index_zero() {
+    each_app(|kind| {
+        let mut h = rig(kind);
+        click(&mut h, font_box(kind));
+        type_chars(&mut h, "C");
+        assert_eq!(edited(&h).as_deref(), Some("Calibri"), "{kind:?}");
+        // The completed suffix is selected; the next letter replaces it and completes again.
+        type_chars(&mut h, "a");
+        assert_eq!(edited(&h).as_deref(), Some("Calibri"), "Ca, {kind:?}");
+        type_chars(&mut h, "m");
+        assert_eq!(edited(&h).as_deref(), Some("Cambria"), "Cam, {kind:?}");
+        type_chars(&mut h, "x");
+        assert_eq!(
+            edited(&h).as_deref(),
+            Some("Camx"),
+            "no match keeps the typing, {kind:?}"
+        );
+    });
+}
+
+#[test]
+fn the_caret_survives_idle_frames_after_a_completion() {
+    each_app(|kind| {
+        let mut h = rig(kind);
+        click(&mut h, font_box(kind));
+        type_chars(&mut h, "C");
+        for _ in 0..5 {
+            h.step();
+        }
+        let id = egui::Id::new(("combo-edit", ID));
+        let range = egui::TextEdit::load_state(&h.ctx, id)
+            .and_then(|s| s.cursor.char_range())
+            .map(|r| (r.secondary.index.0, r.primary.index.0));
+        assert_eq!(
+            range,
+            Some((1, 7)),
+            "typed part kept, suffix selected, {kind:?}"
+        );
     });
 }

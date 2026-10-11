@@ -13,8 +13,8 @@ use std::sync::Arc;
 use open365_gfx::{DrawList, IconId, Rect as GRect};
 use open365_ui_core::geom::{Point, Rect};
 use open365_ui_core::{
-    Content, Emit, InputEvent, Look, MenuState, Node, NodeId, TabItem, TextEdit, Tip, Token, Ui,
-    Widget,
+    Content, Emit, InputEvent, Key, Look, MenuState, Node, NodeId, TabItem, TextEdit, Tip, Token,
+    Ui, Widget,
 };
 
 use crate::layout::{self, LayoutInput, PlacedChrome, PlacedControl, PlacedGroup, PxRect};
@@ -25,6 +25,7 @@ use crate::spec::{AppSpec, Control, Kind, REF_SCALE, Scale as GroupScale, Size};
 use crate::{AppKind, doc, icons};
 
 mod grid;
+mod share;
 
 /// What the window should do after a widget event.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -100,6 +101,11 @@ pub struct Shell {
     sheet: SheetModel,
     editor: Option<grid::Editor>,
     grid_ids: Vec<NodeId>,
+    /// The Writer document (Writer only); `None` shows the placeholder page.
+    writer: Option<doc::WriterPane>,
+    refocus_doc: bool,
+    share: Option<share::ShareDialog>,
+    share_o: (i32, i32),
     canvas: Option<NodeId>,
 }
 
@@ -110,6 +116,27 @@ impl std::fmt::Debug for Shell {
             .field("tab", &self.tab)
             .finish_non_exhaustive()
     }
+}
+
+/// The menu items that carry an icon: the last dotted segment of the item id, and the Tabler
+/// icon it shows. Every name must be in the icon table (see the `menu_icons_resolve` test).
+pub(crate) const MENU_ICONS: &[(&str, &str)] = &[
+    ("paste", "clipboard"),
+    ("values", "numbers"),
+    ("formatting", "paint"),
+    ("link", "link"),
+    ("special", "clipboard"),
+    ("az", "sort-ascending-letters"),
+    ("za", "sort-descending-letters"),
+    ("filter", "filter"),
+    ("invite", "users"),
+    ("send", "mail-forward"),
+    ("commands", "dots"),
+    ("more", "dots"),
+];
+
+fn menu_icon_name(tail: &str) -> Option<&'static str> {
+    MENU_ICONS.iter().find(|(k, _)| *k == tail).map(|(_, v)| *v)
 }
 
 const TOGGLE_IDS: [&str; 8] = [
@@ -139,7 +166,7 @@ impl Shell {
             inset: (0, 0, 0, 0),
             tab: 0,
             ribbon_open: true,
-            formula_expanded: false,
+            formula_expanded: kind == AppKind::Sheets,
             ribbon_scroll: 0,
             backstage: None,
             group_popup: None,
@@ -156,6 +183,10 @@ impl Shell {
             sheet: SheetModel::blank(),
             editor: None,
             grid_ids: Vec::new(),
+            writer: None,
+            refocus_doc: false,
+            share: None,
+            share_o: (0, 0),
             canvas: None,
         }
     }
@@ -164,7 +195,41 @@ impl Shell {
         &self.spec
     }
 
+    pub fn set_writer(&mut self, ui: &mut Ui, pane: doc::WriterPane) {
+        self.writer = Some(pane);
+        self.build_doc(ui);
+        self.sync_history(ui);
+    }
+
+    pub fn writer(&self) -> Option<&doc::WriterPane> {
+        self.writer.as_ref()
+    }
+
+    pub fn writer_mut(&mut self) -> Option<&mut doc::WriterPane> {
+        self.writer.as_mut()
+    }
+
+    /// (Re)creates the document canvas node over the content area, or removes it under Backstage.
+    pub(super) fn build_doc(&mut self, ui: &mut Ui) {
+        let covered = self.backstage.is_some()
+            || self.share.is_some()
+            || self.content.w <= 0
+            || self.content.h <= 0;
+        let (area, scale, zoom, root) =
+            (self.content, self.scale, self.zoom / 100.0, ui.tree.root());
+        if let Some(p) = self.writer.as_mut() {
+            if covered {
+                p.release(ui);
+            } else {
+                p.build(ui, root, area, scale, zoom);
+            }
+        }
+    }
+
     pub fn title(&self) -> String {
+        if let Some(p) = self.writer.as_ref() {
+            return p.title();
+        }
         let doc = match self.kind {
             AppKind::Writer => "Document1 - Word",
             AppKind::Sheets => "Book1 - Excel",
@@ -376,6 +441,8 @@ impl Shell {
         }
         self.sync_bars(ui);
         self.build_grid(ui);
+        self.build_doc(ui);
+        self.sync_history(ui);
         self.refresh_hover(ui);
     }
 
@@ -387,6 +454,7 @@ impl Shell {
         self.build_body_with(ui, &lay);
         self.sync_bars(ui);
         self.build_grid(ui);
+        self.build_doc(ui);
         self.refresh_hover(ui);
     }
 
@@ -802,8 +870,9 @@ impl Shell {
                 Act::Menu(c.id.clone()),
             ),
             _ => {
-                let label = if c.id.contains("autosave") {
-                    "AutoSave  Off"
+                let autosave = c.id.contains("autosave");
+                let label = if autosave {
+                    "AutoSave"
                 } else {
                     c.label.as_str()
                 };
@@ -821,6 +890,7 @@ impl Shell {
                         } else {
                             Content::TextOnly
                         },
+                        switch: autosave.then_some(false),
                         ..Look::default()
                     },
                     Act::Cmd(c.id.clone()),
@@ -1177,6 +1247,9 @@ impl Shell {
         if let Some(sel) = self.backstage {
             self.build_backstage(ui, sel);
         }
+        if self.share.is_some() {
+            self.build_share(ui);
+        }
         let menu = Node::new(
             Widget::Menu(MenuState::new(Vec::new())),
             Rect::new(0.0, 0.0, 240.0, 0.0),
@@ -1417,18 +1490,9 @@ impl Shell {
                     look.chevron = true;
                     // Office shows the label only when icon, label and chevron fit; Fill, Clear and
                     // Orientation (50 u wide) are icon and chevron only.
-                    let label_w = ui
-                        .assets
-                        .layout_text(
-                            ui.font,
-                            &c.label,
-                            13.0 * s / REF_SCALE,
-                            0.0,
-                            0.0,
-                            open365_gfx::TextLayoutOptions::default(),
-                        )
-                        .width;
-                    let chrome_w = (self.px(5 + 20 + 6 + 8 + 14 + 5)) as f32;
+                    // Measured at the size the face paints at, so a label that is shown is whole.
+                    let label_w = ui.measure(&c.label);
+                    let chrome_w = (self.px(4 * 2 + 16 + 4 + 12)) as f32;
                     let fits = label_w + chrome_w <= pc.rect.w as f32;
                     if look.content == Content::IconBeside && !fits {
                         look.content = Content::IconOnly;
@@ -1465,7 +1529,15 @@ impl Shell {
                         open: false,
                     },
                     &c.label,
-                    Look::default(),
+                    Look {
+                        // Office's lists: font names 33 u rows, sizes 30 u (menu rows 36 u).
+                        list_row: match tail.as_str() {
+                            "font" => open365_ui_core::LIST_ROW_FONT_H,
+                            "font-size" => open365_ui_core::LIST_ROW_SIZE_H,
+                            _ => 0.0,
+                        },
+                        ..Look::default()
+                    },
                     act,
                 )
             }
@@ -1521,11 +1593,17 @@ impl Shell {
                     },
                     Act::Inert,
                 );
-                self.gallery_cells(ui, id, origin, pc.rect);
+                self.gallery_cells(ui, id, origin, pc.rect, &c.id);
                 id
             }
             _ => {
-                let toggled = TOGGLE_IDS.contains(&tail.as_str()).then_some(false);
+                let toggled = (TOGGLE_IDS.contains(&tail.as_str())
+                    || (self.kind == AppKind::Writer
+                        && matches!(
+                            tail.as_str(),
+                            "align-left" | "centre" | "align-right" | "justify"
+                        )))
+                .then_some(false);
                 self.add(
                     ui,
                     parent,
@@ -1547,10 +1625,26 @@ impl Shell {
     }
 
     /// Sample cells of a gallery (styles, themes) and its scroll strip.
-    fn gallery_cells(&mut self, ui: &mut Ui, gallery: NodeId, origin: (i32, i32), r: PxRect) {
+    fn gallery_cells(
+        &mut self,
+        ui: &mut Ui,
+        gallery: NodeId,
+        origin: (i32, i32),
+        r: PxRect,
+        gallery_id: &str,
+    ) {
         let strip = self.px(18);
         let cells = 4;
         let cell_w = ((r.w - strip - self.px(4)) / cells).max(1);
+        // The Writer style gallery applies the built-in styles; other galleries are samples.
+        const STYLES: [(&str, &str); 4] = [
+            ("normal", "Normal"),
+            ("no-spacing", "No Spacing"),
+            ("heading-1", "Heading 1"),
+            ("heading-2", "Heading 2"),
+        ];
+        let styles =
+            self.kind == AppKind::Writer && (gallery_id.ends_with("styles.gallery") || r.w < 700);
         for i in 0..cells {
             let cell = PxRect {
                 x: r.x + self.px(2) + i * cell_w,
@@ -1558,7 +1652,8 @@ impl Shell {
                 w: cell_w - self.px(2),
                 h: r.h - self.px(4),
             };
-            self.add(
+            let style = styles.then(|| STYLES[i as usize]);
+            let id = self.add(
                 ui,
                 gallery,
                 origin,
@@ -1569,8 +1664,14 @@ impl Shell {
                     content: Content::TextOnly,
                     ..Look::default()
                 },
-                Act::Inert,
+                match style {
+                    Some((slug, _)) => Act::Cmd(format!("home.styles.{slug}")),
+                    None => Act::Inert,
+                },
             );
+            if let (Some((_, name)), Some(n)) = (style, ui.tree.get_mut(id)) {
+                n.tooltip = Some(name.to_owned());
+            }
         }
         let third = (r.h - self.px(4)) / 3;
         for (i, icon) in ["chevron-up", "chevron-down", "dots"].iter().enumerate() {
@@ -1745,6 +1846,18 @@ impl Shell {
 
     // ---- menus -----------------------------------------------------------------------------
 
+    /// Menu icons (Tabler) by the tail of the command id.
+    fn give_icons(&self, items: &mut [open365_ui_core::MenuItem]) {
+        for it in items {
+            let tail = it.id.rsplit('.').next().unwrap_or(&it.id);
+            let name = menu_icon_name(tail);
+            if it.icon.is_none() {
+                it.icon = name.and_then(|n| self.icon(n));
+            }
+            self.give_icons(&mut it.submenu);
+        }
+    }
+
     fn open_menu(&mut self, ui: &mut Ui, owner: NodeId, id: &str) {
         let Some(menu) = self.roles.menu else { return };
         let label = ui
@@ -1752,7 +1865,8 @@ impl Shell {
             .get(owner)
             .map(|n| n.label.clone())
             .unwrap_or_default();
-        let items = menus::items_for(id, &label);
+        let mut items = menus::items_for(id, &label);
+        self.give_icons(&mut items);
         let widest = items
             .iter()
             .map(|i| ui.measure(&i.label) / ui.scale.0)
@@ -1784,6 +1898,9 @@ impl Shell {
             closed = true;
         }
         if self.backstage.take().is_some() {
+            closed = true;
+        }
+        if self.close_share() {
             closed = true;
         }
         if closed {
@@ -1853,6 +1970,40 @@ impl Shell {
             if self.kind == AppKind::Sheets && self.grid_event(ui, &ev) {
                 continue;
             }
+            if let Emit::KeyPressed(n, Key::Char(c), m) = &ev
+                && m.ctrl
+                && matches!(c.to_ascii_uppercase(), 'Z' | 'Y')
+                && self.writer.as_ref().is_some_and(|p| p.canvas() == Some(*n))
+            {
+                self.history(ui, c.eq_ignore_ascii_case(&'Z'));
+                continue;
+            }
+            if let Emit::KeyPressed(_, Key::Char(c), m) = &ev
+                && m.ctrl
+                && !m.alt
+                && !m.shift
+                && c.eq_ignore_ascii_case(&'f')
+                && let Some(p) = self.writer.as_mut()
+            {
+                p.find_open();
+                self.refocus_doc = true;
+                continue;
+            }
+            if let Some(p) = self.writer.as_mut() {
+                let consumed = match &ev {
+                    Emit::CanvasAction(n, req) if Some(*n) == p.canvas() => {
+                        p.accessibility_action(req);
+                        true
+                    }
+                    _ => p.handle(ui, &ev),
+                };
+                if let Some(z) = p.take_zoom_change() {
+                    self.set_zoom(ui, z);
+                }
+                if consumed {
+                    continue;
+                }
+            }
             match ev {
                 Emit::TabSelected(_, i) => {
                     if !self.ribbon_open {
@@ -1868,9 +2019,14 @@ impl Shell {
                 }
                 Emit::MenuRequested(n) => {
                     if let Some(Act::Cmd(id) | Act::Menu(id)) = self.acts.get(&n).cloned() {
+                        if id == "share" {
+                            self.open_share(ui);
+                            continue;
+                        }
                         self.open_menu(ui, n, &id);
                     }
                 }
+                Emit::MenuCommand(_, id) if id.starts_with("share.") => self.open_share(ui),
                 Emit::MenuCommand(_, id) => self.run(&id, &mut out),
                 Emit::TextChanged(n, t) => {
                     if Some(n) == self.roles.formula {
@@ -1886,6 +2042,8 @@ impl Shell {
                     } else if Some(n) == self.roles.formula {
                         self.formula = t;
                         self.run("formula.enter", &mut out);
+                    } else if let Some(Act::Cmd(id)) = self.acts.get(&n).cloned() {
+                        self.run(&format!("{id}={t}"), &mut out);
                     }
                 }
                 Emit::ValueChanged(n, v) => {
@@ -1903,14 +2061,137 @@ impl Shell {
                 | Emit::KeyPressed(..)
                 | Emit::CanvasText(..)
                 | Emit::CanvasIme(..)
+                | Emit::CanvasWheel { .. }
+                | Emit::CanvasDrag { .. }
+                | Emit::CanvasRelease { .. }
+                | Emit::CanvasAction(..)
                 | Emit::CanvasPointer { .. } => {}
             }
         }
+        self.sync_writer_state(ui);
+        self.sync_history(ui);
         out
+    }
+
+    /// Undo (`true`) or redo through the command history, in both apps.
+    pub fn history(&mut self, ui: &mut Ui, undo: bool) {
+        if self.kind == AppKind::Sheets {
+            let ok = if undo {
+                self.sheet.undo()
+            } else {
+                self.sheet.redo()
+            };
+            if ok {
+                self.editor = None;
+                self.sync_bars(ui);
+                self.build_grid(ui);
+            }
+        } else if let Some(p) = self.writer.as_mut() {
+            if undo {
+                p.undo();
+            } else {
+                p.redo();
+            }
+            self.refocus_doc = true;
+        }
+        self.sync_history(ui);
+    }
+
+    /// Whether Undo and Redo have something to do, as the command history reports it.
+    pub fn history_state(&mut self) -> (bool, bool) {
+        match self.kind {
+            AppKind::Sheets => (self.sheet.can_undo(), self.sheet.can_redo()),
+            AppKind::Writer => match self.writer.as_ref() {
+                Some(p) => (p.can_undo(), p.can_redo()),
+                None => (false, false),
+            },
+        }
+    }
+
+    /// Greys the Undo and Redo buttons of the quick access toolbar when there is nothing to do.
+    pub fn sync_history(&mut self, ui: &mut Ui) {
+        let (undo, redo) = self.history_state();
+        for (node, act) in &self.acts {
+            let Act::Cmd(id) = act else { continue };
+            let on = match id.as_str() {
+                "qat.undo" => undo,
+                "qat.redo" => redo,
+                _ => continue,
+            };
+            if let Some(n) = ui.tree.get_mut(*node) {
+                n.enabled = on;
+            }
+        }
+    }
+
+    /// Reflects the caret's formatting in the ribbon (toggle buttons, font and size boxes) and
+    /// returns the keyboard focus to the document after a ribbon command.
+    pub fn sync_writer_state(&mut self, ui: &mut Ui) {
+        let Some(p) = self.writer.as_ref() else {
+            return;
+        };
+        use doc::Toggle;
+        let font = p.font_state();
+        let align = p.alignment_state();
+        let flags = [
+            ("home.font.bold", p.toggle_state(Toggle::Bold)),
+            ("home.font.italic", p.toggle_state(Toggle::Italic)),
+            ("home.font.underline", p.toggle_state(Toggle::Underline)),
+            ("home.font.strikethrough", p.toggle_state(Toggle::Strike)),
+        ];
+        let aligns = [
+            ("home.paragraph.align-left", open365_docx::Alignment::Left),
+            ("home.paragraph.centre", open365_docx::Alignment::Center),
+            ("home.paragraph.align-right", open365_docx::Alignment::Right),
+            ("home.paragraph.justify", open365_docx::Alignment::Justify),
+        ];
+        let ruler = p.ruler();
+        let focused = ui.focus();
+        for (node, act) in &self.acts {
+            let Act::Cmd(id) = act else { continue };
+            let Some(n) = ui.tree.get_mut(*node) else {
+                continue;
+            };
+            match &mut n.widget {
+                Widget::Checkbox { checked } if id == "view.show.ruler" => *checked = ruler,
+                Widget::Button { toggled: Some(t) } => {
+                    if let Some((_, v)) = flags.iter().find(|(k, _)| k == id) {
+                        *t = *v;
+                    } else if let Some((_, a)) = aligns.iter().find(|(k, _)| k == id) {
+                        *t = align == Some(*a);
+                    }
+                }
+                Widget::Combo { edit, .. } if focused != Some(*node) => {
+                    if let Some((name, size)) = &font {
+                        let text = match id.as_str() {
+                            "home.font.font" => Some(name.clone()),
+                            "home.font.font-size" => Some(if size.fract() == 0.0 {
+                                format!("{}", *size as i32)
+                            } else {
+                                format!("{size}")
+                            }),
+                            _ => None,
+                        };
+                        if let Some(t) = text
+                            && edit.text != t
+                        {
+                            edit.text = t;
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
+        if std::mem::take(&mut self.refocus_doc)
+            && let Some(c) = self.writer.as_ref().and_then(doc::WriterPane::canvas)
+        {
+            ui.set_focus(Some(c));
+        }
     }
 
     fn set_zoom(&mut self, ui: &mut Ui, z: f32) {
         self.zoom = z.clamp(10.0, 400.0);
+        self.build_doc(ui);
         if let Some(n) = self.roles.zoom_label.and_then(|id| ui.tree.get_mut(id)) {
             n.label = format!("{}%", self.zoom as i32);
         }
@@ -1926,6 +2207,24 @@ impl Shell {
     }
 
     fn run(&mut self, id: &str, out: &mut Vec<WinAct>) {
+        if let Some(p) = self.writer.as_mut() {
+            match id {
+                "view.show.ruler" => {
+                    let on = !p.ruler();
+                    p.set_ruler(on);
+                    self.refocus_doc = true;
+                }
+                "home.editing.find" => {
+                    p.find_open();
+                    self.refocus_doc = true;
+                }
+                _ => {}
+            }
+        }
+        if let (Some(p), Some(f)) = (self.writer.as_mut(), doc::Format::from_ribbon(id)) {
+            p.format(f);
+            self.refocus_doc = true;
+        }
         self.note = id.to_owned();
         out.push(WinAct::Title(self.title()));
     }
@@ -1935,6 +2234,17 @@ impl Shell {
             return;
         };
         match act {
+            Act::Cmd(id) if id.starts_with("share.dialog.") => {
+                if self.share_action(ui, n, &id) {
+                    self.close_share();
+                    self.build_body(ui);
+                }
+            }
+            Act::Menu(id) if id == "share" => self.open_share(ui),
+            Act::Cmd(id) if id == "qat.undo" || id == "qat.redo" || id == "qat.redoorrepeat" => {
+                self.history(ui, id == "qat.undo");
+                out.push(WinAct::Title(self.title()));
+            }
             Act::Cmd(id) => {
                 if self.group_popup.is_some() {
                     self.group_popup = None;
@@ -2012,16 +2322,22 @@ impl Shell {
             return;
         }
         match self.kind {
-            AppKind::Writer => {
-                doc::paint_writer(
+            AppKind::Writer => match self.writer.as_mut() {
+                Some(p) => {
+                    p.paint(ui, list, &self.pal, std::time::Instant::now());
+                    if let (Some(id), Some(a)) = (p.canvas(), p.access()) {
+                        ui.set_canvas_access(id, a.node, a.nodes);
+                    }
+                }
+                None => doc::paint_writer(
                     ui,
                     list,
                     self.content,
                     &self.pal,
                     self.scale,
                     self.zoom / 100.0,
-                );
-            }
+                ),
+            },
             AppKind::Sheets => {
                 let hdr = (
                     self.spec.row_header_w.unwrap_or(34),

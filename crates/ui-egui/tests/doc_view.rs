@@ -23,10 +23,10 @@ fn fixture(rel: &str) -> PathBuf {
 }
 
 fn harness_for(target: Target) -> Harness<'static, State> {
-    let state = State {
-        view: DocView::new(),
-        target,
-    };
+    // These tests are about layout and paint; background proofing would keep requesting repaints.
+    let mut view = DocView::new();
+    view.proof_mut().enabled = false;
+    let state = State { view, target };
     let mut h = Harness::builder()
         .with_size(vec2(1100.0, 800.0))
         .build_ui_state(

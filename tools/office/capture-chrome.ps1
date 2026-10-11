@@ -140,6 +140,9 @@ function Invoke-Capture([string]$Which) {
       # rendering of the same glyphs can be compared. Our own workbook only; it is never saved.
       $ws = $office.ActiveSheet
       $ws.Range('B2:B6').Value2 = 'The quick brown fox jumps over the lazy dog 0123456789'
+      # Rows 2-3 and 4-5 in Segoe UI 11 and 9 pt (a font the fit can load); row 6 keeps the default font.
+      $ws.Range('B2:B3').Font.Name = 'Segoe UI'; $ws.Range('B2:B3').Font.Size = 11
+      $ws.Range('B4:B5').Font.Name = 'Segoe UI'; $ws.Range('B4:B5').Font.Size = 9
       $shape = $ws.Shapes.AddTextbox(1, 400, 30, 420, 120)
       $shape.TextFrame2.TextRange.Text = "The quick brown fox jumps over the lazy dog 0123456789`rHamburgefonstiv, Rhythm and Blues"
       $shape.TextFrame2.TextRange.Font.Size = 11

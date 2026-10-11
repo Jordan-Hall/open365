@@ -8,7 +8,7 @@
       { "keep": 0, "width": 35, "min_rest": 0 }
     ],
     "min_w": 78,
-    "search": { "box_min_cw": 1007, "ratio_pct": 27, "max_w": 460, "pin_x": 493, "gap": 10, "button_w": 58, "button_y": 7, "button_h": 46 }
+    "search": { "box_min_cw": 1032, "ratio_pct": 27, "max_w": 460, "pin_x": 501, "gap": 10, "button_w": 58, "button_y": 7, "button_h": 46 }
   },
   "tabs": {
     "gap": 1,

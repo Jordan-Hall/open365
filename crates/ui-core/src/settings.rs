@@ -112,6 +112,52 @@ impl PlatformSettings {
     }
 }
 
+/// The regional settings of the signed-in person (`HKCU\Control Panel\International`), read
+/// only: the language tag and the short date and time patterns they may have customised.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct OsLocale {
+    /// `en-GB`.
+    pub name: Option<String>,
+    /// `dd/MM/yyyy`.
+    pub short_date: Option<String>,
+    /// `HH:mm:ss`.
+    pub time: Option<String>,
+}
+
+/// Reads the regional settings; empty off Windows.
+pub fn os_locale() -> OsLocale {
+    os_locale_impl()
+}
+
+#[cfg(windows)]
+fn os_locale_impl() -> OsLocale {
+    use windows_registry::CURRENT_USER;
+    let Ok(key) = CURRENT_USER.open(r"Control Panel\International") else {
+        return OsLocale::default();
+    };
+    let get = |n: &str| key.get_string(n).ok().filter(|v| !v.is_empty());
+    OsLocale {
+        name: get("LocaleName"),
+        short_date: get("sShortDate"),
+        time: get("sTimeFormat"),
+    }
+}
+
+#[cfg(not(windows))]
+fn os_locale_impl() -> OsLocale {
+    let tag = ["LC_ALL", "LC_TIME", "LANG"]
+        .iter()
+        .find_map(|k| std::env::var(k).ok())
+        .and_then(|v| {
+            let base = v.split(['.', '@']).next()?.replace('_', "-");
+            (base.len() >= 2 && base != "C" && base != "POSIX").then_some(base)
+        });
+    OsLocale {
+        name: tag,
+        ..OsLocale::default()
+    }
+}
+
 #[cfg(windows)]
 fn read_impl() -> PlatformSettings {
     use windows_registry::CURRENT_USER;

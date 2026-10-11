@@ -104,8 +104,6 @@ pub struct Face {
     /// The face itself is bold / italic; when false, bold is faked by overstrike and italic
     /// by egui's slant.
     pub real_bold: bool,
-    // Unused since the document view draws layout glyphs (glyphs.rs); delete with the grid's last use.
-    #[allow(dead_code)]
     pub real_italic: bool,
 }
 

@@ -132,6 +132,18 @@ pub enum Command {
         end: DocPos,
         text: String,
     },
+    /// Right-click spelling correction: replaces the misspelled word at `start..end` (character offsets in
+    /// paragraph `para`) with `replacement`. Fail-closed: `expected` is the word the proofing pass flagged, and the
+    /// command fails without changing anything when the paragraph no longer holds exactly that text there, so a
+    /// stale squiggle can never overwrite text the person typed after it. The replacement keeps the formatting of
+    /// the first replaced run. One undo step.
+    DocxCorrectWord {
+        para: usize,
+        start: usize,
+        end: usize,
+        expected: String,
+        replacement: String,
+    },
     /// Word's Replace All: every match of `find` becomes `replacement` (`^&` is the found text,
     /// `^t` a tab, `^l` a line break). Matches span runs; the replacement takes the formatting
     /// of the first matched run. One undo step.
@@ -316,6 +328,39 @@ pub enum Command {
         #[serde(default)]
         overwrite: bool,
     },
+    /// `share.send-copy`: writes the document, as it is now, to `path` or (without one) to a
+    /// new temporary folder, for an attachment. Never the document's own file. Effect `Export`.
+    ShareSendCopy {
+        #[serde(default)]
+        path: Option<PathBuf>,
+        #[serde(default)]
+        overwrite: bool,
+    },
+    /// `share.send-pdf`: as `ExportPdf`, to `path` or a temporary folder. Effect `Export`.
+    ShareSendPdf {
+        #[serde(default)]
+        path: Option<PathBuf>,
+        #[serde(default)]
+        overwrite: bool,
+    },
+    /// `share.inspect`: reports comments, tracked changes, hidden text, properties and author
+    /// names in the document (`Outcome::report`). Writes nothing; effect `Read`.
+    ShareInspect,
+    /// `share.sanitize-copy`: writes a copy without the chosen kinds of content to `path` or a
+    /// temporary folder. The document is not changed. Effect `Export`.
+    ShareSanitizeCopy {
+        #[serde(default)]
+        path: Option<PathBuf>,
+        #[serde(default)]
+        overwrite: bool,
+        remove: Vec<crate::HiddenKind>,
+    },
+    /// `share.os-sheet`: a request for the operating system's share sheet for the file at
+    /// `path`. The command only builds the request (`Outcome::report`); the UI performs the
+    /// share. Effect `Egress`.
+    ShareOsSheet {
+        path: PathBuf,
+    },
 }
 
 impl Command {
@@ -354,6 +399,7 @@ impl Command {
             Self::DocxMoveTab { .. } => "docx_move_tab",
             Self::DocxClearTab { .. } => "docx_clear_tab",
             Self::DocxReplaceRange { .. } => "docx_replace_range",
+            Self::DocxCorrectWord { .. } => "docx_correct_word",
             Self::DocxReplaceAll { .. } => "docx_replace_all",
             Self::XlsxReplaceAll { .. } => "xlsx_replace_all",
             Self::XlsxPaste { .. } => "xlsx_paste",
@@ -380,7 +426,38 @@ impl Command {
             Self::MergeCells { .. } => "merge_cells",
             Self::Save { .. } => "save",
             Self::ExportPdf { .. } => "export_pdf",
+            Self::ShareSendCopy { .. } => "share_send_copy",
+            Self::ShareSendPdf { .. } => "share_send_pdf",
+            Self::ShareInspect => "share_inspect",
+            Self::ShareSanitizeCopy { .. } => "share_sanitize_copy",
+            Self::ShareOsSheet { .. } => "share_os_sheet",
         }
+    }
+
+    /// Whether this is one of the `share_*` commands (ADR-013 Stage 0). They have their own
+    /// entry points on the CLI and MCP surfaces because they return a report or write a copy
+    /// outside the document.
+    pub fn is_share(&self) -> bool {
+        matches!(
+            self,
+            Self::ShareSendCopy { .. }
+                | Self::ShareSendPdf { .. }
+                | Self::ShareInspect
+                | Self::ShareSanitizeCopy { .. }
+                | Self::ShareOsSheet { .. }
+        )
+    }
+
+    /// Whether running this command writes a file (so a scratch run must not execute it).
+    pub fn writes_file(&self) -> bool {
+        matches!(
+            self,
+            Self::Save { .. }
+                | Self::ExportPdf { .. }
+                | Self::ShareSendCopy { .. }
+                | Self::ShareSendPdf { .. }
+                | Self::ShareSanitizeCopy { .. }
+        )
     }
 
     /// The effect class from the command alone. Formatting and insertion are `Edit`; deleting
@@ -402,6 +479,20 @@ impl Command {
                 }
             }
             Self::Save { .. } | Self::ExportPdf { .. } => EffectClass::Export,
+            // A share copy is a new file. Naming the document's own file is refused when the
+            // command runs; classified here as the overwrite it would be.
+            Self::ShareSendCopy { path, .. }
+            | Self::ShareSendPdf { path, .. }
+            | Self::ShareSanitizeCopy { path, .. } => match path {
+                Some(p) if current_path == Some(p.as_path()) && p.exists() => {
+                    EffectClass::Destructive
+                }
+                _ => EffectClass::Export,
+            },
+            // Reports what the document holds; writes nothing.
+            Self::ShareInspect => EffectClass::Read,
+            // Hands a file to the operating system's share sheet: data leaves this machine.
+            Self::ShareOsSheet { .. } => EffectClass::Egress,
             Self::DocxDeleteRange { start, end } | Self::DocxReplaceRange { start, end, .. } => {
                 if start == end {
                     EffectClass::Edit
@@ -409,7 +500,9 @@ impl Command {
                     EffectClass::Destructive
                 }
             }
-            Self::DocxReplaceAll { .. }
+            // Replaces existing text (the flagged word), so it is destructive like any non-empty replacement.
+            Self::DocxCorrectWord { .. }
+            | Self::DocxReplaceAll { .. }
             | Self::XlsxReplaceAll { .. }
             | Self::DeleteRows { .. }
             | Self::DeleteColumns { .. } => EffectClass::Destructive,
@@ -525,6 +618,7 @@ impl Command {
             | Self::DocxMoveTab { .. }
             | Self::DocxClearTab { .. }
             | Self::DocxReplaceRange { .. }
+            | Self::DocxCorrectWord { .. }
             | Self::DocxReplaceAll { .. }
             | Self::XlsxReplaceAll { .. }
             | Self::SetColumnWidth { .. }
@@ -545,7 +639,12 @@ impl Command {
             | Self::CopyFormat { .. }
             | Self::ChangeDecimals { .. }
             | Self::Save { .. }
-            | Self::ExportPdf { .. } => false,
+            | Self::ExportPdf { .. }
+            | Self::ShareSendCopy { .. }
+            | Self::ShareSendPdf { .. }
+            | Self::ShareInspect
+            | Self::ShareSanitizeCopy { .. }
+            | Self::ShareOsSheet { .. } => false,
         }
     }
 }
@@ -580,6 +679,9 @@ pub struct Outcome {
     /// Set by the replace-all commands: how many replacements were made.
     #[serde(default, skip_serializing_if = "is_zero")]
     pub replaced: usize,
+    /// Set by the `share_*` commands: the hidden-content report or the share-sheet request.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub report: Option<serde_json::Value>,
 }
 
 fn is_zero(n: &usize) -> bool {

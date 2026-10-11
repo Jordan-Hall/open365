@@ -14,8 +14,7 @@ use crate::settings::PlatformSettings;
 use crate::textedit::{Composition, TextEdit};
 use crate::theme::Theme;
 use crate::tree::{
-    DROPDOWN_ARROW_W, MENU_PAD, MENU_ROW_H, MenuItem, MenuState, Node, NodeId, SPINNER_BUTTON_W,
-    Tree, Widget,
+    DROPDOWN_ARROW_W, MENU_PAD, MenuItem, MenuState, Node, NodeId, SPINNER_BUTTON_W, Tree, Widget,
 };
 
 /// How long the pointer rests on a node before its tooltip shows.
@@ -88,6 +87,10 @@ pub struct Ui {
     pub(crate) redraw: bool,
     last_click: Option<(Instant, Point, u8)>,
     shift_down: bool,
+    ctrl_down: bool,
+    /// Accessibility subtree a canvas owner publishes (see `set_canvas_access`).
+    pub(crate) canvas_access:
+        HashMap<NodeId, (accesskit::Node, Vec<(accesskit::NodeId, accesskit::Node)>)>,
 }
 
 impl std::fmt::Debug for Ui {
@@ -150,6 +153,8 @@ impl Ui {
             redraw: true,
             last_click: None,
             shift_down: false,
+            ctrl_down: false,
+            canvas_access: HashMap::new(),
         }
     }
 
@@ -239,6 +244,17 @@ impl Ui {
         }
     }
 
+    /// Replaces what the accessibility tree shows for a canvas: `node` stands in for the
+    /// canvas node (its label and bounds are kept) and `nodes` are its descendants.
+    pub fn set_canvas_access(
+        &mut self,
+        canvas: NodeId,
+        node: accesskit::Node,
+        nodes: Vec<(accesskit::NodeId, accesskit::Node)>,
+    ) {
+        self.canvas_access.insert(canvas, (node, nodes));
+    }
+
     fn touch_focus(&mut self) {
         let now = self.now;
         let Some(f) = self.focus else {
@@ -247,6 +263,10 @@ impl Ui {
         };
         let blink = self.settings.caret_blink;
         let mut text = false;
+        let canvas = self
+            .tree
+            .get(f)
+            .is_some_and(|n| matches!(n.widget, Widget::Canvas { .. }));
         if let Some(e) = self
             .tree
             .get_mut(f)
@@ -260,7 +280,9 @@ impl Ui {
                 .tree
                 .get(f)
                 .is_some_and(|n| matches!(n.widget, Widget::Canvas { .. }));
-        if text && let Some(b) = blink {
+        if (text || canvas)
+            && let Some(b) = blink
+        {
             self.schedule(now + b, TimerKind::Blink);
         }
     }
@@ -337,10 +359,10 @@ impl Ui {
                 TimerKind::Blink => {
                     if self.window_focused
                         && let (Some(f), Some(b)) = (self.focus, self.settings.caret_blink)
-                        && self
-                            .tree
-                            .get(f)
-                            .is_some_and(|n| editable(&n.widget).is_some())
+                        && self.tree.get(f).is_some_and(|n| {
+                            editable(&n.widget).is_some()
+                                || matches!(n.widget, Widget::Canvas { .. })
+                        })
                     {
                         self.redraw = true;
                         self.schedule(now + b, TimerKind::Blink);
@@ -486,7 +508,18 @@ impl Ui {
         self.pointer = p;
         self.drag = None;
         let pressed = self.pressed.take();
-        self.capture = None;
+        if let Some(c) = self.capture.take()
+            && self
+                .tree
+                .get(c)
+                .is_some_and(|n| matches!(n.widget, Widget::Canvas { .. }))
+        {
+            let rect = self.tree.abs_rect(c);
+            self.emit(Emit::CanvasRelease {
+                node: c,
+                at: Point::new(p.x - rect.x, p.y - rect.y),
+            });
+        }
         self.redraw = true;
         let hit = self.tree.hit_test(p);
         if let (Some(a), Some(b)) = (pressed, hit)
@@ -522,7 +555,7 @@ impl Ui {
             }
             Widget::Dropdown { items, open, .. } => {
                 if open && p.y >= rect.bottom() {
-                    if let Some(i) = self.list_row(&rect, p, items.len()) {
+                    if let Some(i) = self.list_row(id, &rect, p, items.len()) {
                         self.select_item(id, i);
                     }
                     self.set_open(id, false);
@@ -532,7 +565,7 @@ impl Ui {
             }
             Widget::Combo { items, open, .. } => {
                 if open && p.y >= rect.bottom() {
-                    if let Some(i) = self.list_row(&rect, p, items.len()) {
+                    if let Some(i) = self.list_row(id, &rect, p, items.len()) {
                         self.select_item(id, i);
                     }
                     self.set_open(id, false);
@@ -568,11 +601,12 @@ impl Ui {
         }
     }
 
-    fn list_row(&self, rect: &Rect, p: Point, n: usize) -> Option<usize> {
+    fn list_row(&self, id: NodeId, rect: &Rect, p: Point, n: usize) -> Option<usize> {
         let y = p.y - rect.bottom() - MENU_PAD;
-        (y >= 0.0)
-            .then(|| (y / MENU_ROW_H) as usize)
-            .filter(|i| *i < n)
+        let row_h = self.tree.get(id).map_or(crate::tree::MENU_ROW_H, |n| {
+            crate::tree::list_row_h(&n.look)
+        });
+        (y >= 0.0).then(|| (y / row_h) as usize).filter(|i| *i < n)
     }
 
     /// Toggles, checks or presses a button-like widget and reports it.
@@ -713,7 +747,10 @@ impl Ui {
         };
         let mut path: Vec<usize> = m.path.iter().take(level).copied().collect();
         let items = m.level_items(level).unwrap_or(&[]);
-        if items.get(row).is_some_and(|i| !i.separator && i.enabled) {
+        if items
+            .get(row)
+            .is_some_and(|i| !i.separator && !i.heading && i.enabled)
+        {
             path.push(row);
             if let Some(Widget::Menu(m)) = self.tree.get_mut(id).map(|n| &mut n.widget)
                 && m.path != path
@@ -750,7 +787,7 @@ impl Ui {
         let Some(item) = m.level_items(level).and_then(|i| i.get(row)).cloned() else {
             return;
         };
-        if item.separator || !item.enabled {
+        if item.separator || item.heading || !item.enabled {
             return;
         }
         if !item.submenu.is_empty() {
@@ -849,11 +886,21 @@ impl Ui {
     }
 
     fn wheel(&mut self, delta_y: f32) {
-        if let Some(h) = self.hover
-            && let Some(Widget::ScrollBar(s)) = self.tree.get(h).map(|n| n.widget.clone())
-        {
+        let Some(h) = self.hover else { return };
+        match self.tree.get(h).map(|n| n.widget.clone()) {
             // One notch (positive up) scrolls three lines.
-            self.scroll_by(h, -delta_y * s.line * 3.0);
+            Some(Widget::ScrollBar(s)) => self.scroll_by(h, -delta_y * s.line * 3.0),
+            Some(Widget::Canvas { .. }) => {
+                let shift = self.shift_down;
+                let ctrl = self.ctrl_down;
+                self.emit(Emit::CanvasWheel {
+                    node: h,
+                    delta_y,
+                    shift,
+                    ctrl,
+                });
+            }
+            _ => {}
         }
     }
 
@@ -867,13 +914,25 @@ impl Ui {
             self.text_size * self.scale.0,
             0.0,
             0.0,
-            open365_gfx::TextLayoutOptions::default(),
+            crate::paint::UI_TEXT,
         );
         lay.byte_at(x * self.scale.0)
     }
 
     fn drag_text(&mut self, id: NodeId, p: Point) {
         let rect = self.tree.abs_rect(id);
+        if self
+            .tree
+            .get(id)
+            .is_some_and(|n| matches!(n.widget, Widget::Canvas { .. }))
+        {
+            self.emit(Emit::CanvasDrag {
+                node: id,
+                at: Point::new(p.x - rect.x, p.y - rect.y),
+            });
+            self.redraw = true;
+            return;
+        }
         if self
             .tree
             .get(id)
@@ -990,6 +1049,9 @@ impl Ui {
         if key == Key::Shift {
             self.shift_down = pressed;
             return;
+        }
+        if key == Key::Ctrl {
+            self.ctrl_down = pressed;
         }
         // Alt tips.
         if key == Key::Alt {
@@ -1244,7 +1306,10 @@ impl Ui {
             let mut i = from.map_or(if dir > 0 { -1 } else { n }, |v| v as i32);
             for _ in 0..n {
                 i = (i + dir).rem_euclid(n);
-                if !cur_items[i as usize].separator && cur_items[i as usize].enabled {
+                if !cur_items[i as usize].separator
+                    && !cur_items[i as usize].heading
+                    && cur_items[i as usize].enabled
+                {
                     return Some(i as usize);
                 }
             }
@@ -1486,6 +1551,12 @@ impl Ui {
                     true
                 });
                 self.emit(Emit::TextCommitted(id, text));
+                true
+            }
+            Action::SetTextSelection | Action::ReplaceSelectedText
+                if matches!(widget, Widget::Canvas { .. }) =>
+            {
+                self.emit(Emit::CanvasAction(id, request.clone()));
                 true
             }
             Action::Increment | Action::Decrement => {

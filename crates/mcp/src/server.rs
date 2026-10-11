@@ -637,7 +637,14 @@ fn needs_intent(name: &str, args: &Value) -> bool {
     match name {
         "apply_commands" => !flag("dry_run"),
         "close" => flag("discard"),
-        "save_as" | "export_pdf" | "new_from_template" | "request_scope" => true,
+        "save_as"
+        | "export_pdf"
+        | "new_from_template"
+        | "request_scope"
+        | "share_send_copy"
+        | "share_send_pdf"
+        | "share_sanitize_copy"
+        | "share_os_sheet" => true,
         _ => false,
     }
 }

@@ -7,8 +7,8 @@
 //! [`show`] draws a menu with its open sub-menus and handles the pointer and the keyboard.
 
 use egui::{
-    Align2, Area, Color32, CornerRadius, FontId, Id, Key, Order, Painter, Pos2, Rect, Sense,
-    Stroke, StrokeKind, pos2, vec2,
+    Align2, Area, Color32, CornerRadius, FontFamily, FontId, Id, Key, Order, Painter, Pos2, Rect,
+    Sense, Stroke, StrokeKind, pos2, vec2,
 };
 
 use crate::host::{EntryKind, MenuEntry};
@@ -682,16 +682,31 @@ pub fn show(
                                     let y = inset.bottom() - f32::from(e.1) * K / 2.0;
                                     line(pos2(inset.left(), y), pos2(inset.right(), y), e);
                                 }
-                                clip.text(
-                                    inset.center(),
-                                    Align2::CENTER_CENTER,
+                                let px = (size::LABEL * t.text_pct.clamp(50, 250) as f32 / 100.0)
+                                    .min(size::LABEL * 2.0);
+                                let family = t
+                                    .font
+                                    .as_ref()
+                                    .map_or(FontFamily::Proportional, |f| f.family.clone());
+                                let fake_bold = t.font.as_ref().is_some_and(|f| f.fake_bold);
+                                let fake_italic = t.font.as_ref().is_some_and(|f| f.fake_italic);
+                                let mut job = egui::text::LayoutJob::default();
+                                job.append(
                                     &t.label,
-                                    FontId::proportional(
-                                        (size::LABEL * t.text_pct.clamp(50, 250) as f32 / 100.0)
-                                            .min(size::LABEL * 2.0),
-                                    ),
-                                    ink,
+                                    0.0,
+                                    egui::TextFormat {
+                                        font_id: FontId::new(px, family),
+                                        color: ink,
+                                        italics: fake_italic,
+                                        ..Default::default()
+                                    },
                                 );
+                                let galley = clip.layout_job(job);
+                                let at = inset.center() - galley.size() / 2.0;
+                                if fake_bold {
+                                    clip.galley(at + vec2(K, 0.0), galley.clone(), ink);
+                                }
+                                clip.galley(at, galley, ink);
                                 if r.hovered() || t.checked {
                                     clip.rect_stroke(
                                         cr,

@@ -1,11 +1,11 @@
-rev	0	Insert	Author A	2026-10-11T15:20:00Z	 inserted
-rev	1	Property	Author A	2026-10-11T15:20:00Z	inserted
-rev	2	Delete	Author A	2026-10-11T15:20:00Z	gamma 
-rev	3	Property	Author A	2026-10-11T15:20:00Z	gamma
-rev	4	ParagraphProperty	Author A	2026-10-11T15:20:00Z	Second LINEline of text.
-rev	5	Insert	Author A	2026-10-11T15:20:00Z	LINE
-rev	6	Delete	Author A	2026-10-11T15:20:00Z	line
-rev	7	Insert	Author A	2026-10-11T15:20:00Z	\rInserted before third
+rev	0	Insert	Author A	2026-10-11T18:21:00Z	 inserted
+rev	1	Property	Author A	2026-10-11T18:21:00Z	inserted
+rev	2	Delete	Author A	2026-10-11T18:21:00Z	gamma 
+rev	3	Property	Author A	2026-10-11T18:21:00Z	gamma
+rev	4	ParagraphProperty	Author A	2026-10-11T18:21:00Z	Second LINEline of text.
+rev	5	Insert	Author A	2026-10-11T18:21:00Z	LINE
+rev	6	Delete	Author A	2026-10-11T18:21:00Z	line
+rev	7	Insert	Author A	2026-10-11T18:21:00Z	\rInserted before third
 para	markup	0	Alpha beta inserted gamma delta.	0	Normal	0	B0I0U0S22x11;B1I0U0S22x8;B0I0U0S22x1;B0I1U0S22x5;B0I0U0S22x7
 para	markup	1	Second LINEline of text.	2	Normal	0	B0I0U0S22x24
 para	markup	2		0	Normal	0	

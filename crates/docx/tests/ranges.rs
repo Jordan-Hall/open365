@@ -339,6 +339,7 @@ fn run_props_patch_sets_every_property_across_paragraphs() {
         strike: Some(true),
         size_half_points: Some(48),
         color: Some("FF0000".into()),
+        vert_align: Some(open365_docx::VertAlign::Superscript),
         font: Some("Georgia".into()),
     };
     d.set_run_props(pos(0, 2), pos(1, 3), &patch)

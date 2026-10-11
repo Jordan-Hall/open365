@@ -142,3 +142,72 @@ mod tests {
         }
     }
 }
+
+#[cfg(test)]
+mod prop {
+    use super::*;
+    use proptest::prelude::*;
+
+    fn any_scope() -> impl Strategy<Value = LinkScope> {
+        prop_oneof![
+            Just(LinkScope::View),
+            Just(LinkScope::Edit),
+            Just(LinkScope::ViewNoDownload)
+        ]
+    }
+
+    fn any_role() -> impl Strategy<Value = Role> {
+        prop_oneof![Just(Role::Viewer), Just(Role::Editor), Just(Role::Owner)]
+    }
+
+    fn any_grant() -> impl Strategy<Value = Grant> {
+        prop_oneof![
+            any_role().prop_map(Grant::Role),
+            any_scope().prop_map(Grant::Link)
+        ]
+    }
+
+    fn within(a: Rights, b: Rights) -> bool {
+        (!a.read || b.read)
+            && (!a.download || b.download)
+            && (!a.write || b.write)
+            && (!a.manage || b.manage)
+    }
+
+    proptest! {
+        #[test]
+        fn rights_are_internally_consistent(g in any_grant()) {
+            let r = rights(g);
+            prop_assert!(r.read);
+            prop_assert!(!r.write || r.download, "writers can read the content");
+            prop_assert!(!r.manage || r.write);
+            if matches!(g, Grant::Link(_)) {
+                prop_assert!(!r.manage, "a link never manages access");
+            }
+        }
+
+        #[test]
+        fn a_link_never_exceeds_the_editor_role_and_roles_are_ordered(s in any_scope()) {
+            let link = rights(Grant::Link(s));
+            prop_assert!(within(link, rights(Grant::Role(Role::Editor))));
+            prop_assert!(within(rights(Grant::Role(Role::Viewer)), rights(Grant::Role(Role::Editor))));
+            prop_assert!(within(rights(Grant::Role(Role::Editor)), rights(Grant::Role(Role::Owner))));
+        }
+
+        #[test]
+        fn only_edit_scopes_write_and_only_the_owner_manages(g in any_grant()) {
+            let r = rights(g);
+            let may_write = matches!(g, Grant::Role(Role::Editor | Role::Owner) | Grant::Link(LinkScope::Edit));
+            prop_assert_eq!(r.write, may_write);
+            prop_assert_eq!(r.manage, g == Grant::Role(Role::Owner));
+        }
+
+        #[test]
+        fn scope_names_round_trip_and_nothing_else_parses(s in r"\PC{0,24}") {
+            match LinkScope::parse(&s) {
+                Some(scope) => prop_assert_eq!(scope.as_str(), s.as_str()),
+                None => prop_assert!(!["view", "edit", "view-no-download"].contains(&s.as_str())),
+            }
+        }
+    }
+}

@@ -7,7 +7,7 @@ use open365_commands::{
     HAlign, LineSpec, MergeMode, NumberFormatSpec, RangeRef, RotationSpec, UnderlineKind, VAlign,
     merge_discards,
 };
-use open365_ui_shell::{CommandState, MenuEntry};
+use open365_ui_shell::{CommandState, MenuEntry, TileFont};
 use open365_xlsx::{
     CellFormat, Color, ColorSource, HorizontalAlignment, Rgb, Underline, VerticalAlignment,
     Workbook,
@@ -747,7 +747,13 @@ impl FormatUi {
         }
     }
 
-    pub fn menu(&self, id: &str, wb: Option<&Workbook>, sel: Sel) -> Option<Vec<MenuEntry>> {
+    pub fn menu(
+        &self,
+        id: &str,
+        wb: Option<&Workbook>,
+        sel: Sel,
+        face: &dyn Fn(&str, bool, bool) -> TileFont,
+    ) -> Option<Vec<MenuEntry>> {
         let wb = wb?;
         match id {
             "home.alignment.merge-centre" => Some(vec![
@@ -807,7 +813,7 @@ impl FormatUi {
             ),
             "home.font.fill-colour" => Some(colour_menu(wb, ColourSlot::Fill, &self.last_fill)),
             "home.font.font-colour" => Some(colour_menu(wb, ColourSlot::Font, &self.last_font)),
-            "home.styles.cell-styles" => Some(cell_styles_menu(wb, sel)),
+            "home.styles.cell-styles" => Some(cell_styles_menu(wb, sel, face)),
             "home.alignment.orientation" => Some(vec![
                 entry("fmt.rotate#45".into(), "Angle Counterclockwise"),
                 entry("fmt.rotate#-45".into(), "Angle Clockwise"),
@@ -1174,7 +1180,12 @@ fn colour_menu(wb: &Workbook, slot: ColourSlot, current: &ColorSpec) -> Vec<Menu
 
 /// Gives a gallery tile the look of a cell style: its real fill (white where the style has none, as
 /// the grid's cells are), font colour and size, and the four border edges.
-fn style_tile(wb: &Workbook, f: &open365_xlsx::CellFormat, tile: &mut open365_ui_shell::Tile) {
+fn style_tile(
+    wb: &Workbook,
+    f: &open365_xlsx::CellFormat,
+    tile: &mut open365_ui_shell::Tile,
+    face: &dyn Fn(&str, bool, bool) -> TileFont,
+) {
     use open365_xlsx::{BorderStyle as B, ColorSource, FillPattern};
     let rgb = |c: &open365_xlsx::Color| {
         let v = wb.styles().resolve_color(c);
@@ -1210,10 +1221,15 @@ fn style_tile(wb: &Workbook, f: &open365_xlsx::CellFormat, tile: &mut open365_ui
     tile.text_pct = (f.font.size / 11.0 * 100.0).round() as u32;
     tile.bold = f.font.bold;
     tile.italic = f.font.italic;
+    tile.font = Some(face(&f.font.name, f.font.bold, f.font.italic));
 }
 
 /// The Cell Styles gallery: one heading and a grid of 133 x 36 u tiles per group.
-fn cell_styles_menu(wb: &Workbook, sel: Sel) -> Vec<MenuEntry> {
+fn cell_styles_menu(
+    wb: &Workbook,
+    sel: Sel,
+    face: &dyn Fn(&str, bool, bool) -> TileFont,
+) -> Vec<MenuEntry> {
     let names = wb.styles().cell_style_names();
     let current = wb
         .styles()
@@ -1234,7 +1250,7 @@ fn cell_styles_menu(wb: &Workbook, sel: Sel) -> Vec<MenuEntry> {
                     Some(&n) == current.as_ref(),
                 );
                 if let Some(f) = format {
-                    style_tile(wb, &f, &mut tile);
+                    style_tile(wb, &f, &mut tile, face);
                 }
                 tile
             })

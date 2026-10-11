@@ -74,14 +74,32 @@ pub(crate) fn gate_write(
     let mut command = command.clone();
     let mut canonical = Vec::new();
     if !roots.is_empty() {
-        let (Command::Save { path } | Command::ExportPdf { path, .. }) = &mut command else {
+        let existing = matches!(command, Command::ShareOsSheet { .. });
+        let (Command::Save { path }
+        | Command::ExportPdf { path, .. }
+        | Command::ShareSendCopy {
+            path: Some(path), ..
+        }
+        | Command::ShareSendPdf {
+            path: Some(path), ..
+        }
+        | Command::ShareSanitizeCopy {
+            path: Some(path), ..
+        }
+        | Command::ShareOsSheet { path }) = &mut command
+        else {
             return Ok(Gated {
                 command,
-                roots: canonical,
+                roots: canonical_roots(roots)?,
             });
         };
         let fence = Fence::new(roots).map_err(CliError::Other)?;
-        match fence.resolve_new(&path.to_string_lossy()) {
+        let resolved = if existing {
+            fence.resolve_existing(&path.to_string_lossy())
+        } else {
+            fence.resolve_new(&path.to_string_lossy())
+        };
+        match resolved {
             Ok(resolved) => *path = resolved,
             Err(denied) => return refuse(format!("{}: {}", path.display(), denied.0)),
         }
@@ -94,6 +112,11 @@ pub(crate) fn gate_write(
         }),
         Err(reason) => refuse(reason),
     }
+}
+
+/// The canonical roots a write must stay inside, for a command that names no path.
+fn canonical_roots(roots: &[PathBuf]) -> Result<Vec<PathBuf>, CliError> {
+    Ok(Fence::new(roots).map_err(CliError::Other)?.roots().to_vec())
 }
 
 /// Reads a text file of at most `MAX_COMMAND_FILE` bytes.
@@ -163,11 +186,11 @@ pub fn execute(log: &CommandLog, opts: &Options) -> Result<Report, CliError> {
             command.name(),
             effect_name(effect)
         ));
-        let save = matches!(command, Command::Save { .. } | Command::ExportPdf { .. });
+        let save = command.writes_file() || command.is_share();
         let blocked = save || cli_decision(&step.risk, opts.allow_destructive).is_err();
         if blocked {
             let reason = if save {
-                "save and export_pdf are not allowed in a command file; the output path is set with -o (use docx export-pdf for a PDF)"
+                "save, export_pdf and the share_* commands are not allowed in a command file; the output path is set with -o (use docx export-pdf for a PDF, open365 share for copies)"
             } else {
                 "refused: destructive/egress command needs --allow-destructive"
             };

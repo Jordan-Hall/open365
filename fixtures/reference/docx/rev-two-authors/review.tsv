@@ -1,13 +1,13 @@
-rev	0	Delete	Author A	2026-10-11T16:34:00Z	beta 
-rev	1	Insert	Author B	2026-10-11T16:34:00Z	GAMMA
-rev	2	Delete	Author A	2026-10-11T16:34:00Z	gamma
-rev	3	Insert	Author B	2026-10-11T16:34:00Z	 zeta
-rev	4	Property	Author A	2026-10-11T16:34:00Z	line
-rev	5	Delete	Author B	2026-10-11T16:34:00Z	text 
-rev	6	Delete	Author B	2026-10-11T16:34:00Z	Third line goes.
-rev	7	Delete	Author A	2026-10-11T16:34:00Z	
-rev	8	Insert	Author A	2026-10-11T16:34:00Z	
-rev	9	Insert	Author B	2026-10-11T16:34:00Z	Inserted last
+rev	0	Delete	Author A	2026-10-11T18:21:00Z	beta 
+rev	1	Insert	Author B	2026-10-11T18:21:00Z	GAMMA
+rev	2	Delete	Author A	2026-10-11T18:21:00Z	gamma
+rev	3	Insert	Author B	2026-10-11T18:21:00Z	 zeta
+rev	4	Property	Author A	2026-10-11T18:21:00Z	line
+rev	5	Delete	Author B	2026-10-11T18:21:00Z	text 
+rev	6	Delete	Author B	2026-10-11T18:21:00Z	Third line goes.
+rev	7	Delete	Author A	2026-10-11T18:21:00Z	
+rev	8	Insert	Author A	2026-10-11T18:21:00Z	
+rev	9	Insert	Author B	2026-10-11T18:21:00Z	Inserted last
 para	markup	0	Alpha beta GAMMAgamma delta epsilon zeta.	0	Normal	0	B0I0U0S22x41
 para	markup	1	Second line of text here.	0	Normal	0	B0I0U0S22x7;B1I0U0S22x4;B0I0U0S22x14
 para	markup	2	Third line goes.	0	Normal	0	B0I0U0S22x16

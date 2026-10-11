@@ -33,5 +33,7 @@ notices with all copies (SCOWL, VarCon, Princeton WordNet 1.6, UKACD, Ispell); t
 (no endorsement by Geoff Kuenning, modifications marked) apply; no warranty. Size 60 does not include the
 UKACD word list (size 80+), but its licence is kept verbatim anyway.
 
+The complete notice text for these files is reproduced in the repository's `THIRD-PARTY-NOTICES.md`.
+
 Every other language is NOT bundled. See `docs/architecture/adr-spell.md` for how other dictionaries are
 installed at run time and which licences they carry.

@@ -5,7 +5,9 @@
 //! with the day counts of the basis (`finbond::days_between`). Measured against Excel with the conformance groups
 //! `oddfprice`, `oddfyield`, `oddlprice` and `oddlyield`.
 
-use super::finbond::{coupon_date, date_arg, days_between, frequency, num, opt_basis};
+use super::finbond::{
+    clamped_date, coupon_date, date_arg, days_between, frequency, num, opt_basis,
+};
 use super::{Res, arity, number};
 use crate::eval::{Arg, EvalContext};
 use crate::value::{ErrorKind, Value};
@@ -15,6 +17,8 @@ struct Dc {
     basis: u8,
     freq: i64,
     d1904: bool,
+    /// ODDL*: the normal period of bases 2 and 3 is the actual length of the quasi-coupon period (measured).
+    last: bool,
 }
 
 impl Dc {
@@ -29,6 +33,7 @@ impl Dc {
     fn normal(&self, a: i64, b: i64) -> f64 {
         match self.basis {
             1 => (b - a) as f64,
+            2 | 3 if self.last => (b - a) as f64,
             3 => 365.0 / self.freq as f64,
             _ => 360.0 / self.freq as f64,
         }
@@ -60,7 +65,7 @@ fn forwards(last: i64, maturity: i64, step: i64, d1904: bool) -> Res<Vec<i64>> {
     let mut v = vec![last];
     let mut k = 1;
     while *v.last().unwrap_or(&last) < maturity {
-        v.push(quasi(last, -step, k, d1904)?);
+        v.push(clamped_date(last, -step, k, d1904)?);
         k += 1;
         if k > 100_000 {
             return Err(ErrorKind::Num);
@@ -170,6 +175,7 @@ fn first_model(a: &Args, d1904: bool) -> Res<First> {
         basis: a.basis,
         freq: a.freq,
         d1904,
+        last: false,
     };
     let step = 12 / a.freq;
     let f = a.freq as f64;
@@ -184,7 +190,13 @@ fn first_model(a: &Args, d1904: bool) -> Res<First> {
         let (lo, hi) = (q[i], q[i - 1]);
         let nl = dc.normal(lo, hi);
         let start = lo.max(a.other);
-        c1 += dc.days(start, hi)? / nl;
+        // a quasi-coupon period inside the odd period counts as exactly 1 (measured on bases 2 and 3, where the
+        // actual length differs from the nominal one); only the period that contains the issue date is partial
+        c1 += if lo >= a.other {
+            1.0
+        } else {
+            dc.days(start, hi)? / nl
+        };
         if a.settlement > start {
             accrued += dc.days(start, a.settlement.min(hi))? / nl;
         }
@@ -206,7 +218,11 @@ fn first_model(a: &Args, d1904: bool) -> Res<First> {
             return Err(ErrorKind::Num);
         }
     }
-    // the loop counted the dates maturity - j*step >= first for j = 0..k-1: that is k dates
+    // the loop counted the dates maturity - j*step >= first for j = 0..k-1: that is k dates;
+    // Excel refuses a first coupon date that is not on the maturity's schedule (`#NUM!`, measured: 187 of 187)
+    if quasi(a.maturity, step, k - 1, d1904)? != a.first {
+        return Err(ErrorKind::Num);
+    }
     let n = k as f64;
     Ok(First {
         redemption: a.redemption,
@@ -275,6 +291,7 @@ fn last_model(a: &Args, d1904: bool) -> Res<Last> {
         basis: a.basis,
         freq: a.freq,
         d1904,
+        last: true,
     };
     let step = 12 / a.freq;
     let f = a.freq as f64;

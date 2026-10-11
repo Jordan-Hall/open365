@@ -19,7 +19,7 @@ pub const DEFAULT_TEXT_PT: f64 = 10.0;
 /// Default chart title size in points (bold) when the chart states none; measured from Excel.
 pub const DEFAULT_TITLE_PT: f64 = 18.0;
 
-fn is_chart_ns(e: &XmlElement) -> bool {
+pub(crate) fn is_chart_ns(e: &XmlElement) -> bool {
     matches!(e.head.ns.as_deref(), Some(CHART_NS | CHART_NS_STRICT))
 }
 
@@ -85,9 +85,22 @@ pub enum GroupKind {
     Pie,
     Doughnut,
     Scatter,
-    /// A chart type this model does not draw (bubble, radar, stock, surface, 3-D). The
-    /// element stays in the tree.
+    /// `c:bubbleChart`: scatter with a third dimension (`c:bubbleSize`).
+    Bubble,
+    /// `c:radarChart`.
+    Radar,
+    /// `c:stockChart`: high/low/close (or open/high/low/close) line series.
+    Stock,
+    /// A chart type this model does not draw (surface, 3-D, of-pie). The element stays in the
+    /// tree.
     Unsupported,
+}
+
+impl GroupKind {
+    /// Groups plotted on two value axes (scatter and bubble).
+    pub fn is_xy(self) -> bool {
+        matches!(self, Self::Scatter | Self::Bubble)
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -193,6 +206,55 @@ pub struct Series {
     pub explosion: Option<u32>,
     /// `c:marker/c:symbol`, for example `circle` or `none`.
     pub marker: Option<String>,
+    /// `c:bubbleSize` of a bubble series.
+    pub bubble_sizes: Option<DataRef>,
+    pub trendlines: Vec<Trendline>,
+    pub error_bars: Vec<ErrorBars>,
+}
+
+/// `c:trendlineType`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TrendlineKind {
+    Exponential,
+    Linear,
+    Log,
+    MovingAvg,
+    Poly,
+    Power,
+}
+
+/// `c:trendline`.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Trendline {
+    pub name: Option<String>,
+    pub kind: TrendlineKind,
+    /// `c:order` of a polynomial trendline (2..=6).
+    pub order: Option<u32>,
+    /// `c:period` of a moving average (at least 2).
+    pub period: Option<u32>,
+    pub forward: Option<f64>,
+    pub backward: Option<f64>,
+    pub intercept: Option<f64>,
+    pub display_r_squared: bool,
+    pub display_equation: bool,
+}
+
+/// `c:errBars`.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ErrorBars {
+    /// `c:errDir`: `x` or `y`; `None` where the schema omits it (bar and line charts: y).
+    pub direction: Option<char>,
+    /// `c:errBarType`: `both`, `plus` or `minus`.
+    pub bar_type: String,
+    /// `c:errValType`: `cust`, `fixedVal`, `percentage`, `stdDev` or `stdErr`.
+    pub value_type: String,
+    pub no_end_cap: bool,
+    /// `c:val`.
+    pub value: Option<f64>,
+    /// `c:plus` of a custom error bar.
+    pub plus: Option<DataRef>,
+    /// `c:minus` of a custom error bar.
+    pub minus: Option<DataRef>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -210,6 +272,17 @@ pub struct ChartGroup {
     pub series: Vec<Series>,
     pub data_labels: Option<DataLabels>,
     pub axis_ids: Vec<u32>,
+    /// `c:bubbleScale` (percent of the default size) of a bubble group.
+    pub bubble_scale: u32,
+    /// `c:sizeRepresents`: `area` (default) or `w`.
+    pub size_represents: String,
+    pub show_negative_bubbles: bool,
+    /// `c:radarStyle`: `standard`, `marker` or `filled`.
+    pub radar_style: Option<String>,
+    /// `c:hiLowLines` is present (stock and line groups).
+    pub hi_low_lines: bool,
+    /// `c:upDownBars` is present (stock and line groups).
+    pub up_down_bars: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -306,6 +379,28 @@ pub struct PlotArea {
     pub axes: Vec<Axis>,
 }
 
+impl PlotArea {
+    /// The axis with id `id`.
+    pub fn axis(&self, id: u32) -> Option<&Axis> {
+        self.axes.iter().find(|a| a.id == id)
+    }
+
+    /// True when the groups mix chart families (a combo chart).
+    pub fn is_combo(&self) -> bool {
+        self.groups
+            .windows(2)
+            .any(|w| w[0].kind != w[1].kind || w[0].direction != w[1].direction)
+    }
+
+    /// Groups that use another pair of axes than the first group: the secondary axis groups.
+    pub fn secondary_groups(&self) -> impl Iterator<Item = &ChartGroup> {
+        let primary = self.groups.first().map(|g| g.axis_ids.clone());
+        self.groups
+            .iter()
+            .filter(move |g| primary.as_ref().is_some_and(|p| *p != g.axis_ids))
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct Chart {
     pub title: Option<Title>,
@@ -326,6 +421,9 @@ pub struct ChartSpace {
     pub text_pt: Option<f64>,
     /// Default chart font family (`a:latin/@typeface` of the chart-space `c:txPr`).
     pub text_family: Option<String>,
+    /// Chart style number: `c14:style` (Office 2010 and later, 101..=148) or the `c:style`
+    /// fallback (1..=48).
+    pub style_id: Option<u32>,
     xml: ParsedXml,
 }
 
@@ -345,6 +443,7 @@ impl ChartSpace {
             rounded_corners: val_bool(root, "roundedCorners").unwrap_or(false),
             text_pt: child(root, "txPr").and_then(text_size),
             text_family: child(root, "txPr").and_then(text_family),
+            style_id: style_id(root),
             chart,
             xml,
         })
@@ -355,6 +454,10 @@ impl ChartSpace {
         &self.xml
     }
 
+    pub(crate) fn xml_mut(&mut self) -> &mut ParsedXml {
+        &mut self.xml
+    }
+
     /// The part bytes: the parsed document written back. Unedited, this is infoset-equal to
     /// the input and keeps every unknown element.
     pub fn to_bytes(&self) -> Vec<u8> {
@@ -362,7 +465,32 @@ impl ChartSpace {
     }
 }
 
-fn parse_chart(e: &XmlElement) -> Chart {
+/// `c14:style` inside `mc:AlternateContent/mc:Choice`, else `c:style`.
+fn style_id(root: &XmlElement) -> Option<u32> {
+    fn find(e: &XmlElement) -> Option<u32> {
+        for c in e.elements() {
+            if c.head.local_name() == "style"
+                && let Some(v) = c.head.attr("val").and_then(|v| v.parse().ok())
+            {
+                return Some(v);
+            }
+            if c.head.local_name() == "AlternateContent"
+                && let Some(v) = find(c)
+            {
+                return Some(v);
+            }
+            if matches!(c.head.local_name(), "Choice" | "Fallback")
+                && let Some(v) = find(c)
+            {
+                return Some(v);
+            }
+        }
+        None
+    }
+    find(root)
+}
+
+pub(crate) fn parse_chart(e: &XmlElement) -> Chart {
     let plot_el = child(e, "plotArea");
     Chart {
         title: child(e, "title").map(parse_title),
@@ -542,10 +670,11 @@ fn group_kind(name: &str) -> Option<GroupKind> {
         "pieChart" => GroupKind::Pie,
         "doughnutChart" => GroupKind::Doughnut,
         "scatterChart" => GroupKind::Scatter,
-        "bar3DChart" | "line3DChart" | "area3DChart" | "pie3DChart" | "bubbleChart"
-        | "radarChart" | "stockChart" | "surfaceChart" | "surface3DChart" | "ofPieChart" => {
-            GroupKind::Unsupported
-        }
+        "bubbleChart" => GroupKind::Bubble,
+        "radarChart" => GroupKind::Radar,
+        "stockChart" => GroupKind::Stock,
+        "bar3DChart" | "line3DChart" | "area3DChart" | "pie3DChart" | "surfaceChart"
+        | "surface3DChart" | "ofPieChart" => GroupKind::Unsupported,
         _ => return None,
     })
 }
@@ -588,6 +717,12 @@ fn parse_group(e: &XmlElement, kind: GroupKind) -> ChartGroup {
         axis_ids: children(e, "axId")
             .filter_map(|a| a.head.attr("val")?.trim().parse().ok())
             .collect(),
+        bubble_scale: val_u32(e, "bubbleScale").unwrap_or(100),
+        size_represents: val(e, "sizeRepresents").unwrap_or("area").to_owned(),
+        show_negative_bubbles: val_bool(e, "showNegBubbles").unwrap_or(true),
+        radar_style: val(e, "radarStyle").map(str::to_owned),
+        hi_low_lines: child(e, "hiLowLines").is_some(),
+        up_down_bars: child(e, "upDownBars").is_some(),
     }
 }
 
@@ -651,6 +786,53 @@ fn parse_series(e: &XmlElement) -> Series {
         smooth: val_bool(e, "smooth").unwrap_or(false),
         explosion: val_u32(e, "explosion"),
         marker: child(e, "marker").and_then(|m| val(m, "symbol").map(str::to_owned)),
+        bubble_sizes: data("bubbleSize"),
+        trendlines: children(e, "trendline")
+            .filter_map(parse_trendline)
+            .collect(),
+        error_bars: children(e, "errBars").map(parse_error_bars).collect(),
+    }
+}
+
+fn parse_trendline(e: &XmlElement) -> Option<Trendline> {
+    let kind = match val(e, "trendlineType")? {
+        "exp" => TrendlineKind::Exponential,
+        "linear" => TrendlineKind::Linear,
+        "log" => TrendlineKind::Log,
+        "movingAvg" => TrendlineKind::MovingAvg,
+        "poly" => TrendlineKind::Poly,
+        "power" => TrendlineKind::Power,
+        _ => return None,
+    };
+    Some(Trendline {
+        name: child(e, "name").map(|n| text_of(n).trim().to_owned()),
+        kind,
+        order: val_u32(e, "order"),
+        period: val_u32(e, "period"),
+        forward: val_f64(e, "forward"),
+        backward: val_f64(e, "backward"),
+        intercept: val_f64(e, "intercept"),
+        display_r_squared: val_bool(e, "dispRSqr").unwrap_or(false),
+        display_equation: val_bool(e, "dispEq").unwrap_or(false),
+    })
+}
+
+fn parse_error_bars(e: &XmlElement) -> ErrorBars {
+    let data = |name: &str| {
+        child(e, name).and_then(|c| {
+            c.elements()
+                .find(|x| is_chart_ns(x))
+                .map(|x| parse_data_ref(x, false))
+        })
+    };
+    ErrorBars {
+        direction: val(e, "errDir").and_then(|d| d.chars().next()),
+        bar_type: val(e, "errBarType").unwrap_or("both").to_owned(),
+        value_type: val(e, "errValType").unwrap_or("fixedVal").to_owned(),
+        no_end_cap: val_bool(e, "noEndCap").unwrap_or(false),
+        value: val_f64(e, "val"),
+        plus: data("plus"),
+        minus: data("minus"),
     }
 }
 

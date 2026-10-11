@@ -324,7 +324,11 @@ fn state_diff(label: &str, ours: &State, theirs: &State) -> Option<String> {
     None
 }
 
-/// (fixture, label prefix) pairs where the model is known not to reach Word's state yet.
+/// (fixture, label prefix) pairs where the model is known not to reach Word's state yet. Each
+/// must still fail, so the list cannot go stale. Empty: every measured state matches Word,
+/// including the `rev-cell-edge-*` cases (a cell revision's `Range.Revisions` scope is its whole
+/// row; the first of a row's equal cell revisions also takes the row; a continuation cell that
+/// is widened by a removed neighbour stops being merged).
 const KNOWN_GAPS: &[(&str, &str)] = &[];
 
 fn is_known_gap(name: &str, label: &str) -> bool {
@@ -373,10 +377,16 @@ fn run(only: Option<&str>) -> (usize, usize, Vec<String>) {
             } else if let Some(i) = label.strip_prefix("reject1:") {
                 doc.reject_revision(i.parse().unwrap())
             } else if let Some(i) = label.strip_prefix("acceptp:") {
-                let i = visible_paragraphs(&doc)[i.parse::<usize>().unwrap()];
+                let Some(&i) = visible_paragraphs(&doc).get(i.parse::<usize>().unwrap()) else {
+                    failures.push(format!("{name}: {label}: paragraph is not visible"));
+                    continue;
+                };
                 doc.accept_revisions_in_paragraphs(i, i).map(drop)
             } else if let Some(i) = label.strip_prefix("rejectp:") {
-                let i = visible_paragraphs(&doc)[i.parse::<usize>().unwrap()];
+                let Some(&i) = visible_paragraphs(&doc).get(i.parse::<usize>().unwrap()) else {
+                    failures.push(format!("{name}: {label}: paragraph is not visible"));
+                    continue;
+                };
                 doc.reject_revisions_in_paragraphs(i, i).map(drop)
             } else {
                 panic!("unknown label {label}")
@@ -391,7 +401,12 @@ fn run(only: Option<&str>) -> (usize, usize, Vec<String>) {
                     failures.push(format!("{name}: known gap {label} now matches; remove it"));
                 }
                 None => matched += 1,
-                Some(_) if is_known_gap(&name, &label) => matched += 1,
+                Some(d) if is_known_gap(&name, &label) => {
+                    if std::env::var("REV_SHOW").is_ok() {
+                        eprintln!("GAP {name}: {d}");
+                    }
+                    matched += 1;
+                }
                 Some(d) => failures.push(format!("{name}: {d}")),
             }
         }

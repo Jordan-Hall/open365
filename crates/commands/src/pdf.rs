@@ -7,7 +7,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 
 use open365_docx::Document;
 use open365_layout::{LayoutOptions, layout_document_cancellable};
-use open365_pdf::{PdfError, PdfMetadata, export_pdf_cancellable};
+use open365_pdf::{Conformance, PdfError, PdfMetadata, export_pdf_with};
 use open365_text::{FontLibrary, FontMatch};
 
 use crate::error::CommandError;
@@ -15,9 +15,20 @@ use crate::target::write_atomic;
 
 /// What `ExportPdf` needs besides the document. Not part of the command: it is policy of the
 /// caller (a CLI flag, a server limit), never document state.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 pub struct PdfOptions {
     pub metadata: PdfMetadata,
+    /// Export only these pages, 1-based and inclusive (Word's "Page(s) From .. To"); the end is
+    /// clamped to the last page and a start past it is an error. `None` exports everything.
+    pub pages: Option<(usize, usize)>,
+    /// Archival profile (PDF/A-1b or PDF/A-2b); `Conformance::None` by default.
+    pub conformance: Conformance,
+    /// Outline from the headings ("Create bookmarks using Headings"); on by default.
+    pub bookmarks: bool,
+    /// Declare PDF/UA-1 and write what the profile needs besides the tags (a title). The PDF is
+    /// always tagged; `tags` is not an option because an untagged export would be a regression
+    /// for accessibility and Word's own default is tagged.
+    pub ua: bool,
     /// Use fonts installed on this machine for families the bundled fonts cannot stand in for.
     /// The result then depends on the machine.
     pub system_fonts: bool,
@@ -29,7 +40,32 @@ pub struct PdfOptions {
     pub cancel: Option<Arc<AtomicBool>>,
 }
 
+impl Default for PdfOptions {
+    fn default() -> Self {
+        let pdf = open365_pdf::PdfOptions::default();
+        Self {
+            metadata: PdfMetadata::default(),
+            pages: pdf.pages,
+            conformance: pdf.conformance,
+            bookmarks: pdf.bookmarks,
+            ua: pdf.ua,
+            system_fonts: false,
+            max_bytes: None,
+            cancel: None,
+        }
+    }
+}
+
 impl PdfOptions {
+    fn writer_options(&self) -> open365_pdf::PdfOptions {
+        open365_pdf::PdfOptions {
+            conformance: self.conformance,
+            bookmarks: self.bookmarks,
+            ua: self.ua,
+            pages: self.pages,
+        }
+    }
+
     pub(crate) fn check_cancelled(&self) -> Result<(), CommandError> {
         match &self.cancel {
             Some(flag) if flag.load(Ordering::Relaxed) => Err(CommandError::Cancelled),
@@ -80,12 +116,18 @@ pub(crate) fn render(doc: &Document, options: &PdfOptions) -> Result<Rendered, C
             )
         })
         .collect();
-    let out = export_pdf_cancellable(doc, &layout, &fonts, &options.metadata, &flag).map_err(
-        |e| match e {
-            PdfError::Cancelled => CommandError::Cancelled,
-            e => CommandError::Pdf(e.to_string()),
-        },
-    )?;
+    let out = export_pdf_with(
+        doc,
+        &layout,
+        &fonts,
+        &options.metadata,
+        &options.writer_options(),
+        &flag,
+    )
+    .map_err(|e| match e {
+        PdfError::Cancelled => CommandError::Cancelled,
+        e => CommandError::Pdf(e.to_string()),
+    })?;
     if let Some(limit) = options.max_bytes
         && out.bytes.len() > limit
     {
@@ -95,7 +137,10 @@ pub(crate) fn render(doc: &Document, options: &PdfOptions) -> Result<Rendered, C
     warnings.extend(out.warnings);
     Ok(Rendered {
         bytes: out.bytes,
-        pages: layout.pages.len(),
+        pages: match options.pages {
+            Some((from, to)) => to.min(layout.pages.len()).saturating_sub(from.max(1) - 1),
+            None => layout.pages.len(),
+        },
         warnings,
     })
 }

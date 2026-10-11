@@ -87,31 +87,15 @@ fn authorize(
     Err(ApiError::Forbidden("insufficient_role"))
 }
 
-/// Appends an immutable version. Quota and optimistic-concurrency checks happen here for users and links alike.
-pub fn add_version(
-    inner: &Inner,
-    tx: &Transaction<'_>,
-    tenant: &str,
-    doc_id: &str,
-    data: &[u8],
-    created_by: &str,
-    base_version: Option<i64>,
-) -> ApiResult<i64> {
-    let current: i64 = tx.query_row(
-        "SELECT current_version FROM documents WHERE id = ?1 AND tenant_id = ?2",
-        params![doc_id, tenant],
-        |r| r.get(0),
-    )?;
-    if base_version.is_some_and(|b| b != current) {
-        return Err(ApiError::Conflict("version_conflict"));
-    }
-    let used: i64 = tx.query_row(
+/// Fails early (before any bytes are written) when the tenant has no room for `size` more bytes.
+pub fn quota_precheck(conn: &Connection, tenant: &str, size: usize) -> ApiResult<()> {
+    let size = i64::try_from(size).map_err(|_| ApiError::TooLarge)?;
+    let used: i64 = conn.query_row(
         "SELECT COALESCE(SUM(size), 0) FROM versions WHERE tenant_id = ?1",
         [tenant],
         |r| r.get(0),
     )?;
-    let size = i64::try_from(data.len()).map_err(|_| ApiError::TooLarge)?;
-    let quota: i64 = tx.query_row(
+    let quota: i64 = conn.query_row(
         "SELECT quota_bytes FROM tenants WHERE id = ?1",
         [tenant],
         |r| r.get(0),
@@ -119,12 +103,40 @@ pub fn add_version(
     if used + size > quota {
         return Err(ApiError::TooLarge);
     }
-    let blob = inner.blobs.put(tenant, data)?;
+    Ok(())
+}
+
+/// Appends an immutable version whose bytes are already on disk (`blob` is `(blob id, size)`, written and fsynced
+/// before the database lock was taken). Quota and optimistic-concurrency checks happen here for users and links.
+pub fn add_version(
+    tx: &Transaction<'_>,
+    tenant: &str,
+    doc_id: &str,
+    blob: &(String, i64),
+    created_by: &str,
+    base_version: Option<i64>,
+) -> ApiResult<i64> {
+    let current: i64 = tx
+        .query_row(
+            "SELECT current_version FROM documents WHERE id = ?1 AND tenant_id = ?2 AND deleted_at IS NULL",
+            params![doc_id, tenant],
+            |r| r.get(0),
+        )
+        .optional()?
+        .ok_or(ApiError::NotFound)?;
+    if base_version.is_some_and(|b| b != current) {
+        return Err(ApiError::Conflict("version_conflict"));
+    }
+    quota_precheck(
+        tx,
+        tenant,
+        usize::try_from(blob.1).map_err(|_| ApiError::TooLarge)?,
+    )?;
     let n = current + 1;
     tx.execute(
         "INSERT INTO versions (document_id, n, tenant_id, blob_id, size, created_by, created_at)
          VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
-        params![doc_id, n, tenant, blob, size, created_by, now()],
+        params![doc_id, n, tenant, blob.0, blob.1, created_by, now()],
     )?;
     tx.execute(
         "UPDATE documents SET current_version = ?1, updated_at = ?2 WHERE id = ?3 AND tenant_id = ?4",
@@ -185,6 +197,9 @@ pub async fn create(
     }
     let id = new_id();
     let id2 = id.clone();
+    let (t, size) = (ctx.tenant_id.clone(), body.len());
+    st.run(move |_, c| quota_precheck(c, &t, size)).await?;
+    let blob = st.store_blob(&ctx.tenant_id, body).await?;
     st.run(move |inner, c| {
         let tx = c.transaction()?;
         tx.execute(
@@ -192,7 +207,7 @@ pub async fn create(
              VALUES (?1, ?2, ?3, ?4, 0, ?5, ?5)",
             params![id2, ctx.tenant_id, name, ctx.user_id, now()],
         )?;
-        let n = add_version(inner, &tx, &ctx.tenant_id, &id2, &body, &ctx.user_id, None)?;
+        let n = add_version(&tx, &ctx.tenant_id, &id2, &blob, &ctx.user_id, None)?;
         audit::append(&tx, &inner.audit, &ctx.tenant_id, &ctx.user_id, "document.create", &id2, &format!("v{n}"))?;
         tx.commit()?;
         Ok(())
@@ -252,15 +267,21 @@ pub async fn new_version(
     if body.is_empty() {
         return Err(ApiError::BadRequest("empty_body"));
     }
+    let (c2, d2, size) = (ctx.clone(), doc.clone(), body.len());
+    st.run(move |inner, c| {
+        authorize(inner, c, &c2, &d2, |r| r.write, "upload")?;
+        quota_precheck(c, &c2.tenant_id, size)
+    })
+    .await?;
+    let blob = st.store_blob(&ctx.tenant_id, body).await?;
     st.run(move |inner, c| {
         authorize(inner, c, &ctx, &doc, |r| r.write, "upload")?;
         let tx = c.transaction()?;
         let n = add_version(
-            inner,
             &tx,
             &ctx.tenant_id,
             &doc,
-            &body,
+            &blob,
             &ctx.user_id,
             q.base_version,
         )?;
@@ -476,9 +497,208 @@ pub async fn audit_verify(State(st): State<AppState>, ctx: TenantCtx) -> ApiResu
     if !ctx.is_admin {
         return Err(ApiError::Forbidden("admin_required"));
     }
-    st.run(move |inner, c| {
-        let v = audit::verify(c, &inner.audit, &ctx.tenant_id)?;
+    // Verified in batches that each take the database lock briefly, so a long chain does not stall every request.
+    st.run_unlocked(move |inner| {
+        let tenant = ctx.tenant_id.clone();
+        let v = audit::verify_with(&inner.audit, &tenant, |after, limit| {
+            audit::fetch_after(&inner.db.lock(), &tenant, after, limit)
+        })?;
         Ok(Json(json!({ "ok": v.ok, "entries": v.entries, "first_bad_seq": v.first_bad_seq, "head_mac": v.head_mac })))
+    })
+    .await
+}
+
+/// Soft delete: the document disappears for everyone (links stop resolving) but can be restored until purged.
+pub async fn delete(
+    State(st): State<AppState>,
+    ctx: TenantCtx,
+    Path(doc): Path<String>,
+) -> ApiResult<StatusCode> {
+    st.run(move |inner, c| {
+        let (d, _) = authorize(inner, c, &ctx, &doc, |r| r.manage, "document.delete")?;
+        let tx = c.transaction()?;
+        tx.execute(
+            "UPDATE documents SET deleted_at = ?1, deleted_by = ?2 WHERE id = ?3 AND tenant_id = ?4",
+            params![now(), ctx.user_id, d.id, ctx.tenant_id],
+        )?;
+        audit::append(&tx, &inner.audit, &ctx.tenant_id, &ctx.user_id, "document.delete", &d.id, "soft")?;
+        tx.commit()?;
+        Ok(StatusCode::NO_CONTENT)
+    })
+    .await
+}
+
+/// A soft-deleted document the caller may restore or purge: its owner, or a tenant admin. Anyone else (including
+/// other tenants) sees `NotFound`.
+fn load_deleted(conn: &Connection, ctx: &TenantCtx, id: &str) -> ApiResult<DocRow> {
+    if !is_hex_id(id, 32) {
+        return Err(ApiError::NotFound);
+    }
+    let doc = conn
+        .query_row(
+            "SELECT id, name, owner_id, current_version FROM documents
+             WHERE id = ?1 AND tenant_id = ?2 AND deleted_at IS NOT NULL",
+            params![id, ctx.tenant_id],
+            |r| {
+                Ok(DocRow {
+                    id: r.get(0)?,
+                    name: r.get(1)?,
+                    owner_id: r.get(2)?,
+                    current_version: r.get(3)?,
+                })
+            },
+        )
+        .optional()?
+        .ok_or(ApiError::NotFound)?;
+    if doc.owner_id == ctx.user_id || ctx.is_admin {
+        Ok(doc)
+    } else {
+        Err(ApiError::NotFound)
+    }
+}
+
+pub async fn restore(
+    State(st): State<AppState>,
+    ctx: TenantCtx,
+    Path(doc): Path<String>,
+) -> ApiResult<StatusCode> {
+    st.run(move |inner, c| {
+        let d = load_deleted(c, &ctx, &doc)?;
+        let tx = c.transaction()?;
+        tx.execute(
+            "UPDATE documents SET deleted_at = NULL, deleted_by = NULL WHERE id = ?1 AND tenant_id = ?2",
+            params![d.id, ctx.tenant_id],
+        )?;
+        audit::append(&tx, &inner.audit, &ctx.tenant_id, &ctx.user_id, "document.restore", &d.id, "")?;
+        tx.commit()?;
+        Ok(StatusCode::NO_CONTENT)
+    })
+    .await
+}
+
+/// Permanent removal of a soft-deleted document: versions, ACL, links and any blob no other version uses.
+/// The audit trail keeps its rows.
+pub async fn purge(
+    State(st): State<AppState>,
+    ctx: TenantCtx,
+    Path(doc): Path<String>,
+) -> ApiResult<StatusCode> {
+    st.run(move |inner, c| {
+        let d = load_deleted(c, &ctx, &doc)?;
+        let tx = c.transaction()?;
+        let blobs: Vec<String> = {
+            let mut s = tx.prepare(
+                "SELECT DISTINCT blob_id FROM versions WHERE document_id = ?1 AND tenant_id = ?2",
+            )?;
+            s.query_map(params![d.id, ctx.tenant_id], |r| r.get(0))?
+                .collect::<Result<_, _>>()?
+        };
+        tx.execute(
+            "DELETE FROM share_link_users WHERE tenant_id = ?2 AND link_id IN
+               (SELECT id FROM share_links WHERE document_id = ?1 AND tenant_id = ?2)",
+            params![d.id, ctx.tenant_id],
+        )?;
+        for table in ["share_links", "acl", "versions"] {
+            tx.execute(
+                &format!("DELETE FROM {table} WHERE document_id = ?1 AND tenant_id = ?2"),
+                params![d.id, ctx.tenant_id],
+            )?;
+        }
+        tx.execute(
+            "DELETE FROM documents WHERE id = ?1 AND tenant_id = ?2",
+            params![d.id, ctx.tenant_id],
+        )?;
+        audit::append(
+            &tx,
+            &inner.audit,
+            &ctx.tenant_id,
+            &ctx.user_id,
+            "document.purge",
+            &d.id,
+            &format!("versions={}", d.current_version),
+        )?;
+        tx.commit()?;
+        // Content-addressed blobs can be shared by other versions of other documents: keep those.
+        for b in blobs {
+            let used: bool = c.query_row(
+                "SELECT EXISTS(SELECT 1 FROM versions WHERE tenant_id = ?1 AND blob_id = ?2)",
+                params![ctx.tenant_id, b],
+                |r| r.get(0),
+            )?;
+            if !used {
+                inner.blobs.delete(&ctx.tenant_id, &b)?;
+            }
+        }
+        Ok(StatusCode::NO_CONTENT)
+    })
+    .await
+}
+
+/// The caller's soft-deleted documents (a tenant admin sees the tenant's).
+pub async fn trash(State(st): State<AppState>, ctx: TenantCtx) -> ApiResult<Json<Value>> {
+    st.run(move |_, c| {
+        let mut s = c.prepare(
+            "SELECT id, name, deleted_at, owner_id FROM documents
+             WHERE tenant_id = ?1 AND deleted_at IS NOT NULL AND (owner_id = ?2 OR ?3)
+             ORDER BY deleted_at DESC, id",
+        )?;
+        let rows = s
+            .query_map(params![ctx.tenant_id, ctx.user_id, ctx.is_admin], |r| {
+                Ok(
+                    json!({ "id": r.get::<_, String>(0)?, "name": r.get::<_, String>(1)?,
+                           "deleted_at": r.get::<_, i64>(2)?, "owner_id": r.get::<_, String>(3)? }),
+                )
+            })?
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(Json(json!(rows)))
+    })
+    .await
+}
+
+#[derive(Deserialize, Debug)]
+pub struct TransferReq {
+    email: String,
+}
+
+/// Ownership transfer. Only the current owner may do it, to an enabled account in the same tenant. The previous
+/// owner keeps access as an editor.
+pub async fn transfer(
+    State(st): State<AppState>,
+    ctx: TenantCtx,
+    Path(doc): Path<String>,
+    Json(req): Json<TransferReq>,
+) -> ApiResult<StatusCode> {
+    let email = req.email.trim().to_lowercase();
+    st.run(move |inner, c| {
+        let (d, _) = authorize(inner, c, &ctx, &doc, |r| r.manage, "document.transfer")?;
+        let to: String = c
+            .query_row(
+                "SELECT id FROM users WHERE tenant_id = ?1 AND email = ?2 AND disabled = 0",
+                params![ctx.tenant_id, email],
+                |r| r.get(0),
+            )
+            .optional()?
+            .ok_or(ApiError::BadRequest("unknown_user"))?;
+        if to == d.owner_id {
+            return Err(ApiError::BadRequest("already_owner"));
+        }
+        let tx = c.transaction()?;
+        tx.execute(
+            "UPDATE documents SET owner_id = ?1 WHERE id = ?2 AND tenant_id = ?3 AND owner_id = ?4",
+            params![to, d.id, ctx.tenant_id, d.owner_id],
+        )?;
+        tx.execute(
+            "DELETE FROM acl WHERE document_id = ?1 AND tenant_id = ?2 AND user_id = ?3",
+            params![d.id, ctx.tenant_id, to],
+        )?;
+        tx.execute(
+            "INSERT INTO acl (document_id, tenant_id, user_id, role, granted_by, created_at) VALUES (?1, ?2, ?3, 'editor', ?4, ?5)
+             ON CONFLICT (document_id, user_id) DO UPDATE SET role = 'editor'",
+            params![d.id, ctx.tenant_id, d.owner_id, ctx.user_id, now()],
+        )?;
+        audit::append(&tx, &inner.audit, &ctx.tenant_id, &ctx.user_id, "document.transfer", &d.id, &format!("{} -> {to}", d.owner_id))?;
+        tx.commit()?;
+        Ok(StatusCode::NO_CONTENT)
     })
     .await
 }

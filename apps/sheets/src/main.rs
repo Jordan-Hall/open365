@@ -8,7 +8,7 @@ use std::path::{Path, PathBuf};
 use egui::{Key, KeyboardShortcut, Modifiers, Ui};
 use open365_commands::{Command, Target};
 use open365_ui_egui::{ClipboardState, DocView, FindDialog, GridColors, GridView, Resize};
-use open365_ui_shell::{AppKind, CommandState, MenuEntry, Mode, Shell, ShellHost, Theme};
+use open365_ui_shell::{AppKind, CommandState, MenuEntry, Mode, Shell, ShellHost, Theme, TileFont};
 use open365_xlsx::Workbook;
 
 use format_ui::{Action, FormatUi, Sel};
@@ -676,7 +676,15 @@ impl ShellHost for Host<'_> {
 
     fn menu(&self, id: &str) -> Option<Vec<MenuEntry>> {
         if format_ui::handles(id) {
-            return self.s.fmt.menu(id, self.s.workbook(), self.s.sel());
+            let face = |name: &str, bold: bool, italic: bool| {
+                let (family, fake_bold, fake_italic) = self.s.grid.preview_face(name, bold, italic);
+                TileFont {
+                    family,
+                    fake_bold,
+                    fake_italic,
+                }
+            };
+            return self.s.fmt.menu(id, self.s.workbook(), self.s.sel(), &face);
         }
         let e = |i: &str, l: &str| MenuEntry::new(i, l, true);
         match id {

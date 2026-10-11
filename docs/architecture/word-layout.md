@@ -91,7 +91,7 @@ stream order (Word writes a page column by column; lines of two columns share ba
 | A continuous break balances the columns of the section it ends, on the section's last page only: each column aims at `content height / n` and takes a line that starts before that share is used up (10 lines and two gaps over two columns: 6 + 4); the height grows until the rest fits in the other columns; widow, orphan and keep rules apply. The next section starts below the tallest column plus the space after its last paragraph (none when the column ends inside a paragraph). The last section of the document and sections before a next-page break are not balanced. | `layout-cols-balance/-balance-pages/-continuous/-mid` |
 | `Column`-relative float positions use the column (`float-poscol`, 235 of 236). Floats wrap per column. | `layout-float-poscol` |
 
-Not done: footnotes in columns (`layout-cols-footnote`, 38 of 63: Word puts the notes under their own column), the `w:sep` line is not drawn,
+Footnotes in columns: done in Round 3 (below). Not done: the `w:sep` line is not drawn,
 tables in unequal columns use the first column's width, documents with columns are always paginated from scratch (no incremental restart).
 
 ## Content controls (`w:sdt`; `para.rs`, `incremental.rs`, `crates/docx/src/flatten.rs`)
@@ -203,6 +203,15 @@ Before / after (system fonts, 443,196 Word glyphs): 93.6 % -> 94.7 %; layout-jus
 | A justified line is stretched to `avail - 0.02 pt x spaces` (lines with at least 10 spaces): Word's lines end up to 0.6 pt short and the shortfall grows with the number of spaces. Empirical (0.01: 86.5 %, 0.02: 87.2 %, 0.035: 85.3 % on layout-justify); a rule `slack / (n + c)` fits worse. | `layout-justify`, `-align` |
 | A tab is a break opportunity before it, not after it: `Twelve` + tab + `Thirteen` at the margin puts the tab at the start of the next line, which then advances to the next stop (108 pt). | `layout-tabs` (16 -> 17 of 18 lines; corpus unchanged at 5385 of 7998) |
 
+Round 2 (justified breaks, tab leaders):
+
+| Rule | Evidence |
+|---|---|
+| A justified line may squeeze its spaces by 0.24 x space width (was 0.2): per-candidate fit over 2,424 lines of `layout-justify`: 64 -> 48 wrong accept/reject decisions; the optimum is flat at 0.235-0.245. Word's own space is 2.4 pt (10 px of 0.24 pt) against the engine's 2.487, so 0.2 x 2.4 plus that offset is about 0.24. | `layout-justify` 87.2 % -> 92.4 %; other justified fixtures unchanged |
+| Tab leaders are glyph runs of the tab's font on a grid of one pitch from the text-area left edge; pitch = advance of the leader character rounded to 0.24 pt ('.' 2.88, '-' 3.36, '_' 5.52 at Calibri 11), from the first grid point at or after the tab start to the last that ends by the tab target. Glyphs carry `ClusterKind::Other` with the character in `text_start` (`Line::leader_char`). | `layout-tabs` 65.2 % -> 72.8 % |
+
+Open: the remaining 48 wrong decisions are mostly lines with ligatures and the `sound` / `of` case (Word rejects `of` at a shrink it accepts elsewhere); Word advances are whole 300 dpi pixels (round(units x ppem / upem), ppem = round(size x 300 / 72); 95 % of pairs match) but rounding every advance in the engine lowered parity (layout-align 96.7 % -> 83.8 %), so kerning/pair rounding is still not understood. The leader pitch in Word's PDF is 2.88 pt (the reader saw 2.78 until Round 3 fixed `Tc`).
+
 Findings that did not become rules (so nobody retries the same thing):
 
 - Word's glyph advances and spaces are whole multiples of 0.24 pt (two 600 dpi pixels): in the PDF `l`/`i` advance 22 px (design 21.1), `t` 30 (30.7), `h`/`o`/`u` 48, `e` 46,
@@ -216,7 +225,39 @@ Findings that did not become rules (so nobody retries the same thing):
   is now the largest in-line loss. `SPACE_SHRINK` = 0.2 is not a threshold on shrink per space (overflow at the end of the word did not separate the two sets).
 - Tab leaders are drawn by Word as glyph rows ('.' every 2.78 pt, '-' every 3.37 pt, starting a fraction of a point after the text) and are not drawn by the engine: 326 of 892 glyphs of
   layout-tabs are leader glyphs with no engine counterpart.
-- Not looked at: list label offsets, mixed sizes, footnotes in columns (layout-cols-footnote 65 %), text boxes.
+- Looked at in Round 3: list labels, mixed sizes and footnotes in columns (below). Not looked at: text boxes.
+
+Round 3 (reader, list labels, footnotes in columns; system fonts, 443,196 Word glyphs): 94.7 % -> 96.3 % (bundled 93.6 % -> 93.8 %).
+
+| Rule | Evidence |
+|---|---|
+| `wordpdf.rs` honours `Tc`, `Tw` and `Tz` (graphics state, saved and restored by `q` / `Q`). Word writes `Tc` (e.g. -0.0773) on list labels and on `w:spacing` runs; ignoring it put every later glyph of the `TJ` off. This is a reader fix, not an engine change: it raised `fields` 142 -> 352 of 353, `layout-tabs` 649 -> 872, `layout-caps` 2066 -> 2076, `layout-caps-sizes` 198 -> 206 (system). | all 29 PDFs that contain `Tc` |
+| The one lowered floor, caused by the reader fix: bundled `layout-caps-sizes` 122 -> 119 of 208 (the earlier 122 counted glyphs that agreed only because `Tc` was ignored; the system-font figure rose). | `charx-floor.toml` |
+| The space after a label (`w:suff` = space) is set in Arial at the label's size, whatever the label font: the PDF draws it in ArialMT and the text starts 3.12 pt after the label at 11 pt (Calibri's space would give 2.4 pt). | `layout-lists-suff` 1959 -> 1990 of 2015 |
+| A list label is not kerned (`v.`, `r.`, `o.` keep their unkerned gap; kerning moved `.` by 0.5 to 1.2 pt). | `layout-lists-formats` 3808 -> 3816 of 3862 |
+| Label x positions for left, centre and right alignment, the tab / space / nothing gaps and the hanging indent were already right (`layout-lists-style` 90.9 %, `-suff` 98.8 %, `-multilevel` 100 %); what remains there is 0.5 to 0.9 pt drift after the first 30 glyphs of a line (the kerning/rounding noise below), not label placement. | `CHARX_DETAIL` rows |
+| Footnotes of a section with equal columns are set at the column width and balanced over the columns: whole notes in order, split so the tallest column is as short as it can be (6 one-line notes in 2 columns: 3 + 3). The note area (`NoteStore::area`) is that tallest column plus the separator, so the body gets the room back. Unequal columns still use the full width. | `layout-cols-footnote` 1446 -> 2212 of 2224 glyphs, lines 38 -> 62 of 63 |
+
+Mixed sizes (`layout-mixed-sizes`, 96.9 %): the failing glyphs are the same sub-pixel drift (0.5 to 0.7 pt late in the line), baselines and the x of the size change agree; no rule to add.
+
+Open after Round 3: Word's glyph advances are whole pixels but rounding in the engine still lowers parity (kerning-pair rounding not investigated this round); the 5385 -> 5396 of 7998 corpus lines are mostly cell rectangles, text boxes and `ca4e5536`-style titles (a Title paragraph inside a block `w:sdt` is left-aligned by the engine where Word centres it, x 72 against 217.9; not diagnosed). The ~120 dropped blank rows are an oracle-side pairing problem (they need Word's `Range.Information`); they cannot be recovered from the committed references.
+
+## Superscript and subscript runs (`w:vertAlign`; `para.rs` `style_from`, `GlyphRun::vert_align`)
+
+Measured from Word's PDF: the MS-template references with `th`/`st` superscripts (`114ed224`, `1907b7c8`, `33449d14`, `b97c34b7`, `c0651bb6`,
+`e41daea3`) and a probe (`vert/probe.docx`, Arial, Calibri and Times New Roman at 10, 12 and 20 pt, exported through Word's PDF export; subscripts have no
+fixture). Word snaps sizes and baselines to its 0.24 pt grid.
+
+| Base size | Super size | Super raise | Sub size | Sub drop |
+|---|---|---|---|---|
+| 10 pt (PDF 10.08) | 6.48 | 3.60 | 6.48 | 0.96 |
+| 12 pt | 7.92 | 4.08 | 7.92 | 0.96 |
+| 20 pt (PDF 19.92) | 12.96 | 6.48 | 12.96 | 1.44 |
+
+Rule used: size 0.65 of the run's size, superscript raised by 1/3 em of the unreduced size, subscript lowered by 1/12 em (all within one grid step of
+the data; identical across the three fonts). The raise is `PlacedGlyph::y_offset`; the run keeps the full size for line metrics, so the line height does not
+change. Not matched: Segoe UI in `c0651bb6` raises 4.08 pt at 10 pt (a font-specific value, probably the OS/2 superscript metrics), and Avenir Next LT Pro Light
+shrinks to 6.0 pt rather than 6.5; both are left on the generic rule. `w:position` is still ignored. Note reference marks keep their own rule (`superscript`).
 
 ## Not matched yet
 

@@ -78,6 +78,13 @@ pub const FIELD_RIGHT_U: i32 = 10;
 /// Strip height (formula_left / formula_bar panes): expanded measured, collapsed derived.
 pub const STRIP_H_EXPANDED_U: i32 = 96;
 pub const STRIP_H_COLLAPSED_U: i32 = 48;
+/// Sheet-tab strip (Excel, measured by the 1 px sweep): it ends at `SPLIT_FRACTION * pane width - SPLIT_MARGIN_U`,
+/// the split handle is `SPLIT_W_U` wide and the horizontal scroll bar starts right after it.
+pub const SPLIT_FRACTION: f32 = 0.6;
+pub const SPLIT_MARGIN_U: f32 = 15.0;
+pub const SPLIT_W_U: i32 = 40;
+/// Width of the vertical scroll bar the horizontal one stops before (right-anchored, 23 u from the pane edge).
+pub const VSCROLL_RIGHT_U: i32 = 23;
 /// Distance from the pane's right edge to the ribbon card's right edge (pixel scan of the oracle window).
 pub const CARD_RIGHT_U: i32 = 11;
 
@@ -166,6 +173,11 @@ pub struct Layout<'a> {
     pub formula_bar: Option<PxRect>,
     pub sheet_bar: Option<PxRect>,
     pub sheet_items: Vec<PlacedChrome<'a>>,
+    /// Spreadsheet: the split handle between the sheet tabs and the horizontal scroll bar (Excel's
+    /// `XLCTL`). The tab strip ends here.
+    pub sheet_split: Option<PxRect>,
+    /// Spreadsheet: the horizontal scroll bar, from 40 u right of the split to the vertical scroll bar.
+    pub hscroll: Option<PxRect>,
     /// The area left for the document.
     pub content: PxRect,
 }
@@ -666,7 +678,8 @@ pub fn compute_scrolled<'a>(spec: &'a AppSpec, input: &LayoutInput, scroll: i32)
         out.name_box = Some(conv.rect4(&rr));
     }
     if let Some(f) = &spec.formula_bar {
-        let w = pane_w_u - f.x - f.right;
+        // Excel's formula bar is `win - 292` wide at every width: it always runs to the pane edge.
+        let w = pane_w_u - f.x;
         out.formula_bar = Some(conv.rect(f.x, f.y - collapse, w, f.h));
         // Pieces of the strip, anchored like Excel's: left pieces to the left, field to the right.
         let shrink = if input.formula_expanded {
@@ -712,9 +725,35 @@ pub fn compute_scrolled<'a>(spec: &'a AppSpec, input: &LayoutInput, scroll: i32)
             ox: bar.x + conv.px(s.x),
             oy: bar.y,
         };
+        let split_u = split_x_u(pane_w_u);
+        let tabs_fit = tab_strip_fits(s, split_u);
         for c in &s.items {
-            out.sheet_items.push(placed(c, sc.rect(c.x, c.y, c.w, c.h)));
+            let name = c.ref_name.as_deref().unwrap_or_default();
+            if name == "Sheet1" && !tabs_fit {
+                continue;
+            }
+            // The first tab is clipped by the strip's end, so its card narrows as the window does.
+            let w = if name == "Sheet1" {
+                c.w.min(split_u - c.x - TAB_STRIP_RESERVE_U)
+            } else {
+                c.w
+            };
+            let x = if name == "Add Sheet" && !tabs_fit {
+                hidden_add_x(s)
+            } else {
+                c.x
+            };
+            out.sheet_items.push(placed(c, sc.rect(x, c.y, w, c.h)));
         }
+        let bar_conv = Conv {
+            scale: input.scale,
+            ox: bar.x,
+            oy: bar.y,
+        };
+        out.sheet_split = Some(bar_conv.rect(split_u, 1, SPLIT_W_U, s.h - 1));
+        let hs_x = split_u + SPLIT_W_U;
+        let hs_end = pane_w_u - VSCROLL_RIGHT_U;
+        out.hscroll = Some(bar_conv.rect(hs_x, 9, (hs_end - hs_x).max(0), 21));
         content_bottom = bar.y;
     }
     out.content = PxRect {
@@ -724,4 +763,33 @@ pub fn compute_scrolled<'a>(spec: &'a AppSpec, input: &LayoutInput, scroll: i32)
         h: (content_bottom - content_top - it).max(0),
     };
     out
+}
+
+/// Where the sheet-tab strip ends (the split handle's x) at a pane width, in `u`.
+#[must_use]
+pub fn split_x_u(pane_w_u: i32) -> i32 {
+    (SPLIT_FRACTION * pane_w_u as f32 - SPLIT_MARGIN_U).floor() as i32
+}
+
+/// The first tab stops `TAB_STRIP_RESERVE_U` before the split handle (its card is the tab minus 11 u).
+const TAB_STRIP_RESERVE_U: i32 = 74;
+/// The tab is dropped once its clipped card (the tab minus 11 u) is no wider than this.
+const TAB_MIN_CARD_U: i32 = 20;
+
+/// The first sheet tab is shown while its clipped card is wider than `TAB_MIN_CARD_U`.
+fn tab_strip_fits(s: &crate::spec::SheetTabs, split_u: i32) -> bool {
+    s.items
+        .iter()
+        .filter(|c| c.ref_name.as_deref() == Some("Sheet1"))
+        .all(|c| c.w.min(split_u - c.x - TAB_STRIP_RESERVE_U) - 11 > TAB_MIN_CARD_U)
+}
+
+/// Add Sheet moves next to the scroll buttons when no tab is shown.
+fn hidden_add_x(s: &crate::spec::SheetTabs) -> i32 {
+    s.items
+        .iter()
+        .filter(|c| c.ref_name.as_deref() == Some("Sheet1"))
+        .map(|c| c.x)
+        .min()
+        .unwrap_or(0)
 }

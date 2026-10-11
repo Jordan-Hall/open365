@@ -11,7 +11,7 @@ export_pdf(doc: &Document, layout: &Layout, fonts: &FontLibrary, meta: &PdfMetad
 ```
 
 `export_pdf_with(.., &PdfOptions { conformance, bookmarks, ua }, &cancel)` adds PDF/A-1b/2b, the
-bookmarks switch and PDF/UA-1 (`pdfuaid`); `export_pdf` uses the defaults (plain PDF 1.7, bookmarks on).
+bookmarks switch and PDF/UA-1 (`pdfuaid`); `export_pdf` uses the defaults (plain PDF 1.7, bookmarks on). `PdfOptions::pages: Option<(usize, usize)>` takes a 1-based inclusive page range; the end is clamped to the last page, and NoPages is returned when the start is past the last page.
 `fonts` must be the library the layout was made with. CLI: `open365 docx export-pdf <in> -o <out>
 [--title --author --subject --keywords --language|--lang --document-properties --pdfa 1b|2b --pdfua
 --no-bookmarks --system-fonts --overwrite --allow-destructive --root <dir>]`. Author and dates are
@@ -35,10 +35,10 @@ PDF 1.7, classic xref table, own writer on `flate2` (already in the dependency g
 | Decoration | Underline and strike from the font's `post`/`OS/2` metrics. |
 | Tables | `CellBox` carries the resolved fill (`w:shd`, `pctNN` mixes mixed) and the four borders (cell, then table style, then table; solid, double, dashed, dotted). The PDF draws them as artifacts straight from the layout; it does not read the DOCX for them. Table, row and column ids are in `CellBox` too. |
 | Images | Body pictures, and the inline and floating pictures of headers, footers and footnotes (`Page::header_images`, `footer_images`, `note_images`). A picture's `embed` id is resolved through the relationships of the part the layout names (`ImageSource`), so a header picture is found through the header part. Header, footer and note pictures are artifacts. JPEG: header validated, DCTDecode pass-through (CMYK Adobe inverted handled). Others: decoded with `image` under limits, Flate RGB plus an `SMask` when any alpha is not 255. |
-| Tagging | `MarkInfo`, `StructTreeRoot`, `ParentTree`, `IDTree`, `/Tabs /S`. Elements: Document, P, H1-H6 (also a numbered heading, whose label is part of the heading's marked content, as in Word; a heading is found by role or by its style `heading N` through `basedOn`), L (`/A ListNumbering`)/LI/Lbl/LBody for other numbered paragraphs, `Table > THead > TR > TH` and `TBody > TR > TH/TD` as Word writes them (the first row, plus `tblHeader` rows, is the head; with the table look `firstColumn` the first cell of each body row is a TH). TH has `/ID` and `/A Scope Column|Row`; TD has `/A Headers [ids]` (the column heads it spans and its row head); spans are `ColSpan`/`RowSpan` and a cell covered by a vertical merge has no element. `Table /Alt` and `/A Summary` come from `w:tblDescription` (Word writes only `/Alt`, from the description, never from the caption). Figure with `/Alt` from the picture description (PDF/UA mode: a placeholder when there is none). A hyperlink is a `Link` element inside its paragraph (marked content of the link text plus an `OBJR` to the annotation). Footnote lines become P elements at the end; headers, footers, shading, borders and repeated table header rows are artifacts. |
-| Language | `/Lang` in the catalog: the caller's, else the primary subtag of the document default (`w:docDefaults` `w:lang`; `de-DE` gives `de`, as Word writes the subtag). Text whose effective language (run `w:lang`, character style, paragraph style chain, default) differs from it gets a `Span /Lang` element (evidence: Word's exports of `fixtures/reference/pdf/probes/probe-lang*`). Word's own catalog `/Lang` was `en` for every probe whatever the document language (de-DE, fr-FR), so it is not derived from the document; we write the document's. |
+| Tagging | `MarkInfo`, `StructTreeRoot`, `ParentTree`, `IDTree`, `/Tabs /S`. Elements: Document, P, H1-H6 (also a numbered heading, whose label is part of the heading's marked content, as in Word; a heading is found by role or by its style `heading N` through `basedOn`), L (`/A ListNumbering`)/LI/Lbl/LBody for other numbered paragraphs, `Table > THead > TR > TH` and `TBody > TR > TH/TD` as Word writes them (the first row, plus `tblHeader` rows, is the head; with the table look `firstColumn` the first cell of each body row is a TH). TH has `/ID` and `/A Scope Column|Row`; TD has `/A Headers [ids]` (the column heads it spans and its row head); spans are `ColSpan`/`RowSpan` and a cell covered by a vertical merge has no element. `Table /Alt` and `/A Summary` come from `w:tblDescription` (Word writes only `/Alt`, from the description, never from the caption). Figure with `/Alt` from the picture description (PDF/UA mode: a placeholder when there is none). A hyperlink is a `Link` element inside its paragraph (marked content of the link text plus an `OBJR` to the annotation). Footnotes and endnotes follow Word: in the paragraph, `Link` > (`OBJR` of an internal link annotation on the reference mark, `Span` of the mark, `Footnote` or `Endnote` element with `/ID (Note N)` (N counts all notes in order of their marks, and the IDTree names it) holding the note's P elements); the StructTreeRoot has a `RoleMap` mapping `Footnote` and `Endnote` to `Note`. The annotation's `Dest` is 3 pt left of the note's first line, on whole points, as Word's is; headers, footers, shading, borders and repeated table header rows are artifacts. |
+| Language | `/Lang` in the catalog: the caller's, else the primary subtag of the document default (`w:docDefaults` `w:lang`; `de-DE` gives `de`, as Word writes the subtag). Text whose effective language (run `w:lang`, character style, paragraph style chain, default) differs from it gets a `Span /Lang` element (evidence: Word's exports of `fixtures/reference/pdf/probes/probe-lang*`). Word's own catalog `/Lang` was `en` for every probe whatever the document language (de-DE, fr-FR), so it is not derived from the document; we write `en` (or the caller's) and span the rest. |
 | Metadata | Info dictionary and XMP from `PdfMetadata` (title, author, subject, keywords, creator, created, modified, language); Info and XMP carry the same values. `PdfMetadata::from_document` reads the document's own core properties (Word's "Document properties" option); it is never applied implicitly. `DisplayDocTitle` only with a title. PDF/UA (`PdfOptions::ua`): `pdfuaid:part` 1 in the XMP, `DisplayDocTitle` always, and when no title was given the first heading is used (with a warning). |
-| Hyperlinks | `Link` annotations (print flag, no border, `Contents` = link text) over the glyph extent of each line the link covers. External targets are limited to `http`, `https`, `mailto`, `ftp`, `tel` (anything else is dropped with a warning); `w:anchor` becomes an explicit `Dest [page /XYZ x y 0]` at the first line of the bookmark's paragraph. Link ranges come from aligning the model's paragraph text (cached field results, no field codes) with the text the layout drew (`align.rs`: common prefix and suffix plus an LCS of the middle), so a link around a field whose value the layout computed (a PAGE field) is still found; no text search is used. Links in headers, footers and notes are made (the header or footer part is picked per section and kind, as the layout does); their annotations get a `Link` element each (headers and footers are artifacts, so it sits under the Document element and holds only the OBJR). Links in text boxes are not made. |
+| Hyperlinks | `Link` annotations (print flag, no border, `Contents` = link text) over the glyph extent of each line the link covers. External targets are limited to `http`, `https`, `mailto`, `ftp`, `tel` (anything else is dropped with a warning); `w:anchor` becomes an explicit `Dest [page /XYZ x y 0]` at the first line of the bookmark's paragraph. Link ranges come from aligning the model's paragraph text (cached field results, no field codes) with the text the layout drew (`align.rs`: common prefix and suffix plus an LCS of the middle), so a link around a field whose value the layout computed (a PAGE field) is still found; no text search is used. Links in headers, footers and notes are made (the header or footer part is picked per section and kind, as the layout does); their annotations get a `Link` element each (headers and footers are artifacts, so it sits under the Document element and holds only the OBJR). Links in text boxes are made: each box's links become Link annotations with a Link structure element, while the box text stays an artifact. |
 | Bookmarks | Outline from the layout's heading roles (`PdfOptions::bookmarks`, default on, as Word's "Create bookmarks using Headings"), nested by level, `Dest` at the top of the heading's first line. |
 | Pages | MediaBox from each page's section, on Word's 600 dpi grid: an A4 section (595.3 x 841.9 pt) is written 595.2 x 841.92 pt as Word does (evidence: every A4 page of the 132 reference PDFs); other sizes are written as the section says. |
 | PDF/A | `PdfOptions::conformance` = `PdfA1b` (header 1.4, pictures with alpha composited onto white, no soft masks) or `PdfA2b` (1.7). Both: XMP with `pdfaid:part`/`conformance`, uncompressed XMP, Info/XMP agreement, `/ID`, sRGB output intent with an ICC profile written by `icc.rs` from the public sRGB definition, all fonts embedded, no encryption/JavaScript/transparency operators. PDF/A-1 also gets a `CIDSet` per font; the `.notdef` glyph is never drawn in PDF/A or PDF/UA mode. veraPDF results: see Validation. |
@@ -89,22 +89,21 @@ caller's library, not from the document.
   probes plus plain-paragraphs, table-merged-cells, hyperlink-external, footnotes-endnotes,
   header-footer, layout-hf-basic, layout-lists-multilevel, inline-image, layout-table-basic,
   comments, fields), each exported with `--pdfa 1b`, `--pdfa 2b`, `--pdfua` and `--pdfua --pdfa
-  2b`: PDF/A-1b 17 of 17 pass, PDF/A-2b 17 of 17, PDF/UA-1 17 of 17, PDF/UA-1 on the combined
-  files 17 of 17. Problems it found and that were fixed: PDF/A-1 `CIDSet` missing (6.3.5),
+  2b`: 17 fixtures in each of 4 modes (PDF/A-1b, PDF/A-2b, PDF/UA-1, PDF/A-2b+UA), 68 of 68 pass. Problems it found and that were fixed: PDF/A-1 `CIDSet` missing (6.3.5),
   `.notdef` glyph drawn (6.2.11.8; UA 7.21.7, 7.21.8), a figure without alternative text (UA 7.3),
   rows of a table with vertical merges counted twice (UA 7.2-42). This is a sample, not a claim of
   full conformance: text boxes, charts and EMF pictures are not covered.
 
 ## Word geometry (measured 2026-10-11)
 
-word geometry: 125 fixtures, 438027 Word glyphs, 99.37% paired, 86.23% within 0.5 pt of Word; pages 347 ours / 347 Word, same size 347, exact 185
+word geometry: 125 fixtures, 438027 Word glyphs, 99.37% paired, 88.28% within 0.5 pt of Word; pages 347 ours / 347 Word, same size 347, exact 185
 
 Word 16.0.20430 on the generated fixtures that the bundled fonts can lay out. "Paired" is the share
 of Word's non-blank characters that have a counterpart in our page (LCS); "within 0.5 pt" counts
 pairs whose x and y both agree. Pages and MediaBoxes agree on all 347 pages. The PDF writer adds
 no error of its own (`roundtrip.rs`: glyphs equal the layout within 0.01 pt), so every miss below
 is the layout engine's: the layout owner's list is under "Differences for the layout owner".
-The floors in the test (99.3 % paired, 86.2 % within tolerance, 185 exact pages) only move up.
+The floors in the test (99.3 % paired, 87.5 % within tolerance, 185 exact pages) only move up.
 
 ```
 comments                           pages  1/1  glyphs     42 paired 100.0% within 0.5 pt 100.0%
@@ -232,7 +231,7 @@ plain-paragraphs                   pages  1/1  glyphs     74 paired 100.0% withi
 sections-landscape                 pages  2/2  glyphs     33 paired 100.0% within 0.5 pt 100.0%
 table-merged-cells                 pages  1/1  glyphs     64 paired 100.0% within 0.5 pt 100.0%
 tracked-changes                    pages  1/1  glyphs     39 paired 100.0% within 0.5 pt 100.0%
-word geometry: 125 fixtures, 438027 Word glyphs, 99.37% paired, 86.23% within 0.5 pt of Word; pages 347 ours / 347 Word, same size 347, exact 185
+word geometry: 125 fixtures, 438027 Word glyphs, 99.37% paired, 88.28% within 0.5 pt of Word; pages 347 ours / 347 Word, same size 347, exact 185
 ```
 
 ### Differences for the layout owner (fixtures under 70 % within 0.5 pt, not fixed here)
@@ -248,20 +247,68 @@ layout-frame-* 74 to 93 % (frames and drop caps pair only 81 to 94 %). These mat
 the layout oracle (alignment, tabs, list labels, caps, footnotes/endnotes, floats, text boxes,
 justification); the PDF side was not changed to hide them.
 
+## Where we follow Word
+
+The owner rule is no deliberate difference from Word's PDF. `tests/word_structure.rs` compares the
+tagged structure (catalog `/Lang`, `RoleMap`, elements, link rectangles) with Word's exports in
+`fixtures/reference/pdf` and the probes in `fixtures/reference/pdf/probes` (the `p-*` probes were
+exported for this by `tools/office/make-pdf-refs.ps1 -DocxDir`). `O365_STRUCT_REPORT=1 cargo test
+-p open365-pdf --test word_structure -- --nocapture` lists every remaining difference per fixture.
+
+- `RoleMap` is Word's (Footnote, Endnote, Textbox, Header, Footer, InlineShape, Annotation,
+  Artifact, Workbook, ..., Title, CommentAnchor, Notes); one constant, `ROLE_MAP`.
+- Catalog `/Lang` is not the document's language: Word writes `en` (its application language) for
+  de-DE, fr-FR and en-GB documents, and tags every run in another language with `Span /Lang`, a
+  whole German document included (`probes/p-lang-settings`). We write `en` unless the caller passes
+  `PdfMetadata::language` (the CLI `--language`; a desktop would pass the user's UI language).
+- Link rectangles: the glyph extent widened by 2.25 pt (3 px at 96 dpi) each side; from the top
+  of the line box, raised by the paragraph's space above that the previous paragraph's space
+  below does not already cover, to the bottom of the line, lowered by the space after on the last
+  line of a paragraph; a paragraph with contextual spacing drops its own space towards a
+  neighbour of the same style (`probes/p-rect`, 125 fixtures). This also fixes the note-mark
+  rectangle (22.5 pt = 14.5 line + 8 space after). `link_rectangles_equal_words` pins it.
+- Links in endnote text are found (the line key now uses the note's own paragraph number).
+- A link's text is a `Span` inside the `Link` (`Link > OBJR, Span > MCID`).
+- Links in headers and footers are annotations without `StructParent` or structure element (Word
+  has none); with `PdfOptions::ua` they still get a `Link` element under the Document element.
+- A table is tagged only when it draws a border or a fill (shading alone counts); a borderless
+  table is "layout" and its cell paragraphs are plain `P`s under the parent (`p-thdr`, 17 layout
+  fixtures). A nested table inside a tagged table is `Table > TR > TD`, no `THead`/`TBody`.
+- Tab leaders are text, not artifacts: one string of the leader character inside the paragraph's
+  marked content, no `ActualText`, in x order. Fonts: Word writes the blanks and leaders as a
+  simple TrueType subset (character codes 32 to 46, no ToUnicode) and everything else as Type0. We
+  keep Type0 with a ToUnicode entry for them too: the glyphs, the copied text and the reading
+  order are the same (`tests/word_text.rs`), so nothing a user sees, copies or hears differs, and
+  simple fonts would add a second encoding path for no observable gain. This is the one
+  deliberate difference left.
+
 ## Known gaps
 
 - PDF/A and PDF/UA were validated on a sample only (see Validation). A DeviceCMYK JPEG is not
-  converted for PDF/A. UA: the footnote reference mark in the body is not a link to its note and
-  notes are not `Footnote`/`Note` elements (Word writes both); header and footer link annotations
-  are tagged under the Document element, not inside the header.
+  converted for PDF/A. 
+- Structure now matching Word (counts and nesting in `word_structure` report): continuation `Span`
+  on later pages (also repeated table header rows, `layout-table-pages`), `Figure` as a sibling
+  after its `P`, `Textbox` after the anchor paragraph with a `P` per box paragraph (links in boxes
+  hang under the box `P`; no Word probe yet), nested `L` in `LBody` with `ListNumbering` from the
+  number format, no `P` for an empty section-break paragraph, a vertical-merge continuation cell
+  or a text paragraph that drew nothing, a table inside a layout table is a normal table.
+- Differences that remain: TOC entries (`TOC > TOCI > Span, Link, Span`; Word's PAGEREF Links have
+  no annotation) and the hidden zero-size link of a REF field (`fields`); `CommentAnchor`; two
+  adjacent note marks give one link (`layout-fn-mixed`); the blank `( )` Word draws after a note
+  mark or a paragraph (trailing `Span`, also after a foreign-language run in `probe-lang`);
+  `THead` for a first row of a table with direct borders and no `tblLook` (`p-rect`, `p-tnest`:
+  rule not found, needs probes); floating `Figure` count (`layout-float-wrap-tight`); no `/Pg` on
+  struct elements; simple TrueType subsets for blanks and leaders (still Type0 + ToUnicode, the
+  one deliberate difference); P/Span counts that follow layout differences (`trh-*`,
+  `float-anchor-*`, `frame-dropcap`, `fn-long`). No text-box probe was made.
+- Footnote marks over 8 characters or with symbols are skipped. Footnote marks over 8 characters or with symbols are skipped.
 - Language: only `w:lang w:val` is read (not `w:eastAsia` or `w:bidi` by script; Word picks by
-  script). Catalog `/Lang` differs from Word's constant `en` for non-English documents, on purpose.
+  script).
 - CFF: subroutines are not pruned, there is no test with a CID-keyed font and no CFF font is
   bundled, so the end-to-end CFF path (FontFile3) was exercised only on unit fixtures and one
   ad hoc font. Complex-script (Identity-H plus cluster ToUnicode) is tested with the Latin
   ligature/accent clusters of the bundled fonts only; no Arabic or Indic font is available.
-- Hyperlinks: the alignment finds a link whose text a field replaced, but a link inside a text
-  box is not made (text boxes are artifacts); the layout owner could remove the alignment by
+- Hyperlinks: the alignment finds a link whose text a field replaced, the layout owner could remove the alignment by
   putting the link index on `GlyphRun` or `Cluster`; a link over several lines gets one annotation per line but one `Link` element placed at its
   first line in the reading order.
 - Nested tables: an outer cell that contains an inner table takes its borders from the least

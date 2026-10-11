@@ -69,7 +69,8 @@ fn external_hyperlink_is_an_annotation_owned_by_a_link_element() {
     let rect = d["Rect"].arr();
     assert!(rect[2].num() > rect[0].num() && rect[3].num() > rect[1].num());
 
-    // The Link element holds the link text's marked content and the annotation.
+    // The Link element holds the annotation and a Span with the link text's marked content, as
+    // Word's does.
     let (link_id, link) = all_objects(&r)
         .into_iter()
         .find(|(_, o)| matches!(o, Obj::Dict(d) if is_name(d.get("S"), "Link")))
@@ -84,6 +85,14 @@ fn external_hyperlink_is_an_annotation_owned_by_a_link_element() {
             Some(Obj::Name(t)) if t == "OBJR" => {
                 objr += 1;
                 assert_eq!(k.dict()["Obj"], Obj::Ref(annot_id));
+            }
+            Some(Obj::Name(t)) if t == "StructElem" => {
+                assert!(is_name(k.dict().get("S"), "Span"));
+                for m in r.key(&k, "K").expect("span K").arr() {
+                    let m = r.resolve(m);
+                    assert!(matches!(m.dict().get("Type"), Some(Obj::Name(t)) if t == "MCR"));
+                    mcr += 1;
+                }
             }
             other => panic!("unexpected kid {other:?}"),
         }

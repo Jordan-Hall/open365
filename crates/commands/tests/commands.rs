@@ -526,6 +526,35 @@ mod docx_edits {
     }
 
     #[test]
+    fn vert_align_applies_toggles_and_undoes() {
+        use open365_commands::VertAlign;
+        let mut t = plain();
+        let original = main_xml(&t);
+        let set = |v: VertAlign| Command::DocxSetRunProps {
+            start: pos(0, 0),
+            end: pos(0, 3),
+            patch: RunPropsPatch::vert_align(v),
+        };
+        assert_eq!(set(VertAlign::Superscript).effect(None), EffectClass::Edit);
+        apply(&mut t, set(VertAlign::Superscript)).expect("super");
+        let sup = main_xml(&t);
+        assert!(sup.contains(r#"<w:vertAlign w:val="superscript"/>"#));
+        // Toggling an already superscript range sets baseline.
+        apply(&mut t, set(VertAlign::Baseline)).expect("toggle off");
+        assert!(main_xml(&t).contains(r#"<w:vertAlign w:val="baseline"/>"#));
+        apply(&mut t, set(VertAlign::Subscript)).expect("sub");
+        assert!(main_xml(&t).contains(r#"<w:vertAlign w:val="subscript"/>"#));
+        t.undo().expect("undo sub");
+        assert!(main_xml(&t).contains(r#"w:val="baseline""#));
+        t.undo().expect("undo toggle");
+        assert_eq!(main_xml(&t), sup);
+        t.undo().expect("undo super");
+        assert_eq!(main_xml(&t), original);
+        let json = serde_json::to_string(&set(VertAlign::Subscript)).expect("json");
+        assert!(json.contains(r#""vert_align":"subscript""#), "{json}");
+    }
+
+    #[test]
     fn new_commands_round_trip_through_json() {
         let log = CommandLog(vec![
             Command::DocxDeleteRange {

@@ -204,6 +204,13 @@ fn check_width(spec: &AppSpec, width: i32, w: &Value, t: &mut Tally) {
         (got, want) => t.flag(&tag("tab scroll present"), got.is_some(), want.is_some()),
     }
 
+    // Excel: Win32 child windows below the ribbon (schema 3; the UI Automation rectangles are stale).
+    if spec.sheet_tabs.is_some()
+        && let Some(extra) = w.get("extra").filter(|e| e.is_array())
+    {
+        check_excel_extra(&lay, width, &recs(extra), &w["tabs"], px, py, t);
+    }
+
     // Status bar: the items the spec knows must be shown exactly when Office shows them.
     for c in &spec.status.items {
         let name = c.ref_name.as_deref().unwrap_or_default();
@@ -221,12 +228,72 @@ fn check_width(spec: &AppSpec, width: i32, w: &Value, t: &mut Tally) {
     }
 }
 
+/// Name Box host, formula bar, sheet-tab split handle and horizontal scroll bar, from the visible Win32 children.
+#[allow(clippy::too_many_arguments)]
+fn check_excel_extra(
+    lay: &Layout<'_>,
+    width: i32,
+    extra: &[Rec<'_>],
+    tabs: &Value,
+    px: i32,
+    py: i32,
+    t: &mut Tally,
+) {
+    let tag = |s: &str| format!("{width} {s}");
+    let find = |name: &str, pred: &dyn Fn(&Rec<'_>) -> bool| {
+        extra.iter().find(|r| r.name == name && pred(r))
+    };
+    if let (Some(got), Some(r)) = (lay.formula_left, find("EXCEL;", &|_| true)) {
+        t.x_w(&tag("name box host"), pane(got, px, py), r.r);
+    }
+    if let (Some(got), Some(r)) = (lay.name_box, find("ComboBox", &|_| true)) {
+        t.x_w(&tag("name box"), pane(got, px, py), r.r);
+    }
+    if let (Some(got), Some(r)) = (lay.formula_bar, find("EXCEL<", &|_| true)) {
+        t.x_w(&tag("formula bar"), pane(got, px, py), r.r);
+    }
+    if let (Some(got), Some(r)) = (lay.sheet_split, find("XLCTL", &|_| true)) {
+        t.x_w(&tag("sheet split"), pane(got, px, py), r.r);
+    }
+    // The Sheet1 tab card (a white run in the first colour row) is there exactly when the layout shows the tab.
+    if let Some(row) = tabs.get(0).and_then(|r| r.get(1)).and_then(Value::as_array) {
+        let card = row
+            .iter()
+            .find(|run| run[2].as_str() == Some("ffffff") && run[1].as_i64().unwrap_or(0) > 20);
+        let item = lay
+            .sheet_items
+            .iter()
+            .find(|i| i.chrome.ref_name.as_deref() == Some("Sheet1"));
+        t.flag(&tag("sheet tab shown"), item.is_some(), card.is_some());
+        if let (Some(item), Some(card)) = (item, card) {
+            let x = i32::try_from(card[0].as_i64().unwrap_or(0)).unwrap_or(0);
+            let w = i32::try_from(card[1].as_i64().unwrap_or(0)).unwrap_or(0);
+            // The card is the tab inset by about 5.5 px each side.
+            t.x_w(
+                &tag("sheet tab card"),
+                PxRect {
+                    x: item.rect.x + 5,
+                    w: item.rect.w - 11,
+                    ..item.rect
+                },
+                PxRect { x, w, ..item.rect },
+            );
+        }
+    }
+    if let (Some(got), Some(r)) = (
+        lay.hscroll,
+        find("NUIScrollbar", &|r| r.r.h <= 21 && r.r.w > 21),
+    ) {
+        t.x_w(&tag("horizontal scroll bar"), pane(got, px, py), r.r);
+    }
+}
+
 fn run(app: &str, spec: &AppSpec) {
     let d = load(app);
-    if d["schema"].as_i64() != Some(2) {
+    if !matches!(d["schema"].as_i64(), Some(2 | 3)) {
         // The committed file is still the old 25 px sweep (schema 1); re-run the oracle with
         // `-ChromeWidths 1900..407:1` to replace it.
-        println!("{app}: NOT RUN, {app}-chrome-responsive.json is not a schema 2 sweep");
+        println!("{app}: NOT RUN, {app}-chrome-responsive.json is not a schema 2 or 3 sweep");
         return;
     }
     let widths = d["widths"].as_array().expect("widths");

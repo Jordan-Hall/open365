@@ -3,8 +3,10 @@
 //! and the rules that decide which style element formats which cell of the table.
 
 mod custom;
+mod formats;
 
 pub use custom::CustomStyles;
+pub use formats::{Dxfs, UserFormat, apply_user_formats};
 
 use std::collections::HashMap;
 use std::sync::OnceLock;
@@ -179,6 +181,8 @@ pub struct CellStyle {
     pub font_color: Option<Rgb>,
     /// left, top, bottom, right.
     pub borders: [Option<Edge>; 4],
+    /// `numFmtId` a user format sets (the dxf's number format); `None` leaves the cell's own.
+    pub num_fmt_id: Option<u32>,
 }
 
 /// Styles for every cell of the pivot range (page fields included).
@@ -232,6 +236,14 @@ const PRIORITY: [usize; 28] = [
 /// Marks a cell of the page-field area: it takes the whole-table font and fill, but not the
 /// whole-table outer borders (the page area is outside the table body).
 const PAGE_AREA: u32 = 1 << 31;
+
+/// Marks a label cell whose subheading element ends at its own top and bottom edges: it does
+/// not join the cells above and below into one block.
+const OWN_BLOCK: u32 = 1 << 30;
+
+/// Like [`OWN_BLOCK`] for the left and right edges: a data field caption cell of the column
+/// axis is a block of its own.
+const OWN_BLOCK_H: u32 = 1 << 29;
 
 /// Position of a cell relative to the table body.
 struct Place<'a> {
@@ -314,6 +326,13 @@ impl Place<'_> {
                 && continues
             {
                 add(element::ROW_SUBHEADING_1 + c.min(2));
+                if c == 0
+                    && l.kind == LineKind::DataLeaf
+                    && self.grid.row_levels.last() == Some(&None)
+                    && self.grid.row_levels.len() > 2
+                {
+                    add(30);
+                }
             }
         }
         if let Some(l) = rl {
@@ -322,6 +341,10 @@ impl Place<'_> {
                 // In tabular form the label columns left of the subtotal belong to the groups.
                 LineKind::Subtotal if !(self.grid.label_cols > 1 && c < l.level) => {
                     add(element::SUBTOTAL_ROW_1 + l.level.min(2));
+                    // One subtotal line per data field: each is a block of its own.
+                    if self.grid.row_levels.last() == Some(&None) {
+                        add(30);
+                    }
                 }
                 LineKind::Item
                     if !l.leaf
@@ -339,10 +362,13 @@ impl Place<'_> {
             && header
             && r >= 1
             && r - 1 == l.level
-            && l.kind == LineKind::Item
+            && (l.kind == LineKind::Item || (l.kind == LineKind::DataLeaf && l.level >= 1))
         {
             // The labels of column field level k sit in header row k + 1.
             add(element::COLUMN_SUBHEADING_1 + l.level.min(2));
+            if l.kind == LineKind::DataLeaf {
+                add(29);
+            }
         }
         if let Some(l) = cl {
             match l.kind {
@@ -446,6 +472,35 @@ pub fn style_cells_with(
     })
 }
 
+/// Like [`style_cells_with`], then the user formats (`formats` of the table definition, the
+/// `dxfs` of the style sheet) laid over it. A table without a style still gets its user formats.
+pub fn style_cells_full(
+    table: &PivotTable,
+    grid: &PivotGrid,
+    theme: &Theme,
+    custom: &CustomStyles,
+    dxfs: &Dxfs,
+) -> Option<StyledGrid> {
+    let user = table.user_formats();
+    let styled = style_cells_with(table, grid, theme, custom);
+    if user.is_empty() {
+        return styled;
+    }
+    let mut styled = styled.unwrap_or_else(|| {
+        let page_rows = (grid.body.0 - grid.range.0) as usize;
+        let rows = grid.header_rows + grid.row_lines.len();
+        let cols = grid.label_cols + grid.col_lines.len();
+        let width = ((grid.range.3 - grid.range.1 + 1) as usize).max(cols);
+        StyledGrid {
+            top: grid.range.0,
+            left: grid.range.1,
+            cells: vec![vec![CellStyle::default(); width]; page_rows + rows],
+        }
+    });
+    apply_user_formats(&mut styled, table, grid, &user, dxfs, theme);
+    Some(styled)
+}
+
 /// Border candidates of one cell: per side (left, top, bottom, right), the edge each applying
 /// element defines, in ascending element priority.
 #[derive(Debug, Clone, Default)]
@@ -485,10 +540,26 @@ const EDGE_PRIORITY: [usize; 28] = [
     element::PAGE_FIELD_VALUES,
 ];
 
+/// Pseudo element of an inside border of the whole table (between two cells of the table):
+/// it ranks just above the plain whole-table border and beats a stripe border only when it is
+/// heavier (measured on custom styles).
+const WHOLE_INSIDE: usize = element::COUNT;
+
+/// Heaviness of an Excel border weight (hair, thin, medium, thick).
+fn weight_order(w: i32) -> i32 {
+    match w {
+        1 => 0,
+        2 => 1,
+        -4138 => 2,
+        _ => 3,
+    }
+}
+
 fn edge_rank(element: usize) -> usize {
-    let rank = |e: usize| EDGE_PRIORITY.iter().position(|x| *x == e).unwrap_or(0);
+    let rank = |e: usize| 2 * EDGE_PRIORITY.iter().position(|x| *x == e).unwrap_or(0);
     // Subtotal rows and row subheadings tie (the lower cell wins a shared border).
     match element {
+        WHOLE_INSIDE => rank(element::WHOLE_TABLE) + 1,
         e if (element::SUBTOTAL_ROW_1..element::SUBTOTAL_ROW_1 + 3).contains(&e) => {
             rank(element::SUBTOTAL_ROW_1)
         }
@@ -502,7 +573,21 @@ fn edge_rank(element: usize) -> usize {
 /// The border a shared edge shows: the best-ranked candidate of the two cells; on a tie the
 /// lower (or right) cell's. `first` is the upper (or left) cell's candidates.
 fn resolve_edge(first: &[(usize, Edge)], second: &[(usize, Edge)]) -> Option<Edge> {
-    let best = |c: &[(usize, Edge)]| c.iter().max_by_key(|(e, _)| edge_rank(*e)).copied();
+    let best = |c: &[(usize, Edge)]| {
+        let top = c.iter().max_by_key(|(e, _)| edge_rank(*e)).copied()?;
+        let stripe = (element::ROW_STRIPE_1..=element::COL_STRIPE_2).contains(&top.0);
+        if stripe
+            && let Some(w) = c
+                .iter()
+                .filter(|(e, x)| {
+                    *e == WHOLE_INSIDE && weight_order(x.weight) > weight_order(top.1.weight)
+                })
+                .max_by_key(|(_, x)| weight_order(x.weight))
+        {
+            return Some(*w);
+        }
+        Some(top)
+    };
     match (best(first), best(second)) {
         (Some((a, x)), Some((b, y))) => Some(if edge_rank(a) > edge_rank(b) { x } else { y }),
         (Some((_, x)), None) | (None, Some((_, x))) => Some(x),
@@ -581,7 +666,15 @@ fn compose(
         if let Some(f) = d.fill {
             style.fill = Some(f.resolve(theme));
         }
-        let inside = |dr: isize, dc: isize| neighbour(dr, dc).is_some_and(|s| s & (1 << e) != 0);
+        let own = here & OWN_BLOCK != 0
+            && ((element::ROW_SUBHEADING_1..element::ROW_SUBHEADING_1 + 3).contains(&e)
+                || (element::SUBTOTAL_ROW_1..element::SUBTOTAL_ROW_1 + 3).contains(&e));
+        let own_h = here & OWN_BLOCK_H != 0
+            && (element::COLUMN_SUBHEADING_1..element::COLUMN_SUBHEADING_1 + 3).contains(&e);
+        let inside = |dr: isize, dc: isize| {
+            !(own && dr != 0 || own_h && dc != 0)
+                && neighbour(dr, dc).is_some_and(|s| s & (1 << e) != 0)
+        };
         let page_whole = e == element::WHOLE_TABLE && here & PAGE_AREA != 0;
         // side: 0 left, 1 top, 2 bottom, 3 right; borders: left, top, bottom, right, iv, ih
         let picks = [
@@ -596,8 +689,13 @@ fn compose(
                 continue;
             }
             if let Some(b) = d.borders[idx] {
+                let tag = if e == element::WHOLE_TABLE && idx >= 4 {
+                    WHOLE_INSIDE
+                } else {
+                    e
+                };
                 cand.0[side].push((
-                    e,
+                    tag,
                     Edge {
                         line: b.line,
                         weight: b.weight,

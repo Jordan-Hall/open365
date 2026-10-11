@@ -30,6 +30,8 @@ use std::time::Instant;
 use egui::text::CCursor;
 use egui::text::{LayoutJob, TextFormat};
 use egui::text_edit::TextEditState;
+
+use crate::proofing::{ProofState, SpellTarget};
 use egui::{
     Align, Color32, Context, Event, EventFilter, FontId, Id, Key, Painter, PointerButton, Pos2,
     Rect, Sense, Stroke, TextEdit, Ui, UiBuilder, Vec2, accesskit, vec2,
@@ -586,6 +588,10 @@ pub struct GridView {
     /// widgets in that frame and the next (press, then click), so both ask again.
     refocus_frame: Option<u64>,
     editing: bool,
+    /// Spell checking of the cell being edited (squiggles and the right-click menu).
+    proof: ProofState,
+    /// The flagged word the open right-click menu of the cell editor is about.
+    spell_menu: Option<SpellTarget>,
     edit_text: String,
     scroll_target: Option<(u32, u32)>,
     /// Scroll offset to jump to next frame (Page Up and Page Down).
@@ -706,6 +712,8 @@ impl GridView {
             press_on_header: false,
             refocus_frame: None,
             editing: false,
+            proof: ProofState::new(),
+            spell_menu: None,
             edit_text: String::new(),
             scroll_target: None,
             pending_scroll: None,
@@ -748,6 +756,23 @@ impl GridView {
     }
 
     /// A grid that draws with the application's shared font book (which the application syncs).
+    /// The egui family that draws `name` in the given weight and slant, with what the family could not supply
+    /// as `(family, bold must be faked, italic must be faked)`. The face is registered on first use and
+    /// becomes available one pass later; until then the UI family answers with both flags set as asked.
+    /// Chrome that previews a style (the Cell Styles gallery) uses it so a tile shows the real face.
+    #[must_use]
+    pub fn preview_face(
+        &self,
+        name: &str,
+        bold: bool,
+        italic: bool,
+    ) -> (egui::FontFamily, bool, bool) {
+        let face = self.fonts.borrow_mut().resolve(name, bold, italic);
+        let fake_bold = bold && !face.real_bold;
+        let fake_italic = italic && !face.real_italic;
+        (face.family, fake_bold, fake_italic)
+    }
+
     pub(crate) fn with_fonts(fonts: Rc<RefCell<FontBook>>) -> Self {
         Self {
             fonts,
@@ -855,6 +880,16 @@ impl GridView {
             .as_ref()
             .map(|(_, cf)| Rc::clone(cf))
             .filter(|cf| !cf.is_empty())
+    }
+
+    /// The speller of the cell editor (language, user dictionary, on/off).
+    pub fn proof_mut(&mut self) -> &mut ProofState {
+        &mut self.proof
+    }
+
+    /// The word the open spelling menu of the cell editor is about.
+    pub fn spell_menu(&self) -> Option<&SpellTarget> {
+        self.spell_menu.as_ref()
     }
 
     pub fn is_editing(&self) -> bool {
@@ -1412,7 +1447,8 @@ impl GridView {
             .desired_rows(1)
             .frame(egui::Frame::NONE)
             .font(FontId::proportional(13.0));
-        let resp = ui.add(edit);
+        let out = edit.show(ui);
+        let resp = out.response.clone();
         resp.widget_info(|| {
             egui::WidgetInfo::labeled(
                 egui::WidgetType::TextEdit,
@@ -1420,6 +1456,15 @@ impl GridView {
                 format!("Formula bar for {active_address}"),
             )
         });
+        if self.editing {
+            crate::proofing::edit_spelling(
+                ui,
+                &mut self.proof,
+                &mut self.spell_menu,
+                &mut self.edit_text,
+                &out,
+            );
+        }
         if resp.changed() || (resp.gained_focus() && !self.editing) {
             self.editing = true;
         }
@@ -1465,7 +1510,8 @@ impl GridView {
                     .desired_width(f32::INFINITY)
                     .font(FontId::monospace(13.0))
                     .hint_text("Value or =formula");
-                let resp = ui.add(edit);
+                let out = edit.show(ui);
+                let resp = out.response.clone();
                 resp.widget_info(|| {
                     egui::WidgetInfo::labeled(
                         egui::WidgetType::TextEdit,
@@ -1473,6 +1519,15 @@ impl GridView {
                         format!("Formula bar for {active_address}"),
                     )
                 });
+                if self.editing {
+                    crate::proofing::edit_spelling(
+                        ui,
+                        &mut self.proof,
+                        &mut self.spell_menu,
+                        &mut self.edit_text,
+                        &out,
+                    );
+                }
                 if resp.changed() || (resp.gained_focus() && !self.editing) {
                     self.editing = true;
                 }

@@ -12,12 +12,21 @@ pub enum ApiError {
     NotFound,
     Conflict(&'static str),
     TooLarge,
-    RateLimited,
+    /// Over a rate limit; carries the `Retry-After` seconds.
+    RateLimited(u64),
+    Timeout,
+    /// A feature the operator has not configured (for example TOTP without a secret key).
+    Unavailable(&'static str),
     Internal,
 }
 
 impl IntoResponse for ApiError {
     fn into_response(self) -> Response {
+        let retry = if let Self::RateLimited(s) = &self {
+            Some(*s)
+        } else {
+            None
+        };
         let (status, code) = match self {
             Self::BadRequest(c) => (StatusCode::BAD_REQUEST, c),
             Self::Unauthorized(c) => (StatusCode::UNAUTHORIZED, c),
@@ -25,10 +34,19 @@ impl IntoResponse for ApiError {
             Self::NotFound => (StatusCode::NOT_FOUND, "not_found"),
             Self::Conflict(c) => (StatusCode::CONFLICT, c),
             Self::TooLarge => (StatusCode::PAYLOAD_TOO_LARGE, "too_large"),
-            Self::RateLimited => (StatusCode::TOO_MANY_REQUESTS, "rate_limited"),
+            Self::RateLimited(_) => (StatusCode::TOO_MANY_REQUESTS, "rate_limited"),
+            Self::Timeout => (StatusCode::REQUEST_TIMEOUT, "timeout"),
+            Self::Unavailable(c) => (StatusCode::SERVICE_UNAVAILABLE, c),
             Self::Internal => (StatusCode::INTERNAL_SERVER_ERROR, "internal"),
         };
-        (status, Json(serde_json::json!({ "error": code }))).into_response()
+        let mut resp = (status, Json(serde_json::json!({ "error": code }))).into_response();
+        if let Some(s) = retry
+            && let Ok(v) = axum::http::HeaderValue::from_str(&s.max(1).to_string())
+        {
+            resp.headers_mut()
+                .insert(axum::http::header::RETRY_AFTER, v);
+        }
+        resp
     }
 }
 

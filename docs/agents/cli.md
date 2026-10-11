@@ -68,3 +68,17 @@ The MCP server (`open365 mcp --timeout-secs <n>`, default 30) gives each `layout
 - The CLI commands above (`docx export-pdf`, `docx layout`, `xlsx eval`) run to completion; they have no deadline. A script that needs one wraps the process in its own timeout.
 
 For library callers the entry points are `layout_document_cancellable`, `export_pdf_cancellable`, `Engine::set_cancel`, `FormulaEngine::evaluate_cancellable` and `PdfOptions::cancel`. The old functions are unchanged wrappers. Tests: `crates/mcp/tests/cancel.rs`.
+
+## Sharing (`open365 share`, ADR-013 Stage 0)
+
+| Subcommand | Command | Effect | Notes |
+|---|---|---|---|
+| `share send-copy <doc> [--to P]` | `share_send_copy` | export | Copy of the document as it is now. Without `--to`, a new temporary folder. |
+| `share send-pdf <doc> [--to P]` | `share_send_pdf` | export | DOCX only, through the PDF export. |
+| `share inspect <doc>` | `share_inspect` | read | Comments, tracked changes, hidden text, properties, author names. |
+| `share sanitize-copy <doc> --remove K...` | `share_sanitize_copy` | export | K: comments, tracked-changes, hidden-text, properties, personal-info. Tracked changes are accepted. Hidden sheets, rows and columns of a workbook are reported but never removed (the command is refused if you ask). |
+| `share os-sheet <doc> <file>` | `share_os_sheet` | egress | Builds the request only; the desktop app calls the OS. Needs `--allow-destructive`. |
+
+The document and its file are never written. A target equal to the document's own file is refused.
+`--overwrite` on an existing target is also refused without `--allow-destructive`. `--root` fences
+the copy. `share_*` commands are not accepted by `run` or `apply`.

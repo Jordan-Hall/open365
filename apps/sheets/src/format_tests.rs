@@ -386,6 +386,24 @@ fn cell_styles_gallery_lists_the_built_in_styles_and_applies_one() {
         open365_ui_shell::EntryKind::Tiles { tiles, .. }
             if tiles.iter().any(|t| t.id == "home.styles.cell-styles#Good")
     )));
+    // Every tile names its style's font and weight, so the gallery draws the real face (until the family is
+    // registered the UI family answers and the weight is faked).
+    let tile = |id: &str| {
+        gallery
+            .iter()
+            .find_map(|e| match &e.kind {
+                open365_ui_shell::EntryKind::Tiles { tiles, .. } => {
+                    tiles.iter().find(|t| t.id == id).cloned()
+                }
+                _ => None,
+            })
+            .expect("tile")
+    };
+    let heading = tile("home.styles.cell-styles#Heading 1");
+    assert!(heading.bold);
+    let font = heading.font.expect("font face");
+    assert!(font.fake_bold || font.family != egui::FontFamily::Proportional);
+    assert!(tile("home.styles.cell-styles#Good").font.is_some());
     click(&mut s, "home.styles.cell-styles#Good");
     assert_eq!(cell(&s, 1, 1).fill.pattern, FillPattern::Solid);
     let name = wb(&s).styles().cell_style_name(wb(&s).cell_xf(0, 1, 1));

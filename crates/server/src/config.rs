@@ -46,8 +46,64 @@ pub struct Config {
     pub link_fail_rate: Rate,
     /// Wrong passwords per link, across all addresses.
     pub link_password_fail_rate: Rate,
-    /// Failed sign-ins per tenant, address and email.
+    /// Failed sign-ins per tenant, address and email (counted before the password check).
     pub login_fail_rate: Rate,
+    /// Every sign-in attempt per client address, successful or not.
+    pub login_ip_rate: Rate,
+    /// Wrong passwords per link and client address (the looser per-link limit is `link_password_token_rate`).
+    pub link_password_token_rate: Rate,
+    /// Uploads through one edit link.
+    pub link_upload_rate: Rate,
+    /// Failed sign-ins per tenant and account across ALL addresses. Applies only to addresses that have not signed in
+    /// to that account before, so an attacker cannot lock the owner out (they only lock themselves).
+    pub login_account_rate: Rate,
+    /// Share links one signed-in user may create.
+    pub link_create_rate: Rate,
+    /// Bytes one edit link may add per hour.
+    pub link_upload_bytes_per_hour: i64,
+    /// Whole-request time limit for ordinary routes.
+    pub request_timeout_secs: u64,
+    /// Whole-request time limit for routes that carry document bytes.
+    pub upload_timeout_secs: u64,
+    /// Body limit for JSON routes (uploads use `max_upload_bytes`).
+    pub json_body_limit: usize,
+    /// Peers allowed to set `X-Forwarded-For`. Empty (the default) trusts none.
+    pub trusted_proxies: Vec<crate::proxy::Cidr>,
+    /// Concurrent argon2 computations.
+    pub argon2_concurrency: usize,
+    /// Send `Strict-Transport-Security` (set when TLS is served here or terminated by a proxy).
+    pub hsts: bool,
+    /// OpenID Connect providers, one per tenant (used only with the `oidc` feature).
+    pub oidc: Vec<OidcProvider>,
+    /// Encrypts TOTP secrets at rest. Without it TOTP enrolment and sign-in with TOTP are refused (fail closed).
+    pub secret_keys: Option<crate::secrets::SecretKeys>,
+    /// Time a client has to send a complete request head (slowloris defence).
+    pub header_read_timeout_secs: u64,
+    /// Open connections in total and per peer address; 0 = unlimited.
+    pub max_connections: usize,
+    pub max_connections_per_ip: usize,
+}
+
+/// One tenant's OpenID Connect provider. The issuer comes only from here, never from a request.
+#[derive(Clone)]
+pub struct OidcProvider {
+    pub tenant_slug: String,
+    pub issuer: String,
+    pub client_id: String,
+    pub client_secret: Option<String>,
+    pub redirect_uri: String,
+    /// Hosts besides the issuer's that discovery may point at (for example Google's token host).
+    pub extra_hosts: Vec<String>,
+}
+
+impl std::fmt::Debug for OidcProvider {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("OidcProvider")
+            .field("tenant_slug", &self.tenant_slug)
+            .field("issuer", &self.issuer)
+            .field("client_id", &self.client_id)
+            .finish_non_exhaustive()
+    }
 }
 
 impl Config {
@@ -80,6 +136,38 @@ impl Config {
                 max: 8,
                 window_secs: 900,
             },
+            login_ip_rate: Rate {
+                max: 60,
+                window_secs: 60,
+            },
+            link_password_token_rate: Rate {
+                max: 100,
+                window_secs: 900,
+            },
+            link_upload_rate: Rate {
+                max: 60,
+                window_secs: 3600,
+            },
+            login_account_rate: Rate {
+                max: 40,
+                window_secs: 3600,
+            },
+            link_create_rate: Rate {
+                max: 120,
+                window_secs: 3600,
+            },
+            link_upload_bytes_per_hour: 512 * 1024 * 1024,
+            request_timeout_secs: 30,
+            upload_timeout_secs: 300,
+            json_body_limit: 64 * 1024,
+            trusted_proxies: vec![],
+            argon2_concurrency: std::thread::available_parallelism().map_or(2, usize::from),
+            hsts: false,
+            oidc: vec![],
+            secret_keys: None,
+            header_read_timeout_secs: 10,
+            max_connections: 4096,
+            max_connections_per_ip: 64,
         }
     }
 }
@@ -110,6 +198,29 @@ impl AuditKeys {
         })
     }
 
+    /// Several keys, oldest first, with the current key named explicitly. The named key must exist and must be the
+    /// last entry, so that a provider returning keys in a different order is refused, not silently trusted.
+    pub fn with_current(keys: Vec<(String, Vec<u8>)>, current: &str) -> Result<Self, String> {
+        let k = Self::list(keys)?;
+        match k.index_of(current) {
+            None => Err("the named current audit key is not among the keys".into()),
+            Some(i) if i + 1 != k.keys.len() => {
+                Err("the current audit key must be the last (newest) entry".into())
+            }
+            Some(_) => Ok(k),
+        }
+    }
+
+    /// Position of `id` in the list (older keys have lower positions).
+    pub fn index_of(&self, id: &str) -> Option<usize> {
+        self.keys.iter().position(|(k, _)| k == id)
+    }
+
+    /// The oldest key, used as the root for server-side derived keys (stable across rotations).
+    pub fn root_key(&self) -> &[u8] {
+        &self.keys[0].1
+    }
+
     pub fn current(&self) -> (&str, &[u8]) {
         let (id, k) = self.keys.last().expect("AuditKeys is never empty");
         (id, k)
@@ -136,7 +247,7 @@ pub fn load_secret(file_var: &str, value_var: &str) -> Result<Option<String>, St
 }
 
 #[cfg(unix)]
-fn check_mode(p: &Path) -> Result<(), String> {
+pub(crate) fn check_mode(p: &Path) -> Result<(), String> {
     use std::os::unix::fs::PermissionsExt;
     let mode = std::fs::metadata(p)
         .map_err(|e| format!("cannot stat key file: {e}"))?
@@ -153,14 +264,37 @@ fn check_mode(p: &Path) -> Result<(), String> {
 }
 
 #[cfg(not(unix))]
-fn check_mode(_: &Path) -> Result<(), String> {
+pub(crate) fn check_mode(_: &Path) -> Result<(), String> {
     Ok(())
 }
 
+impl AuditKeys {
+    /// Several keys, oldest first. Only the newest signs new rows; the others still verify old rows.
+    pub fn list(keys: Vec<(String, Vec<u8>)>) -> Result<Self, String> {
+        if keys.is_empty() {
+            return Err("at least one audit key is required".into());
+        }
+        if keys.iter().any(|(_, k)| k.len() < 32) {
+            return Err("audit key must be at least 32 bytes".into());
+        }
+        let mut ids: Vec<&String> = keys.iter().map(|(i, _)| i).collect();
+        ids.sort();
+        ids.dedup();
+        if ids.len() != keys.len() {
+            return Err("audit key ids must be unique".into());
+        }
+        Ok(Self { keys })
+    }
+}
+
+/// Audit keys from the file provider (`OPEN365_AUDIT_KEY_FILES=k1=/path/old.key,k2=/path/new.key`, oldest first,
+/// newest signs; else `OPEN365_AUDIT_KEY_FILE` / `OPEN365_AUDIT_KEY`). See [`crate::keys`] for the other providers.
 pub fn audit_keys_from_env() -> Result<AuditKeys, String> {
-    let hex = load_secret("OPEN365_AUDIT_KEY_FILE", "OPEN365_AUDIT_KEY")?
-        .ok_or("set OPEN365_AUDIT_KEY_FILE (see `open365-server gen-key`) or OPEN365_AUDIT_KEY")?;
-    let key = crate::util::unhex(&hex).ok_or("audit key must be hex")?;
-    let id = std::env::var("OPEN365_AUDIT_KEY_ID").unwrap_or_else(|_| "k1".into());
-    AuditKeys::single(&id, key)
+    crate::keys::audit_keys(&crate::keys::FileProvider)
+}
+
+/// Secret keys from the file provider (`OPEN365_SECRET_KEY_FILES=s1=/path/old.key,s2=/path/new.key`, oldest first,
+/// newest seals; else `OPEN365_SECRET_KEY_FILE` / `OPEN365_SECRET_KEY`). `None` when nothing is set.
+pub fn secret_keys_from_env() -> Result<Option<crate::secrets::SecretKeys>, String> {
+    crate::keys::secret_keys(&crate::keys::FileProvider)
 }

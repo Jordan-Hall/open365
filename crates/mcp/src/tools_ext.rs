@@ -47,7 +47,7 @@ fn extension(path: &Path) -> String {
 
 /// The write policy shared by the two tools that create files: the `export` scope for a new
 /// file; replacing one needs `overwrite: true` and the operator's confirmation.
-fn check_create(
+pub(crate) fn check_create(
     server: &mut Server,
     tool: &str,
     path: &Path,

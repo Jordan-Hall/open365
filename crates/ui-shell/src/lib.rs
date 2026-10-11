@@ -19,6 +19,6 @@ pub mod spec;
 pub mod theme;
 
 pub use caret::CaretSettings;
-pub use host::{CommandState, EntryKind, MenuEntry, ShellHost, Swatch, Tile};
+pub use host::{CommandState, EntryKind, MenuEntry, ShellHost, Swatch, Tile, TileFont};
 pub use shell::{Shell, ShellOptions};
 pub use theme::{AppKind, Mode, Theme};

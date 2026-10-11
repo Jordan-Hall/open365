@@ -87,11 +87,6 @@ impl Languages {
         out
     }
 
-    /// The document's default language tag as written in the file (`en-GB`).
-    pub fn default_tag(&self) -> Option<&str> {
-        self.default.as_deref()
-    }
-
     fn style_lang(&self, id: &str) -> Option<&str> {
         let mut at = Some(id);
         for _ in 0..32 {

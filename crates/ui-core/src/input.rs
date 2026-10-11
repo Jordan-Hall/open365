@@ -25,6 +25,7 @@ pub enum Key {
     PageDown,
     F2,
     F10,
+    F12,
     Alt,
     Shift,
     Ctrl,
@@ -109,4 +110,23 @@ pub enum Emit {
         clicks: u8,
         shift: bool,
     },
+    /// The pointer moved while a canvas holds the primary press (`at` relative to the canvas).
+    CanvasDrag {
+        node: NodeId,
+        at: Point,
+    },
+    /// The primary button was released after a press on a canvas.
+    CanvasRelease {
+        node: NodeId,
+        at: Point,
+    },
+    /// The wheel turned over a canvas (`delta_y` in notches, positive up).
+    CanvasWheel {
+        node: NodeId,
+        delta_y: f32,
+        shift: bool,
+        ctrl: bool,
+    },
+    /// A screen reader action aimed at a canvas (SetTextSelection, ReplaceSelectedText).
+    CanvasAction(NodeId, accesskit::ActionRequest),
 }

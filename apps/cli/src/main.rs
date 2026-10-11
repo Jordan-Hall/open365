@@ -11,6 +11,7 @@ mod layout_cmd;
 mod mcp_cmd;
 mod output;
 mod read_cmd;
+mod share_cmd;
 mod template_cmd;
 
 use std::collections::BTreeSet;
@@ -108,6 +109,11 @@ enum Command {
     },
     /// List every command of the command layer (the catalogue `run` and MCP use).
     Commands(commands_cmd::ListArgs),
+    /// Share a document: send a copy or PDF, list hidden content, write a sanitised copy.
+    Share {
+        #[command(subcommand)]
+        command: share_cmd::ShareCommand,
+    },
     /// Run one command by name and save the result (`save` and `export_pdf` write to their
     /// own `path`). Effect classes and refusals work as for `apply`.
     Run(commands_cmd::RunArgs),
@@ -300,6 +306,7 @@ fn main() -> ExitCode {
         Command::Xlsx { command } => xlsx_command(command),
         Command::Commands(a) => ("commands", commands_cmd::list(a)),
         Command::Run(a) => ("run", commands_cmd::run(a)),
+        Command::Share { command } => ("share", share_cmd::run(command)),
         Command::Apply {
             commands,
             input,

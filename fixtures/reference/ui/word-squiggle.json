@@ -1,0 +1,160 @@
+{
+ "schema": 1,
+ "app": "Word",
+ "measuredScale": 1.25,
+ "note": "Red wavy proofing underline, measured on the reference machine (dark Word theme, page fill 262626, Calibri 11 pt, en-GB) by squiggle probe: own Word instance, AutomationSecurity 3, PrintWindow, pixels only. Rows/columns are physical px relative to the misspelled range's left edge (GetPoint) and to the text baseline (first pixel row under the last text row). The wave is a triangle wave with a fixed 6 px period and a fixed 4 px height at every zoom (100 % and 200 % identical). Light-theme colour not measured (Office settings are never changed).",
+ "colorPeak": "ff4a4a",
+ "periodPx": 6,
+ "heightPx": 4,
+ "peakAtPx": [
+  0,
+  6
+ ],
+ "troughAtPx": 3,
+ "extendsPastWordPx": 2,
+ "topBelowBaselinePx": {
+  "zoom100": 1,
+  "zoom200": 3
+ },
+ "spellingErrors": [
+  "Wordz",
+  "teh",
+  "quik"
+ ],
+ "samples": [
+  {
+   "zoom": 100,
+   "rows": [
+    18,
+    21
+   ],
+   "x": [
+    0,
+    48
+   ],
+   "wordWidth": 48
+  },
+  {
+   "zoom": 100,
+   "rows": [
+    18,
+    21
+   ],
+   "x": [
+    0,
+    27
+   ],
+   "wordWidth": 25
+  },
+  {
+   "zoom": 100,
+   "rows": [
+    18,
+    21
+   ],
+   "x": [
+    0,
+    33
+   ],
+   "wordWidth": 32
+  },
+  {
+   "zoom": 200,
+   "rows": [
+    38,
+    41
+   ],
+   "x": [
+    0,
+    96
+   ],
+   "wordWidth": 96
+  },
+  {
+   "zoom": 200,
+   "rows": [
+    38,
+    41
+   ],
+   "x": [
+    0,
+    51
+   ],
+   "wordWidth": 49
+  },
+  {
+   "zoom": 200,
+   "rows": [
+    38,
+    41
+   ],
+   "x": [
+    0,
+    63
+   ],
+   "wordWidth": 63
+  }
+ ],
+ "period0to12Rows": [
+  [
+   "ff4a4a",
+   "",
+   "",
+   "",
+   "",
+   "ae3d3d",
+   "ff4a4a",
+   "793333",
+   "",
+   "",
+   "",
+   "ae3d3d",
+   "ff4a4a"
+  ],
+  [
+   "a43b3b",
+   "9b3939",
+   "",
+   "",
+   "ac3d3d",
+   "a03a3a",
+   "823535",
+   "e74646",
+   "",
+   "",
+   "ac3d3d",
+   "a03a3a",
+   "823535"
+  ],
+  [
+   "",
+   "de4545",
+   "b23d3d",
+   "813434",
+   "e74646",
+   "",
+   "",
+   "ac3d3d",
+   "a03a3a",
+   "823535",
+   "e74646",
+   "",
+   ""
+  ],
+  [
+   "",
+   "",
+   "b63e3e",
+   "ff4a4a",
+   "793333",
+   "",
+   "",
+   "",
+   "ae3d3d",
+   "ff4a4a",
+   "793333",
+   "",
+   ""
+  ]
+ ]
+}

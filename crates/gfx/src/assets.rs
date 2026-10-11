@@ -11,7 +11,7 @@ use skrifa::{FontRef, GlyphId, MetadataProvider};
 
 use crate::atlas::{Atlas, AtlasSlot};
 use crate::error::GfxError;
-use crate::raster::{Flattener, RasterMode, rasterize};
+use crate::raster::{Flattener, LcdFilter, RasterMode, rasterize_with};
 
 /// Registered font, returned by [`Assets::add_font`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -46,6 +46,21 @@ pub struct TextOptions {
     pub subpixel_bins: u8,
     /// Rasterise for a ClearType-style RGB-stripe LCD instead of grayscale.
     pub lcd: bool,
+    /// FIR filter across subpixels when `lcd` is set.
+    pub lcd_filter: LcdFilter,
+}
+
+impl TextOptions {
+    /// The fit to Office (`RenderParams::office_fitted`): normal hinting, quarter-pixel
+    /// positions, the soft LCD filter; `lcd` picks ClearType-style or grayscale.
+    pub fn office(lcd: bool) -> Self {
+        Self {
+            hinting: Hinting::Normal,
+            subpixel_bins: 4,
+            lcd,
+            lcd_filter: LcdFilter::Soft,
+        }
+    }
 }
 
 impl Default for TextOptions {
@@ -54,6 +69,7 @@ impl Default for TextOptions {
             hinting: Hinting::Normal,
             subpixel_bins: 4,
             lcd: false,
+            lcd_filter: LcdFilter::Default,
         }
     }
 }
@@ -391,7 +407,7 @@ impl Assets {
         } else {
             RasterMode::Gray
         };
-        let bitmap = rasterize(&lines, offset, mode)?;
+        let bitmap = rasterize_with(&lines, offset, mode, key.options.lcd_filter)?;
         let slot = if key.options.lcd {
             // RGB coverage into RGBA texels; alpha carries the mean for debugging.
             let mut rgba = Vec::with_capacity(bitmap.data.len() / 3 * 4);

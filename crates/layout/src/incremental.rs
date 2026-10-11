@@ -207,12 +207,12 @@ impl IncrementalLayout {
         let doc_sections = doc.sections();
         let sections: Vec<SectionProps> = doc_sections.iter().map(SectionProps::from).collect();
         let furniture = Furniture::new(doc, &doc_sections, &sections, &ctx);
-        let note_store = NoteStore::new(doc, &sections, &order, &ctx);
         let cols: Vec<SectionCols> = doc_sections
             .iter()
             .zip(&sections)
             .map(|(s, p)| SectionCols::from_section(s, p.text_width()))
             .collect();
+        let note_store = NoteStore::new(doc, &sections, &cols, &order, &ctx);
         // Balancing rewrites pages that already exist, so documents with columns are always
         // paginated from the start.
         let multicol = cols.iter().any(SectionCols::is_multi);

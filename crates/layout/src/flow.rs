@@ -256,7 +256,7 @@ impl PageBuild {
                 .any(|s| s.id == slot.id && s.from == slot.from)
         {
             self.slots.push(slot);
-            self.notes_h += h;
+            self.notes_h = env.notes.area(self.section_index, &self.slots);
         }
     }
 
@@ -346,8 +346,7 @@ struct NotesAt<'a> {
     section: usize,
     /// The page's body bottom before footnotes, the footnotes already on it and their height.
     frame_bottom: f64,
-    count: usize,
-    height: f64,
+    slots: &'a [NoteSlot],
     sep: f64,
 }
 
@@ -359,20 +358,31 @@ fn lines_fitting_notes(
     y0: f64,
     n: &NotesAt<'_>,
 ) -> (usize, Option<(i64, usize)>) {
-    let (mut y, mut nh, mut has, mut k) = (y0, n.height, n.count > 0, 0);
+    let mut slots = n.slots.to_vec();
+    let (mut y, mut nh, mut has, mut k) = (
+        y0,
+        n.env.notes.area(n.section, &slots),
+        !slots.is_empty(),
+        0,
+    );
     for l in lines {
         y += l.lead;
-        let mut add = 0.0;
         let mut any = false;
         let mut ids = Vec::new();
+        let mut with = slots.clone();
         for (a, id) in &para.foot_refs {
             if l.atoms.contains(a) {
-                let h = n.env.notes.height(n.section, *id);
-                any |= h > 0.0;
-                add += h;
+                let to = n.env.notes.line_count(n.section, *id);
+                any |= n.env.notes.height(n.section, *id) > 0.0;
+                with.push(NoteSlot {
+                    id: *id,
+                    from: 0,
+                    to,
+                });
                 ids.push(*id);
             }
         }
+        let add = n.env.notes.area(n.section, &with) - nh;
         let has2 = has || any;
         let total = nh + add + if has2 { n.sep } else { 0.0 };
         if y + l.height - l.slack + total > n.frame_bottom + EPS {
@@ -408,6 +418,7 @@ fn lines_fitting_notes(
         }
         y += l.height;
         nh += add;
+        slots = with;
         has = has2;
         k += 1;
     }
@@ -617,6 +628,7 @@ pub(crate) fn build_line(
             strike: st.strike,
             color: st.color,
             superscript: false,
+            vert_align: open365_docx::VertAlign::Baseline,
             glyphs,
         });
     }
@@ -636,6 +648,7 @@ pub(crate) fn build_line(
                 strike: st.strike,
                 color: st.color,
                 superscript: st.superscript,
+                vert_align: st.vert_align,
                 glyphs: Vec::new(),
             });
             cur_style = Some(atom.style);
@@ -674,6 +687,56 @@ pub(crate) fn build_line(
             }
         }
     }
+    for span in &lb.leaders {
+        let style = para.atoms[span.atom].style;
+        let Some(lg) = para
+            .leader_glyphs
+            .iter()
+            .find(|g| g.style == style && g.ch == span.ch)
+        else {
+            continue;
+        };
+        // Leader glyphs sit on a grid of one pitch from the left edge of the text area, from
+        // the tab's start to the last one that ends by the tab's target (`layout-tabs`).
+        let st = &para.styles[style];
+        let mut glyphs = Vec::new();
+        let mut k = ((span.x0 - 0.1) / lg.pitch).ceil().max(0.0);
+        loop {
+            let gx = k * lg.pitch;
+            if gx + lg.pitch > span.x1 + 0.05 {
+                break;
+            }
+            glyphs.push(PlacedGlyph {
+                face: lg.face,
+                glyph_id: lg.glyph_id,
+                x: left_origin + gx,
+                y_offset: 0.0,
+                advance: lg.pitch,
+                cluster: Cluster {
+                    kind: ClusterKind::Other,
+                    start: 0,
+                    end: 0,
+                    text_start: u32::from(span.ch),
+                    text_end: u32::from(span.ch),
+                },
+            });
+            k += 1.0;
+        }
+        if !glyphs.is_empty() {
+            runs.push(GlyphRun {
+                face: lg.face,
+                size: st.size,
+                bold: st.bold,
+                italic: st.italic,
+                underline: false,
+                strike: false,
+                color: st.color,
+                superscript: st.superscript,
+                vert_align: open365_docx::VertAlign::Baseline,
+                glyphs,
+            });
+        }
+    }
     if para.separator
         && let Some(st) = para.styles.first()
     {
@@ -690,6 +753,7 @@ pub(crate) fn build_line(
                 strike: false,
                 color: None,
                 superscript: false,
+                vert_align: open365_docx::VertAlign::Baseline,
                 glyphs: vec![PlacedGlyph {
                     face: st.face,
                     glyph_id: 0,
@@ -2197,8 +2261,7 @@ impl<'a> Paginator<'a> {
                 env,
                 section: self.page.section_index,
                 frame_bottom: self.page.frame_bottom,
-                count: self.page.slots.len(),
-                height: self.page.notes_h,
+                slots: &self.page.slots,
                 sep: self.page.sep_h,
             };
             let mut place = decide(
@@ -2369,10 +2432,7 @@ pub(crate) fn paginate<'a>(
                 first_in_section: r.page.first_in_section,
                 top: r.page.body_top,
                 frame_bottom: r.page.body_bottom,
-                notes_h: slots
-                    .iter()
-                    .map(|s| env.notes.slot_height(section_index, *s))
-                    .sum(),
+                notes_h: env.notes.area(section_index, &slots),
                 sep_h: env.notes.sep_height(section_index),
                 slots,
                 y: r.checkpoint.y,

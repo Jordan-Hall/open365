@@ -15,6 +15,7 @@ pub fn items_for(id: &str, label: &str) -> Vec<MenuItem> {
     let tail = id.rsplit('.').next().unwrap_or(id);
     match tail {
         "paste" => vec![
+            MenuItem::heading("Paste Options:"),
             item(id, "Paste", 'P'),
             item(&format!("{id}.values"), "Paste Values", 'V'),
             item(&format!("{id}.formatting"), "Paste Formatting", 'F'),
@@ -33,7 +34,11 @@ pub fn items_for(id: &str, label: &str) -> Vec<MenuItem> {
         ],
         "fill-colour" | "font-colour" | "highlight" => vec![
             item(&format!("{id}.auto"), "Automatic", 'A'),
+            MenuItem::heading("Theme Colours"),
             item(&format!("{id}.theme"), "Theme Colours", 'T'),
+            MenuItem::heading("Standard Colours"),
+            item(&format!("{id}.standard"), "Standard Colours", 'S'),
+            MenuItem::separator(),
             item(&format!("{id}.more"), "More Colours...", 'M'),
         ],
         "sort-filter" | "sort-and-filter" => vec![
@@ -88,10 +93,11 @@ mod tests {
 
     #[test]
     fn known_and_unknown_controls_get_a_menu() {
-        assert_eq!(items_for("home.clipboard.paste", "Paste").len(), 6);
+        assert_eq!(items_for("home.clipboard.paste", "Paste").len(), 7);
         let generic = items_for("home.cells.format", "Format");
         assert_eq!(generic.len(), 4);
         assert!(generic[1].submenu.len() == 2);
+        assert!(items_for("home.clipboard.paste", "Paste")[0].heading);
         assert!(combo_items("home.font.font").contains(&"Calibri".to_string()));
     }
 }

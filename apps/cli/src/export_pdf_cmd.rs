@@ -86,6 +86,7 @@ fn pdf_options(args: &Args) -> PdfOptions {
         },
         bookmarks: !args.no_bookmarks,
         ua: args.pdfua,
+        pages: None,
     }
 }
 

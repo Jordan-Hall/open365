@@ -195,6 +195,8 @@ impl Ui {
                         for (i, it) in m.items.iter().enumerate() {
                             let mut mi = Node::new(if it.separator {
                                 Role::Splitter
+                            } else if it.heading {
+                                Role::Label
                             } else if it.checked {
                                 Role::MenuItemCheckBox
                             } else {
@@ -215,6 +217,17 @@ impl Ui {
                     }
                 }
                 _ => {}
+            }
+            if let Some((over, extra)) = self.canvas_access.get(&id) {
+                let mut o = over.clone();
+                if let Some(l) = node.label() {
+                    o.set_label(l.to_owned());
+                }
+                if let Some(b) = node.bounds() {
+                    o.set_bounds(b);
+                }
+                node = o;
+                nodes.extend(extra.iter().cloned());
             }
             let id_ak = ak_id(id);
             // Parent chain: top-level widgets hang off the window; nested ones off their parent.

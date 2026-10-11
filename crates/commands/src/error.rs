@@ -27,6 +27,8 @@ pub enum CommandError {
     Exists { path: String },
     #[error("the PDF is larger than {limit} bytes")]
     TooLarge { limit: usize },
+    #[error("share: {0}")]
+    Share(String),
     #[error("the operation was cancelled")]
     Cancelled,
     #[error("nothing to undo")]
@@ -43,4 +45,6 @@ pub enum CommandError {
     Log(String),
     #[error("cell format: {0}")]
     Format(String),
+    #[error("spelling correction: {0}")]
+    Proofing(String),
 }

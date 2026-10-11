@@ -167,14 +167,14 @@ SUMX2PY2, SUMXMY2, IMABS, IMSQRT, IMPOWER, IMTAN, IMCOT, IMSEC, IMCSC, IMSECH, I
   that it divides by (`in`, `ft`, `ang`, `dyn`, `cal`, `BTU`, `us_acre`, ...); applying them by division reproduces 91% of 2,390 random conversions bit for bit; the rest of the random conversions were removed. Temperatures go through Celsius, the same unit or alias returns the
   argument unchanged, and prefixes on `K` are ignored by the converter in the corpus cases that remain.
 
-Still missing: `FORECAST.ETS.*`, `GETPIVOTDATA`, `RTD`, the cube and web functions. Not started: the `CHISQ.INV.RT` #NUM! boundary and `CHISQ.INV` with df above 1E10 (Follow-up 2).
+Still missing: `GETPIVOTDATA`, `RTD`, the cube and web functions. Not started: the `CHISQ.INV.RT` #NUM! boundary and `CHISQ.INV` with df above 1E10 (Follow-up 2).
 
 ## Ninth batch (Bessel, odd-period bonds, resource caps): 8 functions
 
 Corpus 100,540 to 109,151 cases (groups `besseli`, `besselj`, `besselk`, `bessely`, `oddfprice`, `oddfyield`, `oddlprice`, `oddlyield` and their `.e` argument cases);
 known differences 7,799 to 10,878 (by category: ulp-noise 7,539, precision-loss 799, algorithm-unknown 2,061, domain-rule 478, nondeterministic 1); 98,273 cases pass (90.03%).
 Of the new entries: BESSEL* 379 (ulp-noise 148, precision-loss 96, algorithm-unknown 103, domain-rule 32), ODDF*/ODDL* 2,700 (precision-loss 586, algorithm-unknown 1,438, domain-rule 357, ulp-noise 319).
-Excel now has no missing function in Engineering (BESSEL*) and Financial (ODDF*/ODDL*); `FORECAST.ETS*` remain the only missing statistical functions.
+Excel now has no missing function in Engineering (BESSEL*) and Financial (ODDF*/ODDL*); `FORECAST.ETS*` was the last missing statistical group and has since been added (Round 17).
 
 * `BESSELI/J/K/Y` (`bessel.rs`): Excel does not return the exact values. It evaluates the *Numerical Recipes* rational/polynomial approximations (accuracy about 1E-8): `bessi0/1`
   (switch at 3.75), `bessk0/1` (switch at 2), `bessj0/1` and `bessy0/1` (switch at 8), `bessi`/`bessj` by Miller's downward recurrence (ACC 40, rescale at 1E10, start `2*(n+sqrt(40n))`), `bessk`/`bessy`
@@ -191,7 +191,7 @@ Excel now has no missing function in Engineering (BESSEL*) and Financial (ODDF*/
   46 (6), 55 (7), 64 (8), 73 (9), 82 (10), 91 (12), 106 (15), 136 (20), 166 (25), 199 (30), 274 (40); df = 2 and df >= 50 never fail up to 1E-307. Finer scans (step 0.25) show a ragged edge (for df 6 the last accepted
   k is 43.5, for df 20 it is 133.75), so it is an iteration cap, not a threshold in p or in the quantile. `CHISQ.INV(p, df)` is `#NUM!` for `trunc(df) > 1E10` (already so in Open365). `CHISQ.INV.RT`
   with `trunc(df) > 1E10` is erratic: 1.5E10 and 3E10 are `#NUM!`, 1E11 and larger return `df * 1.0002658235505755`-like values that hardly depend on p (a failed iteration); not modelled.
-* `FORECAST.ETS*`, exact `COMBIN`: not started in this pass.
+* `FORECAST.ETS*` (added later, see Round 17), exact `COMBIN` (still unidentified, see Round 17).
 * Resource caps (robustness findings R-CALC-1..6): `functions::MAX_ARRAY_CELLS` (2^20) refuses an `MMULT` result or a `LINEST`/`TREND` operand beyond it with `#VALUE!` (Excel
   computes `MMULT` of 100000 x 78 = 7.8 million cells, so the cap is stricter; for 100000 x 702 Excel answers without an error value), `eval.rs` refuses a broadcast array operation beyond the same size with `#VALUE!`,
   `SUBSTITUTE` sizes its result before building it (`#VALUE!` past 32,767 characters, as Excel), `FREQUENCY`, `MODE.MULT` and `UNIQUE` are n log n (sort/hash) with identical results.
@@ -225,11 +225,47 @@ Findings on the unresolved algorithms (Excel 16.0, own instance):
 
 Not started in this pass (open): `BESSELI/J/K/Y`, the `CHISQ.INV.RT` `#NUM!` boundary and `CHISQ.INV` with df above 1E10, the locale-aware built-in number formats and Thai codes in `fmtlocale.rs`, `ODDF*`/`ODDL*`, `FORECAST.ETS*`.
 
+## Round 17 (ETS status, COMBIN, CHISQ.INV.RT)
+
+* **FORECAST.ETS, .CONFINT, .SEASONALITY, .STAT are registered** (`functions/ets.rs`, additive AAA model, parameters on a measured lattice). Statistics match Excel to the last digits when
+  Excel's own parameters are used on non-seasonal series; the parameter search, seasonal start values, period detection and the interval for longer horizons are fitted, not reproduced
+  (known differences with category `algorithm-unknown`). Not decoded this round: Nelder-Mead or hill-climb from (0.1, 0.099), seasonal initialisation, timeline rules.
+* **CHISQ.INV.RT / CHIINV boundary: done empirically.** `-log10 p` above a per-df limit gives `#NUM!`; the limits for df 1 to 43 (df 2 and df above 43 never fail to p = 1E-307; df is truncated, so 1.5 is 1)
+  were scanned on Excel in steps of 0.1 (0.05 for df 1, 0.25 for df 41 to 43) and are a table in `distrib.rs` (`CHISQ_RT_LIMIT`). The edge is smooth in df from 13 and irregular from 9 to 12; the rule is not identified.
+  Near the edge Excel's value is not the exact quantile: its iteration stops at an absolute error in p of about 1E-16 (df 1: relative error of the quantile 1E-9 at p = 1E-9, 3E-3 at p = 1E-16), so the values
+  there are known differences. 86 boundary cases `chisq_inv_rt.edgeNNN` were added (20 known differences, 66 pass); 8 earlier known differences of `chisq_inv_rt`/`chiinv` now pass and were removed.
+* **COMBIN: still not identified.** 11,510 pairs probed (n up to 140 in full, 1,500 random n up to 5,000). Excel is the exactly rounded value for 30% (the current product matches 29%), errors reach 27 ulp,
+  both signs, symmetric in k and n-k, k <= 2 always exact, k = 3 first inexact at n = 9 (`COMBIN(9,3)` = 83.99999999999999), results above the double range are `#NUM!`. Tried: ascending/descending numerator and
+  denominator, multiply-then-divide, divide-first, reciprocal multiplication, `r*(1+m/i)`, fused multiply-add forms, separate products: none above 35% of small pairs.
+* **ODDF*/ODDL* day-count rules and Hijri calendar: not started this round** (ODDF*/ODDL* partly done in Round 18).
+* Test harness: a `nondeterministic` known difference that matches by chance counts as a pass (`randarray.c0214`).
+
+## Round 18 (ODDF*/ODDL* day counts, ETS arity)
+
+Corpus 109,751 cases: 99,754 pass, 9,997 known differences (11,214 before this round, so 1,217 cases moved to pass), 0 unexpected. Pass counts by function (pass / known difference):
+`oddfprice` 1,025/373 (was 681 of 1,300 plus extras), `oddfyield` 358/1,035 (was 130 of 1,300), `oddlprice` 1,337/37 and `oddlyield` 1,337/37 (were 867 and 866 of 1,300).
+Per basis the old residue was concentrated in `ODDLPRICE`/`ODDLYIELD` bases 2 and 3 (10 and 43 of about 225 numbers passing) and in `ODDFPRICE` bases 2 and 3.
+
+* **ODDL*:** with bases 1, 2 and 3 the normal period length E of every quasi-coupon period is its actual length (basis 2 and 3 do not use 360/f or 365/f here; measured with a zero rate and `DSM/E`, e.g. 8/183 and 11/181).
+  The quasi-coupon dates are stepped forward from the last interest date with the day clamped to the month length and **no end-of-month rule** (EOM rule: 1,180 of 1,243 exact, clamped: 1,207 in an independent model).
+  36 cases remain, all basis 0 (30/360 corner cases at February ends, unresolved).
+* **ODDF*:** `#NUM!` when the first coupon date is not on the maturity's coupon schedule (with the end-of-month rule): 187 of 187 misaligned cases, 5 aligned error cases remain (`oddfprice.c0090`, `c0403`, `c0501`, `c0546`, `c0675`; rule open).
+  Quasi-coupon periods that lie entirely inside the odd period count exactly 1 in the first-coupon accrual (`c1`); only the period that contains the issue date is partial (`days/E`). This fixed bases 2 and 3 for non-month-end dates:
+  probes with a zero rate (isolates the discount exponent), a zero yield (isolates the coupon sum) and both, 200 random series per basis, match to the last digit, including bases 0/4 without month-end dates.
+* **ODDF* residue (open):** month-end first-coupon dates (day 29 to 31) on bases 0, 1 and 4 and some on 2: the discount exponent `DSC/E` jumps by one whole period depending on the settlement day (probe `first = 2031-08-31`, `f = 4`:
+  the exponent is `d360(settlement, first) (+90 on days that are neither a month end nor in a month holding a quasi-coupon date)`), so Excel's period counting uses a month arithmetic that is not reproduced.
+  Trying `E - A` instead of `days(settle, coupon)` for bases 0 and 4 helped February but hurt the probes and was not adopted. Stepping back from `first` without the EOM rule gave 28 vs 31 big cases on basis 0 but worse on basis 1: inconclusive.
+* **ODDFYIELD:** the price model is now exact for about 70% of the cases, but Excel stops its iteration early (price residual at Excel's yield: median 3E-9, 90% below 1E-2 where the model differs).
+  Newton (finite-difference slope) and secant iterations with start values rate, 0, 0.05, 0.1 and tolerances 1E-5 to 1E-10 were compared with 120 sampled Excel yields: none reproduces the stopping point
+  (best 22 of 120, the same cases that a fully converged root gives). The bisection stays; the mismatches are `precision-loss` or `ulp-noise`.
+* **FORECAST.ETS* arity** re-measured on Excel (`_xlfn.` names, own instance): `FORECAST.ETS` 3 to 6, `FORECAST.ETS.CONFINT` 3 to 7, `FORECAST.ETS.SEASONALITY` 2 to 4, `FORECAST.ETS.STAT` 3 to 6; identical to `parser_arity.rs`, no change.
+* Not started (turn budget): ETS parameter search (Nelder-Mead / hill-climb from (0.1, 0.099)) with a hold-out set, seasonal initialisation and period detection, Hijri calendar, and a new COMBIN hypothesis.
+
 ## Missing by category
 
 **Math and trigonometry** (0): none
 
-**Statistical** (4): FORECAST.ETS, FORECAST.ETS.CONFINT, FORECAST.ETS.SEASONALITY, FORECAST.ETS.STAT
+**Statistical** (0): none (FORECAST.ETS, FORECAST.ETS.CONFINT, FORECAST.ETS.SEASONALITY and FORECAST.ETS.STAT are registered, see `functions/ets.rs` and "Round 17")
 
 **Financial** (0): none
 

@@ -13,6 +13,9 @@
 
 use std::collections::{BTreeMap, HashSet};
 
+mod stories;
+pub use stories::{CommentStory, StoryAnchor, StoryPos};
+
 use open365_opc::{Package, PartName, Relationships, TargetMode, rels_part_name, resolve_target};
 
 use crate::DocxError;
@@ -82,6 +85,10 @@ pub struct Comment {
     pub scope_text: String,
     /// `w14:paraId` of the body's last paragraph, the key of the extension parts.
     pub para_id: Option<String>,
+    /// The story the range markers are in. Outside the main story the anchor is `None` and
+    /// `story_anchor` says where; see [`Document::add_story_comment`].
+    pub story: CommentStory,
+    pub story_anchor: Option<StoryAnchor>,
 }
 
 /// A comment to add.
@@ -133,6 +140,8 @@ pub(crate) struct CommentParts {
     extensible: Option<PartXml>,
     /// `word/people.xml` (`w15:person`): the authors of comments.
     people: Option<PartXml>,
+    /// Header, footer, note and similar parts opened for editing, by part name.
+    stories: BTreeMap<String, PartXml>,
     /// A comment part exists but cannot be parsed: comment edits are refused.
     broken: Option<String>,
 }
@@ -215,6 +224,12 @@ impl CommentParts {
             }
             package.set_part(part.name.clone(), part.xml.to_bytes());
             part.dirty = false;
+        }
+        for part in self.stories.values_mut() {
+            if part.dirty {
+                package.set_part(part.name.clone(), part.xml.to_bytes());
+                part.dirty = false;
+            }
         }
         Ok(())
     }
@@ -547,6 +562,7 @@ impl Document {
             return Vec::new();
         };
         let marks = self.marks();
+        let story_marks = self.story_marks();
         let ext = self.comments.extended.as_ref();
         let ext_of = |para_id: &str| -> Option<&XmlElement> {
             ext?.xml
@@ -588,8 +604,18 @@ impl Document {
                     Some(CommentAnchor { start, end })
                 });
                 // Word reports a reply's scope as its parent's.
-                let scope_id = parent.filter(|p| marks.contains_key(p)).unwrap_or(id);
-                let scope_text = self.scope_text(scope_id);
+                let scope_id = parent
+                    .filter(|p| marks.contains_key(p) || story_marks.contains_key(p))
+                    .unwrap_or(id);
+                let scope_text = match story_marks.get(&scope_id) {
+                    Some(m) if !marks.contains_key(&scope_id) => m.scope_text(),
+                    _ => self.scope_text(scope_id),
+                };
+                let story_anchor = if anchor.is_none() {
+                    story_marks.get(&id).and_then(|m| m.anchor.clone())
+                } else {
+                    None
+                };
                 let text = comment_paragraphs(c)
                     .into_iter()
                     .map(|p| {
@@ -610,6 +636,10 @@ impl Document {
                     anchor,
                     scope_text,
                     para_id,
+                    story: story_anchor
+                        .as_ref()
+                        .map_or(CommentStory::Main, |a| a.story),
+                    story_anchor,
                 })
             })
             .collect()
@@ -754,6 +784,14 @@ impl Document {
         self.comment(parent)
             .ok_or(DocxError::NoSuchComment(parent))?;
         let marks = self.marks();
+        if !marks.contains_key(&parent)
+            && let Some(anchor) = self
+                .story_marks()
+                .get(&parent)
+                .and_then(|m| m.anchor.clone())
+        {
+            return self.reply_in_story(parent, &anchor, comment);
+        }
         let m = marks.get(&parent).copied().ok_or_else(|| {
             DocxError::CommentsUnavailable("the comment is not anchored".to_owned())
         })?;
@@ -867,6 +905,8 @@ impl Document {
             let para = self.paragraph_mut(p)?;
             remove_marks(&mut para.content, &doomed);
         }
+        let story_marks = self.story_marks();
+        self.remove_story_markers(&doomed, &story_marks)?;
         if let Some(part) = &mut self.comments.comments {
             part.xml.root.children.retain(|c| {
                 !matches!(c, RawXml::Element(e) if e.head.is_w("comment")
@@ -888,6 +928,43 @@ impl Document {
         }
         self.edited();
         Ok(())
+    }
+
+    /// Drops the body of comment `id` and its extension entries (undo of a failed add).
+    fn remove_comment_body(&mut self, id: u32) {
+        let para_ids: HashSet<String> = self
+            .comments
+            .comments
+            .as_ref()
+            .map(|p| {
+                p.xml
+                    .root
+                    .children
+                    .iter()
+                    .filter_map(RawXml::as_element)
+                    .filter(|e| e.head.is_w("comment") && comment_id(e) == Some(id))
+                    .filter_map(last_para_id)
+                    .collect()
+            })
+            .unwrap_or_default();
+        if let Some(part) = &mut self.comments.comments {
+            part.xml.root.children.retain(|c| {
+                !matches!(c, RawXml::Element(e) if e.head.is_w("comment") && comment_id(e) == Some(id))
+            });
+            part.dirty = true;
+        }
+        for (slot, ns, local) in [
+            (&mut self.comments.extended, W15, "commentEx"),
+            (&mut self.comments.ids, W16CID, "commentId"),
+        ] {
+            if let Some(part) = slot {
+                part.xml.root.children.retain(|c| {
+                    !matches!(c, RawXml::Element(e) if is_el(e, ns, local)
+                        && attr_ns(&e.head, ns, "paraId").is_some_and(|v| para_ids.contains(v)))
+                });
+                part.dirty = true;
+            }
+        }
     }
 
     /// The `w14:paraId` of comment `id`'s last paragraph, adding one when it has none.

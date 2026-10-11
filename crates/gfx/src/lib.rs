@@ -29,6 +29,7 @@ pub use draw::{Batch, ClipMask, Decorations, DrawList, LinearGradient, Vertex};
 pub use error::GfxError;
 pub use geom::{PixelRect, Rect};
 pub use path::{Cap, Join, Path, PathCmd};
+pub use raster::LcdFilter;
 pub use render::{
     GpuContext, OFFSCREEN_FORMAT, Offscreen, RenderParams, Renderer, choose_surface_format,
     pixel_at,

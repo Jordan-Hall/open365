@@ -523,14 +523,72 @@ function Invoke-Oracle([string]$Which) {
       $homeTab = $tabItems | Where-Object { $_.Current.AutomationId -eq 'TabHome' } | Select-Object -First 1
       try { $homeTab.GetCurrentPattern([Windows.Automation.SelectionItemPattern]::Pattern).Select() } catch {}
       $statusEl = (Find-All $win { param($e) $e.Current.ControlType -eq [Windows.Automation.ControlType]::StatusBar } 14) | Select-Object -First 1
-      $extraEls = @()
-      if ($Which -eq 'Excel') {
-        foreach ($cls in @('ComboBox', 'ExcelBookTabControl')) {
-          $e1 = (Find-All $win { param($e) $e.Current.ClassName -eq $cls } 14) | Select-Object -First 1
-          if ($e1) { $extraEls += $e1 }
+      # Excel: Name Box, formula bar, sheet tab strip. Their UI Automation rectangles are STALE: the elements keep the
+      # rectangle they had when the workbook window was laid out at its first size (Name Box host 274 u wide, formula
+      # bar 1308 px wide at every window width, found again for every reading or not), so they cannot be used. The
+      # Win32 child windows follow the layout, so the Name Box host (EXCEL;), combo, formula bar window (EXCEL<), grid
+      # window, scroll bars and the sheet-tab splitter (XLCTL) are read with GetWindowRect, relative to the ribbon pane
+      # origin. The sheet tabs are drawn inside the grid window (no child windows), so two pixel rows through the tab
+      # card and its underline are scanned as colour runs [start, length, 'rrggbb'] (rows are placed from the grid
+      # window's bottom edge, 36 and 10 px at 125 %).
+      Add-Type -Namespace Native -Name Kids -MemberDefinition @'
+public delegate bool EnumProc(System.IntPtr h, System.IntPtr l);
+[System.Runtime.InteropServices.DllImport("user32.dll")] public static extern bool EnumChildWindows(System.IntPtr p, EnumProc cb, System.IntPtr l);
+[System.Runtime.InteropServices.DllImport("user32.dll", CharSet=System.Runtime.InteropServices.CharSet.Unicode)] public static extern int GetClassName(System.IntPtr h, System.Text.StringBuilder sb, int n);
+[System.Runtime.InteropServices.DllImport("user32.dll")] public static extern bool IsWindowVisible(System.IntPtr h);
+'@
+      $script:KidRows = New-Object System.Collections.ArrayList
+      $script:KidCb = [Native.Kids+EnumProc]{
+        param($c, $l)
+        $sb = New-Object System.Text.StringBuilder 256
+        [void][Native.Kids]::GetClassName($c, $sb, 256)
+        $cn = $sb.ToString()
+        if ($cn -in 'EXCEL;', 'ComboBox', 'EXCEL<', 'XLDESK', 'NUIScrollbar', 'XLCTL' -and [Native.Kids]::IsWindowVisible($c)) {
+          $r = New-Object Native.Ui+RECT
+          [void][Native.Ui]::GetWindowRect($c, [ref]$r)
+          [void]$script:KidRows.Add(@($cn, $r.Left, $r.Top, ($r.Right - $r.Left), ($r.Bottom - $r.Top)))
         }
-        $e1 = (Find-All $win { param($e) $e.Current.AutomationId -eq 'FormulaBar' } 14) | Select-Object -First 1
-        if ($e1) { $extraEls += $e1 }
+        return $true
+      }
+      function Read-Win32Extra([int]$px, [int]$py) {
+        $script:KidRows.Clear()
+        if ($Which -ne 'Excel') { return @() }
+        $tl = New-Object Native.Ui+RECT
+        [void][Native.Ui]::GetWindowRect($hwnd, [ref]$tl)
+        [void][Native.Kids]::EnumChildWindows($hwnd, $script:KidCb, [IntPtr]::Zero)
+        $out = New-Object System.Collections.ArrayList
+        $deskBottom = 0
+        foreach ($k in $script:KidRows) {
+          # Position relative to the ribbon pane origin ($px, $py are screen coordinates).
+          [void]$out.Add(@($k[0], 'win32', ($k[1] - $px), ($k[2] - $py), $k[3], $k[4], 0))
+          if ($k[0] -eq 'XLDESK') { $deskBottom = $k[2] + $k[4] - $tl.Top }
+        }
+        return @{ rects = $out.ToArray(); deskBottom = $deskBottom; left = $tl.Left; top = $tl.Top; w = ($tl.Right - $tl.Left); h = ($tl.Bottom - $tl.Top) }
+      }
+      function Read-TabRuns($info) {
+        if ($Which -ne 'Excel' -or -not $info.deskBottom) { return @() }
+        $bmp = New-Object System.Drawing.Bitmap $info.w, $info.h
+        $g = [System.Drawing.Graphics]::FromImage($bmp)
+        $dc = $g.GetHdc()
+        [void][Native.Ui]::PrintWindow($hwnd, $dc, 2)
+        $g.ReleaseHdc($dc); $g.Dispose()
+        $rows = @()
+        foreach ($dy in 36, 10) {
+          $y = $info.deskBottom - $dy
+          $runs = New-Object System.Collections.ArrayList
+          $start = 0; $prev = $null
+          for ($x = 0; $x -lt $info.w; $x++) {
+            $c = $bmp.GetPixel($x, $y).ToArgb() -band 0xffffff
+            if ($c -ne $prev) {
+              if ($null -ne $prev) { [void]$runs.Add(@($start, ($x - $start), ('{0:x6}' -f $prev))) }
+              $start = $x; $prev = $c
+            }
+          }
+          if ($null -ne $prev) { [void]$runs.Add(@($start, ($info.w - $start), ('{0:x6}' -f $prev))) }
+          $rows += , @($y, $runs.ToArray())
+        }
+        $bmp.Dispose()
+        return $rows
       }
       function Add-Rec($list, $el, [int]$px, [int]$py) {
         $c = $el.Current; $r = $c.BoundingRectangle
@@ -569,20 +627,22 @@ function Invoke-Oracle([string]$Which) {
           $t1 = $walker.GetFirstChild($statusEl)
           while ($t1) { Add-Rec $stat $t1 $px $py; $t1 = $walker.GetNextSibling($t1) }
         }
-        $extra = New-Object System.Collections.ArrayList
-        foreach ($e1 in $extraEls) {
-          Add-Rec $extra $e1 $px $py
-          if ($e1.Current.ClassName -eq 'ExcelBookTabControl') {
-            $t1 = $walker.GetFirstChild($e1)
-            while ($t1) { Add-Rec $extra $t1 $px $py; $t1 = $walker.GetNextSibling($t1) }
-          }
-        }
+        $w32 = Read-Win32Extra $px $py
+        $extra = if ($Which -eq 'Excel') { $w32.rects } else { @() }
+        $tabRuns = Read-TabRuns $w32
         $gr = New-Object Native.Ui+RECT
         [void][Native.Ui]::GetWindowRect($hwnd, [ref]$gr)
-        return [ordered]@{ win = @(($gr.Right - $gr.Left), ($gr.Bottom - $gr.Top)); pane = @($px, $py, [int]$pr.Width, [int]$pr.Height); top = $top.ToArray(); status = $stat.ToArray(); extra = $extra.ToArray() }
+        return [ordered]@{ win = @(($gr.Right - $gr.Left), ($gr.Bottom - $gr.Top)); pane = @($px, $py, [int]$pr.Width, [int]$pr.Height); top = $top.ToArray(); status = $stat.ToArray(); extra = $extra; tabs = $tabRuns }
       }
       $cw = New-Object System.Collections.ArrayList
+      # Checkpoint: one JSON line per finished width, so a long sweep can be resumed (done widths are reloaded, not re-measured).
+      $ckPath = Join-Path $chromeOutDir ("{0}-chrome-checkpoint.jsonl" -f $Which.ToLower())
+      $done = @{}
+      if (Test-Path $ckPath) {
+        foreach ($ln in Get-Content $ckPath) { if ($ln) { $o = $ln | ConvertFrom-Json -AsHashtable; $done[[int]$o.w] = $o } }
+      }
       foreach ($rw in $ChromeList) {
+        if ($done.ContainsKey([int]$rw)) { [void]$cw.Add($done[[int]$rw]); continue }
         [void][Native.Ui]::SetWindowPos($hwnd, [IntPtr]::Zero, 0, 0, $rw, $WindowHeight, 0x14)
         Start-Sleep -Milliseconds $ChromeSettleMs
         # Office re-lays out the title row, tab row and status bar at different moments: read again until two
@@ -596,10 +656,14 @@ function Invoke-Oracle([string]$Which) {
           if ($sig2 -eq $sig) { break }
           $sig = $sig2
         }
-        [void]$cw.Add([ordered]@{ w = $rw; win = $rec.win; pane = $rec.pane; top = $rec.top; status = $rec.status; extra = $rec.extra })
+        $entry = [ordered]@{ w = $rw; win = $rec.win; pane = $rec.pane; top = $rec.top; status = $rec.status; extra = $rec.extra; tabs = $rec.tabs }
+        [void]$cw.Add($entry)
+        $ln = $entry | ConvertTo-Json -Depth 8 -Compress
+        foreach ($t in $script:Scrub) { if ($t) { $ln = $ln.Replace($t, '<user>') } }
+        [IO.File]::AppendAllText($ckPath, $ln + "`n", (New-Object Text.UTF8Encoding($false)))
       }
       [void][Native.Ui]::SetWindowPos($hwnd, [IntPtr]::Zero, 0, 0, $WindowWidth, $WindowHeight, 0x14)
-      $cj = [ordered]@{ schema = 2; app = $Which; measuredScale = $scale; note = 'w = requested outer window width in physical px (client = win[0] - 18). Records are [name, id, x, y, w, h, offscreen] with x, y relative to the ribbon pane origin.'; widths = $cw.ToArray() } | ConvertTo-Json -Depth 8 -Compress
+      $cj = [ordered]@{ schema = 3; app = $Which; measuredScale = $scale; note = 'w = requested outer window width in physical px (client = win[0] - 18). Records are [name, id, x, y, w, h, offscreen] with x, y relative to the ribbon pane origin. Excel extra = visible Win32 child windows (class in the name column, id win32); tabs = [window y, [[start, len, rrggbb]...]] for two rows through the sheet tab card and underline (UI Automation rectangles of Excel workbook-window elements are stale and not recorded).'; widths = $cw.ToArray() } | ConvertTo-Json -Depth 8 -Compress
       foreach ($t in $script:Scrub) { if ($t) { $cj = $cj.Replace($t, '<user>') } }
       [IO.File]::WriteAllText((Join-Path $chromeOutDir ("{0}-chrome-responsive.json" -f $Which.ToLower())), $cj, (New-Object Text.UTF8Encoding($false)))
     }

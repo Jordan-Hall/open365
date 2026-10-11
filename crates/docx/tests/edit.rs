@@ -489,3 +489,49 @@ fn first_edit_leaves_no_dangling_content_type_override() {
         .collect();
     assert!(dangling.is_empty(), "{dangling:?}");
 }
+
+#[test]
+fn vert_align_patch_sets_overrides_and_round_trips() {
+    use open365_docx::{DocPos, RunPropsPatch, VertAlign};
+    let mut doc = open_body(r#"<w:p><w:r><w:t>H2O and x2</w:t></w:r></w:p>"#);
+    doc.set_run_props(
+        DocPos::new(0, 1),
+        DocPos::new(0, 2),
+        &RunPropsPatch::vert_align(VertAlign::Subscript),
+    )
+    .expect("subscript");
+    doc.set_run_props(
+        DocPos::new(0, 9),
+        DocPos::new(0, 10),
+        &RunPropsPatch::vert_align(VertAlign::Superscript),
+    )
+    .expect("superscript");
+    let bytes = doc.save().expect("save");
+    let again = Document::open(&bytes, &Limits::default()).expect("reopen");
+    let Inline::Run(sub) = &again.paragraph(0).expect("p").content[1] else {
+        panic!("run")
+    };
+    assert_eq!(sub.text(), "2");
+    assert_eq!(sub.props.vert_align(), Some("subscript"));
+    let aligns: Vec<_> = again
+        .paragraph(0)
+        .expect("p")
+        .content
+        .iter()
+        .filter_map(|i| match i {
+            Inline::Run(r) => Some(r.props.vert_align()),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(aligns, [None, Some("subscript"), None, Some("superscript")]);
+    // Baseline is written explicitly so it overrides a style.
+    let mut doc = again;
+    doc.set_run_props(
+        DocPos::new(0, 1),
+        DocPos::new(0, 2),
+        &RunPropsPatch::vert_align(VertAlign::Baseline),
+    )
+    .expect("baseline");
+    let xml = String::from_utf8(doc.serialize_main()).expect("utf8");
+    assert!(xml.contains(r#"<w:vertAlign w:val="baseline"/>"#), "{xml}");
+}

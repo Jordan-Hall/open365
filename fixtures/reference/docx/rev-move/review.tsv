@@ -1,7 +1,7 @@
-rev	0	MovedFrom	Author A	2026-10-11T15:20:00Z	Move alpha paragraph.
-rev	1	MovedTo	Author A	2026-10-11T15:20:00Z	Move gamma paragraph.
-rev	2	MovedTo	Author A	2026-10-11T15:20:00Z	Move alpha paragraph.
-rev	3	MovedFrom	Author A	2026-10-11T15:20:00Z	Move gamma paragraph.
+rev	0	MovedFrom	Author A	2026-10-11T18:21:00Z	Move alpha paragraph.
+rev	1	MovedTo	Author A	2026-10-11T18:21:00Z	Move gamma paragraph.
+rev	2	MovedTo	Author A	2026-10-11T18:21:00Z	Move alpha paragraph.
+rev	3	MovedFrom	Author A	2026-10-11T18:21:00Z	Move gamma paragraph.
 para	markup	0	Move alpha paragraph.	0	Normal	0	B0I0U0S22x21
 para	markup	1	Move gamma paragraph.	0	Normal	0	B0I0U0S22x21
 para	markup	2	Move alpha paragraph.	0	Normal	0	B0I0U0S22x21

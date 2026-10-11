@@ -5,6 +5,7 @@
 mod common;
 
 use common::{Rig, Scratch, s};
+use open365_mcp::Scope;
 use open365_mcp::registry::{COMMANDS, Domain};
 use serde_json::{Value, json};
 
@@ -15,7 +16,16 @@ const XLSX: &str = "xlsx/formulas-basic.xlsx";
 fn run_through_mcp(name: &str, example: &Value, fixture: &str) -> Value {
     let scratch = Scratch::new(&format!("cov-{name}-{}", fixture.replace('/', "_")));
     let file = scratch.put(fixture);
-    let mut r = Rig::all(&scratch);
+    let mut r = Rig::new(
+        &scratch,
+        &[
+            Scope::Edit,
+            Scope::Save,
+            Scope::Export,
+            Scope::ExecuteExternal,
+        ],
+        true,
+    );
     let id = r.open(&file);
     if matches!(name, "docx_move_tab" | "docx_clear_tab") {
         // These act on a tab stop that has to exist first.
@@ -39,6 +49,25 @@ fn run_through_mcp(name: &str, example: &Value, fixture: &str) -> Value {
             "export_pdf",
             json!({"document": id, "path": s(&scratch.root().join("out.pdf"))}),
         ),
+        "share_send_copy" => r.ok(
+            "share_send_copy",
+            json!({"document": id, "path": s(&scratch.root().join(format!("copy.{ext}")))}),
+        ),
+        "share_send_pdf" => r.ok(
+            "share_send_pdf",
+            json!({"document": id, "path": s(&scratch.root().join("copy.pdf"))}),
+        ),
+        "share_inspect" => r.ok("share_inspect", json!({"document": id})),
+        "share_sanitize_copy" => r.ok(
+            "share_sanitize_copy",
+            json!({"document": id, "remove": ["comments", "personal_info"],
+                "path": s(&scratch.root().join(format!("clean.{ext}")))}),
+        ),
+        "share_os_sheet" => {
+            let made = scratch.root().join(format!("made.{ext}"));
+            r.ok("share_send_copy", json!({"document": id, "path": s(&made)}));
+            r.ok("share_os_sheet", json!({"document": id, "path": s(&made)}))
+        }
         _ => r.ok(
             "apply_commands",
             json!({"document": id, "commands": [example]}),
@@ -61,6 +90,12 @@ fn every_command_runs_through_mcp() {
             match spec.name {
                 "save" => assert!(out["bytes_written"].as_u64().unwrap_or(0) > 0, "{out}"),
                 "export_pdf" => assert!(out["pages"].as_u64().unwrap_or(0) > 0, "{out}"),
+                "share_send_copy" | "share_sanitize_copy" => {
+                    assert!(out["bytes_written"].as_u64().unwrap_or(0) > 0, "{out}");
+                }
+                "share_send_pdf" => assert!(out["pages"].as_u64().unwrap_or(0) > 0, "{out}"),
+                "share_inspect" => assert!(out["items"].is_array(), "{out}"),
+                "share_os_sheet" => assert_eq!(out["performed"], false, "{out}"),
                 _ => assert_eq!(out["applied"], 1, "{}: {out}", spec.name),
             }
         }

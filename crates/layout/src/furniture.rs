@@ -28,7 +28,7 @@ use crate::flow::{Base, build_line, line_images};
 use crate::incremental::{REL_FOOTNOTES, related_links};
 use crate::numbering::ListLabel;
 use crate::para::{Context, FieldEnv, NoteOrder, ParaLayout};
-use crate::props::SectionProps;
+use crate::props::{SectionCols, SectionProps};
 use crate::rules::rules_of;
 use crate::{ImagePlacement, ImageSource, Line, NoteSlot, Page, StoryKind};
 
@@ -379,6 +379,9 @@ struct SectionNotes {
     heights: HashMap<i64, f64>,
     /// Height of every line of a note, flattened over its paragraphs.
     line_heights: HashMap<i64, Vec<f64>>,
+    /// Left edge of each note column relative to the text area (one entry for a one-column
+    /// section).
+    col_x: Vec<f64>,
 }
 
 /// Footnote layouts for every section.
@@ -391,6 +394,7 @@ impl NoteStore {
     pub(crate) fn new(
         doc: &Document,
         sections: &[SectionProps],
+        cols: &[SectionCols],
         order: &NoteOrder,
         ctx: &Context<'_>,
     ) -> Self {
@@ -410,9 +414,26 @@ impl NoteStore {
             .map(|n| n.blocks.clone())
             .unwrap_or_default();
         let mut out = Vec::new();
-        for sp in sections {
-            let width = sp.text_width();
-            let sep = layout_blocks(&ctx, &sep_blocks, width);
+        for (si, sp) in sections.iter().enumerate() {
+            // Measured (layout-cols-footnote): the footnotes of a section with equal columns are
+            // set in columns of the section's width and balanced over them.
+            let col_x: Vec<f64> = match cols.get(si) {
+                Some(c)
+                    if c.is_multi()
+                        && c.columns
+                            .iter()
+                            .all(|g| (g.width - c.first_width()).abs() < 0.01) =>
+                {
+                    c.columns.iter().map(|g| g.x).collect()
+                }
+                _ => vec![0.0],
+            };
+            let width = if col_x.len() > 1 {
+                cols[si].first_width()
+            } else {
+                sp.text_width()
+            };
+            let sep = layout_blocks(&ctx, &sep_blocks, sp.text_width());
             let sep_h = height_of(&sep);
             let labels: [Option<ListLabel>; 0] = [];
             let mut b = Builder::new(ctx, &labels, 0);
@@ -454,6 +475,7 @@ impl NoteStore {
                 ranges,
                 heights,
                 line_heights,
+                col_x,
             });
         }
         Self { sections: out }
@@ -493,6 +515,54 @@ impl NoteStore {
             .map_or(0.0, |hs| hs[slot.from.min(n)..slot.to.min(n)].iter().sum())
     }
 
+    /// The column (0-based) of each slot and the height of the note area: whole notes in order,
+    /// split over the section's note columns so that the tallest column is as short as it can be.
+    fn columns_of(&self, section: usize, slots: &[NoteSlot]) -> (Vec<usize>, f64) {
+        let n = self
+            .sections
+            .get(section)
+            .map_or(1, |s| s.col_x.len().max(1));
+        let hs: Vec<f64> = slots
+            .iter()
+            .map(|sl| self.slot_height(section, *sl))
+            .collect();
+        let total: f64 = hs.iter().sum();
+        if n == 1 {
+            return (vec![0; hs.len()], total);
+        }
+        let pack = |limit: f64| {
+            let (mut col, mut used) = (0usize, 0.0f64);
+            let mut out = Vec::with_capacity(hs.len());
+            for h in &hs {
+                if used > 0.0 && used + h > limit + 1e-6 && col + 1 < n {
+                    col += 1;
+                    used = 0.0;
+                }
+                used += h;
+                out.push((col, used));
+            }
+            out
+        };
+        let (mut lo, mut hi) = (hs.iter().copied().fold(0.0, f64::max), total);
+        for _ in 0..40 {
+            let mid = (lo + hi) / 2.0;
+            let tallest = pack(mid).iter().map(|p| p.1).fold(0.0, f64::max);
+            if tallest <= mid + 1e-6 {
+                hi = mid;
+            } else {
+                lo = mid;
+            }
+        }
+        let packed = pack(hi);
+        let height = packed.iter().map(|p| p.1).fold(0.0, f64::max);
+        (packed.iter().map(|p| p.0).collect(), height)
+    }
+
+    /// Height of the note area (separator excluded) for `slots`.
+    pub(crate) fn area(&self, section: usize, slots: &[NoteSlot]) -> f64 {
+        self.columns_of(section, slots).1
+    }
+
     /// The separator and note lines of a page whose body area ends at `bottom`.
     pub(crate) fn page_lines(
         &self,
@@ -507,11 +577,8 @@ impl NoteStore {
         if slots.is_empty() {
             return (Vec::new(), Vec::new());
         }
-        let total: f64 = s.sep_h
-            + slots
-                .iter()
-                .map(|sl| self.slot_height(section, *sl))
-                .sum::<f64>();
+        let (col_of, area) = self.columns_of(section, slots);
+        let total: f64 = s.sep_h + area;
         let mut y = bottom - total;
         let src = ImageSource::Footnotes;
         let sep = place(
@@ -525,13 +592,15 @@ impl NoteStore {
         y += sep.height;
         let mut lines = sep.lines;
         let mut images: Vec<ImagePlacement> = sep.images.into_iter().map(|i| i.1).collect();
-        for sl in slots {
+        let mut col_y = vec![y; s.col_x.len().max(1)];
+        for (sl, col) in slots.iter().zip(col_of) {
+            y = col_y[col];
             let Some(r) = s.ranges.get(&sl.id) else {
                 continue;
             };
             let placed = place(
                 &s.paras[r.clone()],
-                origin_x,
+                origin_x + s.col_x.get(col).copied().unwrap_or(0.0),
                 0.0,
                 StoryKind::Footnotes,
                 &src,
@@ -556,7 +625,7 @@ impl NoteStore {
                 im.y += shift;
                 im
             }));
-            y += self.slot_height(section, *sl);
+            col_y[col] = y + self.slot_height(section, *sl);
             lines.extend(l);
         }
         (lines, images)

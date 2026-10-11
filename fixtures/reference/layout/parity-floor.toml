@@ -81,7 +81,7 @@ matched = 75
 total = 75
 
 [fixtures.layout-cols-footnote]
-matched = 38
+matched = 62
 total = 63
 
 [fixtures.layout-cols-four]
@@ -325,7 +325,7 @@ matched = 88
 total = 98
 
 [fixtures.layout-justify]
-matched = 1207
+matched = 1267
 total = 1471
 
 [fixtures.layout-keep]
@@ -589,7 +589,7 @@ matched = 75
 total = 75
 
 [system.layout-cols-footnote]
-matched = 38
+matched = 62
 total = 63
 
 [system.layout-cols-four]
@@ -845,7 +845,7 @@ matched = 98
 total = 98
 
 [system.layout-justify]
-matched = 1351
+matched = 1411
 total = 1471
 
 [system.layout-keep]

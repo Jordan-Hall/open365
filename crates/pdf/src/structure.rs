@@ -13,7 +13,8 @@ use std::collections::HashMap;
 use std::ops::Range;
 
 use open365_docx::{
-    Block, BreakKind, Document, Inline, Paragraph, RawXml, Run, RunContent, Styles, TableChild,
+    Block, BreakKind, Document, Inline, Numbering, Paragraph, RawXml, Run, RunContent, Styles,
+    TableChild,
 };
 use open365_layout::ParaRole;
 use open365_opc::{Relationships, TargetMode};
@@ -36,6 +37,8 @@ pub enum Kind {
     Tr,
     Th,
     Td,
+    /// A text box (Word's `Textbox`, role-mapped to `Sect`): the paragraphs of the box.
+    Textbox,
 }
 
 impl Kind {
@@ -54,6 +57,7 @@ impl Kind {
             Self::Tr => "TR".into(),
             Self::Th => "TH".into(),
             Self::Td => "TD".into(),
+            Self::Textbox => "Textbox".into(),
         }
     }
 }
@@ -78,6 +82,17 @@ pub struct ParaMeta {
     pub tag: String,
     /// Heading level (the title for the outline), also for a numbered heading.
     pub heading: Option<u8>,
+    /// The paragraph's space after, in points (Word's link rectangles include it on the last
+    /// line).
+    pub after: f64,
+    /// The paragraph's space before, in points.
+    pub before: f64,
+    /// Contextual spacing is on, and the style id (spacing is dropped between paragraphs of one
+    /// style).
+    pub contextual: bool,
+    pub style: Option<String>,
+    /// First paragraph of its container (the body, a table cell): nothing above it.
+    pub first: bool,
 }
 
 /// Where a hyperlink goes.
@@ -104,6 +119,9 @@ pub struct ParaText {
     pub text: String,
     pub links: Vec<Range<usize>>,
     pub langs: Vec<(Range<usize>, String)>,
+    /// Byte offsets in `text` where a footnote or endnote reference mark stands (the model
+    /// holds no text for it; the layout draws the number there).
+    pub note_marks: Vec<(usize, bool)>,
 }
 
 #[derive(Debug)]
@@ -120,6 +138,16 @@ pub struct DocStructure {
     pub dropped_links: usize,
     /// `/ID` strings of table headers and their elements, for the `IDTree`.
     pub ids: Vec<(String, u32)>,
+    /// The text boxes of the main story in anchor order (the layout's frame ids): the index of
+    /// the paragraph each is anchored in and its content.
+    pub boxes: Vec<(usize, std::sync::Arc<open365_docx::TextBox>)>,
+    /// The `Textbox` element of each box of `boxes`, after the paragraph the box is anchored in.
+    pub box_elems: Vec<u32>,
+    /// Paragraphs that carry a section break or sit in a cell covered by a vertical merge: Word writes no `P` for one
+    /// that drew nothing.
+    pub section_breaks: std::collections::HashSet<u32>,
+    /// (story code, paragraph index in the notes story) -> index of the note it belongs to.
+    pub note_of: HashMap<(u8, usize), usize>,
 }
 
 /// Reads hyperlinks, languages and text of paragraphs.
@@ -160,6 +188,12 @@ impl TextReader<'_> {
                     BreakKind::Page => '\u{c}',
                     BreakKind::Column => '\u{e}',
                 }),
+                RunContent::Raw(RawXml::Element(e))
+                    if e.head.is_w("footnoteReference") || e.head.is_w("endnoteReference") =>
+                {
+                    out.note_marks
+                        .push((out.text.len(), e.head.is_w("endnoteReference")));
+                }
                 RunContent::Raw(_) => {}
             }
         }
@@ -242,6 +276,7 @@ struct Walker<'a> {
     pdf: &'a mut Pdf,
     roles: &'a HashMap<usize, ParaRole>,
     styles: Option<&'a Styles>,
+    numbering: Option<&'a Numbering>,
     reader: TextReader<'a>,
     next_para: usize,
     paras: Vec<ParaMeta>,
@@ -249,7 +284,27 @@ struct Walker<'a> {
     texts: HashMap<usize, ParaText>,
     bookmarks: HashMap<String, usize>,
     table_no: usize,
+    /// Tables (document-order ids) with a drawn border or fill: Word tags only those as tables.
+    tagged_tables: &'a std::collections::HashSet<usize>,
+    /// Nesting depth of the table being read (0 outside tables).
+    depth: usize,
+    /// Nesting depth of layout (untagged) tables being read.
+    flat: usize,
+    /// Inside a cell that a vertical merge covers.
+    vcont: usize,
     ids: Vec<(String, u32)>,
+    boxes: Vec<(usize, std::sync::Arc<open365_docx::TextBox>)>,
+    box_elems: Vec<u32>,
+    section_breaks: std::collections::HashSet<u32>,
+}
+
+/// The paragraph ends a section (`w:sectPr` in its properties).
+fn has_sect_pr(para: &Paragraph) -> bool {
+    para.props.as_ref().is_some_and(|p| {
+        p.children
+            .iter()
+            .any(|c| matches!(c, RawXml::Element(e) if e.head.is_w("sectPr")))
+    })
 }
 
 fn pstyle(para: &Paragraph) -> Option<&str> {
@@ -278,7 +333,73 @@ fn heading_level(styles: Option<&Styles>, para: &Paragraph) -> Option<u8> {
     None
 }
 
+/// The innermost open list of the last list in `out`, `depth` lists deep: each nested list hangs
+/// in the `LBody` of the last item of the one around it.
+fn deepest(out: &mut [Node], depth: usize) -> &mut Node {
+    let mut node = out.last_mut().expect("an open list");
+    for _ in 1..depth {
+        let li = node.kids.last_mut().expect("a list item");
+        let body = li.kids.last_mut().expect("a list body");
+        node = body.kids.last_mut().expect("a nested list");
+    }
+    node
+}
+
+/// The text boxes anchored in a paragraph's runs, in order.
+fn text_boxes_of(content: &[Inline], out: &mut Vec<std::sync::Arc<open365_docx::TextBox>>) {
+    for inline in content {
+        match inline {
+            Inline::Run(r) => {
+                for c in &r.content {
+                    let RunContent::Raw(RawXml::Element(e)) = c else {
+                        continue;
+                    };
+                    let drawing = if e.head.is_w("drawing") {
+                        open365_docx::Drawing::from_element(e)
+                    } else {
+                        open365_docx::Drawing::from_alternate_content(e)
+                    };
+                    if let Some(tb) = drawing.and_then(|d| d.text_box) {
+                        out.push(tb);
+                    }
+                }
+            }
+            Inline::Group(g) => text_boxes_of(&g.content, out),
+            Inline::Raw(_) => {}
+        }
+    }
+}
+
+/// Word's `ListNumbering` value for a number format.
+fn list_numbering(fmt: &str) -> &'static str {
+    match fmt {
+        "decimal" => "Decimal",
+        "lowerLetter" => "LowerAlpha",
+        "upperLetter" => "UpperAlpha",
+        "lowerRoman" => "LowerRoman",
+        "upperRoman" => "UpperRoman",
+        "bullet" => "Disc",
+        _ => "None",
+    }
+}
+
 impl Walker<'_> {
+    /// (list id, level, `ListNumbering`) of a list paragraph (evidence: `layout-lists-formats`,
+    /// `layout-lists-multilevel`, `numbering`).
+    fn list_info(&self, p: &Paragraph) -> (i64, usize, &'static str) {
+        let Some(n) = self.numbering else {
+            return (0, 0, "Decimal");
+        };
+        let Some(at) = n.paragraph_numbering(self.styles, p) else {
+            return (0, 0, "Decimal");
+        };
+        let fmt = n
+            .resolve(self.styles, at.num_id)
+            .and_then(|r| r.level(at.ilvl))
+            .map_or("decimal", |l| l.num_fmt.as_str());
+        (at.num_id, at.ilvl, list_numbering(fmt))
+    }
+
     fn node(&mut self, kind: Kind, kids: Vec<Node>) -> Node {
         Node {
             kind,
@@ -290,12 +411,26 @@ impl Walker<'_> {
 
     fn blocks(&mut self, blocks: &[Block]) -> Vec<Node> {
         let mut out: Vec<Node> = Vec::new();
+        // The open lists of the last list in `out`: (list id, level), outermost first.
+        let mut open: Vec<(i64, usize)> = Vec::new();
         for block in blocks {
+            if !matches!(block, Block::Paragraph(_)) {
+                open.clear();
+            }
             match block {
                 Block::Paragraph(p) => {
                     let index = self.next_para;
                     self.next_para += 1;
                     let (text, links) = self.reader.paragraph(p);
+                    let mut found = Vec::new();
+                    text_boxes_of(&p.content, &mut found);
+                    let mut box_nodes = Vec::new();
+                    for b in found {
+                        let node = self.node(Kind::Textbox, Vec::new());
+                        self.box_elems.push(node.id);
+                        box_nodes.push(node);
+                        self.boxes.push((index, b));
+                    }
                     for name in self.reader.bookmarks.drain(..) {
                         self.bookmarks.entry(name).or_insert(index);
                     }
@@ -314,28 +449,75 @@ impl Walker<'_> {
                         (ParaRole::Plain, None) => (Kind::P, false, None),
                     };
                     let leaf = self.node(kind, Vec::new());
+                    if has_sect_pr(p)
+                        || self.vcont > 0
+                        || !self.texts[&index].text.trim().is_empty()
+                    {
+                        self.section_breaks.insert(leaf.id);
+                    }
                     let lbl = labeled.then(|| self.node(Kind::Lbl, Vec::new()));
                     self.paras.push(ParaMeta {
                         node: leaf.id,
                         label: lbl.as_ref().map(|l| l.id),
                         tag: kind.name(),
                         heading,
+                        after: self
+                            .styles
+                            .map_or(0.0, |s| f64::from(s.effective_para_props(p).space_after_pt)),
+                        before: self.styles.map_or(0.0, |s| {
+                            f64::from(s.effective_para_props(p).space_before_pt)
+                        }),
+                        contextual: self
+                            .styles
+                            .is_some_and(|s| s.paragraph_flow_props(p).contextual_spacing),
+                        style: pstyle(p).map(str::to_owned),
+                        first: out.is_empty(),
                     });
                     if let Some(lbl) = lbl {
+                        let (num_id, ilvl, fmt) = self.list_info(p);
                         let li = self.node(Kind::Li, vec![lbl, leaf]);
-                        match out.last_mut() {
-                            Some(l) if l.kind == Kind::L => l.kids.push(li),
-                            _ => {
-                                let mut list = self.node(Kind::L, vec![li]);
-                                list.attrs = "/A << /O /List /ListNumbering /Decimal >>".into();
+                        if !matches!(out.last(), Some(l) if l.kind == Kind::L) {
+                            open.clear();
+                        }
+                        while open.len() > 1 && open.last().is_some_and(|o| o.1 > ilvl) {
+                            open.pop();
+                        }
+                        if open.first().is_some_and(|o| o.0 != num_id) {
+                            open.clear();
+                        }
+                        let nest = open.last().is_some_and(|o| o.1 < ilvl);
+                        let new_list = open.is_empty() || nest;
+                        let list = new_list.then(|| {
+                            let mut list = self.node(Kind::L, Vec::new());
+                            list.attrs = format!("/A << /O /List /ListNumbering /{fmt} >>");
+                            list
+                        });
+                        if new_list {
+                            if open.is_empty() {
+                                // Hung after the paragraphs before it.
+                                let mut list = list.expect("new list");
+                                list.kids.push(li);
                                 out.push(list);
+                            } else {
+                                let mut list = list.expect("new list");
+                                list.kids.push(li);
+                                let item = deepest(&mut out, open.len())
+                                    .kids
+                                    .last_mut()
+                                    .expect("a list item");
+                                item.kids.last_mut().expect("a list body").kids.push(list);
                             }
+                            open.push((num_id, ilvl));
+                        } else {
+                            deepest(&mut out, open.len()).kids.push(li);
                         }
                     } else {
                         out.push(leaf);
                     }
+                    // Word writes the text boxes of a paragraph after its `P`.
+                    out.extend(box_nodes);
                 }
-                Block::Table(t) => out.push(self.table(t)),
+                Block::Table(t) => out.extend(self.table(t)),
                 // The paragraphs of a content control follow the layout's order in place.
                 Block::Sdt(sdt) => {
                     for content in sdt.content() {
@@ -348,10 +530,33 @@ impl Walker<'_> {
         out
     }
 
-    fn table(&mut self, t: &open365_docx::Table) -> Node {
+    /// The elements of a table: one `Table` element, or, for a table that draws no border and no
+    /// fill (a layout table), the elements of its cells' paragraphs, as Word writes them
+    /// (evidence: `p-tshd`, `p-thdr`, `p-tcell`, `p-tmix` and the layout fixtures). A table inside a
+    /// tagged table is always a table, with rows directly under it (`p-tnest`).
+    fn table(&mut self, t: &open365_docx::Table) -> Vec<Node> {
         let view = t.view();
         self.table_no += 1;
         let no = self.table_no;
+        // A table inside any table is a table (`p-tnest`, `layout-table-flow`); only inside a
+        // tagged table are its rows directly under it, inside a layout table it is a plain one.
+        let inside = self.depth > 0;
+        let nested = self.depth > self.flat;
+        if !inside && !self.tagged_tables.contains(&(no - 1)) {
+            let mut flat = Vec::new();
+            self.depth += 1;
+            self.flat += 1;
+            for row in &view.rows {
+                for c in &row.cells {
+                    self.vcont += usize::from(c.row_span == 0);
+                    flat.extend(self.blocks(&c.cell.blocks));
+                    self.vcont -= usize::from(c.row_span == 0);
+                }
+            }
+            self.flat -= 1;
+            self.depth -= 1;
+            return flat;
+        }
         let look = view.props.look.unwrap_or_default();
         let mut head_rows = 0;
         for (r, row) in view.rows.iter().enumerate() {
@@ -366,19 +571,23 @@ impl Walker<'_> {
         let mut head_nodes = Vec::new();
         let mut body_nodes = Vec::new();
         for (r, row) in view.rows.iter().enumerate() {
-            let in_head = r < head_rows;
+            let in_head = r < head_rows && !nested;
             let row_head_id = (!in_head && look.first_column)
                 .then(|| row.cells.iter().find(|c| c.col == 0))
                 .flatten()
                 .map(|_| format!("t{no}r{r}c0"));
             let mut cell_nodes = Vec::new();
             for c in &row.cells {
+                self.depth += 1;
+                self.vcont += usize::from(c.row_span == 0);
                 let kids = self.blocks(&c.cell.blocks);
+                self.vcont -= usize::from(c.row_span == 0);
+                self.depth -= 1;
                 // A cell covered by a vertical merge: its origin carries the RowSpan.
                 if c.row_span == 0 {
                     continue;
                 }
-                let is_row_head = !in_head && look.first_column && c.col == 0;
+                let is_row_head = !nested && !in_head && look.first_column && c.col == 0;
                 let th = in_head || is_row_head;
                 let mut entries: Vec<String> = Vec::new();
                 let mut attrs = String::new();
@@ -430,11 +639,15 @@ impl Walker<'_> {
             }
         }
         let mut sections = Vec::new();
-        if !head_nodes.is_empty() {
-            sections.push(self.node(Kind::THead, head_nodes));
-        }
-        if !body_nodes.is_empty() {
-            sections.push(self.node(Kind::TBody, body_nodes));
+        if nested {
+            sections = body_nodes;
+        } else {
+            if !head_nodes.is_empty() {
+                sections.push(self.node(Kind::THead, head_nodes));
+            }
+            if !body_nodes.is_empty() {
+                sections.push(self.node(Kind::TBody, body_nodes));
+            }
         }
         let mut table = self.node(Kind::Table, sections);
         if let Some(desc) = table_description(t) {
@@ -444,7 +657,7 @@ impl Walker<'_> {
                 text_string(&desc)
             );
         }
-        table
+        vec![table]
     }
 }
 
@@ -475,12 +688,14 @@ pub fn analyse(
     rels: Option<&Relationships>,
     langs: &Languages,
     base: Option<&str>,
+    tagged_tables: &std::collections::HashSet<usize>,
     pdf: &mut Pdf,
 ) -> DocStructure {
     let mut walker = Walker {
         pdf,
         roles,
         styles: doc.styles(),
+        numbering: doc.numbering(),
         reader: TextReader {
             rels,
             langs,
@@ -494,7 +709,14 @@ pub fn analyse(
         texts: HashMap::new(),
         bookmarks: HashMap::new(),
         table_no: 0,
+        tagged_tables,
+        depth: 0,
+        flat: 0,
+        vcont: 0,
         ids: Vec::new(),
+        boxes: Vec::new(),
+        box_elems: Vec::new(),
+        section_breaks: std::collections::HashSet::new(),
     };
     let kids = walker.blocks(&doc.body().blocks);
     let root = walker.node(Kind::Document, kids);
@@ -506,6 +728,10 @@ pub fn analyse(
         bookmarks: walker.bookmarks,
         dropped_links: walker.reader.dropped_links,
         ids: walker.ids,
+        boxes: walker.boxes,
+        box_elems: walker.box_elems,
+        section_breaks: walker.section_breaks,
+        note_of: HashMap::new(),
     }
 }
 

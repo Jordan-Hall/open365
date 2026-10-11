@@ -5,13 +5,15 @@ use std::fmt::Debug;
 use std::io::{self, Write as _};
 use std::path::PathBuf;
 
-use crate::util::{is_hex_id, new_id, sha256_hex};
+use crate::util::{is_hex_id, make_private_dir, new_id, sha256_hex};
 
 pub trait BlobStore: Send + Sync + Debug {
     /// Stores `data` for `tenant` and returns its blob id (lowercase SHA-256 hex).
     fn put(&self, tenant: &str, data: &[u8]) -> io::Result<String>;
     /// Returns the bytes after re-checking their hash.
     fn get(&self, tenant: &str, blob_id: &str) -> io::Result<Vec<u8>>;
+    /// Removes a blob; a missing blob is not an error. The caller checks that no version still references it.
+    fn delete(&self, tenant: &str, blob_id: &str) -> io::Result<()>;
 }
 
 #[derive(Debug)]
@@ -26,7 +28,7 @@ fn bad(msg: &'static str) -> io::Error {
 impl LocalDiskBlobStore {
     pub fn new(root: impl Into<PathBuf>) -> io::Result<Self> {
         let root = root.into();
-        std::fs::create_dir_all(&root)?;
+        make_private_dir(&root)?;
         Ok(Self { root })
     }
 
@@ -46,16 +48,25 @@ impl BlobStore for LocalDiskBlobStore {
         let id = sha256_hex(data);
         let dest = self.path(tenant, &id)?;
         if dest.exists() {
+            // Refresh the modification time so that `gc-blobs` (which spares recent files) cannot delete a blob that
+            // is about to be referenced again.
+            if let Ok(f) = std::fs::OpenOptions::new().write(true).open(&dest) {
+                let _ = f.set_modified(std::time::SystemTime::now());
+            }
             return Ok(id);
         }
         let dir = dest.parent().ok_or_else(|| bad("no parent"))?;
-        std::fs::create_dir_all(dir)?;
+        make_private_dir(dir)?;
         let tmp = dir.join(format!(".tmp-{}", new_id()));
         {
-            let mut f = std::fs::OpenOptions::new()
-                .write(true)
-                .create_new(true)
-                .open(&tmp)?;
+            let mut opts = std::fs::OpenOptions::new();
+            opts.write(true).create_new(true);
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::OpenOptionsExt;
+                opts.mode(0o600);
+            }
+            let mut f = opts.open(&tmp)?;
             f.write_all(data)?;
             f.sync_all()?;
         }
@@ -81,6 +92,13 @@ impl BlobStore for LocalDiskBlobStore {
             ));
         }
         Ok(data)
+    }
+
+    fn delete(&self, tenant: &str, blob_id: &str) -> io::Result<()> {
+        match std::fs::remove_file(self.path(tenant, blob_id)?) {
+            Err(e) if e.kind() != io::ErrorKind::NotFound => Err(e),
+            _ => Ok(()),
+        }
     }
 }
 

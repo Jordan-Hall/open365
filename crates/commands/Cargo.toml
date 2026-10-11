@@ -19,5 +19,8 @@ serde.workspace = true
 serde_json.workspace = true
 thiserror = "2.0.21"
 
+[dev-dependencies]
+zip = { version = "9.0.1", default-features = false, features = ["deflate"] }
+
 [lints]
 workspace = true

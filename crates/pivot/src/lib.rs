@@ -110,7 +110,51 @@ impl SheetPivot {
         strings: &PivotStrings,
     ) -> Result<PivotGrid, PivotError> {
         let data = Dataset::from_workbook(wb, &self.cache)?;
-        compute(&self.table, &self.cache, &data, strings, OrderMode::Refresh)
+        let cache = self.cache_with_refreshed_bounds(&data);
+        compute(&self.table, &cache, &data, strings, OrderMode::Refresh)
+    }
+
+    /// The cache with the automatic bounds of month and quarter groups moved to the refreshed
+    /// data (Excel regroups from the first to the last date; a bound set by hand stays). The
+    /// item lists of those groups do not depend on the bounds.
+    fn cache_with_refreshed_bounds(&self, data: &Dataset) -> CacheDefinition {
+        let mut cache = self.cache.clone();
+        for fi in 0..cache.fields.len() {
+            let Some(g) = cache.fields[fi].group.as_ref() else {
+                continue;
+            };
+            if !matches!(g.group_by.as_deref(), Some("months" | "quarters"))
+                || (!g.auto_start && !g.auto_end)
+            {
+                continue;
+            }
+            let base = if cache.fields[fi].database_field {
+                fi
+            } else {
+                g.base.map_or(fi, |b| b as usize)
+            };
+            let dates = data
+                .columns
+                .get(base)
+                .into_iter()
+                .flatten()
+                .filter_map(Value::number);
+            let (min, max) = dates.fold((f64::INFINITY, f64::NEG_INFINITY), |(lo, hi), x| {
+                (lo.min(x), hi.max(x))
+            });
+            if min > max {
+                continue;
+            }
+            if let Some(g) = cache.fields[fi].group.as_mut() {
+                if g.auto_start {
+                    g.start_date = Some(min.floor());
+                }
+                if g.auto_end {
+                    g.end_date = Some(max.floor());
+                }
+            }
+        }
+        cache
     }
 }
 

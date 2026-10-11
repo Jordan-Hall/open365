@@ -7,7 +7,7 @@ use std::sync::Arc;
 
 use open365_docx::{
     Alignment, Drawing, EffectiveParagraph, EffectiveRun, IndentOverride, Inline, Paragraph,
-    ParagraphProps, RawXml, Run, RunContent, RunLayoutProps, Styles, TableCellFormat,
+    ParagraphProps, RawXml, Run, RunContent, RunLayoutProps, Styles, TableCellFormat, VertAlign,
 };
 use open365_text::{
     BreakKind, FaceId, FontChain, FontLibrary, FontStyle, ShapeFeatures, break_opportunities,
@@ -28,7 +28,7 @@ const OBJECT_CHAR: &str = "\u{fffc}";
 /// A justified line may squeeze its spaces by up to this fraction of their width to take one
 /// more word (Word 2013+ layout). Fitted to layout-align and layout-justify: 0.2 gives the best
 /// match, but Word also weighs the alternative break, which is not modelled yet.
-const SPACE_SHRINK: f64 = 0.2;
+const SPACE_SHRINK: f64 = 0.24;
 
 /// Word's justified lines end a little short of the margin, about this much per stretched space
 /// (points): in `layout-justify` the glyphs of a 16-space line sit up to 0.6 pt right of Word's
@@ -38,6 +38,14 @@ const SPACE_SHRINK: f64 = 0.2;
 const JUSTIFY_SHORTFALL: f64 = 0.02;
 /// Lines with fewer stretched spaces (narrow columns) are not shortened: `layout-cols-line`.
 const JUSTIFY_SHORTFALL_MIN_SPACES: usize = 10;
+
+/// Word draws a super- or subscript run at this fraction of its size (measured:
+/// 10, 12 and 20 pt runs give 6.48, 7.92 and 12.96 pt on Word's 0.24 pt grid).
+const VERT_SIZE: f64 = 0.65;
+/// Raise of a superscript run, in em of the unreduced size (measured at about 0.33).
+const VERT_SUPER_RAISE: f64 = 1.0 / 3.0;
+/// Drop of a subscript run, in em of the unreduced size (measured at about 0.08).
+const VERT_SUB_LOWER: f64 = 1.0 / 12.0;
 
 /// Resolved formatting of a run of text.
 #[derive(Debug, Clone)]
@@ -60,6 +68,10 @@ pub(crate) struct RunStyle {
     pub scale: f64,
     /// A note reference mark.
     pub superscript: bool,
+    /// `w:vertAlign`: size is already reduced for super- and subscript.
+    pub vert_align: open365_docx::VertAlign,
+    /// Shift of the glyphs from the baseline in points, positive up (`vert_align`).
+    pub raise: f64,
     /// Size the line metrics come from: [`Self::size`], except for the reduced capitals of
     /// small caps, which sit on a line sized for the full-size font.
     pub metric_size: f64,
@@ -333,6 +345,28 @@ pub(crate) struct LineBox {
     /// one adds `(m - 1)` font heights under the descent, and Word keeps the line on the page
     /// when its text fits (layout-face-multiple).
     pub slack: f64,
+    /// Tab leaders on the line.
+    pub leaders: Vec<LeaderSpan>,
+}
+
+/// The gap a tab with a leader leaves, in text-area coordinates.
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct LeaderSpan {
+    /// The tab atom.
+    pub atom: usize,
+    pub x0: f64,
+    pub x1: f64,
+    pub ch: char,
+}
+
+/// The glyph of a leader character in one run style and its pitch (Word's whole-pixel advance).
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct LeaderGlyph {
+    pub style: usize,
+    pub ch: char,
+    pub face: FaceId,
+    pub glyph_id: u32,
+    pub pitch: f64,
 }
 
 /// What line breaking needs besides the atoms, so that a paragraph can be broken again when
@@ -411,6 +445,8 @@ pub(crate) struct ParaLayout {
     /// The paragraph holds nothing but a section break: it takes no height and no spacing, and
     /// the spacing around it passes straight through.
     pub section_mark: bool,
+    /// Glyphs of the tab leaders of the paragraph's tab stops, per style of its tabs.
+    pub leader_glyphs: Vec<LeaderGlyph>,
 }
 
 /// Length of the footnote and endnote separator rule in points (measured: the paragraph mark
@@ -513,11 +549,17 @@ fn style_from(ctx: &Context<'_>, er: &EffectiveRun, lay: &RunLayoutProps) -> Run
         .first()
         .copied()
         .unwrap_or_else(|| FaceId::from_index(0));
+    let full_size = f64::from(er.size_half_points) / 2.0;
+    let (size_factor, raise_em) = match lay.vert_align {
+        VertAlign::Baseline => (1.0, 0.0),
+        VertAlign::Superscript => (VERT_SIZE, VERT_SUPER_RAISE),
+        VertAlign::Subscript => (VERT_SIZE, -VERT_SUB_LOWER),
+    };
     RunStyle {
         requested: er.font.clone(),
         chain,
         face,
-        size: f64::from(er.size_half_points) / 2.0,
+        size: full_size * size_factor,
         bold: er.bold,
         italic: er.italic,
         underline: er.underline,
@@ -527,7 +569,9 @@ fn style_from(ctx: &Context<'_>, er: &EffectiveRun, lay: &RunLayoutProps) -> Run
         spacing: f64::from(lay.spacing_pt()),
         scale: f64::from(lay.scale_percent) / 100.0,
         superscript: false,
-        metric_size: f64::from(er.size_half_points) / 2.0,
+        vert_align: lay.vert_align,
+        raise: full_size * raise_em,
+        metric_size: full_size,
         case: if lay.caps {
             CaseMode::Caps
         } else if lay.small_caps {
@@ -631,11 +675,19 @@ impl Collector<'_, '_> {
 
     fn mark(&mut self, text: &str, style_of: &RunStyle) {
         let mut st = style_of.clone();
-        let half = (st.size * 2.0 * 0.65).round().max(1.0);
+        // A reference style that already says `w:vertAlign` has shrunk `size`; start from the full one.
+        let full = if st.vert_align == VertAlign::Baseline {
+            st.size
+        } else {
+            st.metric_size
+        };
+        let half = (full * 2.0 * 0.65).round().max(1.0);
         st.size = half / 2.0;
         st.metric_size = st.size;
         st.case = CaseMode::Normal;
         st.superscript = true;
+        st.vert_align = open365_docx::VertAlign::Baseline;
+        st.raise = 0.0;
         self.styles.push(st);
         let style = self.styles.len() - 1;
         self.push(text, style);
@@ -1027,7 +1079,7 @@ pub(crate) fn layout_paragraph(
                             face: g.face,
                             glyph_id: g.glyph_id,
                             x_offset: f64::from(g.x_offset) * st.size / upem * st.scale,
-                            y_offset: f64::from(g.y_offset) * st.size / upem,
+                            y_offset: f64::from(g.y_offset) * st.size / upem + st.raise,
                             adv,
                             cluster: (byte_start - range.start) as u32,
                         });
@@ -1090,9 +1142,27 @@ pub(crate) fn layout_paragraph(
     // Shape the label and find where the text of the first line starts.
     let label_shape = label.zip(label_style).map(|(l, ls)| {
         let st = &styles[ls];
-        let shape = |s: &str| shape_glyphs(ctx, st, s);
-        let (glyphs, width) = shape(&l.text);
-        let space = shape(" ").1;
+        // Measured (layout-lists-formats): Word does not kern a label (`v.`, `r.`, `o.` keep their
+        // unkerned gap), whatever the paragraph's `w:kern`.
+        let unkerned = RunStyle {
+            kerning: false,
+            ..st.clone()
+        };
+        let (glyphs, width) = shape_glyphs(ctx, &unkerned, &l.text);
+        // Measured (layout-lists-suff, `suff="space"`): Word sets the space after a label in
+        // Arial at the label's size, whatever the label's font (a 3.12 pt gap at 11 pt where
+        // Calibri's space is 2.4 pt).
+        let arial = RunStyle {
+            chain: ctx.fonts.chain(
+                "Arial",
+                FontStyle {
+                    bold: st.bold,
+                    italic: st.italic,
+                },
+            ),
+            ..st.clone()
+        };
+        let space = shape_glyphs(ctx, &arial, " ").1;
         (l, ls, glyphs, width, space)
     });
     let metrics: Vec<(f64, f64)> = styles
@@ -1180,6 +1250,7 @@ pub(crate) fn layout_paragraph(
     };
 
     let border = crate::rules::BorderSpec::from_docx(&flow.borders);
+    let leader_glyphs = leader_glyphs(ctx, &flow, &atoms, &styles);
     ParaLayout {
         index,
         props,
@@ -1199,6 +1270,7 @@ pub(crate) fn layout_paragraph(
         role,
         border,
         section_mark,
+        leader_glyphs,
     }
 }
 
@@ -1262,6 +1334,7 @@ impl LineBuilder<'_> {
                 page_break_after: false,
                 column_break_after: false,
                 slack: 0.0,
+                leaders: Vec::new(),
             });
         }
         lines
@@ -1376,6 +1449,7 @@ impl LineBuilder<'_> {
         let mut column_break_after = false;
         let justify = self.props.alignment == Alignment::Justify;
         let mut space_sum = 0.0;
+        let mut tab_leaders: Vec<(usize, TabLeader)> = Vec::new();
         while i < n {
             let a = &self.atoms[i];
             let adv = match a.class {
@@ -1396,6 +1470,9 @@ impl LineBuilder<'_> {
             if boxed && i > a0 && x + adv > right_limit + squeeze + EPS {
                 end = cand.unwrap_or(i);
                 break;
+            }
+            if a.class == AtomClass::Tab {
+                tab_leaders.push((i, self.next_stop(x).leader));
             }
             xs.push(x);
             advs.push(adv);
@@ -1518,6 +1595,21 @@ impl LineBuilder<'_> {
             }
         }
 
+        let leaders: Vec<LeaderSpan> = tab_leaders
+            .iter()
+            .filter(|(i, _)| *i < end)
+            .filter_map(|&(i, l)| {
+                let ch = leader_char(l)?;
+                let k = i - a0;
+                Some(LeaderSpan {
+                    atom: i,
+                    x0: xs[k],
+                    x1: xs[k] + advs[k],
+                    ch,
+                })
+            })
+            .collect();
+
         // Height from the fonts on the line.
         let mut asc: f64 = 0.0;
         let mut desc: f64 = 0.0;
@@ -1602,8 +1694,66 @@ impl LineBuilder<'_> {
             page_break_after,
             column_break_after,
             slack,
+            leaders,
         }
     }
+}
+
+/// Characters Word repeats across the gap of a tab with a leader (`w:leader`).
+fn leader_char(l: TabLeader) -> Option<char> {
+    match l {
+        TabLeader::None => None,
+        TabLeader::Dot => Some('.'),
+        TabLeader::Hyphen => Some('-'),
+        TabLeader::Underscore | TabLeader::Heavy => Some('_'),
+        TabLeader::MiddleDot => Some('\u{b7}'),
+    }
+}
+
+/// Shapes the leader characters of `flow`'s tab stops for every style a tab of the paragraph
+/// has. Word draws a leader as glyphs of the tab's own font, one every whole-pixel advance of
+/// the character at 300 dpi (0.24 pt pixels): '.' every 2.88 pt, '-' every 3.36 pt at 11 pt
+/// Calibri (`layout-tabs`).
+fn leader_glyphs(
+    ctx: &Context<'_>,
+    flow: &ParagraphProps,
+    atoms: &[Atom],
+    styles: &[RunStyle],
+) -> Vec<LeaderGlyph> {
+    let mut chars: Vec<char> = flow
+        .tabs
+        .iter()
+        .filter_map(|t| leader_char(t.leader))
+        .collect();
+    chars.sort_unstable();
+    chars.dedup();
+    let mut out = Vec::new();
+    if chars.is_empty() {
+        return out;
+    }
+    let mut seen: Vec<usize> = Vec::new();
+    for a in atoms.iter().filter(|a| a.class == AtomClass::Tab) {
+        if seen.contains(&a.style) {
+            continue;
+        }
+        seen.push(a.style);
+        let st = &styles[a.style];
+        for &ch in &chars {
+            let (glyphs, width) = shape_glyphs(ctx, st, &ch.to_string());
+            let Some(g) = glyphs.first() else { continue };
+            let pitch = (width / 0.24).round() * 0.24;
+            if pitch > 0.0 {
+                out.push(LeaderGlyph {
+                    style: a.style,
+                    ch,
+                    face: g.face,
+                    glyph_id: g.glyph_id,
+                    pitch,
+                });
+            }
+        }
+    }
+    out
 }
 
 fn shift_all(xs: &mut [f64], by: f64) {
@@ -1640,7 +1790,7 @@ fn shape_glyphs(ctx: &Context<'_>, st: &RunStyle, text: &str) -> (Vec<PlacedGlyp
                 face: g.face,
                 glyph_id: g.glyph_id,
                 x_offset: f64::from(g.x_offset) * st.size / upem * st.scale,
-                y_offset: f64::from(g.y_offset) * st.size / upem,
+                y_offset: f64::from(g.y_offset) * st.size / upem + st.raise,
                 adv,
                 cluster: g.cluster,
             }

@@ -200,3 +200,30 @@ Most of the remaining error is not text: Office draws its own coloured icons (we
 **Accessibility actions (done).** `Ui::accessibility_action` maps Focus, Click (the pointer click path), SetValue (commit as Enter) and Increment or Decrement to widgets; `UiAdapter` forwards AccessKit requests and pumps the resulting events.
 
 **Not done, needed in phase 5.** Text fit (integer advances, per-glyph hinting, LCD filter, dark-ink grayscale capture; the 29-level residual is unchanged; the capture script has `-TextProbes` for it); light-theme measurement (needs a light Office session); menu icons, headings and gallery cells; list row heights; expanded formula bar and white grid in the preview; column and row sizing, selection ranges, scrolling by wheel, copy and paste and a file dialog in the grid; the editor draws with the dark field colours instead of Excel's white cell.
+
+## Phase 5 status (2026-10-11)
+
+**Text fit (measured, dark Office theme, own COM instance).** `capture-chrome.ps1 -TextProbes` now puts Segoe UI 11 pt and 9 pt cell text and an 11 pt text box (black on white) on the sheet. `crates/gfx/examples/fit_text.rs` aligns each line (quarter-pixel x, integer baseline) for every hinting, advance and LCD filter choice, then fits gamma. RMS in levels:
+
+| Text | Best setting | RMS |
+|---|---|---|
+| Text box 11 pt, grayscale, dark ink | natural advances, Normal hinting, gamma 2.0 (integer advances: 45) | 20 |
+| Cells 11 pt, ClearType | integer advances at integer ppem (18, not 18.33), Normal, `Soft` filter, gamma 1.4 | 23 |
+| Cells 9 pt, ClearType | integer advances, Normal, `Soft`, gamma 1.4 (default filter 21, unrounded 33) | 19 |
+| Tab labels 14 dip, light ink | integer advances at ppem 17 (17.5 rounds down), Normal, gamma 0.8 (ppem 17.5: 22) | 14 |
+
+Before: about 29 to 65 levels. Applied: `UI_TEXT` (integer advances) and `gdi_ppem` in ui-core, `LcdFilter` and `TextOptions::office`, `RenderParams::office_fitted` (gamma 1.4 dark, 0.8 light), and the host now sets the fitted params. Gray dark ink in the drawing layer wants natural advances and gamma 2.0 but shares `text_gamma` with LCD. Light-theme values are estimates (Office was not switched to light). Not within 1 px: hinting differs from Office's.
+
+**Compare RMS (Sheets Home, 1600 x 1000, 125 %, fresh capture).** Before to after: title row 32.89 to 31.49, tabs 41.01 to 38.91, Clipboard 50.25 to 50.15, Font 36.36 to 36.27, Alignment 43.96 to 43.83, Number 38.37 to 37.70, Styles 33.18 to 31.09, Cells 37.74 to 34.79, Editing 56.17 to 54.87, Add-ins 57.99 to 57.10, formula bar 113.30 to 19.41 (expanded three-line bar is now the Sheets default), status bar 40.15 to 36.67, whole window 63.62 to 39.45.
+
+**Done also.** Pill AutoSave switch drawn in our own style (`Look::switch`). One canvas event set: `CanvasPointer`, `CanvasDrag`, `CanvasRelease`, `CanvasWheel`, `CanvasAction`, canvas caret blink, `Key::F12`, `Ui::set_canvas_access`; the Writer pane is wired into the window.
+
+**Still open.** Menu icons, group headings, gallery cells and list row heights (30/33/60/36 px) were not started; the "Ori" clipping and Fill chevron overlap; Office's coloured ribbon icons; light-theme measurements; separate gamma for grayscale dark ink.
+
+## Phase 6 status (2026-10-11)
+
+**Real-window smoke test (release exes copied to a scratch folder, driven by a PowerShell SendInput harness, own PIDs only).** `open365-writer-next` with `layout-table-basic.docx` and `footnotes-endnotes.docx`: click, Ctrl+Home, typed text (Unicode SendInput), arrows, wheel, Ctrl+S; the saved DOCX has the typed text and the table intact. `open365-sheets-next` with `dates-1900.xlsx`: clicked C2, typed `42` Enter and `=A1*2` Enter, wheel, Ctrl+S; the saved sheet holds `<v>42</v>` and `<f>A1*2</f><v>118</v>`. Findings: winit's `MainWindowHandle` is a 14 px helper window, so windows are found by EnumWindows per PID; ribbon Undo/Redo enable state is still static (Undo greyed after typing); the formula bar shows the raw serial for a date cell.
+
+**Done.** Ribbon formatting through the command layer (`Format`, `WriterPane::format`: bold, italic, underline, strikethrough, font, size, grow and shrink, alignment; combos by list or Enter; toggle and combo state follows the caret). Writer vertical scroll bar (thumb, track click, drag). Share dialog from the title-bar Share button (`shell/share.rs`): send a copy, send as PDF, inspect, remove and send a clean copy, show in folder; link and people controls disabled with "Connect a server". Sheets Ctrl+D and Ctrl+R, weekday and month name series, date cells fill by day. Tests: `ribbon_format.rs`, `share_dialog.rs`, `grid_fill.rs`.
+
+**Still open.** Table borders and shading, pictures, superscript raise for note references (the layout exposes `cells`, `images` and `rules` on `Page`; the pane does not draw them), ruler, zoom in the pane, Undo/Redo state, menu icons, group headings, gallery cells, list row heights, "Ori" clipping and Fill chevron overlap, frozen panes from the file (`Sheet::frozen_panes` exists; the grid geometry, painting and scrolling do not use it), OS share sheet (the dialog falls back to showing the file in its folder).

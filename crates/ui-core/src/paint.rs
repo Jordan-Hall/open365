@@ -6,10 +6,21 @@ use open365_gfx::{Color, Decorations, DrawList, Path, Rect as GRect, TextLayoutO
 use crate::geom::{DeviceRect, Rect};
 use crate::theme::Token;
 use crate::tree::{
-    Content, DROPDOWN_ARROW_W, MENU_PAD, MENU_ROW_H, MENU_SEP_H, MENU_TEXT_X, MenuState, Node,
-    NodeId, SPINNER_BUTTON_W, Widget, tab_rects,
+    Content, DROPDOWN_ARROW_W, MENU_PAD, MENU_SEP_H, MENU_TEXT_X, MenuState, Node, NodeId,
+    SPINNER_BUTTON_W, Widget, tab_rects,
 };
 use crate::ui::Ui;
+
+/// Layout options for UI text: whole-pixel advances, as Office's GDI-compatible chrome text.
+pub const UI_TEXT: TextLayoutOptions = TextLayoutOptions {
+    round_advances: true,
+};
+
+/// Office draws chrome text at a whole pixels-per-em: 17.5 px becomes 17 and 18.33 becomes 18
+/// (measured against captures: a half rounds down).
+pub fn gdi_ppem(px: f32) -> f32 {
+    (px - 0.5).ceil().max(1.0)
+}
 
 /// Which parts of the UI to paint. Tests use the partial layers to isolate geometry.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -42,7 +53,7 @@ impl Ui {
     }
 
     fn text_px(&self) -> f32 {
-        self.text_size * self.scale.0
+        gdi_ppem(self.text_size * self.scale.0)
     }
 
     /// Width in device pixels of `text` at the UI text size.
@@ -53,7 +64,7 @@ impl Ui {
     /// Width in device pixels of `text` at `px` pixels.
     pub fn measure_px(&self, text: &str, px: f32) -> f32 {
         self.assets
-            .layout_text(self.font, text, px, 0.0, 0.0, TextLayoutOptions::default())
+            .layout_text(self.font, text, px, 0.0, 0.0, UI_TEXT)
             .width
     }
 
@@ -94,9 +105,9 @@ impl Ui {
             .floor();
         let base =
             (r.y0 as f32 + (r.height() as f32 - (m.ascent + m.descent)) / 2.0 + m.ascent).round();
-        let lay =
-            self.assets
-                .layout_text(self.font, text, px, x, base, TextLayoutOptions::default());
+        let lay = self
+            .assets
+            .layout_text(self.font, text, px, x, base, UI_TEXT);
         list.push_clip(GRect::from_edges(
             r.x0 as f32,
             r.y0 as f32,
@@ -138,7 +149,64 @@ impl Ui {
     fn face_px(&self, node: &Node) -> f32 {
         node.look
             .text_size
-            .map_or_else(|| self.text_px(), |t| t * self.scale.0)
+            .map_or_else(|| self.text_px(), |t| gdi_ppem(t * self.scale.0))
+    }
+
+    /// Label, then a pill switch: 1.5 dip outline, a round knob that sits left when off and
+    /// right (on an accent fill) when on. Geometry in dip from the Excel title bar at 125 %.
+    fn paint_switch(&mut self, list: &mut DrawList, node: &Node, r: DeviceRect, on: bool) {
+        let s = self.scale.0;
+        let ink = self.color(Token::Text);
+        let px = self.face_px(node);
+        let label = DeviceRect {
+            x0: r.x0 + (6.4 * s) as i32,
+            ..r
+        };
+        self.put_text_px(
+            list,
+            &node.label,
+            label,
+            0.0,
+            ink,
+            Decorations::default(),
+            px,
+        );
+        let (w, h) = (43.2 * s, 20.0 * s);
+        let x0 = r.x0 as f32 + 56.8 * s;
+        let y0 = (r.y0 + r.y1) as f32 / 2.0 - h / 2.0;
+        let pill = GRect::from_xywh(x0.round(), y0.round(), w.round(), h.round());
+        let line = (1.6 * s).round().max(1.0);
+        if on {
+            list.fill_rrect(pill, pill.height() / 2.0, self.color(Token::Accent));
+        }
+        list.stroke_rrect(
+            GRect::from_xywh(
+                pill.x0 + line / 2.0,
+                pill.y0 + line / 2.0,
+                pill.width() - line,
+                pill.height() - line,
+            ),
+            pill.height() / 2.0,
+            line,
+            ink,
+        );
+        let d = (h - 2.0 * line - 4.0 * s).round();
+        let kx = if on {
+            pill.x0 + pill.width() - line - 2.0 * s - d
+        } else {
+            pill.x0 + line + 2.0 * s
+        };
+        let knob = if on { Color::WHITE } else { ink };
+        list.fill_rrect(
+            GRect::from_xywh(
+                kx.round(),
+                (pill.y0 + (pill.height() - d) / 2.0).round(),
+                d,
+                d,
+            ),
+            d / 2.0,
+            knob,
+        );
     }
 
     /// Icon and label of a button-like node inside `r`, per its [`crate::Look`].
@@ -155,6 +223,10 @@ impl Ui {
         }
         let look = node.look;
         let px = self.face_px(node);
+        if let Some(on) = look.switch {
+            self.paint_switch(list, node, r, on);
+            return;
+        }
         let ink = look
             .ink
             .filter(|_| node.enabled)
@@ -177,9 +249,20 @@ impl Ui {
         let decor = Decorations::default();
         match mode {
             Content::IconOnly => {
-                let x0 = r.x0 + (r.width() - isz) / 2;
                 let y0 = r.y0 + (r.height() - isz) / 2;
-                self.put_icon(list, node, icon_at(x0, y0), ink);
+                if look.chevron {
+                    // Icon and chevron sit side by side, centred as one unit; the chevron never
+                    // overlaps the icon.
+                    let gap = self.scale.edge(4.0);
+                    let chev = self.scale.edge(12.0);
+                    let x0 = r.x0 + (r.width() - (isz + gap + chev)) / 2;
+                    self.put_icon(list, node, icon_at(x0, y0), ink);
+                    let cx = (x0 + isz + gap) as f32 + self.scale.0 * 6.0;
+                    self.chevron(list, cx, (r.y0 + r.y1) as f32 / 2.0, ink, false);
+                } else {
+                    let x0 = r.x0 + (r.width() - isz) / 2;
+                    self.put_icon(list, node, icon_at(x0, y0), ink);
+                }
             }
             Content::IconBeside => {
                 let gap = self.scale.edge(4.0);
@@ -782,14 +865,9 @@ impl Ui {
             Some(c) => format!("{}{}{}", &e.text[..b], c.text, &e.text[b..]),
             None => e.text.clone(),
         };
-        let lay = self.assets.layout_text(
-            self.font,
-            &shown,
-            px,
-            area.x0 as f32,
-            base,
-            TextLayoutOptions::default(),
-        );
+        let lay = self
+            .assets
+            .layout_text(self.font, &shown, px, area.x0 as f32, base, UI_TEXT);
         list.push_clip(GRect::from_edges(
             area.x0 as f32,
             area.y0 as f32,
@@ -867,16 +945,22 @@ impl Ui {
                 items, open: true, ..
             } => {
                 let sel = selected_of(&node.widget);
+                let row_h = crate::tree::list_row_h(&node.look);
                 let panel = Rect::new(
                     ar.x,
                     ar.bottom(),
                     ar.w,
-                    items.len() as f32 * MENU_ROW_H + MENU_PAD * 2.0,
+                    items.len() as f32 * row_h + MENU_PAD * 2.0,
                 );
-                let rows: Vec<(&str, bool, bool, bool, bool)> = items
+                let rows: Vec<MenuRow<'_>> = items
                     .iter()
                     .enumerate()
-                    .map(|(i, s)| (s.as_str(), Some(i) == sel, false, false, false))
+                    .map(|(i, s)| MenuRow {
+                        label: s.as_str(),
+                        hot: Some(i) == sel,
+                        h: row_h,
+                        ..MenuRow::default()
+                    })
                     .collect();
                 self.paint_panel(list, panel, &rows);
             }
@@ -887,17 +971,20 @@ impl Ui {
                 while let Some(items) = m.level_items(level) {
                     let panel = Rect::new(x, y, ar.w, MenuState::panel_height(items));
                     let hot = m.path.get(level).copied();
-                    let rows: Vec<(&str, bool, bool, bool, bool)> = items
+                    let rows: Vec<MenuRow<'_>> = items
                         .iter()
                         .enumerate()
-                        .map(|(i, it)| {
-                            (
-                                if it.separator { "-" } else { it.label.as_str() },
-                                hot == Some(i),
-                                it.checked,
-                                !it.submenu.is_empty(),
-                                !it.enabled,
-                            )
+                        .map(|(i, it)| MenuRow {
+                            label: it.label.as_str(),
+                            detail: it.detail.as_deref(),
+                            hot: hot == Some(i),
+                            checked: it.checked,
+                            sub: !it.submenu.is_empty(),
+                            disabled: !it.enabled,
+                            icon: it.icon,
+                            separator: it.separator,
+                            heading: it.heading,
+                            h: it.height_after(i.checked_sub(1).map(|p| &items[p])),
                         })
                         .collect();
                     self.paint_panel(list, panel, &rows);
@@ -911,14 +998,8 @@ impl Ui {
         }
     }
 
-    /// A popup panel with shadow, border and rows `(label, hot, checked, submenu, disabled)`;
-    /// the label `-` is a separator.
-    fn paint_panel(
-        &mut self,
-        list: &mut DrawList,
-        panel: Rect,
-        rows: &[(&str, bool, bool, bool, bool)],
-    ) {
+    /// A popup panel with shadow, border and rows.
+    fn paint_panel(&mut self, list: &mut DrawList, panel: Rect, rows: &[MenuRow<'_>]) {
         let r = self.dev(panel);
         let s = self.scale.0;
         list.shadow(
@@ -931,19 +1012,48 @@ impl Ui {
         list.fill_rect(r.to_gfx(), self.color(Token::MenuBg));
         list.rect_outline(r.to_gfx(), 1.0, self.color(Token::MenuBorder));
         let mut y = panel.y + MENU_PAD;
-        for (label, hot, checked, sub, disabled) in rows {
-            if *label == "-" {
+        for r in rows {
+            let MenuRow {
+                label,
+                detail,
+                hot,
+                checked,
+                sub,
+                disabled,
+                icon,
+                separator,
+                heading,
+                h,
+            } = r;
+            if *separator {
                 // 1 px line, one device pixel below the separator's top.
                 let line = self.dev(Rect::new(panel.x, y + 0.8, panel.w, 0.8));
                 list.fill_rect(line.to_gfx(), self.color(Token::Separator));
                 y += MENU_SEP_H;
                 continue;
             }
+            if *heading {
+                // A caption: dim text on the menu background, no hover.
+                let row = self.dev(Rect::new(
+                    panel.x + MENU_PAD,
+                    y,
+                    panel.w - MENU_PAD * 2.0,
+                    *h,
+                ));
+                let text_r = DeviceRect {
+                    x0: row.x0 + self.scale.edge(10.0),
+                    ..row
+                };
+                let ink = self.color(Token::TextDim);
+                self.put_text(list, label, text_r, 0.0, ink, Decorations::default());
+                y += *h;
+                continue;
+            }
             let row = self.dev(Rect::new(
                 panel.x + MENU_PAD,
                 y,
                 panel.w - MENU_PAD * 2.0,
-                MENU_ROW_H,
+                *h,
             ));
             if *hot && !*disabled {
                 list.fill_rect(row.to_gfx(), self.color(Token::MenuHot));
@@ -957,7 +1067,43 @@ impl Ui {
                 x0: row.x0 + self.scale.edge(MENU_TEXT_X),
                 ..row
             };
-            self.put_text(list, label, text_r, 0.0, ink, Decorations::default());
+            if let Some(detail) = detail {
+                // Label on the upper half, description under it.
+                let half = (row.y1 - row.y0) / 2;
+                let top = DeviceRect {
+                    y1: row.y0 + half,
+                    ..text_r
+                };
+                let bottom = DeviceRect {
+                    y0: row.y0 + half,
+                    ..text_r
+                };
+                self.put_text(list, label, top, 0.0, ink, Decorations::default());
+                let dim = if *disabled {
+                    ink
+                } else {
+                    self.color(Token::TextDim)
+                };
+                self.put_text(list, detail, bottom, 0.0, dim, Decorations::default());
+            } else {
+                self.put_text(list, label, text_r, 0.0, ink, Decorations::default());
+            }
+            if let Some(icon) = icon {
+                let side = 16.0 * s;
+                let cx = (row.x0 + self.scale.edge(14.0)) as f32;
+                let cy = (row.y0 + row.y1) as f32 / 2.0;
+                list.icon(
+                    &mut self.assets,
+                    *icon,
+                    open365_gfx::Rect::from_edges(
+                        cx - side / 2.0,
+                        cy - side / 2.0,
+                        cx + side / 2.0,
+                        cy + side / 2.0,
+                    ),
+                    ink,
+                );
+            }
             if *checked {
                 let mut p = Path::new();
                 let (cx, cy) = (
@@ -991,7 +1137,7 @@ impl Ui {
                     ink,
                 );
             }
-            y += MENU_ROW_H;
+            y += *h;
         }
     }
 
@@ -1044,6 +1190,22 @@ impl Ui {
         let ink = self.color(Token::TooltipText);
         self.put_text(list, &t.text, r, 0.5, ink, Decorations::default());
     }
+}
+
+/// A popup row as painted.
+#[derive(Default)]
+struct MenuRow<'a> {
+    label: &'a str,
+    detail: Option<&'a str>,
+    hot: bool,
+    checked: bool,
+    sub: bool,
+    disabled: bool,
+    icon: Option<open365_gfx::IconId>,
+    separator: bool,
+    heading: bool,
+    /// Row height in logical units.
+    h: f32,
 }
 
 fn selected_of(w: &Widget) -> Option<usize> {

@@ -79,6 +79,10 @@ pub struct PdfOptions {
     /// Declare PDF/UA-1 (`pdfuaid:part` in the XMP) and write what the profile needs besides the
     /// tags: a title (the first heading when the caller gave none) shown in the title bar.
     pub ua: bool,
+    /// Export only these pages, 1-based and inclusive (Word's "Page(s) From .. To"); the end is
+    /// clamped to the last page. Page numbers drawn in the text stay as laid out. Links and
+    /// outline entries that lead to a page left out are dropped (links with a warning).
+    pub pages: Option<(usize, usize)>,
 }
 
 impl Default for PdfOptions {
@@ -87,6 +91,7 @@ impl Default for PdfOptions {
             conformance: Conformance::None,
             bookmarks: true,
             ua: false,
+            pages: None,
         }
     }
 }
@@ -168,6 +173,11 @@ struct LinkElem {
     annots: Vec<(usize, u32)>,
 }
 
+/// Word's `RoleMap`: custom element names it writes, with the standard type each stands for
+/// (from its exports; the names it never emits in a plain document are kept so that a reader sees
+/// the same map).
+const ROLE_MAP: &str = "<< /Footnote /Note /Endnote /Note /Textbox /Sect /Header /Sect /Footer /Sect /InlineShape /Sect /Annotation /Sect /Artifact /Sect /Workbook /Document /Worksheet /Part /Macrosheet /Part /Chartsheet /Part /Dialogsheet /Part /Slide /Sect /Chart /Sect /Diagram /Figure /Title /H1 /CommentAnchor /Span /Notes /Sect >>";
+
 /// A hyperlink's place in its paragraph: byte range in the paragraph text and index in
 /// [`DocStructure::links`].
 type Span = (usize, usize, usize);
@@ -184,6 +194,20 @@ struct LangElem {
 
 /// A language range of a paragraph in the layout's text: byte range and primary subtag.
 type LangSpan = (usize, usize, String);
+
+/// The "language" of a [`LangSpan`] that marks a note reference mark: written as Word writes it,
+/// a `Link` holding a `Span` (no `/Lang`) and the `Footnote` or `Endnote` element of the note
+/// body. Not a valid language tag, so it cannot clash; it goes on with `F` or `E`, the note's
+/// number among the notes of its kind, `:` and its number among all notes of the document.
+const NOTE_REF: &str = "<note-ref>";
+
+/// The note a [`NOTE_REF`] language stands for: (story code, note number, sequence number).
+fn note_ref(lang: &str) -> Option<(u8, usize, usize)> {
+    let rest = lang.strip_prefix(NOTE_REF)?;
+    let code = if rest.starts_with('E') { 3 } else { 2 };
+    let (no, seq) = rest.get(1..)?.split_once(':')?;
+    Some((code, no.parse().ok()?, seq.parse().ok()?))
+}
 
 /// A heading for the outline: level, title, page index, x and top of its first line.
 struct Heading {
@@ -209,9 +233,33 @@ struct Export<'a> {
     /// (story, paragraph) -> extra element for note lines.
     extras: Vec<u32>,
     extra_keys: HashMap<(u8, usize), u32>,
+    /// (story code, note index) -> `Note` element (the entries of `extras`).
+    note_elems: HashMap<(u8, usize), u32>,
+    /// `Note` element -> the `P` elements of its paragraphs, in drawing order.
+    note_paras: HashMap<u32, Vec<u32>>,
+    /// (story code, note number) -> the `Link` element around the note's reference mark and the
+    /// note's number among all notes.
+    note_link: HashMap<(u8, usize), (u32, usize)>,
+    /// (story code, note number) -> (page, x, top) of the note's first line.
+    note_first: HashMap<(u8, usize), (usize, f64, f64)>,
+    /// Layout paragraph number of the first endnote paragraph.
+    end_base: usize,
+    /// (story code, frame, paragraph) -> story offset of the paragraph's last and first line.
+    last_line: HashMap<(u8, usize, usize), usize>,
+    first_line: HashMap<(u8, usize, usize), usize>,
     images: HashMap<String, Option<(String, u32)>>,
-    /// Main-story lines already drawn: (paragraph, first offset).
-    drawn: std::collections::HashSet<(usize, usize)>,
+    /// Main-story paragraph -> page of its first line (empty lines count); the content on a later
+    /// page is a continuation `Span` under the paragraph, as in Word's PDF.
+    para_page: HashMap<usize, usize>,
+    /// (paragraph, page) -> the continuation `Span`.
+    cont_spans: HashMap<(usize, usize), u32>,
+    /// Every continuation `Span` made: (paragraph, element). A link or language run ends the open
+    /// one (Word's order is `Span, Link, Span` under the `P`).
+    cont_all: Vec<(usize, u32)>,
+    /// (box, paragraph in the box) -> the `P` of a text box's paragraph.
+    box_p: HashMap<(usize, usize), u32>,
+    /// `Textbox` element -> its paragraphs in drawing order.
+    box_kids: HashMap<u32, Vec<u32>>,
     /// Glyph (face, id) to the text the font's ToUnicode CMap gives it.
     to_unicode: BTreeMap<(usize, u32), String>,
     /// Main-story paragraph -> (page index, x, top) of its first line.
@@ -220,6 +268,8 @@ struct Export<'a> {
     lang_spans: HashMap<usize, Vec<LangSpan>>,
     lang_elems: HashMap<(usize, usize), LangElem>,
     link_elems: HashMap<(usize, usize), LinkElem>,
+    /// `Link` element -> the `Span` inside it that holds the link text.
+    link_span: HashMap<u32, u32>,
     /// Counter for link elements of annotations that have no paragraph element (header, footer).
     free_links: usize,
     /// Section of the page being drawn (the header and footer parts differ per section).
@@ -266,6 +316,9 @@ struct Piece {
     from: usize,
     to: usize,
 }
+
+/// Word widens a link rectangle by 3 pixels of its 96 dpi device grid on each side.
+const LINK_PAD: f64 = 2.25;
 
 /// The size Word's PDF gives a page. Word lays the page out on a 600 dpi device grid, and for A4
 /// its MediaBox is 595.2 x 841.92 pt (4960 x 7016 device pixels), not the 595.3 x 841.9 pt of
@@ -333,6 +386,22 @@ pub fn export_pdf_with(
         }
     };
     check()?;
+    if let Some((from, to)) = options.pages {
+        let last = layout.pages.len();
+        let (from, to) = (from.max(1), to.min(last));
+        if from > to {
+            return Err(PdfError::NoPages);
+        }
+        if (from, to) != (1, last) {
+            let mut part = layout.clone();
+            part.pages = layout.pages[from - 1..to].to_vec();
+            let whole = PdfOptions {
+                pages: None,
+                ..*options
+            };
+            return export_pdf_with(doc, &part, fonts, meta, &whole, cancel);
+        }
+    }
     if layout.pages.is_empty() {
         return Err(PdfError::NoPages);
     }
@@ -376,15 +445,34 @@ pub fn export_pdf_with(
             roles.entry(line.paragraph).or_insert(line.role);
         }
     }
+    let tagged_tables: std::collections::HashSet<usize> = layout
+        .pages
+        .iter()
+        .flat_map(|p| &p.cells)
+        .filter(|c| {
+            let b = &c.borders;
+            c.fill.is_some()
+                || b.top.is_some()
+                || b.bottom.is_some()
+                || b.left.is_some()
+                || b.right.is_some()
+        })
+        .map(|c| c.table)
+        .collect();
     let main_rels = relationships(doc, doc.main_part());
     let langs = Languages::read(doc);
-    // The document language: the caller's, else the document's own default (Word writes the
-    // primary subtag). Text in another language gets a `Span` with its own `/Lang`.
-    let catalog_lang: Option<String> = meta
-        .language
-        .clone()
-        .filter(|l| !l.is_empty())
-        .or_else(|| langs.default_tag().and_then(lang::primary));
+    // The catalog language: the caller's, else `en`. Word does not take it from the document: its
+    // exports of documents whose default language is de-DE, fr-FR or en-GB all say `en` (the
+    // application's language), and every run in another language than that gets a `Span` with its
+    // own `/Lang`, a whole German document included (evidence: `probes/p-lang-settings`,
+    // `probe-lang*`). The caller (a desktop or CLI that knows the user's language) passes it in
+    // `PdfMetadata::language`.
+    let catalog_lang: Option<String> = Some(
+        meta.language
+            .clone()
+            .filter(|l| !l.is_empty())
+            .unwrap_or_else(|| "en".to_owned()),
+    );
     let base_lang = catalog_lang.as_deref().and_then(lang::primary);
     let mut st = structure::analyse(
         doc,
@@ -392,6 +480,7 @@ pub fn export_pdf_with(
         main_rels.as_ref(),
         &langs,
         base_lang.as_deref(),
+        &tagged_tables,
         &mut pdf,
     );
     add_story_texts(doc, layout, &langs, base_lang.as_deref(), &mut st);
@@ -409,7 +498,29 @@ pub fn export_pdf_with(
         .iter()
         .map(|p| page_dims(p.section.page_width, p.section.page_height))
         .collect();
-    let (para_first, link_spans, lang_spans, headings) = index_main_story(layout, &st);
+    // The layout numbers the paragraphs of the endnotes after those of the body.
+    let end_base = layout
+        .all_lines()
+        .filter(|(_, l)| l.story == StoryKind::Endnotes)
+        .map(|(_, l)| l.paragraph)
+        .min()
+        .unwrap_or(0);
+    let (para_first, link_spans, lang_spans, headings) = index_main_story(layout, &st, end_base);
+    let mut note_first: HashMap<(u8, usize), (usize, f64, f64)> = HashMap::new();
+    for (pi, page) in layout.pages.iter().enumerate() {
+        for line in page.notes.iter().chain(&page.lines) {
+            let code = line.story.word_code();
+            if !matches!(line.story, StoryKind::Footnotes | StoryKind::Endnotes) {
+                continue;
+            }
+            let para = note_paragraph(line, end_base);
+            if let Some(no) = st.note_of.get(&(code, para)) {
+                note_first
+                    .entry((code, *no))
+                    .or_insert((pi, line.left, line.top));
+            }
+        }
+    }
     let mut ex = Export {
         layout,
         doc,
@@ -421,9 +532,45 @@ pub fn export_pdf_with(
         figures: HashMap::new(),
         extras: Vec::new(),
         extra_keys: HashMap::new(),
+        note_elems: HashMap::new(),
+        note_paras: HashMap::new(),
+        note_link: HashMap::new(),
+        note_first,
+        end_base,
+        first_line: {
+            let mut m: HashMap<(u8, usize, usize), usize> = HashMap::new();
+            for (_, line) in layout.all_lines() {
+                let key = (
+                    line.story.word_code(),
+                    line.frame.unwrap_or(0),
+                    note_paragraph(line, end_base),
+                );
+                let e = m.entry(key).or_insert(line.start);
+                *e = (*e).min(line.start);
+            }
+            m
+        },
+        last_line: {
+            let mut m: HashMap<(u8, usize, usize), usize> = HashMap::new();
+            for (_, line) in layout.all_lines() {
+                let key = (
+                    line.story.word_code(),
+                    line.frame.unwrap_or(0),
+                    note_paragraph(line, end_base),
+                );
+                let e = m.entry(key).or_insert(line.start);
+                *e = (*e).max(line.start);
+            }
+            m
+        },
         images: HashMap::new(),
-        drawn: std::collections::HashSet::new(),
+        para_page: HashMap::new(),
+        cont_spans: HashMap::new(),
+        cont_all: Vec::new(),
+        box_p: HashMap::new(),
+        box_kids: HashMap::new(),
         to_unicode,
+        link_span: HashMap::new(),
         para_first,
         link_spans,
         lang_spans,
@@ -570,24 +717,55 @@ fn story_key(story: StoryKind, section: usize, paragraph: usize) -> usize {
     (usize::from(story.word_code()) << 48) | (section << 32) | (paragraph & 0xFFFF_FFFF)
 }
 
-fn line_key(line: &Line, section: usize) -> usize {
-    story_key(line.story, section, line.paragraph)
+/// The index of a note line's paragraph in its notes story (the layout numbers the endnotes'
+/// paragraphs after the body's).
+fn note_paragraph(line: &Line, end_base: usize) -> usize {
+    if line.story == StoryKind::Endnotes {
+        line.paragraph.saturating_sub(end_base)
+    } else {
+        line.paragraph
+    }
+}
+
+fn line_key(line: &Line, section: usize, end_base: usize) -> usize {
+    // A text box is a story of its own: the section slot holds the box's number.
+    let section = if line.story == StoryKind::TextBox {
+        line.frame.unwrap_or(0)
+    } else {
+        section
+    };
+    story_key(line.story, section, note_paragraph(line, end_base))
 }
 
 /// The first line of every main-story paragraph, where each hyperlink and each foreign-language
 /// run sits in the paragraph text the layout drew (found by aligning the model's text with it, so
 /// a field that shows another value does not lose them), and the headings for the outline.
-fn index_main_story(layout: &Layout, st: &DocStructure) -> MainIndex {
+fn index_main_story(layout: &Layout, st: &DocStructure, end_base: usize) -> MainIndex {
     let mut first = HashMap::new();
     let mut spans: HashMap<usize, Vec<Span>> = HashMap::new();
     let mut langs: HashMap<usize, Vec<LangSpan>> = HashMap::new();
     let mut seen = std::collections::HashSet::new();
     let mut headings = Vec::new();
+    // The notes in the order of their reference marks: the number among the notes of the kind
+    // and among all notes.
+    let mut mark_note: HashMap<(usize, usize), (bool, usize, usize)> = HashMap::new();
+    let (mut counts, mut seq) = ([0usize; 2], 0usize);
+    let mut text_keys: Vec<usize> = st.texts.keys().copied().collect();
+    text_keys.sort_unstable();
+    for key in text_keys {
+        for (at, end) in &st.texts[&key].note_marks {
+            seq += 1;
+            let n = &mut counts[usize::from(*end)];
+            mark_note.insert((key, *at), (*end, *n, seq));
+            *n += 1;
+        }
+    }
     for (pi, page) in layout.pages.iter().enumerate() {
         for line in page
             .header
             .iter()
             .chain(&page.lines)
+            .chain(page.frames.iter().flat_map(|f| f.lines.iter()))
             .chain(&page.notes)
             .chain(&page.footer)
         {
@@ -612,14 +790,14 @@ fn index_main_story(layout: &Layout, st: &DocStructure) -> MainIndex {
                     }
                 }
             }
-            let key = line_key(line, page.section_index);
+            let key = line_key(line, page.section_index, end_base);
             if !seen.insert(key) {
                 continue;
             }
             let Some(pt) = st.texts.get(&key) else {
                 continue;
             };
-            if pt.links.is_empty() && pt.langs.is_empty() {
+            if pt.links.is_empty() && pt.langs.is_empty() && pt.note_marks.is_empty() {
                 continue;
             }
             let al = align::Alignment::new(&pt.text, &line.text);
@@ -632,11 +810,29 @@ fn index_main_story(layout: &Layout, st: &DocStructure) -> MainIndex {
             if !found.is_empty() {
                 spans.insert(key, found);
             }
-            let found: Vec<LangSpan> = pt
+            let mut found: Vec<LangSpan> = pt
                 .langs
                 .iter()
                 .filter_map(|(r, l)| al.map(r.clone()).map(|m| (m.start, m.end, l.clone())))
                 .collect();
+            // A reference mark is a short run of digits or letters the model has no text for.
+            for (at, _) in &pt.note_marks {
+                let Some((end, no, seq)) = mark_note.get(&(key, *at)).copied() else {
+                    continue;
+                };
+                if let Some(g) = al.gap_at(*at) {
+                    // Without the paragraph mark or other control characters at its end.
+                    let shown = line.text[g.clone()].trim_end_matches(char::is_control);
+                    if !shown.is_empty()
+                        && shown.len() <= 8
+                        && shown.chars().all(char::is_alphanumeric)
+                    {
+                        let tag = format!("{NOTE_REF}{}{no}:{seq}", if end { 'E' } else { 'F' });
+                        found.push((g.start, g.start + shown.len(), tag));
+                    }
+                }
+            }
+            found.sort_unstable_by_key(|f| f.0);
             if !found.is_empty() {
                 langs.insert(key, found);
             }
@@ -712,6 +908,28 @@ fn add_story_texts(
         let texts = structure::story_texts(&blocks, rels.as_ref(), langs, base);
         put(story, section, texts, st);
     }
+    // Text boxes: one story each, numbered as the layout numbers its frames. Only their links
+    // are carried over; the text stays an artifact.
+    let rels = relationships(doc, doc.main_part());
+    for (id, (anchor, tb)) in st.boxes.clone().iter().enumerate() {
+        let used = layout
+            .pages
+            .iter()
+            .flat_map(|p| &p.frames)
+            .any(|f| f.id == id && f.paragraph == *anchor);
+        if !used {
+            continue;
+        }
+        let texts = structure::story_texts(&tb.blocks, rels.as_ref(), langs, base);
+        let texts = texts
+            .into_iter()
+            .map(|(mut t, l)| {
+                t.langs.clear();
+                (t, l)
+            })
+            .collect();
+        put(StoryKind::TextBox, id, texts, st);
+    }
     // Footnotes and endnotes.
     for (story, notes, suffix) in [
         (StoryKind::Footnotes, doc.footnotes(), "/footnotes"),
@@ -720,12 +938,14 @@ fn add_story_texts(
         let rels = related(doc, doc.main_part(), |r| r.rel_type.ends_with(suffix))
             .and_then(|part| relationships(doc, &part));
         let mut all = Vec::new();
-        for note in notes
+        for (note_no, note) in notes
             .iter()
             .filter(|n| n.kind == open365_docx::NoteKind::Normal)
+            .enumerate()
         {
             for block in &note.blocks {
                 if matches!(block, open365_docx::Block::Paragraph(_)) {
+                    st.note_of.insert((story.word_code(), all.len()), note_no);
                     all.extend(structure::story_texts(
                         std::slice::from_ref(block),
                         rels.as_ref(),
@@ -867,21 +1087,67 @@ impl Export<'_> {
         }
     }
 
-    fn owner_of(&mut self, line: &Line) -> Owner {
+    fn owner_of(&mut self, line: &Line, page: usize) -> Owner {
         match line.story {
             StoryKind::Main => match self.st.paras.get(line.paragraph) {
-                // A repeated table header row shows the same text again: not content.
-                _ if !self.drawn.insert((line.paragraph, line.start)) => Owner::Artifact,
-                Some(p) => Owner::Struct(p.node, p.tag.clone()),
+                // A repeated table header row shows the same text again: Word tags it as a
+                // continuation `Span` of the original paragraph (`layout-table-pages`).
+                Some(p) => {
+                    let first = *self.para_page.entry(line.paragraph).or_insert(page);
+                    if first == page {
+                        Owner::Struct(p.node, p.tag.clone())
+                    } else {
+                        let node = p.node;
+                        let id = match self.cont_spans.get(&(line.paragraph, page)) {
+                            Some(id) => *id,
+                            None => {
+                                let id = self.pdf.reserve();
+                                self.kids.entry(node).or_default().push(Kid::Elem(id));
+                                self.cont_spans.insert((line.paragraph, page), id);
+                                self.cont_all.push((line.paragraph, id));
+                                id
+                            }
+                        };
+                        Owner::Struct(id, "Span".to_owned())
+                    }
+                }
                 None => Owner::Artifact,
             },
+            StoryKind::TextBox => {
+                let frame = line.frame.unwrap_or(0);
+                let Some(&tb) = self.st.box_elems.get(frame) else {
+                    return Owner::Artifact;
+                };
+                let id = match self.box_p.get(&(frame, line.paragraph)) {
+                    Some(id) => *id,
+                    None => {
+                        let id = self.pdf.reserve();
+                        self.box_p.insert((frame, line.paragraph), id);
+                        self.box_kids.entry(tb).or_default().push(id);
+                        id
+                    }
+                };
+                Owner::Struct(id, "P".to_owned())
+            }
             StoryKind::Footnotes | StoryKind::Endnotes => {
-                let key = (line.story.word_code(), line.paragraph);
+                let key = (line.story.word_code(), note_paragraph(line, self.end_base));
                 let id = match self.extra_keys.get(&key) {
                     Some(id) => *id,
                     None => {
                         let id = self.pdf.reserve();
-                        self.extras.push(id);
+                        // The paragraphs of one note share a `Note` element.
+                        let note = self.st.note_of.get(&key).copied().unwrap_or(key.1);
+                        let nkey = (key.0, note);
+                        let note_id = match self.note_elems.get(&nkey) {
+                            Some(n) => *n,
+                            None => {
+                                let n = self.pdf.reserve();
+                                self.extras.push(n);
+                                self.note_elems.insert(nkey, n);
+                                n
+                            }
+                        };
+                        self.note_paras.entry(note_id).or_default().push(id);
                         self.extra_keys.insert(key, id);
                         id
                     }
@@ -912,13 +1178,31 @@ impl Export<'_> {
         };
         let mut out: Vec<(Seg, Vec<Piece>)> = Vec::new();
         let mut prev = Seg::Text;
-        for (ri, run) in line.runs.iter().enumerate() {
-            for (gi, g) in run.glyphs.iter().enumerate() {
+        // Word writes a tab leader where it lies on the line, so that it copies out between the
+        // text on either side; the layout lists the leaders after the text of the line.
+        let mut order: Vec<(usize, usize, &PlacedGlyph)> = line
+            .runs
+            .iter()
+            .enumerate()
+            .flat_map(|(ri, run)| {
+                run.glyphs
+                    .iter()
+                    .enumerate()
+                    .map(move |(gi, g)| (ri, gi, g))
+            })
+            .collect();
+        if order.iter().any(|(_, _, g)| line.leader_char(g).is_some()) {
+            order.sort_by(|a, b| a.2.x.total_cmp(&b.2.x));
+        }
+        {
+            for (ri, gi, g) in order {
                 let c = g.cluster;
                 let key = match c.kind {
                     // A heading's number is part of the heading's own marked content.
                     ClusterKind::Label if label_apart => Seg::Label,
                     ClusterKind::Label => Seg::Text,
+                    // A tab leader is text of the paragraph, as in Word's PDF (one string of the
+                    // leader character in the paragraph's span, no artifact, no ActualText).
                     ClusterKind::Other => Seg::Text,
                     // The later glyphs of a cluster belong with the first.
                     ClusterKind::Text if c.text_start == c.text_end => match prev {
@@ -966,12 +1250,15 @@ impl Export<'_> {
 
     fn draw_line(&mut self, buf: &mut PageBuf, line: &Line) {
         if line.runs.iter().all(|r| r.glyphs.is_empty()) {
+            if line.story == StoryKind::Main {
+                self.para_page.entry(line.paragraph).or_insert(buf.index);
+            }
             return;
         }
-        let owner = self.owner_of(line);
+        let owner = self.owner_of(line, buf.index);
         let structured = matches!(owner, Owner::Struct(..));
         let main = line.story == StoryKind::Main && structured;
-        let key = line_key(line, self.section_of(line));
+        let key = line_key(line, self.section_of(line), self.end_base);
         let label_owner = if main {
             self.st
                 .paras
@@ -985,10 +1272,27 @@ impl Export<'_> {
         // are artifacts) the header and footer.
         let tagged = structured || self.link_spans.contains_key(&key);
         for (seg, pieces) in self.segments(line, key, tagged, label_owner.is_some()) {
+            // Links and language runs hang under the paragraph, also on a continuation page.
+            let parent_of = |this: &Self, id: u32| -> u32 {
+                if line.story == StoryKind::Main {
+                    this.st.paras.get(line.paragraph).map_or(id, |p| p.node)
+                } else {
+                    id
+                }
+            };
+            if matches!(seg, Seg::Link(_) | Seg::Lang(_)) && line.story == StoryKind::Main {
+                self.cont_spans.remove(&(line.paragraph, buf.index));
+            }
             let seg_owner = match (seg, &owner) {
                 (Seg::Label, _) => label_owner.clone().unwrap_or_else(|| owner.clone()),
-                (Seg::Link(k), Owner::Struct(parent, _)) => self.link_owner(key, k, *parent),
-                (Seg::Lang(i), Owner::Struct(parent, _)) => self.lang_owner(key, i, *parent),
+                (Seg::Link(k), Owner::Struct(parent, _)) => {
+                    let parent = parent_of(self, *parent);
+                    self.link_owner(key, k, parent)
+                }
+                (Seg::Lang(i), Owner::Struct(parent, _)) => {
+                    let parent = parent_of(self, *parent);
+                    self.lang_owner(key, i, parent)
+                }
                 _ => owner.clone(),
             };
             self.begin(buf, &seg_owner);
@@ -1018,6 +1322,16 @@ impl Export<'_> {
                     self.add_link(buf, line, key, k, (x0, x1));
                 }
             }
+            if let Seg::Lang(i) = seg {
+                let x0 = glyphs.iter().map(|g| g.x).fold(f64::INFINITY, f64::min);
+                let x1 = glyphs
+                    .iter()
+                    .map(|g| g.x + g.advance)
+                    .fold(f64::NEG_INFINITY, f64::max);
+                if x0.is_finite() && x1.is_finite() {
+                    self.add_note_link(buf, line, key, i, (x0, x1));
+                }
+            }
         }
     }
 
@@ -1040,7 +1354,17 @@ impl Export<'_> {
                 id
             }
         };
-        Owner::Struct(id, "Link".to_owned())
+        // Word puts the text of a link in a `Span` inside the `Link`.
+        let span = match self.link_span.get(&id) {
+            Some(s) => *s,
+            None => {
+                let s = self.pdf.reserve();
+                self.kids.entry(id).or_default().push(Kid::Elem(s));
+                self.link_span.insert(id, s);
+                s
+            }
+        };
+        Owner::Struct(span, "Span".to_owned())
     }
 
     /// The `Span` element carrying the `/Lang` of language span `i` of a paragraph, made on first
@@ -1056,6 +1380,22 @@ impl Export<'_> {
             Some(l) => l.id,
             None => {
                 let id = self.pdf.reserve();
+                let mut parent = parent;
+                if let Some((code, no, seq)) = note_ref(&lang) {
+                    // Word: the mark is a `Span` in a `Link` that also holds the note's body.
+                    let link = self.pdf.reserve();
+                    self.kids.entry(parent).or_default().push(Kid::Elem(link));
+                    self.link_elems.insert(
+                        (key, usize::MAX / 2 + i),
+                        LinkElem {
+                            id: link,
+                            parent,
+                            annots: Vec::new(),
+                        },
+                    );
+                    self.note_link.insert((code, no), (link, seq));
+                    parent = link;
+                }
                 self.kids.entry(parent).or_default().push(Kid::Elem(id));
                 self.lang_elems
                     .insert((key, i), LangElem { id, parent, lang });
@@ -1071,6 +1411,106 @@ impl Export<'_> {
             StoryKind::Main | StoryKind::Footnotes | StoryKind::Endnotes => 0,
             _ => self.current_section,
         }
+    }
+
+    /// The rectangle of a link annotation as Word makes it: the glyph extent widened by 3 px
+    /// (2.25 pt) on each side, from the top of the line box to its bottom, which on the last line
+    /// of a paragraph also holds the paragraph's space after (evidence: every link of the
+    /// reference exports; `tests/word_structure.rs`). Returns `[x0, y0, x1, y1]` in PDF space.
+    fn link_rect(&self, buf: &PageBuf, line: &Line, x: (f64, f64), pad_right: f64) -> [f64; 4] {
+        let key = |l: &Line| {
+            (
+                l.story.word_code(),
+                l.frame.unwrap_or(0),
+                note_paragraph(l, self.end_base),
+            )
+        };
+        let (mut above, mut below) = (0.0, 0.0);
+        if line.story == StoryKind::Main
+            && let Some(p) = self.st.paras.get(line.paragraph)
+        {
+            let prev = line
+                .paragraph
+                .checked_sub(1)
+                .and_then(|i| self.st.paras.get(i))
+                .filter(|_| !p.first);
+            let next = self.st.paras.get(line.paragraph + 1);
+            // Contextual spacing: a paragraph that has it drops its own space towards a
+            // neighbour of the same style (`p-rect`: the other paragraph keeps its space).
+            let same = |a: &structure::ParaMeta, b: &structure::ParaMeta| {
+                a.contextual && a.style == b.style
+            };
+            if self.first_line.get(&key(line)) == Some(&line.start) {
+                // Space above the paragraph that is not already below the one before it.
+                above = match prev {
+                    Some(q) => {
+                        let before = if same(p, q) { 0.0 } else { p.before };
+                        let after = if same(q, p) { 0.0 } else { q.after };
+                        (before - after).max(0.0)
+                    }
+                    None => p.before,
+                };
+            }
+            if self.last_line.get(&key(line)) == Some(&line.start) {
+                below = match next {
+                    Some(n) if same(p, n) => 0.0,
+                    _ => p.after,
+                };
+            }
+        }
+        [
+            x.0 - LINK_PAD,
+            buf.y(line.top + line.height + below),
+            x.1 + pad_right,
+            buf.y(line.top - above),
+        ]
+    }
+
+    /// The `Link` annotation over a note's reference mark, to the first line of the note.
+    fn add_note_link(
+        &mut self,
+        buf: &mut PageBuf,
+        line: &Line,
+        key: usize,
+        i: usize,
+        x: (f64, f64),
+    ) {
+        let Some((code, no, _)) = self
+            .lang_spans
+            .get(&key)
+            .and_then(|l| l.get(i))
+            .and_then(|l| note_ref(&l.2))
+        else {
+            return;
+        };
+        let Some(&(page, left, top)) = self.note_first.get(&(code, no)) else {
+            return;
+        };
+        let Some(&(link, _)) = self.note_link.get(&(code, no)) else {
+            return;
+        };
+        let r = self.link_rect(buf, line, x, LINK_PAD);
+        let annot = self.pdf.reserve();
+        if let Some(l) = self.link_elems.get_mut(&(key, usize::MAX / 2 + i)) {
+            l.annots.push((buf.index, annot));
+        }
+        self.struct_parents.push(link);
+        let sp = self.layout.pages.len() + self.struct_parents.len() - 1;
+        self.pdf.set(
+            annot,
+            format!(
+                "<< /Type /Annot /Subtype /Link /Rect [{} {} {} {}] /Border [0 0 0] /F 4 /Dest [{} 0 R /XYZ {} {} 0] /StructParent {sp} >>",
+                num(r[0], 3),
+                num(r[1], 3),
+                num(r[2], 3),
+                num(r[3], 3),
+                self.page_ids[page],
+                // Word's destination: 3 pt left of the note, on whole points.
+                num(left - 3.0, 0),
+                num((self.page_dims[page].1 - top).round(), 0)
+            ),
+        );
+        self.page_annots[buf.index].push(annot);
     }
 
     /// A `Link` annotation over `x` on `line`, to the hyperlink's target.
@@ -1110,9 +1550,10 @@ impl Export<'_> {
             l.annots.push((buf.index, annot));
             l.id
         });
-        if parent_key.is_none() {
-            // A link in an artifact (header, footer): its annotation still gets a `Link` element
-            // under the document element, so that no link annotation is left untagged.
+        if parent_key.is_none() && (self.ua || line.story == StoryKind::TextBox) {
+            // A link in an artifact (header, footer): Word leaves its annotation untagged; PDF/UA
+            // needs every link annotation in the tree, so there it gets a `Link` element under
+            // the document element.
             let id = self.pdf.reserve();
             let root = self.st.root.id;
             self.kids.entry(root).or_default().push(Kid::Elem(id));
@@ -1132,14 +1573,15 @@ impl Export<'_> {
             self.layout.pages.len() + self.struct_parents.len() - 1
         });
         let sp = struct_parent.map_or(String::new(), |k| format!(" /StructParent {k}"));
+        let r = self.link_rect(buf, line, x, LINK_PAD);
         self.pdf.set(
             annot,
             format!(
                 "<< /Type /Annot /Subtype /Link /Rect [{} {} {} {}] /Border [0 0 0] /F 4 {action} /Contents {}{sp} >>",
-                num(x.0, 3),
-                num(buf.y(line.top + line.height), 3),
-                num(x.1, 3),
-                num(buf.y(line.top), 3),
+                num(r[0], 3),
+                num(r[1], 3),
+                num(r[2], 3),
+                num(r[3], 3),
                 text_string(&spec.text)
             ),
         );
@@ -1454,14 +1896,40 @@ impl Export<'_> {
             },
         );
         self.emit_node(&root, tree_id);
-        // Extra elements (note lines) hang off the document element.
+        // The note bodies: Word's `Footnote` or `Endnote` element inside the `Link` around the
+        // reference mark (role-mapped to `Note`), holding the paragraphs of the note.
         let extras = self.extras.clone();
+        let by_elem: HashMap<u32, (u8, usize)> =
+            self.note_elems.iter().map(|(k, v)| (*v, *k)).collect();
+        let mut loose = self.note_link.values().map(|l| l.1).max().unwrap_or(0);
         for id in &extras {
-            let k = self.kid_list(*id);
+            let paras = self.note_paras.get(id).cloned().unwrap_or_default();
+            for p in &paras {
+                let k = self.kid_list(*p);
+                self.pdf.set(
+                    *p,
+                    format!("<< /Type /StructElem /S /P /P {id} 0 R /K [{k}] >>"),
+                );
+            }
+            let key = by_elem.get(id).copied().unwrap_or((2, 0));
+            let (parent, seq) = match self.note_link.get(&key) {
+                Some(l) => *l,
+                None => {
+                    loose += 1;
+                    (root_id, loose)
+                }
+            };
+            let name = format!("Note {seq}");
+            let role = if key.0 == 3 { "Endnote" } else { "Footnote" };
+            let kids: String = paras.iter().map(|p| format!("{p} 0 R ")).collect();
             self.pdf.set(
                 *id,
-                format!("<< /Type /StructElem /S /P /P {root_id} 0 R /K [{k}] >>"),
+                format!(
+                    "<< /Type /StructElem /S /{role} /ID {} /P {parent} 0 R /K [{kids}] >>",
+                    text_string(&name)
+                ),
             );
+            self.st.ids.push((name, *id));
         }
         // Hyperlinks: the marked content of the link text, then the annotations.
         let mut links: Vec<LinkOut> = self
@@ -1470,13 +1938,35 @@ impl Export<'_> {
             .map(|l| (l.id, l.parent, l.annots.clone()))
             .collect();
         links.sort_unstable_by_key(|l| l.0);
+        let note_links: HashMap<u32, (u8, usize)> =
+            self.note_link.iter().map(|(k, v)| (v.0, *k)).collect();
         for (id, parent, annots) in links {
-            let mut k = self.kid_list(id);
-            for (page, annot) in annots {
-                k.push_str(&format!(
-                    "<< /Type /OBJR /Obj {annot} 0 R /Pg {} 0 R >> ",
-                    self.page_ids[page]
-                ));
+            let objrs: String = annots
+                .iter()
+                .map(|(page, annot)| {
+                    format!(
+                        "<< /Type /OBJR /Obj {annot} 0 R /Pg {} 0 R >> ",
+                        self.page_ids[*page]
+                    )
+                })
+                .collect();
+            let k = match note_links.get(&id) {
+                // Word's order: the annotation, the mark, the note.
+                Some(key) => {
+                    let note = self
+                        .note_elems
+                        .get(key)
+                        .map_or(String::new(), |n| format!("{n} 0 R "));
+                    format!("{objrs}{}{note}", self.kid_list(id))
+                }
+                None => format!("{objrs}{}", self.kid_list(id)),
+            };
+            if let Some(span) = self.link_span.get(&id).copied() {
+                let sk = self.kid_list(span);
+                self.pdf.set(
+                    span,
+                    format!("<< /Type /StructElem /S /Span /P {id} 0 R /K [{sk}] >>"),
+                );
             }
             self.pdf.set(
                 id,
@@ -1491,12 +1981,23 @@ impl Export<'_> {
         spans.sort_unstable_by_key(|l| l.0);
         for (id, parent, lang) in spans {
             let k = self.kid_list(id);
-            self.pdf.set(
-                id,
+            let dict = if lang.starts_with(NOTE_REF) {
+                format!("<< /Type /StructElem /S /Span /P {parent} 0 R /K [{k}] >>")
+            } else {
                 format!(
                     "<< /Type /StructElem /S /Span /P {parent} 0 R /Lang {} /K [{k}] >>",
                     text_string(&lang)
-                ),
+                )
+            };
+            self.pdf.set(id, dict);
+        }
+        // Content of a paragraph on a later page than its first line: a `Span` under the `P`.
+        for (para, id) in std::mem::take(&mut self.cont_all) {
+            let parent = self.st.paras.get(para).map_or(root_id, |p| p.node);
+            let k = self.kid_list(id);
+            self.pdf.set(
+                id,
+                format!("<< /Type /StructElem /S /Span /P {parent} 0 R /K [{k}] >>"),
             );
         }
         let mut nums = String::new();
@@ -1524,7 +2025,7 @@ impl Export<'_> {
         self.pdf.set(
             tree_id,
             format!(
-                "<< /Type /StructTreeRoot /K {root_id} 0 R /ParentTree {parent_tree} 0 R{id_tree} /ParentTreeNextKey {} >>",
+                "<< /Type /StructTreeRoot /K {root_id} 0 R /RoleMap {ROLE_MAP} /ParentTree {parent_tree} 0 R{id_tree} /ParentTreeNextKey {} >>",
                 page_owners.len() + self.struct_parents.len()
             ),
         );
@@ -1599,29 +2100,57 @@ impl Export<'_> {
     }
 
     fn emit_node(&mut self, node: &Node, parent: u32) {
-        let mut k = String::new();
+        // The marked content of a list item's body comes before the lists nested in it.
+        let mut k = if node.kind == structure::Kind::LBody {
+            self.kid_list(node.id)
+        } else {
+            String::new()
+        };
         for kid in &node.kids {
+            if self.is_empty_leaf(kid) {
+                continue;
+            }
             k.push_str(&format!("{} 0 R ", kid.id));
+            // Word writes a picture's `Figure` after the paragraph that holds it, not inside it.
+            if let Some(figs) = self.figures.remove(&kid.id) {
+                for f in figs {
+                    k.push_str(&format!("{} 0 R ", f.id));
+                    let alt = f
+                        .alt
+                        .as_deref()
+                        .map_or(String::new(), |a| format!("/Alt {} ", text_string(a)));
+                    self.pdf.set(
+                        f.id,
+                        format!(
+                            "<< /Type /StructElem /S /Figure /P {} 0 R {alt}/K [<< /Type /MCR /Pg {} 0 R /MCID {} >>] >>",
+                            node.id, self.page_ids[f.page], f.mcid
+                        ),
+                    );
+                }
+            }
         }
-        k.push_str(&self.kid_list(node.id));
-        if let Some(figs) = self.figures.remove(&node.id) {
-            for f in figs {
-                k.push_str(&format!("{} 0 R ", f.id));
-                let alt = f
-                    .alt
-                    .as_deref()
-                    .map_or(String::new(), |a| format!("/Alt {} ", text_string(a)));
+        if node.kind != structure::Kind::LBody {
+            k.push_str(&self.kid_list(node.id));
+        }
+        if node.kind == structure::Kind::Textbox {
+            for p in self.box_kids.get(&node.id).cloned().unwrap_or_default() {
+                k.push_str(&format!("{p} 0 R "));
+                let pk = self.kid_list(p);
                 self.pdf.set(
-                    f.id,
-                    format!(
-                        "<< /Type /StructElem /S /Figure /P {} 0 R {alt}/K [<< /Type /MCR /Pg {} 0 R /MCID {} >>] >>",
-                        node.id, self.page_ids[f.page], f.mcid
-                    ),
+                    p,
+                    format!("<< /Type /StructElem /S /P /P {} 0 R /K [{pk}] >>", node.id),
                 );
             }
         }
         if node.kind == structure::Kind::Document {
-            for id in &self.extras {
+            // The notes whose mark was found hang under its `Link`.
+            let placed: Vec<u32> = self
+                .note_elems
+                .iter()
+                .filter(|(key, _)| self.note_link.contains_key(*key))
+                .map(|(_, id)| *id)
+                .collect();
+            for id in self.extras.iter().filter(|id| !placed.contains(id)) {
                 k.push_str(&format!("{id} 0 R "));
             }
         }
@@ -1638,7 +2167,23 @@ impl Export<'_> {
             ),
         );
         for kid in &node.kids {
-            self.emit_node(kid, node.id);
+            if !self.is_empty_leaf(kid) {
+                self.emit_node(kid, node.id);
+            }
+        }
+    }
+
+    /// An element Word leaves out: a text box that drew nothing (not on a page), a paragraph
+    /// that ends a section and drew nothing (`layout-sect-empty`).
+    fn is_empty_leaf(&self, node: &Node) -> bool {
+        match node.kind {
+            structure::Kind::Textbox => !self.box_kids.contains_key(&node.id),
+            structure::Kind::P | structure::Kind::H(_) => {
+                self.st.section_breaks.contains(&node.id)
+                    && self.kids.get(&node.id).is_none_or(Vec::is_empty)
+                    && !self.figures.contains_key(&node.id)
+            }
+            _ => false,
         }
     }
 

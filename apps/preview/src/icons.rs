@@ -91,6 +91,12 @@ mod tests {
                 assert!(icons.contains_key(&n), "icon {n} is not registered");
             }
         }
+        for (tail, n) in crate::shell::MENU_ICONS {
+            assert!(
+                icons.contains_key(*n),
+                "menu icon {n} (for {tail}) is not registered"
+            );
+        }
         for n in [
             "cap-close",
             "chevron-left",

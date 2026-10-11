@@ -113,8 +113,31 @@ pub struct Bitmap {
     pub data: Vec<u8>,
 }
 
-/// FreeType's default 5-tap LCD filter (sums to 256), applied across subpixels.
-const LCD_FIR: [u32; 5] = [0x08, 0x4D, 0x56, 0x4D, 0x08];
+/// The FIR filter applied across subpixels of an LCD glyph (taps sum to 256).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+pub enum LcdFilter {
+    /// FreeType's default 5-tap filter.
+    #[default]
+    Default,
+    /// FreeType's light filter (3 equal taps): sharper, more colour fringe.
+    Light,
+    /// Wider and softer than the default.
+    Soft,
+    /// No filtering: each subpixel keeps its own coverage (strong colour fringes).
+    None,
+}
+
+impl LcdFilter {
+    /// The five taps, centre at index 2.
+    pub const fn taps(self) -> [u32; 5] {
+        match self {
+            LcdFilter::Default => [0x08, 0x4D, 0x56, 0x4D, 0x08],
+            LcdFilter::Light => [0x00, 0x55, 0x56, 0x55, 0x00],
+            LcdFilter::Soft => [0x30, 0x48, 0x48, 0x48, 0x30],
+            LcdFilter::None => [0x00, 0x00, 0x100, 0x00, 0x00],
+        }
+    }
+}
 
 /// Adds the signed area of one segment to the accumulation buffer.
 fn accumulate(acc: &mut [f32], stride: usize, w: usize, h: usize, seg: [f32; 4]) {
@@ -184,6 +207,17 @@ fn accumulate(acc: &mut [f32], stride: usize, w: usize, h: usize, seg: [f32; 4])
 /// Rasterises `lines` (y up) after shifting them right by `x_offset` pixels. Returns `None` for
 /// an empty outline such as a space.
 pub fn rasterize(lines: &[[f32; 4]], x_offset: f32, mode: RasterMode) -> Option<Bitmap> {
+    rasterize_with(lines, x_offset, mode, LcdFilter::Default)
+}
+
+/// [`rasterize`] with a chosen LCD filter (ignored for grayscale).
+pub fn rasterize_with(
+    lines: &[[f32; 4]],
+    x_offset: f32,
+    mode: RasterMode,
+    filter: LcdFilter,
+) -> Option<Bitmap> {
+    let fir = filter.taps();
     if lines.is_empty() {
         return None;
     }
@@ -240,7 +274,7 @@ pub fn rasterize(lines: &[[f32; 4]], x_offset: f32, mode: RasterMode) -> Option<
                     for ch in 0..3usize {
                         let centre = (px * 3 + ch) as isize;
                         let mut v = 0.0f32;
-                        for (k, wt) in LCD_FIR.iter().enumerate() {
+                        for (k, wt) in fir.iter().enumerate() {
                             let i = centre + k as isize - 2;
                             if i >= 0 && (i as usize) < ow {
                                 v += cover[i as usize] * *wt as f32;

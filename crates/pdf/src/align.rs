@@ -77,6 +77,26 @@ impl Alignment {
         self.model_bytes.partition_point(|b| *b < byte)
     }
 
+    /// The byte range of `shown` that no model character accounts for at model byte `at`: what
+    /// the layout draws where the model holds nothing (a note reference mark). `None` when the
+    /// neighbours leave no gap.
+    pub fn gap_at(&self, at: usize) -> Option<Range<usize>> {
+        let a = self.model_char(at);
+        if a > self.matched.len() {
+            return None;
+        }
+        let start = self.matched[..a]
+            .iter()
+            .rev()
+            .find_map(|m| *m)
+            .map_or(0, |j| j + 1);
+        let end = self.matched[a..]
+            .iter()
+            .find_map(|m| *m)
+            .unwrap_or(self.shown_len);
+        (start < end).then(|| self.shown_bytes[start]..self.shown_bytes[end])
+    }
+
     /// The byte range of `shown` that stands for bytes `range` of the model text: the matched
     /// characters, or the whole gap when the layout shows something else in their place.
     pub fn map(&self, range: Range<usize>) -> Option<Range<usize>> {

@@ -79,7 +79,7 @@ fn flag_element(e: &XmlElement) -> bool {
     !matches!(e.head.attr("val").map(str::trim), Some("0" | "false"))
 }
 
-fn dxf_element(dxf: &XmlElement, stripe: usize) -> ElementDef {
+pub(super) fn dxf_element(dxf: &XmlElement, stripe: usize) -> ElementDef {
     let mut def = ElementDef {
         stripe,
         ..ElementDef::default()

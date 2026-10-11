@@ -205,7 +205,8 @@ impl<A: UiApp> Host<A> {
         };
         surface.configure(&gpu.device, &config);
         let assets = Assets::new(c.atlas_size);
-        let renderer = Renderer::new(&gpu.device, format, assets.atlas_size());
+        let mut renderer = Renderer::new(&gpu.device, format, assets.atlas_size());
+        renderer.set_params(open365_gfx::RenderParams::office_fitted());
         let scheme = window.theme().map_or(ColorScheme::Light, ColorScheme::from);
         let list = DrawList::new(config.width, config.height);
         Ok(Live {

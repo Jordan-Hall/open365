@@ -46,4 +46,4 @@ pub use proof::{LangSpan, ParagraphReport, Proofing};
 pub use session::{ProofRequest, ProofResponse, ProofSession, ProofWorker};
 pub use suggest::SuggestOptions;
 pub use tokenize::{IssueKind, Misspelling, TokenizerOptions, Word, find_words};
-pub use user::UserDictionary;
+pub use user::{MAX_FILE_BYTES, MAX_WORD_CHARS, MAX_WORDS, UserDictionary};

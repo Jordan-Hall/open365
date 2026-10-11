@@ -19,6 +19,7 @@ open365-docx.workspace = true
 open365-layout.workspace = true
 open365-opc.workspace = true
 open365-pdf.workspace = true
+open365-spell.workspace = true
 open365-text.workspace = true
 open365-xlsx.workspace = true
 rfd.workspace = true
@@ -27,6 +28,7 @@ skrifa.workspace = true
 [dev-dependencies]
 egui_kittest = { workspace = true, features = ["eframe"] }
 serde_json.workspace = true
+zip = { version = "9.0.1", default-features = false, features = ["deflate"] }
 
 [lints]
 workspace = true

@@ -87,6 +87,10 @@ struct Tally {
     same_size_pages: usize,
     /// Pages whose every Word glyph is paired and agrees.
     exact_pages: usize,
+    /// Paired glyphs that miss the tolerance in x only, in y only, in both.
+    miss_x: usize,
+    miss_y: usize,
+    miss_xy: usize,
 }
 
 #[test]
@@ -131,10 +135,13 @@ fn glyph_positions_agree_with_words_pdf() {
             let mut agree = 0;
             let pairs = align(&wc, &oc);
             for (i, j) in &pairs {
-                if (wc[*i].1 - oc[*j].1).abs() <= TOLERANCE
-                    && (wc[*i].2 - oc[*j].2).abs() <= TOLERANCE
-                {
-                    agree += 1;
+                let ok_x = (wc[*i].1 - oc[*j].1).abs() <= TOLERANCE;
+                let ok_y = (wc[*i].2 - oc[*j].2).abs() <= TOLERANCE;
+                match (ok_x, ok_y) {
+                    (true, true) => agree += 1,
+                    (false, true) => t.miss_x += 1,
+                    (true, false) => t.miss_y += 1,
+                    (false, false) => t.miss_xy += 1,
                 }
             }
             t.word_glyphs += wc.len();
@@ -157,6 +164,9 @@ fn glyph_positions_agree_with_words_pdf() {
         total.pages_ours += t.pages_ours;
         total.same_size_pages += t.same_size_pages;
         total.exact_pages += t.exact_pages;
+        total.miss_x += t.miss_x;
+        total.miss_y += t.miss_y;
+        total.miss_xy += t.miss_xy;
     }
     for r in &rows {
         println!("{r}");
@@ -172,6 +182,10 @@ fn glyph_positions_agree_with_words_pdf() {
         total.same_size_pages,
         total.exact_pages,
     );
+    println!(
+        "paired glyphs outside the tolerance: x only {}, y only {}, both {}",
+        total.miss_x, total.miss_y, total.miss_xy
+    );
     assert!(rows.len() >= 20, "only {} fixtures compared", rows.len());
     assert!(total.word_glyphs > 10_000);
     // Page count and MediaBox agree on every page (Word's 600 dpi grid for A4 included).
@@ -186,7 +200,7 @@ fn glyph_positions_agree_with_words_pdf() {
         pct(total.paired)
     );
     assert!(
-        pct(total.agree) >= 86.2,
+        pct(total.agree) >= 87.5,
         "within tolerance {:.2}%",
         pct(total.agree)
     );

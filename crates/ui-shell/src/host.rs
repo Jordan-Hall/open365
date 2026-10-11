@@ -67,6 +67,19 @@ pub struct Tile {
     pub text_pct: u32,
     pub bold: bool,
     pub italic: bool,
+    /// The style's real font face; `None` draws the UI font.
+    pub font: Option<TileFont>,
+}
+
+/// The face a tile's sample text is drawn with: an egui family holding the real font (or its metric-compatible
+/// substitute) in the style's weight and slant, plus what the family could not supply and must be faked.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TileFont {
+    pub family: egui::FontFamily,
+    /// Bold is wanted but the family has no bold face: draw the text twice, one device pixel apart.
+    pub fake_bold: bool,
+    /// Italic is wanted but the family has no italic face: slant the glyphs.
+    pub fake_italic: bool,
 }
 
 impl Tile {
@@ -83,6 +96,7 @@ impl Tile {
             text_pct: 100,
             bold: false,
             italic: false,
+            font: None,
         }
     }
 }

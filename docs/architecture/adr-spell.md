@@ -37,15 +37,43 @@ Defaults: ignore UPPERCASE, words with digits, URLs, e-mail and file paths; repe
 
 4054 generated words per locale (sampled stems, single-edit typos, case variants) and 65 hand-written paragraphs; references committed in `fixtures/spell/`. Results with `SPELL_PARITY_FULL=1 cargo test --release -p open365-spell --test word_parity -- --nocapture`:
 
-| Locale | Accept/flag agreement | Suggestion: first equal | Word's first in our top 5 | Our first in Word's top 5 |
-|---|---|---|---|---|
-| en-US | 98.03% | 87.8% | 94.3% | 92.7% |
-| en-GB | 97.39% | 87.2% | 93.4% | 92.1% |
-| en-CA | 97.51% | 87.4% | 93.3% | 92.2% |
-| en-AU | 97.41% | 87.3% | 93.5% | 92.4% |
+| Locale | Accept/flag agreement | Our first = Word's first (top-1) | Word's first in our top 3 | Word's first in our top 5 | Our first in Word's top 5 |
+|---|---|---|---|---|---|
+| en-US | 98.03% | 90.5% (was 87.8%) | 94.2% | 94.7% (was 94.3%) | 94.9% (was 92.7%) |
+| en-GB | 97.39% | 89.6% (was 87.2%) | 93.3% | 93.8% (was 93.4%) | 94.4% (was 92.1%) |
+| en-CA | 97.51% | 90.0% (was 87.4%) | 93.2% | 93.7% (was 93.3%) | 94.6% (was 92.2%) |
+| en-AU | 97.41% | 89.6% (was 87.3%) | 93.3% | 93.9% (was 93.5%) | 94.5% (was 92.4%) |
+
+Verdict agreement is unchanged by the ranking work (it only reorders suggestions). `word_parity` asserts floors of 88.5% top-1 and 91.5% top-3 (when at least 500 suggestion rows are measured) besides the verdict and top-5 floors.
 
 Paragraph flag sets identical to Word: en-US 67.7% (44 of 65), en-GB 70.8%. Doubled-word pairs (342, en-US): 96.8% identical. Caveats: the sample is dominated by dictionary words with a single typo, so suggestion agreement overstates real-world agreement; verdict differences are mostly vocabulary (Word accepts accented forms and many capitalised names, flags some British and slang words). Word's contextual "confused word" errors (`their/there`) are not reproduced. Word's personal custom dictionary on the measuring machine was not inspected.
 
+## Suggestion ranking model (2026-10-11)
+
+Context: suggestions used to come out in generation order (case, `REP`, `MAP`, transpositions, key neighbours, deletions, insertions, substitutions, splits, n-gram). Alternatives: keep stage order (87.8% top-1 en-US); a hand-tuned score; a fitted linear model; a model driven by a word-frequency table (none is available without licence work: SCOWL size 60 carries no frequencies).
+
+Decision: all stages fill a pool of up to 40 candidates (`POOL_LIMIT`) and a linear model ranks it. Features (21 numeric): Damerau/OSA distance, length difference, same first and last letter, shared prefix and suffix, bigram Dice, a consonant-skeleton match and distance (a cheap phonetic proxy), capitalised-when-typed-lower-case, extra apostrophe, whether the candidate is a dictionary entry and how many affix flags it has (a popularity proxy), discovery order, anagram, accented-only, n-gram candidate longer than the input; plus one bias per generation stage. The old hard rule that demotes proper nouns for lower-case input became a learned feature. The weights (`WEIGHTS`, `STAGE_BIAS` in `crates/spell/src/suggest.rs`) come from pairwise logistic regression against Word's suggestion order: candidates absent from Word's list rank last, pair weight 1/(1+rank).
+
+Reproduce: `cargo run --release -p open365-spell --example pool_dump > pool.tsv`, then `python -I crates/spell/tools/fit_ranking.py pool.tsv` (needs scikit-learn); paste the printed arrays into `suggest.rs`. The feature order in `Dictionary::features` must match.
+
+Evidence: 4068 flagged reference queries over four locales. On a 25% holdout of words (crc32 of the word, all locales) top-1 went from 85.8% to 89.6% and top-3 from 94.0% to 94.1% (training set: 87.6% to 89.9% top-1). The ceiling is candidate recall: Word's first suggestion is in our pool for about 94% of queries. Always running the n-gram stage lifted recall to 94.1% (from 93.8%) at roughly twice the suggestion time, so it still runs only when fewer than 3 candidates were found.
+
+Consequences and caveats: the references are Word's answers to generated single-edit typos of dictionary words, so natural misspellings (phonetic errors, several mistakes in one word) are under-represented, and the holdout shares locales and stems with the training data, so it is optimistic. Confidence: medium-low that the 2.7-point top-1 gain transfers in full. It would change if a corpus of natural misspellings run through the oracle shows a different optimum, or if a permissively licensed frequency table is adopted (the next feature to try).
+
+## Non-English dictionaries: plan
+
+Status: nothing non-English is bundled or measured. Licence classes come from `docs/research/spell-dictionaries.md` (LibreOffice dictionaries repository, fetched 2026-10-11); engineering triage, not legal advice.
+
+1. **Tiers by licence.**
+   - Class A, permissive (ru and lt BSD-3-Clause; nl BSD-3-Clause or CC-BY-3.0, choose BSD; tr and ka MIT; fa, ie, tk, tlh Apache-2.0): bundle-eligible after the same review as the English set. Each added dictionary needs a section in `THIRD-PARTY-NOTICES.md` with verbatim licence text, an entry in `crates/spell/dictionaries/NOTICE.md` with upstream commit and SHA-256, and a `<tag>.LICENSE.txt` beside the data. Each gets its own Cargo feature (`bundled-ru`, and so on), never folded into `bundled-en`, so a build can leave it out.
+   - Class B, weak copyleft (fr MPL-2.0; pl and pt, choose MPL-2.0; es, hu, ro, sk, da, el and others with an MPL-1.1 option; ca, sl, hr LGPL options; cy, et, lv, sv, en-ZA LGPL only): optional language packs, unmodified, as separate files outside the MIT binary, source being the upstream URL. The installer shows the licence and needs a click. Choose the MPL option where several are offered.
+   - Class C, strong copyleft (de, it, cs, uk, nb, nn, gl, eu and others GPL only; he AGPL-3.0), and is (CC-BY-SA) and mn (LPPL): never in an Open365-hosted bundle or download list. Cover them through (a) the operating-system proofing service behind the same `Proofing` interface (Windows `ISpellChecker`, macOS `NSSpellChecker`), and (b) `Proofing::install_dir`, where the user supplies a folder; Open365 then neither distributes nor modifies the data.
+2. **Delivery.** A language pack is a directory with `.aff`, `.dic`, a `manifest.json` (tag, upstream URL and commit, SPDX, SHA-256, size) and the licence file. The application layer, not this crate (which does no networking), downloads only on explicit user action from a fixed host allow-list, with SSRF-safe fetching, a size cap and checksum verification. A document never triggers a download. An agent or JSON/MCP caller may list packs; installing one needs the same user confirmation.
+3. **Order.** es, fr, de, pt, it, nl, pl, ru first (largest Office markets), then the rest. de and it are class C, so they depend on the OS backend or user-supplied packs. That is the main product risk, and the OS-backend interface should exist before any German or Italian promise is made.
+4. **Engine readiness.** Real dictionaries exercise directives the English set does not: `COMPOUNDRULE` and `COMPOUNDFLAG` (de, nl), `ICONV`/`OCONV`, `BREAK`, `PHONE`, long and numeric flags, dotted-I casing (tr, az), heavy affix tables (hu, el). Before shipping a language: load its upstream test dictionary in `cargo test`, fuzz the loader with its affix file, record load time and memory.
+5. **Measurement.** `tools/office/make-spell-refs.ps1 -Tags <tag>` already sets the document proofing language, so per-language references need only Word's proofing tools for that language on the measuring machine (check `Languages(id).ActiveSpellingDictionary`; skip a language Word cannot check). Acceptance before bundling or advertising a language: verdict agreement at least 95% and top-5 recall at least 85% over at least 1000 generated words, recorded per language in this ADR. A language that fails is labelled "basic spell check" in the UI; a language with no Word reference is not claimed as Word-compatible. The script's generator currently reads `crates/spell/dictionaries/<tag>.dic`, so a new language needs its dictionary at that path first.
+6. **Not Hunspell-shaped.** Hebrew, Arabic, Thai, CJK and Indic scripts need a different tokeniser or the OS backend; out of scope for the engine until measured.
+
 ## Open
 
-Suggestion ranking is stage-ordered, not frequency- or phonetically ranked; non-English dictionaries are unmeasured; unsupported Hunspell directives are listed in `spell-check.md`; no performance target is set (en-US load about 90 to 140 ms, a bad-word suggestion 3 to 120 ms in release on a loaded machine).
+Suggestion ranking has no word-frequency signal and only a rough phonetic one; non-English dictionaries are unmeasured and unbundled (plan above); unsupported Hunspell directives are listed in `spell-check.md`; no performance target is set (en-US load about 90 to 140 ms, a bad-word suggestion 3 to 120 ms in release on a loaded machine).

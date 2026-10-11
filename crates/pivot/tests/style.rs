@@ -5,7 +5,7 @@
 use std::path::PathBuf;
 
 use open365_opc::Limits;
-use open365_pivot::style::{CellStyle, CustomStyles, style_cells_with};
+use open365_pivot::style::{CellStyle, CustomStyles, Dxfs, style_cells_full};
 use open365_pivot::{PivotStrings, sheet_pivots};
 use open365_xlsx::{Workbook, cell_ref_string, parse_cell_ref};
 
@@ -32,7 +32,7 @@ fn same_edge(want: &str, got: Option<open365_pivot::style::Edge>) -> bool {
     }
 }
 
-fn diff(c: &serde_json::Value, got: &CellStyle) -> Vec<String> {
+fn diff(c: &serde_json::Value, got: &CellStyle, dxfs: &Dxfs) -> Vec<String> {
     let mut bad = Vec::new();
     let want_fill = c["f"].as_i64().unwrap_or(-1);
     if want_fill != got.fill.map_or(-1, bgr) {
@@ -57,6 +57,15 @@ fn diff(c: &serde_json::Value, got: &CellStyle) -> Vec<String> {
             bad.push(format!("{} want {b} got {:?}", names[k], got.borders[k]));
         }
     }
+    if let Some(nf) = c["nf"].as_str() {
+        let got_nf = got
+            .num_fmt_id
+            .and_then(|id| dxfs.number_format_code(id))
+            .unwrap_or_else(|| "General".to_owned());
+        if nf != got_nf {
+            bad.push(format!("numfmt want {nf} got {got_nf}"));
+        }
+    }
     bad
 }
 
@@ -69,6 +78,7 @@ fn run(name: &str) -> (usize, usize, usize, usize) {
     let refs: serde_json::Value =
         serde_json::from_str(&std::fs::read_to_string(&rpath).expect("reference")).expect("json");
     let custom = CustomStyles::from_workbook(&wb);
+    let dxfs = Dxfs::from_workbook(&wb);
     let (mut pok, mut ptotal, mut cok, mut ctotal) = (0, 0, 0, 0);
     let verbose = std::env::var("PIVOT_VERBOSE").ok();
     for p in refs["pivots"].as_array().expect("pivots") {
@@ -78,7 +88,16 @@ fn run(name: &str) -> (usize, usize, usize, usize) {
         let grid = pivot
             .grid_from_cache(&PivotStrings::default())
             .expect("grid");
-        let styled = style_cells_with(&pivot.table, &grid, wb.styles().theme(), &custom);
+        let styled = if std::env::var("PIVOT_NO_USER").is_ok() {
+            open365_pivot::style::style_cells_with(
+                &pivot.table,
+                &grid,
+                wb.styles().theme(),
+                &custom,
+            )
+        } else {
+            style_cells_full(&pivot.table, &grid, wb.styles().theme(), &custom, &dxfs)
+        };
         ptotal += 1;
         let Some(styled) = styled else {
             ctotal += p["cells"].as_array().map_or(0, Vec::len);
@@ -98,7 +117,12 @@ fn run(name: &str) -> (usize, usize, usize, usize) {
                 bad.push(format!("{}: outside", cell_ref_string(r, col)));
                 continue;
             };
-            let d = diff(c, got);
+            let mut d = diff(c, got, &dxfs);
+            // The areas set records one fill per pivot: only the fills show which cells an
+            // area selects (the borders of the table style are measured by the other sets).
+            if name == "formats-areas" {
+                d.retain(|x| x.starts_with("fill"));
+            }
             if d.is_empty() {
                 cok += 1;
             } else {
@@ -122,6 +146,11 @@ fn run(name: &str) -> (usize, usize, usize, usize) {
             for b in bad.iter().take(cap) {
                 println!("    {b}");
             }
+            if std::env::var("PIVOT_FORMATS").is_ok() {
+                for f in pivot.table.user_formats() {
+                    println!("    # {f:?}");
+                }
+            }
         }
     }
     println!("{name}: pivots {pok}/{ptotal}, cells {cok}/{ctotal}");
@@ -136,6 +165,10 @@ fn styles_match_excel_display_format() {
         ("holdout-styles", FLOOR_OUT),
         ("customstyles", FLOOR_CUSTOM),
         ("holdout-customstyles", FLOOR_CUSTOM_OUT),
+        ("formats", FLOOR_FORMATS),
+        ("formats-areas", FLOOR_FORMATS_AREAS),
+        ("formats-borders", 10),
+        ("holdout-formats", FLOOR_FORMATS_OUT),
     ] {
         // `PIVOT_SET=styles` runs (and prints diffs of) one set only: look at the in-sample set
         // while fitting and run the hold-out set for confirmation, never to tune.
@@ -156,10 +189,13 @@ fn styles_match_excel_display_format() {
 
 /// Pivots (per set) that match Excel cell for cell. Raise a floor when the engine improves.
 const FLOOR_IN: usize = 40;
-const FLOOR_IN2: usize = 62;
-const FLOOR_OUT: usize = 38;
-const FLOOR_CUSTOM: usize = 36;
-const FLOOR_CUSTOM_OUT: usize = 27;
+const FLOOR_IN2: usize = 63;
+const FLOOR_OUT: usize = 39;
+const FLOOR_CUSTOM: usize = 39;
+const FLOOR_CUSTOM_OUT: usize = 28;
+const FLOOR_FORMATS: usize = 36;
+const FLOOR_FORMATS_AREAS: usize = 64;
+const FLOOR_FORMATS_OUT: usize = 22;
 
 /// `PIVOT_DUMP=P3`: Excel's and our formatting of one pivot as two character maps. Per cell:
 /// fill letter, `B`/`I`, font letter, then four border digits (left, top, bottom, right).

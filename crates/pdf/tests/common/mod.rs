@@ -13,6 +13,7 @@ use open365_opc::Limits;
 use open365_text::{FontLibrary, FontMatch};
 
 pub mod scan;
+pub mod structure;
 
 pub fn root() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("../..")

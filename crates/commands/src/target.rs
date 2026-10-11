@@ -230,6 +230,8 @@ impl Target {
             self.save_to(path, effect)?
         } else if let Command::ExportPdf { path, overwrite } = &command {
             self.export_pdf_to(path, *overwrite, effect)?
+        } else if command.is_share() {
+            self.share_to(&command, effect)?
         } else {
             self.notes.clear();
             self.replaced = 0;
@@ -253,6 +255,7 @@ impl Target {
                 pages: 0,
                 notes: std::mem::take(&mut self.notes),
                 replaced: std::mem::take(&mut self.replaced),
+                report: None,
             }
         };
         self.audit.0.push(command);
@@ -598,7 +601,105 @@ impl Target {
             pages: 0,
             notes: Vec::new(),
             replaced: 0,
+            report: None,
         })
+    }
+
+    /// The `share_*` commands (ADR-013 Stage 0). None of them changes the document, its undo
+    /// history or its saved state; the copies are made from the content as it is now.
+    fn share_to(
+        &mut self,
+        command: &Command,
+        effect: EffectClass,
+    ) -> Result<Outcome, CommandError> {
+        use crate::share;
+        let source = self.path.clone();
+        let roots = self.write_roots.clone();
+        let (ext, fallback) = match &self.content {
+            Content::Docx(_) => ("docx", "document"),
+            Content::Xlsx(_) => ("xlsx", "workbook"),
+        };
+        let ext_arg = if source.as_deref().is_some_and(|s| s.extension().is_some()) {
+            None
+        } else {
+            Some(ext)
+        };
+        let done =
+            |saved: Option<PathBuf>, bytes: usize, pages: usize, notes: Vec<String>, report| {
+                Outcome {
+                    effect,
+                    changed_cells: Vec::new(),
+                    saved_to: saved,
+                    bytes_written: bytes,
+                    pages,
+                    notes,
+                    replaced: 0,
+                    report,
+                }
+            };
+        match command {
+            Command::ShareInspect => {
+                let report = share::inspect_bytes(&self.snapshot_bytes()?)?;
+                Ok(done(
+                    None,
+                    0,
+                    0,
+                    share::report_notes(&report),
+                    Some(report.to_json()),
+                ))
+            }
+            Command::ShareSendCopy { path, overwrite } => {
+                let bytes = self.snapshot_bytes()?;
+                let name = share::copy_name(source.as_deref(), fallback, "", ext_arg);
+                let to = share::destination(path.as_deref(), source.as_deref(), &name, &roots)?;
+                share::write_share_file(&to, &bytes, *overwrite, &roots)?;
+                Ok(done(Some(to), bytes.len(), 0, Vec::new(), None))
+            }
+            Command::ShareSanitizeCopy {
+                path,
+                overwrite,
+                remove,
+            } => {
+                let clean = share::sanitize_bytes(&self.snapshot_bytes()?, remove)?;
+                let name = share::copy_name(source.as_deref(), fallback, "-clean", ext_arg);
+                let to = share::destination(path.as_deref(), source.as_deref(), &name, &roots)?;
+                share::write_share_file(&to, &clean.bytes, *overwrite, &roots)?;
+                let report = serde_json::json!({
+                    "schema": "open365.sanitize/1",
+                    "removed": clean.removed,
+                });
+                let notes = clean
+                    .removed
+                    .iter()
+                    .map(|(k, n)| format!("removed {n} {}", k.name()))
+                    .collect();
+                Ok(done(Some(to), clean.bytes.len(), 0, notes, Some(report)))
+            }
+            Command::ShareSendPdf { path, overwrite } => {
+                let Content::Docx(s) = &self.content else {
+                    return Err(CommandError::WrongTarget {
+                        command: "share_send_pdf",
+                        target: "XLSX",
+                    });
+                };
+                let rendered = crate::pdf::render(&s.doc, &self.pdf_options)?;
+                let name = share::copy_name(source.as_deref(), fallback, "", Some("pdf"));
+                let to = share::destination(path.as_deref(), source.as_deref(), &name, &roots)?;
+                share::write_share_file(&to, &rendered.bytes, *overwrite, &roots)?;
+                Ok(done(
+                    Some(to),
+                    rendered.bytes.len(),
+                    rendered.pages,
+                    rendered.warnings,
+                    None,
+                ))
+            }
+            Command::ShareOsSheet { path } => {
+                let request = share::os_sheet_request(path)?;
+                Ok(done(None, 0, 0, Vec::new(), Some(request)))
+            }
+            _ => Err(CommandError::Share("not a share command".to_owned())),
+        }
     }
 
     fn export_pdf_to(
@@ -623,6 +724,7 @@ impl Target {
             pages: rendered.pages,
             notes: rendered.warnings,
             replaced: 0,
+            report: None,
         })
     }
 }
@@ -636,6 +738,7 @@ fn edit_outcome(changed_cells: Vec<CellRef>) -> Outcome {
         pages: 0,
         notes: Vec::new(),
         replaced: 0,
+        report: None,
     }
 }
 
@@ -659,6 +762,7 @@ fn is_docx_edit(command: &Command) -> bool {
             | Command::DocxMoveTab { .. }
             | Command::DocxClearTab { .. }
             | Command::DocxReplaceRange { .. }
+            | Command::DocxCorrectWord { .. }
             | Command::DocxReplaceAll { .. }
     )
 }
@@ -680,7 +784,8 @@ fn capture_docx(doc: &Document, command: &Command) -> Result<Vec<Snapshot>, Comm
         | Command::DocxSetIndents { para, .. }
         | Command::DocxAddTab { para, .. }
         | Command::DocxMoveTab { para, .. }
-        | Command::DocxClearTab { para, .. } => vec![one(*para)?],
+        | Command::DocxClearTab { para, .. }
+        | Command::DocxCorrectWord { para, .. } => vec![one(*para)?],
         Command::DocxSplitParagraph { pos } => vec![one(pos.para)?],
         Command::DocxDeleteRange { start, end } | Command::DocxReplaceRange { start, end, .. } => {
             let (s, e) = ordered(*start, *end);
@@ -761,6 +866,37 @@ fn replay_docx(doc: &mut Document, command: &Command) -> Result<usize, CommandEr
         Command::DocxReplaceRange { start, end, text } => {
             doc.replace_range(*start, *end, text)?;
         }
+        Command::DocxCorrectWord {
+            para,
+            start,
+            end,
+            expected,
+            replacement,
+        } => {
+            let text = doc
+                .paragraph_text(*para)
+                .ok_or_else(|| CommandError::Proofing(format!("no paragraph {para}")))?;
+            let found: String = text
+                .chars()
+                .skip(*start)
+                .take(end.saturating_sub(*start))
+                .collect();
+            if expected.is_empty() || start >= end || found != *expected {
+                return Err(CommandError::Proofing(format!(
+                    "paragraph {para} no longer holds {expected:?} at {start}..{end}"
+                )));
+            }
+            if replacement.chars().any(|c| matches!(c, '\u{a}' | '\u{d}')) {
+                return Err(CommandError::Proofing(
+                    "a replacement word cannot contain a line break".to_owned(),
+                ));
+            }
+            let at = |offset: usize| DocPos {
+                para: *para,
+                offset,
+            };
+            doc.replace_range(at(*start), at(*end), replacement)?;
+        }
         _ => {}
     }
     Ok(0)
@@ -818,7 +954,7 @@ pub(crate) fn write_atomic(path: &Path, bytes: &[u8]) -> Result<(), CommandError
 }
 
 /// An unpredictable temporary file name, so nobody can plant a link at it in advance.
-fn temp_name() -> String {
+pub(crate) fn temp_name() -> String {
     use std::hash::{BuildHasher, Hasher, RandomState};
     let mut hasher = RandomState::new().build_hasher();
     hasher.write_u32(std::process::id());

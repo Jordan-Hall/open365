@@ -2203,14 +2203,14 @@ impl Shell {
                 .find(|i| i.chrome.ref_name.as_deref() == Some(name))
                 .map(|i| rect_of(origin, ppp, i.rect))
         };
-        let (Some(left), Some(right), Some(first), Some(add)) = (
-            slot("Scroll Left"),
-            slot("Scroll Right"),
-            slot("Sheet1"),
-            slot("Add Sheet"),
-        ) else {
+        let (Some(left), Some(right), Some(add)) =
+            (slot("Scroll Left"), slot("Scroll Right"), slot("Add Sheet"))
+        else {
             return;
         };
+        // No room for a tab (a very narrow window): only the scroll and add buttons stay.
+        let tabs_shown = slot("Sheet1").is_some();
+        let first = slot("Sheet1").unwrap_or(add);
         let sheets = host.gallery("sheet.tabs");
         let active = host.value("sheet.active").unwrap_or_default();
         let font = FontId::proportional(size::TAB);
@@ -2221,16 +2221,36 @@ impl Shell {
                 .x
         };
         // Excel's tab is 83 units wide for "Sheet1"; text widths vary, so keep that padding.
-        let pad = (first.width() - text_w("Sheet1")).max(8.0);
-        let gap = (add.left() - first.right()).max(0.0);
-        // Tabs run from the first visible one; the tab area ends before 62 % of the bar.
-        let limit = br.left() + br.width() * 0.62;
+        // The first tab may be clipped by a narrow window, so take the padding from the spec width.
+        let natural_w = self
+            .spec
+            .sheet_tabs
+            .as_ref()
+            .and_then(|s| {
+                s.items
+                    .iter()
+                    .find(|c| c.ref_name.as_deref() == Some("Sheet1"))
+            })
+            .map_or(first.width(), |c| c.w as f32 * add.height() / 40.0);
+        let pad = (natural_w - text_w("Sheet1")).max(8.0);
+        let gap = if tabs_shown {
+            (add.left() - first.right()).max(0.0)
+        } else {
+            0.0
+        };
+        // Tabs run from the first visible one; the tab area ends at the split handle.
+        let limit = lay.sheet_split.map_or(br.left() + br.width() * 0.6, |r| {
+            rect_of(origin, ppp, r).left()
+        });
         let widths: Vec<f32> = sheets.iter().map(|(_, n)| text_w(n) + pad).collect();
         self.sheet_first = self.sheet_first.min(sheets.len().saturating_sub(1));
         let mut x = first.left();
         let mut rects = Vec::new();
         #[allow(clippy::needless_range_loop)]
         for i in self.sheet_first..sheets.len() {
+            if !tabs_shown {
+                break;
+            }
             if x + widths[i] > limit && !rects.is_empty() {
                 break;
             }

@@ -12,6 +12,23 @@ pub fn random_bytes<const N: usize>() -> [u8; N] {
     b
 }
 
+/// Creates a directory tree readable only by the server account (0700 on Unix; on Windows protect the data
+/// directory with an ACL, see the README).
+pub fn make_private_dir(p: &std::path::Path) -> std::io::Result<()> {
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::DirBuilderExt;
+        std::fs::DirBuilder::new()
+            .recursive(true)
+            .mode(0o700)
+            .create(p)
+    }
+    #[cfg(not(unix))]
+    {
+        std::fs::create_dir_all(p)
+    }
+}
+
 pub fn hex(b: &[u8]) -> String {
     use std::fmt::Write as _;
     b.iter()
@@ -133,4 +150,68 @@ mod tests {
         assert_eq!(unhex(&hex(&b)).as_deref(), Some(&b[..]));
         assert!(unhex("zz").is_none());
     }
+}
+
+#[cfg(test)]
+mod prop {
+    use super::*;
+    use proptest::prelude::*;
+
+    proptest! {
+        #[test]
+        fn generated_tokens_always_have_the_expected_shape(_n in 0..16u8) {
+            let t = new_token();
+            prop_assert!(token_shape_ok(&t));
+            prop_assert_eq!(t.len(), TOKEN_LEN);
+        }
+
+        #[test]
+        fn only_43_url_safe_characters_pass_token_shape(s in r"\PC{0,60}") {
+            if token_shape_ok(&s) {
+                prop_assert_eq!(s.len(), TOKEN_LEN);
+                prop_assert!(s.bytes().all(|c| c.is_ascii_alphanumeric() || c == b'-' || c == b'_'));
+            }
+        }
+
+        #[test]
+        fn a_single_bad_character_breaks_a_token(pos in 0..TOKEN_LEN, bad in prop_oneof![Just('/'), Just('.'), Just(' '), Just('+'), Just('\n'), Just('%')]) {
+            let mut t: Vec<char> = new_token().chars().collect();
+            t[pos] = bad;
+            prop_assert!(!token_shape_ok(&t.into_iter().collect::<String>()));
+        }
+
+        #[test]
+        fn clean_names_never_carry_separators_or_controls(raw in r"\PC{0,260}") {
+            if let Some(n) = clean_name(&raw) {
+                prop_assert!(n.chars().count() <= 200 && !n.is_empty());
+                prop_assert!(!n.chars().any(|c| c.is_control() || "/\\\"<>|?*:".contains(c)));
+                prop_assert!(n != "." && n != "..");
+            }
+        }
+
+        #[test]
+        fn content_disposition_cannot_be_injected_through_a_name(raw in r"\PC{0,60}") {
+            let d = content_disposition(&raw);
+            prop_assert!(!d.contains('\n') && !d.contains('\r'));
+            let ascii = d.split("filename=\"").nth(1).and_then(|r| r.split('"').next()).expect("quoted");
+            prop_assert!(ascii.chars().all(|c| c.is_ascii_alphanumeric() || ".-_ ".contains(c)));
+        }
+
+        #[test]
+        fn hex_round_trips_for_any_bytes(b in proptest::collection::vec(any::<u8>(), 0..64)) {
+            prop_assert_eq!(unhex(&hex(&b)), Some(b));
+        }
+
+        #[test]
+        fn hex_ids_are_exact(s in "[0-9a-f]{0,40}") {
+            prop_assert_eq!(is_hex_id(&s, 32), s.len() == 32);
+        }
+    }
+}
+
+/// The short code that ties a native app's screen to the browser page of an OpenID Connect hand-off: the first eight
+/// hex digits of the SHA-256 of the app's secret, as `ABCD-EF01`.
+pub fn handoff_user_code(handoff_hash: &str) -> String {
+    let h = handoff_hash.to_ascii_uppercase();
+    format!("{}-{}", &h[..4], &h[4..8])
 }

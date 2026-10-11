@@ -220,6 +220,14 @@ fn score_fixture(name: &str, mode: Mode, detail: bool) -> Result<Outcome, String
             {
                 for r in &l.runs {
                     for g in &r.glyphs {
+                        if let Some(c) = l.leader_char(g) {
+                            ours.push(G {
+                                ch: c,
+                                x: g.x,
+                                y: l.baseline - g.y_offset,
+                            });
+                            continue;
+                        }
                         let t = l.cluster_text(g);
                         for ch in t.chars().filter(|c| !c.is_whitespace()) {
                             ours.push(G {

@@ -29,6 +29,10 @@ fn main() {
     let mut o = Options::new(dark);
     // Office's own window keeps an invisible frame around its pane (measured: pane at 9, 1).
     o.inset = (9, 1, 9, 9);
+    if std::env::var_os("OPEN365_COMPARE_PLAIN").is_none() {
+        o.text = open365_gfx::TextOptions::office(false);
+        o.params = open365_gfx::RenderParams::office_fitted();
+    }
     let mut p = Preview::with_options(kind, capture.width, capture.height, 1.25, o);
     let Some(snap) = p.render() else {
         eprintln!("no GPU adapter");

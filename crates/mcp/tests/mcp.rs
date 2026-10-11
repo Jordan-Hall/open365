@@ -240,7 +240,12 @@ fn json_rpc_session_covers_the_protocol() {
             "read_formulas",
             "get_styles",
             "recalc",
-            "request_scope"
+            "request_scope",
+            "share_send_copy",
+            "share_send_pdf",
+            "share_inspect",
+            "share_sanitize_copy",
+            "share_os_sheet"
         ]
     );
     assert!(tools.iter().all(|t| t["inputSchema"].is_object()));
