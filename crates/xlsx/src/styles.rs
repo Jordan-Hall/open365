@@ -3,6 +3,7 @@
 use std::collections::HashMap;
 
 use crate::XlsxError;
+use crate::builtin_numfmt::builtin_number_format_in;
 use crate::conditional::Dxf;
 use crate::format::{CellFormat, Color, FormatTables, Rgb, Theme};
 use crate::xml::{self, XmlElement};
@@ -96,6 +97,10 @@ pub struct Styles {
     pub(crate) theme: Theme,
     /// `dxfs/dxf` entries, by `dxfId`.
     pub(crate) dxfs: Vec<Dxf>,
+    /// The Windows locale that built-in ids resolve under; `None` keeps the specification's codes.
+    pub(crate) num_fmt_locale: Option<u32>,
+    /// Built-in ids 0 to 81 resolved under `num_fmt_locale`.
+    pub(crate) builtin_resolved: HashMap<u32, String>,
 }
 
 impl Styles {
@@ -130,6 +135,8 @@ impl Styles {
             tables,
             theme: Theme::default(),
             dxfs,
+            num_fmt_locale: None,
+            builtin_resolved: HashMap::new(),
         })
     }
 
@@ -157,10 +164,32 @@ impl Styles {
             .unwrap_or(0)
     }
 
+    /// Makes the built-in number format ids resolve as Excel does under the Windows locale `lcid`
+    /// (see [`crate::builtin_number_format_in`]); `None` returns to the specification's codes
+    /// ([`builtin_number_format`]). The file does not record the locale, so the caller supplies the
+    /// one of the machine or user that opens it.
+    pub fn set_number_format_locale(&mut self, lcid: Option<u32>) {
+        self.num_fmt_locale = lcid;
+        self.builtin_resolved = match lcid {
+            Some(lcid) => (0..=81)
+                .filter_map(|id| builtin_number_format_in(id, lcid).map(|code| (id, code)))
+                .collect(),
+            None => HashMap::new(),
+        };
+    }
+
+    /// The Windows locale built-in ids resolve under, when one was set.
+    pub fn number_format_locale(&self) -> Option<u32> {
+        self.num_fmt_locale
+    }
+
     /// Format code for a number format id: custom `numFmts` first, then the built-in
-    /// table; `General` when unknown.
+    /// table (locale-resolved when a locale was set); `General` when unknown.
     pub fn format_code(&self, num_fmt_id: u32) -> &str {
         if let Some(code) = self.num_fmts.get(&num_fmt_id) {
+            return code;
+        }
+        if let Some(code) = self.builtin_resolved.get(&num_fmt_id) {
             return code;
         }
         builtin_number_format(num_fmt_id).unwrap_or("General")
@@ -252,5 +281,23 @@ mod tests {
         assert_eq!(styles.number_format(1), "0.0%");
         assert_eq!(styles.number_format(2), "mm-dd-yy");
         assert_eq!(styles.number_format(99), "General");
+    }
+
+    #[test]
+    fn built_in_ids_follow_the_set_locale() {
+        let mut styles = Styles::parse(
+            br#"<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><numFmts count="1"><numFmt numFmtId="164" formatCode="0.0%"/></numFmts><cellXfs count="4"><xf numFmtId="0"/><xf numFmtId="164"/><xf numFmtId="14"/><xf numFmtId="5"/></cellXfs></styleSheet>"#,
+        )
+        .unwrap();
+        assert_eq!(styles.number_format_locale(), None);
+        styles.set_number_format_locale(Some(0x0809));
+        assert_eq!(styles.number_format_locale(), Some(0x0809));
+        assert_eq!(styles.number_format(2), "dd/mm/yyyy");
+        assert_eq!(styles.number_format(3), "\u{a3}#,##0;-\u{a3}#,##0");
+        assert_eq!(styles.number_format(1), "0.0%");
+        styles.set_number_format_locale(Some(0x0407));
+        assert_eq!(styles.number_format(2), "dd.mm.yyyy");
+        styles.set_number_format_locale(None);
+        assert_eq!(styles.number_format(2), "mm-dd-yy");
     }
 }

@@ -17,11 +17,11 @@ fn snapped_quotient(a: f64, b: f64) -> f64 {
     if s.fract() == 0.0 { s } else { q }
 }
 
-fn up_to_multiple(x: f64, sig: f64) -> f64 {
+pub(super) fn up_to_multiple(x: f64, sig: f64) -> f64 {
     snapped_quotient(x, sig).ceil() * sig
 }
 
-fn down_to_multiple(x: f64, sig: f64) -> f64 {
+pub(super) fn down_to_multiple(x: f64, sig: f64) -> f64 {
     snapped_quotient(x, sig).floor() * sig
 }
 
@@ -191,14 +191,14 @@ pub(super) fn log(ctx: &EvalContext<'_>, args: &[Arg]) -> Res<Value> {
 }
 
 /// Integer argument for the combinatorial functions: truncated, and negative values are `#NUM!`.
-fn count_arg(ctx: &EvalContext<'_>, arg: &Arg) -> Res<f64> {
+pub(super) fn count_arg(ctx: &EvalContext<'_>, arg: &Arg) -> Res<f64> {
     let n = num_arg(ctx, arg)?.trunc();
     if n < 0.0 { Err(ErrorKind::Num) } else { Ok(n) }
 }
 
 /// `n!` for a whole `n` in 0..=170, multiplied from the top down as Excel does (the order changes the last digit for
 /// n >= 23). Larger values are `#NUM!`.
-fn factorial(n: f64) -> Res<f64> {
+pub(super) fn factorial(n: f64) -> Res<f64> {
     if n > 170.0 {
         return Err(ErrorKind::Num);
     }
@@ -352,7 +352,7 @@ pub(super) fn odd(ctx: &EvalContext<'_>, args: &[Arg]) -> Res<Value> {
 static RNG: AtomicU64 = AtomicU64::new(0);
 
 /// A uniform value in `[0, 1)` from a splitmix64 generator seeded from the system clock.
-fn next_random() -> f64 {
+pub(super) fn next_random() -> f64 {
     let mut state = RNG.load(Ordering::Relaxed);
     if state == 0 {
         state = std::time::SystemTime::now()

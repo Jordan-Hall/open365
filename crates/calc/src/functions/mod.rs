@@ -3,6 +3,7 @@
 mod arith;
 mod cellinfo;
 mod complex;
+mod convert;
 mod criteria;
 mod database;
 mod datecalc;
@@ -23,7 +24,9 @@ mod letters;
 mod logical;
 mod lookup;
 mod math;
+mod mathmore;
 mod mathx;
+mod matrix;
 mod refs;
 mod stats;
 mod statsx;
@@ -481,6 +484,16 @@ static TABLE: &[(&str, Func)] = &[
     ("IMSUB", Func::Res(complex::imsub)),
     ("IMDIV", Func::Res(complex::imdiv)),
     ("IMSUM", Func::Res(complex::imsum)),
+    ("CONVERT", Func::Res(convert::convert)),
+    ("IMABS", Func::Res(complex::imabs)),
+    ("IMSQRT", Func::Res(complex::imsqrt)),
+    ("IMPOWER", Func::Res(complex::impower)),
+    ("IMTAN", Func::Res(complex::imtan)),
+    ("IMCOT", Func::Res(complex::imcot)),
+    ("IMSEC", Func::Res(complex::imsec)),
+    ("IMCSC", Func::Res(complex::imcsc)),
+    ("IMSECH", Func::Res(complex::imsech)),
+    ("IMCSCH", Func::Res(complex::imcsch)),
     ("IMPRODUCT", Func::Res(complex::improduct)),
     ("SEQUENCE", Func::Res(dynarray::sequence)),
     ("TRANSPOSE", Func::Res(dynarray::transpose)),
@@ -539,10 +552,32 @@ static TABLE: &[(&str, Func)] = &[
     ("YEARFRAC", Func::Res(datecalc::yearfrac)),
     ("DATEVALUE", Func::Res(datecalc::datevalue)),
     ("TIMEVALUE", Func::Res(datecalc::timevalue)),
+    // math, batch 8
+    ("CEILING.PRECISE", Func::Res(mathmore::ceiling_precise)),
+    ("ISO.CEILING", Func::Res(mathmore::ceiling_precise)),
+    ("FLOOR.PRECISE", Func::Res(mathmore::floor_precise)),
+    ("COMBINA", Func::Res(mathmore::combina)),
+    ("MULTINOMIAL", Func::Res(mathmore::multinomial)),
+    ("RANDARRAY", Func::Res(mathmore::randarray)),
+    ("MMULT", Func::Res(matrix::mmult)),
+    ("MDETERM", Func::Res(matrix::mdeterm)),
+    ("MINVERSE", Func::Res(matrix::minverse)),
+    ("MUNIT", Func::Res(matrix::munit)),
+    ("SUMX2MY2", Func::Res(matrix::sumx2my2)),
+    ("SUMX2PY2", Func::Res(matrix::sumx2py2)),
+    ("SUMXMY2", Func::Res(matrix::sumxmy2)),
 ];
 
 /// Functions whose result changes without any precedent changing.
-const VOLATILE: &[&str] = &["TODAY", "NOW", "RAND", "RANDBETWEEN", "OFFSET", "INDIRECT"];
+const VOLATILE: &[&str] = &[
+    "TODAY",
+    "NOW",
+    "RAND",
+    "RANDBETWEEN",
+    "RANDARRAY",
+    "OFFSET",
+    "INDIRECT",
+];
 
 fn table() -> &'static HashMap<&'static str, Func> {
     static MAP: OnceLock<HashMap<&'static str, Func>> = OnceLock::new();
@@ -559,7 +594,10 @@ pub fn lookup(name: &str) -> Option<&'static Func> {
 /// Parameters whose argument expressions Excel evaluates over whole ranges instead of taking the
 /// implicit intersection (the array parameters of `INDEX` and `XLOOKUP`, every parameter of `SUMPRODUCT`).
 pub(crate) fn is_array_param(name: &str, index: usize) -> bool {
-    if statsx::takes_arrays(name, index) || distrib_test::takes_arrays(name, index) {
+    if statsx::takes_arrays(name, index)
+        || distrib_test::takes_arrays(name, index)
+        || matrix::takes_arrays(name, index)
+    {
         return true;
     }
     if name.eq_ignore_ascii_case("INDEX") {
@@ -952,6 +990,10 @@ static LIFTING: &[(&str, Lifting)] = &[
     ("COMBIN", ALWAYS),
     ("PERMUT", ALWAYS),
     ("CEILING.MATH", ALWAYS),
+    ("CEILING.PRECISE", ALWAYS),
+    ("ISO.CEILING", ALWAYS),
+    ("FLOOR.PRECISE", ALWAYS),
+    ("COMBINA", ALWAYS),
     ("FLOOR.MATH", ALWAYS),
     ("T", ALWAYS),
     ("CONCATENATE", ALWAYS),
@@ -972,6 +1014,16 @@ static LIFTING: &[(&str, Lifting)] = &[
     ("IMCOS", ALWAYS),
     ("IMSINH", ALWAYS),
     ("IMCOSH", ALWAYS),
+    ("CONVERT", ALWAYS),
+    ("IMABS", ALWAYS),
+    ("IMSQRT", ALWAYS),
+    ("IMPOWER", ALWAYS),
+    ("IMTAN", ALWAYS),
+    ("IMCOT", ALWAYS),
+    ("IMSEC", ALWAYS),
+    ("IMCSC", ALWAYS),
+    ("IMSECH", ALWAYS),
+    ("IMCSCH", ALWAYS),
     ("IMSUB", ALWAYS),
     ("IMDIV", ALWAYS),
     ("BIN2DEC", ALWAYS),

@@ -15,6 +15,8 @@
 //! `t` attribute of a valueless cell is only kept when it is not the type its value
 //! implies.
 
+mod builtin_numfmt;
+mod builtin_numfmt_nls;
 mod conditional;
 mod drawing;
 mod error;
@@ -35,6 +37,10 @@ mod tables;
 mod workbook;
 mod xml;
 
+pub use builtin_numfmt::{
+    builtin_number_format_in, builtin_number_format_lcids, nls_pattern_to_excel,
+    resolve_number_format_lcid,
+};
 pub use conditional::{
     CellIsOp, CfBlock, CfKind, CfRule, Cfvo, CfvoKind, DataBarAxis, DataBarDirection, DataBarExt,
     Dxf, DxfBorder, DxfFill, DxfFont, TimePeriod,

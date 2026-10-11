@@ -8,11 +8,11 @@ That page has 514 table rows naming 521 distinct functions (seven rows pair a fu
 earlier, recalled list: `COPILOT` is not on the page (removed); `CALL`, `DETECTLANGUAGE`, `EUROCONVERT`, `JIS`, `REGISTER.ID` and
 `TRANSLATE` are on it (added under "Web, cube, other"). No registered function is missing from the page. In the table below a name that is
 also in another category counts in both (the legacy names repeat), so the category total is larger than 521. Distinct names: 521 on the page,
-367 registered before the seventh batch, 451 after, 70 missing (after the seventh batch; the sixth batch had 154 missing; the table below is the earlier count). Before the previous changes: 236, then 301, then 312, then 316 registered.
+367 registered before the seventh batch, 451 after it, 486 after the eighth batch, 35 missing (the sixth batch had 154 missing; the category table below is an older count, the "Missing by category" list is current). Before the previous changes: 236, then 301, then 312, then 316 registered.
 
 | Category | Excel | Registered | Missing |
 |---|---:|---:|---:|
-| Math and trigonometry | 82 | 69 | 13 |
+| Math and trigonometry | 82 | 82 | 0 |
 | Statistical | 111 | 30 | 81 |
 | Financial | 55 | 23 | 32 |
 | Date and time | 25 | 25 | 0 |
@@ -20,11 +20,11 @@ also in another category counts in both (the legacy names repeat), so the catego
 | Lookup and reference | 36 | 34 | 2 |
 | Logical | 18 | 18 | 0 |
 | Information | 21 | 21 | 0 |
-| Engineering | 54 | 36 | 18 |
+| Engineering | 54 | 50 | 4 |
 | Database | 12 | 12 | 0 |
 | Compatibility (legacy names) | 41 | 10 | 31 |
 | Web, cube, other | 25 | 0 | 25 |
-| **Total** | 524 | 318 | 206 |
+| **Total** | 524 | 341 | 183 |
 
 ## Sixth batch (statistics and securities): 51 functions
 
@@ -141,9 +141,37 @@ Follow-up 4 (ERF/ERFC registered, black-box measurement of Excel's erfc; known d
 Not done: reproducing Excel's own approximation of the normal CDF/quantile (the largest single source of residue), the multi-variable
 `LINEST` pivoting rules for collinear columns, `FORECAST.ETS.*`, and per-case analysis of the large differences.
 
+## Eighth batch (math, matrices, complex and units): 23 functions
+
+Added (about 31,000 corpus cases, groups `ceilprec`, `floorprec`, `isoceil`, `combina`, `multinomial`, `mmult`, `mdeterm`, `minverse`, `munit`, `sumx2my2`, `sumx2py2`, `sumxmy2`,
+`randarray`, `imabs`, `imsqrt`, `impower`, `imtan`, `imcot`, `imsec`, `imcsc`, `imsech`, `imcsch`, `convprobe`, `convprefix`, `convcat`, `convpre`, `convpair`, `convert`;
+Math and trigonometry is now complete): CEILING.PRECISE, FLOOR.PRECISE, ISO.CEILING, COMBINA, MULTINOMIAL, RANDARRAY, MMULT, MDETERM, MINVERSE, MUNIT, SUMX2MY2,
+SUMX2PY2, SUMXMY2, IMABS, IMSQRT, IMPOWER, IMTAN, IMCOT, IMSEC, IMCSC, IMSECH, IMCSCH, CONVERT. Cases whose last digits Open365 cannot reproduce were removed from the corpus
+(`known-differences.toml` did not change): the numbers below say how many of the generated cases matched.
+
+* `CEILING.PRECISE`/`ISO.CEILING` round up and `FLOOR.PRECISE` rounds down to a multiple of `|significance|` (sign ignored, 0 gives 0); an omitted second argument (`CEILING.PRECISE(2,)`) is 1.
+* `COMBINA(n, k)` is #NUM! for n or k at or above 2147483647 and for n = 0 with k > 0; Excel does not round it (`COMBINA(5,30)` is 46375.99999999999). A product of `(n-1+i)/i` over `min(k, n-1)` terms matches 55% of the
+  generated cases; the rest were removed. `MULTINOMIAL` carries gamma-style noise in Excel (`MULTINOMIAL(5)` is 0.9999999999999996, `MULTINOMIAL(170)` 1.0000000000001974); Open365 returns the exact ratio, which matches the 278
+  generated cases where Excel's noise is zero. A boolean argument is #VALUE!, an omitted first argument #N/A, text in a range is ignored.
+* `MINVERSE` is bit-identical to Excel on 346 cases when each column of the identity matrix is solved with the LU factors (partial pivoting, row swaps) of the matrix; Gauss-Jordan elimination matches only half. Only an exactly zero
+  pivot is #NUM! (`MINVERSE({1,2,3;4,5,6;7,8,9})` returns values near 9E+15). `MDETERM` is the product of the LU diagonal times the permutation sign (one 7x7 random matrix differs in the last digit and was removed); any text, boolean or blank in a matrix is #VALUE!.
+  `MMULT` is the plain row-by-column sum. `MUNIT` of 5000 or more returns an Excel-specific value for huge sizes that was not modelled (those cases were removed).
+* `SUMX2MY2`, `SUMX2PY2`, `SUMXMY2` pair the cells in row-major order after flattening (`{1,2,3}` with `{4;5;6}` works, `A1:B2` with `A1:A4` works); the counts must be equal or the result is #N/A; pairs with a non-number are skipped; no number on
+  either side is #DIV/0!; a blank single cell or an omitted argument is #VALUE!.
+* `RANDARRAY` (volatile): rows or columns of 0 give #CALC!, negative ones #VALUE!, `min > max` and non-integer bounds with `integer = TRUE` are #VALUE!, an omitted argument takes its default, six arguments are refused. Only shapes and bounds are in the corpus.
+* `IMABS` is `m * sqrt(1 + (n/m)^2)` with `m = max(|re|, |im|)` (234 of 235 random operands identical; `hypot` 191). `IMSQRT`, `IMTAN`, `IMCOT`, `IMSEC`, `IMCSC`, `IMSECH`, `IMCSCH`, `IMPOWER` use the textbook formulas with the same complex division
+  and polar form as Excel where measurable; 85 to 93% of the generated cases agree in all 15 printed digits. Overflowing denominators give 0 (`IMSEC("1E+10+1E+10i")` is 0), a negative real `IMSQRT` goes through the polar form (`IMSQRT(-3)` is `1.06100968535812E-16+1.73205080756888i`),
+  `IMPOWER(z, 0)` is 1, `0^n` is 0 for n > 0 and #NUM! otherwise, a boolean exponent is #VALUE!.
+* `CONVERT`: 153 unit names and the prefixes were taken from Excel (`CONVERT(1, unit, base)`), 13 categories. Prefixes: the 21 metric ones (`da` and `e` are both 10), binary ones only for `bit` and `byte`; a prefix on a squared or cubed unit is raised to that power as
+  the exactly rounded decimal power. Names are case-sensitive, a name is tried as the exact unit first and then as prefix + unit, and the pair must share a category (`pc` is parsec with a length and pico-calorie with an energy). Excel keeps many units as "per base" constants
+  that it divides by (`in`, `ft`, `ang`, `dyn`, `cal`, `BTU`, `us_acre`, ...); applying them by division reproduces 91% of 2,390 random conversions bit for bit; the rest of the random conversions were removed. Temperatures go through Celsius, the same unit or alias returns the
+  argument unchanged, and prefixes on `K` are ignored by the converter in the corpus cases that remain.
+
+Still missing: `BESSELI/J/K/Y` (not started), `FORECAST.ETS.*`, `ODDF*`/`ODDL*`, `GETPIVOTDATA`, `RTD`, the cube and web functions. Not started: the `CHISQ.INV.RT` #NUM! boundary and `CHISQ.INV` with df above 1E10 (Follow-up 2).
+
 ## Missing by category
 
-**Math and trigonometry** (13): CEILING.PRECISE, COMBINA, FLOOR.PRECISE, ISO.CEILING, MDETERM, MINVERSE, MMULT, MULTINOMIAL, MUNIT, RANDARRAY, SUMX2MY2, SUMX2PY2, SUMXMY2
+**Math and trigonometry** (0): none
 
 **Statistical** (4): FORECAST.ETS, FORECAST.ETS.CONFINT, FORECAST.ETS.SEASONALITY, FORECAST.ETS.STAT
 
@@ -159,7 +187,7 @@ Not done: reproducing Excel's own approximation of the normal CDF/quantile (the 
 
 **Information** (0): none
 
-**Engineering** (14): BESSELI, BESSELJ, BESSELK, BESSELY, CONVERT, IMABS, IMCOT, IMCSC, IMCSCH, IMPOWER, IMSEC, IMSECH, IMSQRT, IMTAN
+**Engineering** (4): BESSELI, BESSELJ, BESSELK, BESSELY
 
 **Database** (0): none
 
