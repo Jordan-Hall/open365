@@ -1,0 +1,5 @@
+feature = "grid-nav"
+made_with = "Microsoft Excel 20430 (Windows)"
+author = "project member"
+expect_dropped = []
+notes = "blocks of values with gaps, hidden rows and columns, a merged cell, a formatted-only cell, a formula returning an empty string; frozen panes"

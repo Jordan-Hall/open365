@@ -17,7 +17,7 @@ use std::path::PathBuf;
 
 pub use app::{App, print_command};
 pub use doc_view::{DocPos, DocView, Toggle};
-pub use grid_view::{GridView, PaintedCell};
+pub use grid_view::{GridView, PaintedCell, Resize};
 
 /// Opens the main window and runs until it closes. `initial` is a file to open at start-up.
 pub fn run(initial: Option<PathBuf>) -> eframe::Result {

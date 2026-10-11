@@ -102,6 +102,19 @@ impl HintedFace {
     }
 }
 
+/// Height in pixels of one line of `data` at `ppem`, as GDI reports it: the Windows ascent and
+/// descent scaled and rounded one by one.
+pub(crate) fn line_px(data: &FontData, ppem: u32) -> Option<u32> {
+    use skrifa::raw::TableProvider as _;
+    let font = skrifa::FontRef::from_index(&data.font, data.index).ok()?;
+    let os2 = font.os2().ok()?;
+    let upm = f32::from(font.head().ok()?.units_per_em());
+    let scale = ppem.max(1) as f32 / upm;
+    let ascent = (f32::from(os2.us_win_ascent()) * scale).round();
+    let descent = (f32::from(os2.us_win_descent()) * scale).round();
+    Some((ascent + descent) as u32)
+}
+
 /// Hinted faces by font data and pixel size.
 #[derive(Default)]
 pub(crate) struct HintCache {
@@ -199,7 +212,6 @@ pub(crate) enum NumberText {
 }
 
 impl NumberText {
-    #[cfg(test)]
     pub fn into_string(self) -> String {
         match self {
             Self::Text(s) | Self::Hashes(s) => s,
