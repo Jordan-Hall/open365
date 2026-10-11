@@ -1,0 +1,7 @@
+# base tbledit-base-merged
+# op Tables(1).ConvertToText(wdSeparateByTabs)
+p	Before
+p	span12\tc3
+p	vtop\tb2\tc2
+p	\tb3\tc3b
+p	After

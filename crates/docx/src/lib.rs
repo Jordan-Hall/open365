@@ -27,6 +27,7 @@ mod section;
 mod settings;
 mod styles;
 mod table;
+mod table_edit;
 mod track;
 mod xml;
 mod xmlq;
@@ -68,11 +69,13 @@ pub use styles::{
     EffectiveParagraph, EffectiveRun, LineSpacing, StyleInfo, StyleKind, Styles, TableCellFormat,
     ThemeFonts,
 };
+pub use table::AutoFitMode;
 pub use table::{
     Border, BorderSet, CellMargins, CellPosition, CellProps, CellView, HeightRule, RowProps,
     RowView, Shading, TableJustification, TableLayoutType, TableLook, TableProps,
     TableStyleCondition, TableView, TableWidth, VerticalAlign, VerticalMerge,
 };
+pub use table_edit::{BorderSide, ColumnAdjust, ColumnSide, RowSide, TextSeparator};
 pub use xml::{
     Attr, ElementHead, MAX_XML_DEPTH, ParsedXml, RawXml, W_NS, W_NS_STRICT, XmlElement,
     parse as parse_xml,

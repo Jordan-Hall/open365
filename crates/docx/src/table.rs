@@ -653,6 +653,61 @@ pub struct CellView<'a> {
     pub row_span: usize,
 }
 
+/// How a table is sized (Word's Table Properties > AutoFit). A model-level reading of
+/// `w:tblLayout`, `w:tblW` and the cell width types; [`crate::Document::set_table_autofit`]
+/// writes the combinations Word writes (measured with `tools/office/table-edit-oracle.ps1`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AutoFitMode {
+    /// Fixed column width: `w:tblLayout` fixed, or automatic layout with widths in twips
+    /// (what a new table has).
+    Fixed,
+    /// AutoFit to contents: automatic table width and automatic (`auto`) cell widths.
+    Content,
+    /// AutoFit to window: the table width is a percentage of the text area.
+    Window,
+}
+
+impl Table {
+    /// Grid column widths in twips (`w:tblGrid`), exactly as written.
+    pub fn grid_twips(&self) -> Vec<i64> {
+        self.children
+            .iter()
+            .find_map(|c| match c {
+                TableChild::Raw(RawXml::Element(e)) if e.head.is_w("tblGrid") => Some(e),
+                _ => None,
+            })
+            .map(|g| {
+                children(g, "gridCol")
+                    .map(|c| int(c.head.attr_w("w")).unwrap_or(0))
+                    .collect()
+            })
+            .unwrap_or_default()
+    }
+
+    /// The table's sizing mode (see [`AutoFitMode`]).
+    pub fn autofit_mode(&self) -> AutoFitMode {
+        let props = self.properties();
+        if props.layout == Some(TableLayoutType::Fixed) {
+            return AutoFitMode::Fixed;
+        }
+        if matches!(props.width, Some(TableWidth::Percent(_))) {
+            return AutoFitMode::Window;
+        }
+        let mut any = false;
+        let all_auto = self.rows().all(|r| {
+            r.cells().all(|c| {
+                any = true;
+                matches!(c.properties().width, None | Some(TableWidth::Auto))
+            })
+        });
+        if any && all_auto && matches!(props.width, None | Some(TableWidth::Auto)) {
+            AutoFitMode::Content
+        } else {
+            AutoFitMode::Fixed
+        }
+    }
+}
+
 /// Position of a cell in its table, for conditional formatting.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CellPosition {

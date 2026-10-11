@@ -1,0 +1,18 @@
+# base tbledit-base-empty
+# op Tables.Add(range, 3, 3)
+p	Before
+tbl	0	grid=3120,3120,3120	rows=3	pr=tblPr{tblW(type=auto,w=0) tblLayout(type=fixed) tblLook(firstColumn=0,firstRow=0,lastColumn=0,lastRow=0,noHBand=0,noVBand=0,val=0000)}
+row	0	pr=-	ex=tblPrEx{tblCellMar{top(type=dxa,w=0) bottom(type=dxa,w=0)}}
+cell	0	0	pr=tcPr{tcW(type=dxa,w=3120)}	ppr=-	txt=
+cell	0	1	pr=tcPr{tcW(type=dxa,w=3120)}	ppr=-	txt=
+cell	0	2	pr=tcPr{tcW(type=dxa,w=3120)}	ppr=-	txt=
+row	1	pr=-	ex=tblPrEx{tblCellMar{top(type=dxa,w=0) bottom(type=dxa,w=0)}}
+cell	1	0	pr=tcPr{tcW(type=dxa,w=3120)}	ppr=-	txt=
+cell	1	1	pr=tcPr{tcW(type=dxa,w=3120)}	ppr=-	txt=
+cell	1	2	pr=tcPr{tcW(type=dxa,w=3120)}	ppr=-	txt=
+row	2	pr=-	ex=tblPrEx{tblCellMar{top(type=dxa,w=0) bottom(type=dxa,w=0)}}
+cell	2	0	pr=tcPr{tcW(type=dxa,w=3120)}	ppr=-	txt=
+cell	2	1	pr=tcPr{tcW(type=dxa,w=3120)}	ppr=-	txt=
+cell	2	2	pr=tcPr{tcW(type=dxa,w=3120)}	ppr=-	txt=
+p	
+p	After

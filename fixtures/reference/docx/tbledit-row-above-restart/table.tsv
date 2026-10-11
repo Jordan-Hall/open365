@@ -1,0 +1,20 @@
+# base tbledit-base-merged
+# op InsertRowsAbove(1) in cell (2,2): the row where a vertical merge restarts
+p	Before
+tbl	0	grid=3116,3117,3117	rows=4	pr=tblPr{tblStyle(val=TableGrid) tblW(type=auto,w=0) tblLook(firstColumn=1,firstRow=1,lastColumn=0,lastRow=0,noHBand=0,noVBand=1,val=04A0)}
+row	0	pr=-	ex=-
+cell	0	0	pr=tcPr{tcW(type=dxa,w=6233) gridSpan(val=2)}	ppr=-	txt=span12
+cell	0	1	pr=tcPr{tcW(type=dxa,w=3117)}	ppr=-	txt=c3
+row	1	pr=-	ex=-
+cell	1	0	pr=tcPr{tcW(type=dxa,w=3116)}	ppr=-	txt=
+cell	1	1	pr=tcPr{tcW(type=dxa,w=3117)}	ppr=-	txt=
+cell	1	2	pr=tcPr{tcW(type=dxa,w=3117)}	ppr=-	txt=
+row	2	pr=-	ex=-
+cell	2	0	pr=tcPr{tcW(type=dxa,w=3116) vMerge(val=restart)}	ppr=-	txt=vtop
+cell	2	1	pr=tcPr{tcW(type=dxa,w=3117)}	ppr=-	txt=b2
+cell	2	2	pr=tcPr{tcW(type=dxa,w=3117)}	ppr=-	txt=c2
+row	3	pr=-	ex=-
+cell	3	0	pr=tcPr{tcW(type=dxa,w=3116) vMerge}	ppr=-	txt=
+cell	3	1	pr=tcPr{tcW(type=dxa,w=3117)}	ppr=-	txt=b3
+cell	3	2	pr=tcPr{tcW(type=dxa,w=3117)}	ppr=-	txt=c3b
+p	After

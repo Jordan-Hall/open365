@@ -1,0 +1,7 @@
+# base tbledit-base-grid3x3
+# op Tables(1).ConvertToText(wdSeparateByCommas)
+p	Before
+p	r1c1, r1c2, r1c3
+p	r2c1, r2c2, r2c3
+p	r3c1, r3c2, r3c3
+p	After

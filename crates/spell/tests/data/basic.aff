@@ -1,0 +1,49 @@
+# Hand-made fixture exercising the core Hunspell affix features. Public domain.
+SET UTF-8
+LANG en
+TRY esianrtolcdugmphbyfvkwz'
+KEY qwertyuiop|asdfghjkl|zxcvbnm
+WORDCHARS '
+NOSUGGEST !
+FORBIDDENWORD X
+KEEPCASE K
+NEEDAFFIX N
+
+ICONV 1
+ICONV ’ '
+OCONV 1
+OCONV ' ’
+
+REP 3
+REP ie ei
+REP f ph
+REP shun tion
+
+MAP 1
+MAP eé
+
+# un- prefix, crossable with suffixes
+PFX A Y 1
+PFX A 0 un .
+
+# plural / third person
+SFX S Y 4
+SFX S y ies [^aeiou]y
+SFX S 0 es [sxz]
+SFX S 0 s [aeiou]y
+SFX S 0 s [^sxzy]
+
+# past tense
+SFX D Y 3
+SFX D 0 d e
+SFX D y ied [^aeiou]y
+SFX D 0 ed [^ey]
+
+# present participle
+SFX G Y 2
+SFX G e ing e
+SFX G 0 ing [^e]
+
+# agent noun; its own plural is allowed through the continuation flag S
+SFX R Y 1
+SFX R 0 er/S .

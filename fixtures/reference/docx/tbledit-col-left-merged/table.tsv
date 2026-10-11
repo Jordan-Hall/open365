@@ -1,0 +1,19 @@
+# base tbledit-base-merged
+# op InsertColumns (left) in column 2 (row 2)
+p	Before
+tbl	0	grid=3115,3117,3117,3117,3117	rows=3	pr=tblPr{tblStyle(val=TableGrid) tblW(type=dxa,w=15583) tblLook(firstColumn=1,firstRow=1,lastColumn=0,lastRow=0,noHBand=0,noVBand=1,val=04A0)}
+row	0	pr=-	ex=-
+cell	0	0	pr=tcPr{tcW(type=dxa,w=6233) gridSpan(val=2)}	ppr=-	txt=
+cell	0	1	pr=tcPr{tcW(type=dxa,w=6233) gridSpan(val=2)}	ppr=-	txt=span12
+cell	0	2	pr=tcPr{tcW(type=dxa,w=3117)}	ppr=-	txt=c3
+row	1	pr=trPr{gridAfter(val=1) wAfter(type=dxa,w=3117)}	ex=-
+cell	1	0	pr=tcPr{tcW(type=dxa,w=3116)}	ppr=-	txt=
+cell	1	1	pr=tcPr{tcW(type=dxa,w=3116) vMerge(val=restart)}	ppr=-	txt=vtop
+cell	1	2	pr=tcPr{tcW(type=dxa,w=3117)}	ppr=-	txt=b2
+cell	1	3	pr=tcPr{tcW(type=dxa,w=3117)}	ppr=-	txt=c2
+row	2	pr=trPr{gridAfter(val=1) wAfter(type=dxa,w=3117)}	ex=-
+cell	2	0	pr=tcPr{tcW(type=dxa,w=3116)}	ppr=-	txt=
+cell	2	1	pr=tcPr{tcW(type=dxa,w=3116) vMerge}	ppr=-	txt=
+cell	2	2	pr=tcPr{tcW(type=dxa,w=3117)}	ppr=-	txt=b3
+cell	2	3	pr=tcPr{tcW(type=dxa,w=3117)}	ppr=-	txt=c3b
+p	After

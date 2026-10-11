@@ -1,0 +1,7 @@
+# base tbledit-base-grid3x3
+# op Cell(1,1).Merge(Cell(3,3))
+p	Before
+tbl	0	grid=9350	rows=1	pr=tblPr{tblStyle(val=TableGrid) tblW(type=auto,w=0) tblLook(firstColumn=1,firstRow=1,lastColumn=0,lastRow=0,noHBand=0,noVBand=1,val=04A0)}
+row	0	pr=trPr{trHeight(val=816)}	ex=-
+cell	0	0	pr=tcPr{tcW(type=dxa,w=9350)}	ppr=-	txt=r1c1\u00b6r1c2\u00b6r1c3\u00b6r2c1\u00b6r2c2\u00b6r2c3\u00b6r3c1\u00b6r3c2\u00b6r3c3
+p	After

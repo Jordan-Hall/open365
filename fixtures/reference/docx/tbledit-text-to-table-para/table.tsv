@@ -1,0 +1,11 @@
+# base tbledit-base-lines-plain
+# op Range(paragraphs 2-5).ConvertToTable(wdSeparateByParagraphs, 2, 2, ..., fixed, Word9)
+p	Before
+tbl	0	grid=4675,4675	rows=2	pr=tblPr{tblStyle(val=TableGrid) tblW(type=auto,w=0) tblLook(firstColumn=1,firstRow=1,lastColumn=0,lastRow=0,noHBand=0,noVBand=1,val=04A0)}
+row	0	pr=-	ex=-
+cell	0	0	pr=tcPr{tcW(type=dxa,w=4675)}	ppr=-	txt=one
+cell	0	1	pr=tcPr{tcW(type=dxa,w=4675)}	ppr=-	txt=two
+row	1	pr=-	ex=-
+cell	1	0	pr=tcPr{tcW(type=dxa,w=4675)}	ppr=-	txt=three
+cell	1	1	pr=tcPr{tcW(type=dxa,w=4675)}	ppr=-	txt=four
+p	After

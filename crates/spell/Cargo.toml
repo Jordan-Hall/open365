@@ -1,0 +1,17 @@
+[package]
+name = "open365-spell"
+description = "Hunspell-compatible spell checker and suggester for Word and Excel proofing: clean-room affix, compound and suggestion engine, paragraph tokenizer and user dictionary."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+# Legacy single-byte .aff/.dic encodings (ISO-8859-x, KOI8, windows-125x). (Apache-2.0 OR MIT) AND BSD-3-Clause.
+encoding_rs = "0.8"
+# UAX #29 word boundaries for the paragraph tokenizer. MIT OR Apache-2.0.
+unicode-segmentation = "1.13"
+
+[lints]
+workspace = true

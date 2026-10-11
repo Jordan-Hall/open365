@@ -7,8 +7,10 @@ members = [
     "crates/docx",
     "crates/xlsx",
     "crates/chart",
+    "crates/pivot",
     "crates/calc",
     "crates/text",
+    "crates/spell",
     "crates/layout",
     "crates/pdf",
     "crates/commands",
@@ -33,8 +35,10 @@ open365-opc = { path = "crates/opc" }
 open365-docx = { path = "crates/docx" }
 open365-xlsx = { path = "crates/xlsx" }
 open365-chart = { path = "crates/chart" }
+open365-pivot = { path = "crates/pivot" }
 open365-calc = { path = "crates/calc" }
 open365-text = { path = "crates/text" }
+open365-spell = { path = "crates/spell" }
 open365-layout = { path = "crates/layout" }
 open365-pdf = { path = "crates/pdf" }
 open365-commands = { path = "crates/commands" }

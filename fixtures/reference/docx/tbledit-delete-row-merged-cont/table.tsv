@@ -1,0 +1,12 @@
+# base tbledit-base-merged
+# op Selection.Rows.Delete() in cell (3,2) (vertical merge continuation row)
+p	Before
+tbl	0	grid=3116,3117,3117	rows=2	pr=tblPr{tblStyle(val=TableGrid) tblW(type=auto,w=0) tblLook(firstColumn=1,firstRow=1,lastColumn=0,lastRow=0,noHBand=0,noVBand=1,val=04A0)}
+row	0	pr=-	ex=-
+cell	0	0	pr=tcPr{tcW(type=dxa,w=6233) gridSpan(val=2)}	ppr=-	txt=span12
+cell	0	1	pr=tcPr{tcW(type=dxa,w=3117)}	ppr=-	txt=c3
+row	1	pr=-	ex=-
+cell	1	0	pr=tcPr{tcW(type=dxa,w=3116)}	ppr=-	txt=vtop
+cell	1	1	pr=tcPr{tcW(type=dxa,w=3117)}	ppr=-	txt=b2
+cell	1	2	pr=tcPr{tcW(type=dxa,w=3117)}	ppr=-	txt=c2
+p	After
