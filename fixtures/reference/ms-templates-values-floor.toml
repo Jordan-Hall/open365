@@ -1,0 +1,746 @@
+# Per-template counts of Open365 vs Excel (values and text). Counts only; no template content.
+# Regenerate: OPEN365_UPDATE_FLOORS=1 cargo test -p open365-testkit --test ms_template_values
+
+[02f1e98d-bd90-4353-a769-f6709a432f3c]
+cells = 50
+formulas = 9
+values_matched = 49
+values_total = 49
+text_matched = 49
+text_total = 49
+formula_values_matched = 8
+formula_text_matched = 8
+volatile = 1
+narrow = 0
+
+[098a0353-643d-4b2e-9eac-ea919d7f3361]
+cells = 168
+formulas = 57
+values_matched = 165
+values_total = 165
+text_matched = 165
+text_total = 165
+formula_values_matched = 54
+formula_text_matched = 54
+volatile = 3
+narrow = 0
+
+[09eef93c-0551-4864-9f87-312b1e0b1eb2]
+cells = 51
+formulas = 24
+values_matched = 27
+values_total = 27
+text_matched = 27
+text_total = 27
+formula_values_matched = 0
+formula_text_matched = 0
+volatile = 24
+narrow = 0
+
+[0ffdef6d-9a19-4593-bdde-924d9e0aba2d]
+cells = 2413
+formulas = 2322
+values_matched = 287
+values_total = 2413
+text_matched = 287
+text_total = 2413
+formula_values_matched = 196
+formula_text_matched = 196
+volatile = 0
+narrow = 0
+
+[142337c5-35f0-4e42-ab85-0643840d738c]
+cells = 120
+formulas = 33
+values_matched = 120
+values_total = 120
+text_matched = 120
+text_total = 120
+formula_values_matched = 33
+formula_text_matched = 33
+volatile = 0
+narrow = 0
+
+[14a0058b-54c0-4793-b5e1-7d438e7bf2c2]
+cells = 603
+formulas = 601
+values_matched = 14
+values_total = 602
+text_matched = 26
+text_total = 602
+formula_values_matched = 12
+formula_text_matched = 24
+volatile = 1
+narrow = 0
+
+[1c4bd473-9f92-4725-926d-3f198b6152b4]
+cells = 158
+formulas = 80
+values_matched = 158
+values_total = 158
+text_matched = 158
+text_total = 158
+formula_values_matched = 80
+formula_text_matched = 80
+volatile = 0
+narrow = 0
+
+[1cbd5c5c-4e0d-41ba-981f-5d9dc99ffbf6]
+cells = 629
+formulas = 283
+values_matched = 582
+values_total = 629
+text_matched = 582
+text_total = 629
+formula_values_matched = 236
+formula_text_matched = 236
+volatile = 0
+narrow = 0
+
+[1ed52567-f187-484c-8bad-0ff5eb2f1e22]
+cells = 82
+formulas = 38
+values_matched = 82
+values_total = 82
+text_matched = 82
+text_total = 82
+formula_values_matched = 38
+formula_text_matched = 38
+volatile = 0
+narrow = 0
+
+[220529be-9f6e-483a-88f5-703eff93a9e7]
+cells = 470
+formulas = 463
+values_matched = 469
+values_total = 469
+text_matched = 457
+text_total = 469
+formula_values_matched = 462
+formula_text_matched = 450
+volatile = 1
+narrow = 0
+
+[2a72be1c-7be5-413d-b345-417c06878d3a]
+cells = 213
+formulas = 169
+values_matched = 79
+values_total = 198
+text_matched = 79
+text_total = 198
+formula_values_matched = 35
+formula_text_matched = 35
+volatile = 15
+narrow = 0
+
+[2f29bdf2-fcff-4e7a-a9de-9459eb8f1b98]
+cells = 76
+formulas = 0
+values_matched = 76
+values_total = 76
+text_matched = 76
+text_total = 76
+formula_values_matched = 0
+formula_text_matched = 0
+volatile = 0
+narrow = 0
+
+[31cdcf05-df3b-49ad-9932-71b89e4a0759]
+cells = 64
+formulas = 33
+values_matched = 64
+values_total = 64
+text_matched = 64
+text_total = 64
+formula_values_matched = 33
+formula_text_matched = 33
+volatile = 0
+narrow = 0
+
+[369564be-c72a-4eb8-a1f8-27dc5256c0ed]
+cells = 50
+formulas = 5
+values_matched = 49
+values_total = 49
+text_matched = 49
+text_total = 49
+formula_values_matched = 4
+formula_text_matched = 4
+volatile = 1
+narrow = 0
+
+[3e07a89b-bbd4-4998-892f-8b480e1fe7d4]
+cells = 85
+formulas = 47
+values_matched = 40
+values_total = 83
+text_matched = 40
+text_total = 83
+formula_values_matched = 2
+formula_text_matched = 2
+volatile = 2
+narrow = 0
+
+[48f98fd1-a81d-4d08-9d99-6cb0fa8c5b52]
+cells = 504
+formulas = 431
+values_matched = 504
+values_total = 504
+text_matched = 496
+text_total = 504
+formula_values_matched = 431
+formula_text_matched = 423
+volatile = 0
+narrow = 0
+
+[4b371a73-0346-4f26-a194-75ec59ca6c0e]
+cells = 186
+formulas = 87
+values_matched = 171
+values_total = 183
+text_matched = 171
+text_total = 183
+formula_values_matched = 72
+formula_text_matched = 72
+volatile = 3
+narrow = 0
+
+[4bf6b793-490f-4623-84ca-c9c6251a91fc]
+cells = 270
+formulas = 181
+values_matched = 249
+values_total = 269
+text_matched = 249
+text_total = 269
+formula_values_matched = 160
+formula_text_matched = 160
+volatile = 1
+narrow = 0
+
+[4eec2072-a2d7-43fe-baa2-1cc1ee4e84cc]
+cells = 50
+formulas = 22
+values_matched = 50
+values_total = 50
+text_matched = 50
+text_total = 50
+formula_values_matched = 22
+formula_text_matched = 22
+volatile = 0
+narrow = 0
+
+[502c3712-653b-42ab-8a75-4574f6040930]
+cells = 44
+formulas = 17
+values_matched = 44
+values_total = 44
+text_matched = 44
+text_total = 44
+formula_values_matched = 17
+formula_text_matched = 17
+volatile = 0
+narrow = 0
+
+[54d4fddf-e282-4682-8cd9-b8e56604e0e5]
+cells = 392
+formulas = 35
+values_matched = 392
+values_total = 392
+text_matched = 392
+text_total = 392
+formula_values_matched = 35
+formula_text_matched = 35
+volatile = 0
+narrow = 0
+
+[5673dfc3-6f8f-4810-b7e5-a90ae5ff1123]
+cells = 37
+formulas = 0
+values_matched = 37
+values_total = 37
+text_matched = 37
+text_total = 37
+formula_values_matched = 0
+formula_text_matched = 0
+volatile = 0
+narrow = 0
+
+[60c5b272-ef3b-44bb-babc-c0caea29057d]
+cells = 156
+formulas = 74
+values_matched = 156
+values_total = 156
+text_matched = 156
+text_total = 156
+formula_values_matched = 74
+formula_text_matched = 74
+volatile = 0
+narrow = 0
+
+[6667de34-e27d-4c5e-8a86-151e798da560]
+cells = 859
+formulas = 310
+values_matched = 859
+values_total = 859
+text_matched = 859
+text_total = 859
+formula_values_matched = 310
+formula_text_matched = 310
+volatile = 0
+narrow = 0
+
+[684d3472-ad1c-4b10-b8e7-6f0757115700]
+cells = 40
+formulas = 13
+values_matched = 35
+values_total = 35
+text_matched = 31
+text_total = 35
+formula_values_matched = 8
+formula_text_matched = 4
+volatile = 5
+narrow = 0
+
+[6aab7182-eafe-4373-8c7c-ca9b212ff512]
+cells = 80
+formulas = 24
+values_matched = 68
+values_total = 68
+text_matched = 68
+text_total = 68
+formula_values_matched = 12
+formula_text_matched = 12
+volatile = 12
+narrow = 0
+
+[6abb6cbd-cdaa-4f51-af17-796e15ea9c80]
+cells = 103
+formulas = 35
+values_matched = 103
+values_total = 103
+text_matched = 103
+text_total = 103
+formula_values_matched = 35
+formula_text_matched = 35
+volatile = 0
+narrow = 0
+
+[792c56ff-5931-4f2e-bbd3-a00d737f9b57]
+cells = 100
+formulas = 48
+values_matched = 100
+values_total = 100
+text_matched = 100
+text_total = 100
+formula_values_matched = 48
+formula_text_matched = 48
+volatile = 0
+narrow = 0
+
+[7c5c0318-8bc0-4ec9-8be3-2683dbf8adae]
+cells = 58
+formulas = 8
+values_matched = 57
+values_total = 57
+text_matched = 57
+text_total = 57
+formula_values_matched = 7
+formula_text_matched = 7
+volatile = 1
+narrow = 0
+
+[86466670-3e9e-4baa-a47b-7ddd073708d0]
+cells = 123
+formulas = 52
+values_matched = 99
+values_total = 111
+text_matched = 85
+text_total = 86
+formula_values_matched = 28
+formula_text_matched = 28
+volatile = 12
+narrow = 25
+
+[8c4be8ed-3202-4365-acfd-63ea7c279aeb]
+cells = 51
+formulas = 24
+values_matched = 27
+values_total = 27
+text_matched = 27
+text_total = 27
+formula_values_matched = 0
+formula_text_matched = 0
+volatile = 24
+narrow = 0
+
+[8eb8ecb2-3517-422f-a00d-cb63faea9048]
+cells = 511
+formulas = 105
+values_matched = 511
+values_total = 511
+text_matched = 452
+text_total = 511
+formula_values_matched = 105
+formula_text_matched = 46
+volatile = 0
+narrow = 0
+
+[90e1e4c9-80f7-4176-986d-c73167e6c0f0]
+cells = 1550
+formulas = 1523
+values_matched = 1549
+values_total = 1549
+text_matched = 1549
+text_total = 1549
+formula_values_matched = 1522
+formula_text_matched = 1522
+volatile = 1
+narrow = 0
+
+[91b9548b-6080-4dbc-bbe0-35bd56e81311]
+cells = 33
+formulas = 9
+values_matched = 27
+values_total = 27
+text_matched = 27
+text_total = 27
+formula_values_matched = 3
+formula_text_matched = 3
+volatile = 6
+narrow = 0
+
+[94d2de40-69ce-4a0f-bce8-5a38b9cd710a]
+cells = 79
+formulas = 18
+values_matched = 74
+values_total = 79
+text_matched = 74
+text_total = 79
+formula_values_matched = 13
+formula_text_matched = 13
+volatile = 0
+narrow = 0
+
+[94db67f1-b638-4ed2-a9a2-e77a9221d8db]
+cells = 43
+formulas = 5
+values_matched = 42
+values_total = 42
+text_matched = 33
+text_total = 33
+formula_values_matched = 4
+formula_text_matched = 1
+volatile = 1
+narrow = 9
+
+[97739ac3-cc1c-40fb-8682-f809e067145e]
+cells = 145
+formulas = 101
+values_matched = 52
+values_total = 144
+text_matched = 52
+text_total = 144
+formula_values_matched = 8
+formula_text_matched = 8
+volatile = 1
+narrow = 0
+
+[9ac62cd3-d82b-412b-a9d0-66bda0b70165]
+cells = 65
+formulas = 1
+values_matched = 64
+values_total = 64
+text_matched = 63
+text_total = 63
+formula_values_matched = 0
+formula_text_matched = 0
+volatile = 1
+narrow = 1
+
+[9d91ef48-a0d0-41b8-9ae0-4d9b6033dd6e]
+cells = 50
+formulas = 22
+values_matched = 50
+values_total = 50
+text_matched = 50
+text_total = 50
+formula_values_matched = 22
+formula_text_matched = 22
+volatile = 0
+narrow = 0
+
+[9e1c479f-d30e-46d3-a816-131e292c12e9]
+cells = 44
+formulas = 14
+values_matched = 38
+values_total = 38
+text_matched = 38
+text_total = 38
+formula_values_matched = 8
+formula_text_matched = 8
+volatile = 6
+narrow = 0
+
+[a146c834-f9db-4f07-9545-eb00257688cb]
+cells = 52
+formulas = 6
+values_matched = 46
+values_total = 51
+text_matched = 46
+text_total = 51
+formula_values_matched = 0
+formula_text_matched = 0
+volatile = 1
+narrow = 0
+
+[ab449fed-18a0-4af2-844b-0beecceecf83]
+cells = 110
+formulas = 0
+values_matched = 110
+values_total = 110
+text_matched = 110
+text_total = 110
+formula_values_matched = 0
+formula_text_matched = 0
+volatile = 0
+narrow = 0
+
+[b0a247ff-298f-400f-9d2b-e6be95011bc1]
+cells = 132
+formulas = 63
+values_matched = 132
+values_total = 132
+text_matched = 132
+text_total = 132
+formula_values_matched = 63
+formula_text_matched = 63
+volatile = 0
+narrow = 0
+
+[b1eea1e2-2c33-4a7b-bf0f-b9e2f88f1d6e]
+cells = 581
+formulas = 541
+values_matched = 208
+values_total = 580
+text_matched = 208
+text_total = 580
+formula_values_matched = 168
+formula_text_matched = 168
+volatile = 1
+narrow = 0
+
+[b6c07597-04ed-458a-93ef-786081eb4999]
+cells = 627
+formulas = 245
+values_matched = 627
+values_total = 627
+text_matched = 627
+text_total = 627
+formula_values_matched = 245
+formula_text_matched = 245
+volatile = 0
+narrow = 0
+
+[b795847d-eab5-40e7-b041-63c454160fc7]
+cells = 91
+formulas = 20
+values_matched = 91
+values_total = 91
+text_matched = 91
+text_total = 91
+formula_values_matched = 20
+formula_text_matched = 20
+volatile = 0
+narrow = 0
+
+[b86f671c-8d23-4af3-84ee-5d1d9fd9b07f]
+cells = 31
+formulas = 0
+values_matched = 31
+values_total = 31
+text_matched = 31
+text_total = 31
+formula_values_matched = 0
+formula_text_matched = 0
+volatile = 0
+narrow = 0
+
+[ba55235e-4140-4e28-abf8-bb45d8db4934]
+cells = 65
+formulas = 20
+values_matched = 65
+values_total = 65
+text_matched = 40
+text_total = 49
+formula_values_matched = 20
+formula_text_matched = 0
+volatile = 0
+narrow = 16
+
+[c2b640a6-8ee1-4258-9669-a8ab0b41240f]
+cells = 330
+formulas = 67
+values_matched = 330
+values_total = 330
+text_matched = 330
+text_total = 330
+formula_values_matched = 67
+formula_text_matched = 67
+volatile = 0
+narrow = 0
+
+[cc4028ec-32a3-4310-9127-8050fd0e7c05]
+cells = 53
+formulas = 8
+values_matched = 52
+values_total = 52
+text_matched = 52
+text_total = 52
+formula_values_matched = 7
+formula_text_matched = 7
+volatile = 1
+narrow = 0
+
+[cc8dfa38-e399-4f59-9f4b-03eb2c124f9d]
+cells = 50
+formulas = 5
+values_matched = 49
+values_total = 49
+text_matched = 49
+text_total = 49
+formula_values_matched = 4
+formula_text_matched = 4
+volatile = 1
+narrow = 0
+
+[cc8f8a79-96c3-4a3f-9398-5fdcfa9b27e9]
+cells = 69
+formulas = 10
+values_matched = 68
+values_total = 68
+text_matched = 65
+text_total = 65
+formula_values_matched = 9
+formula_text_matched = 9
+volatile = 1
+narrow = 3
+
+[d14f83e2-f49d-4080-9e95-0bd4849fa63f]
+cells = 1170
+formulas = 554
+values_matched = 1167
+values_total = 1170
+text_matched = 1155
+text_total = 1158
+formula_values_matched = 551
+formula_text_matched = 551
+volatile = 0
+narrow = 12
+
+[d75b85c4-1d95-41cf-a47e-81b8c0907101]
+cells = 80
+formulas = 25
+values_matched = 79
+values_total = 79
+text_matched = 55
+text_total = 55
+formula_values_matched = 24
+formula_text_matched = 0
+volatile = 1
+narrow = 24
+
+[d8df692e-a5b8-41b7-8c6e-65a38009a5ab]
+cells = 270
+formulas = 109
+values_matched = 270
+values_total = 270
+text_matched = 270
+text_total = 270
+formula_values_matched = 109
+formula_text_matched = 109
+volatile = 0
+narrow = 0
+
+[dcb1bbfe-6172-435d-bb30-3d21de287a1a]
+cells = 33
+formulas = 4
+values_matched = 33
+values_total = 33
+text_matched = 32
+text_total = 33
+formula_values_matched = 4
+formula_text_matched = 3
+volatile = 0
+narrow = 0
+
+[de27afd1-55a2-404a-af1b-0e4de8fefd24]
+cells = 76
+formulas = 34
+values_matched = 57
+values_total = 66
+text_matched = 57
+text_total = 66
+formula_values_matched = 15
+formula_text_matched = 15
+volatile = 10
+narrow = 0
+
+[e6ae6c3f-7542-4b5a-80ce-d131a04ae548]
+cells = 140
+formulas = 23
+values_matched = 138
+values_total = 140
+text_matched = 108
+text_total = 117
+formula_values_matched = 21
+formula_text_matched = 2
+volatile = 0
+narrow = 23
+
+[ebcaa05b-2f6c-4bb7-8e88-d33225dc8ec7]
+cells = 173
+formulas = 5
+values_matched = 172
+values_total = 173
+text_matched = 172
+text_total = 173
+formula_values_matched = 4
+formula_text_matched = 4
+volatile = 0
+narrow = 0
+
+[f4999261-76bc-4806-a05c-0120522311a2]
+cells = 57
+formulas = 2
+values_matched = 57
+values_total = 57
+text_matched = 57
+text_total = 57
+formula_values_matched = 2
+formula_text_matched = 2
+volatile = 0
+narrow = 0
+
+[f5e29f68-524f-4e52-9b09-e68871fc720b]
+cells = 1131
+formulas = 576
+values_matched = 1130
+values_total = 1130
+text_matched = 1130
+text_total = 1130
+formula_values_matched = 575
+formula_text_matched = 575
+volatile = 1
+narrow = 0
+
+[f79af0fb-8ddb-4dfa-aae1-22f8ae7de1e3]
+cells = 51
+formulas = 22
+values_matched = 51
+values_total = 51
+text_matched = 51
+text_total = 51
+formula_values_matched = 22
+formula_text_matched = 22
+volatile = 0
+narrow = 0
