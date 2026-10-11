@@ -4,7 +4,7 @@
 mod common;
 
 use open365_opc::Limits;
-use open365_xlsx::{CellValue, FormulaKind, Workbook, cell_ref_string, parse_cell_ref};
+use open365_xlsx::{ArrayRole, CellValue, FormulaKind, Workbook, cell_ref_string, parse_cell_ref};
 use serde_json::Value;
 
 use common::{fixture, fixtures, repo_root};
@@ -162,14 +162,32 @@ fn every_formula_reads_as_excel_reports_it() {
                     continue;
                 };
                 let (row, col) = parse_cell_ref(reference).expect("A1 key");
+                let ws = wb.sheet(i).expect("sheet");
+                // Excel reports an array member's formula as the master's.
+                let (qr, qc) = match ws.array_role(row, col) {
+                    Some(ArrayRole::Member { master }) => {
+                        assert_eq!(wb.formula_text(i, row, col), None, "{name}!{reference}");
+                        master
+                    }
+                    _ => (row, col),
+                };
                 let text = wb
-                    .formula_text(i, row, col)
+                    .formula_text(i, qr, qc)
                     .unwrap_or_else(|| panic!("{name}!{reference}: no formula"))
                     .replace("_xlfn.", "");
                 if text.starts_with("[1]") {
                     // External workbooks are stored as an index into externalLink parts;
                     // Excel reports the resolved path. Resolving is out of scope here.
                     external += 1;
+                    continue;
+                }
+                // Structured references are stored with the table name; Excel reports
+                // them in the short form (`[Qty]`, `[@Qty]`). Compared in model.rs.
+                if ws
+                    .tables()
+                    .iter()
+                    .any(|t| text.contains(&format!("{}[", t.name)))
+                {
                     continue;
                 }
                 assert_eq!(format!("={text}"), excel, "{name}!{reference}");

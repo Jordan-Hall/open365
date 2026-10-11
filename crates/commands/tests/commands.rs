@@ -865,7 +865,7 @@ fn resize_limits_follow_excel_and_a_refused_command_changes_nothing() {
             "{width}"
         );
     }
-    for points in [-1.0, 409.5] {
+    for points in [-1.0, 409.6] {
         let c = Command::SetRowHeight {
             sheet: 0,
             first: 1,
@@ -877,7 +877,7 @@ fn resize_limits_follow_excel_and_a_refused_command_changes_nothing() {
     assert_eq!(t.audit_log().commands().len(), before);
     assert!(!t.is_dirty());
     assert!(!t.can_undo());
-    for (width, points) in [(0.0, 0.0), (255.0, 409.0)] {
+    for (width, points) in [(0.0, 0.0), (255.0, 409.5)] {
         apply(
             &mut t,
             Command::SetColumnWidth {
@@ -957,4 +957,16 @@ fn resized_workbook_saves_and_reopens_with_the_sizes() {
     assert_eq!(width_of(&r, 5), Some(18.0));
     assert_eq!(width_of(&r, 6), Some(18.0));
     assert_eq!(height_of(&r, 4), Some(27.0));
+}
+
+#[test]
+fn array_members_keep_cached_values_and_shared_formulas_recalculate() {
+    let mut t = Target::open_path(&fixture("xlsx/model-arrays.xlsx")).expect("open xlsx");
+    apply(&mut t, set_number(0, 12, 1, 10.0)).expect("edit");
+    assert_eq!(number(&t, 12, 2), 21.0);
+    assert_eq!(number(&t, 15, 2), 9.0);
+    let wb = t.xlsx().expect("xlsx");
+    // E4 belongs to the array D4:F4: no formula of its own, cached value untouched.
+    assert_eq!(wb.formula_text(0, 4, 5), None);
+    assert_eq!(number(&t, 4, 5), 4.0);
 }

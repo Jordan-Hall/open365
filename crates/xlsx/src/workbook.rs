@@ -15,6 +15,7 @@ use crate::sheet::{
 };
 use crate::sst::SharedStrings;
 use crate::styles::Styles;
+use crate::tables::Table;
 use crate::xml::{self, Attr, RawXml, XmlElement};
 
 const OFFICE_DOCUMENT_TYPES: [&str; 2] = [
@@ -131,6 +132,15 @@ pub struct DefinedName {
     pub hidden: bool,
     /// The formula text, without `=`.
     pub formula: String,
+    /// The `comment` attribute.
+    pub comment: Option<String>,
+}
+
+impl DefinedName {
+    /// True when the name is scoped to a sheet (`localSheetId`).
+    pub fn is_sheet_scoped(&self) -> bool {
+        self.local_sheet_id.is_some()
+    }
 }
 
 /// What a caller can put in a cell.
@@ -318,6 +328,28 @@ impl Workbook {
             }
         }
 
+        for entry in &mut sheets {
+            let Some(ws) = entry.data.as_mut() else {
+                continue;
+            };
+            let Some(rels) = package.part(rels_part_name(Some(&entry.part)).as_str()) else {
+                continue;
+            };
+            let Ok(rels) = Relationships::parse(rels.data()) else {
+                continue;
+            };
+            let tables = rels
+                .iter()
+                .filter(|r| r.target_mode == TargetMode::Internal && r.rel_type.ends_with("/table"))
+                .filter_map(|r| {
+                    let name = resolve_target(Some(&entry.part), &r.target).ok()?;
+                    let part = package.part(name.as_str())?;
+                    Table::parse(part.name().as_str(), part.data())
+                })
+                .collect();
+            ws.set_tables(tables);
+        }
+
         let defined_names = parsed
             .root
             .child_main("definedNames")
@@ -334,6 +366,7 @@ impl Workbook {
                                 .and_then(|v| v.trim().parse().ok()),
                             hidden: e.head.attr("hidden").is_some_and(is_true),
                             formula: e.own_text(),
+                            comment: e.head.attr("comment").map(str::to_owned),
                         })
                     })
                     .collect()
@@ -454,8 +487,44 @@ impl Workbook {
         self.sheet(sheet)?.formula_text(row, col)
     }
 
+    /// Every defined name, in file order (workbook- and sheet-scoped).
     pub fn defined_names(&self) -> &[DefinedName] {
         &self.defined_names
+    }
+
+    /// Names scoped to sheet `sheet` (`localSheetId`).
+    pub fn sheet_defined_names(&self, sheet: usize) -> impl Iterator<Item = &DefinedName> {
+        self.defined_names
+            .iter()
+            .filter(move |n| n.local_sheet_id.and_then(|i| usize::try_from(i).ok()) == Some(sheet))
+    }
+
+    /// Looks a name up the way Excel resolves it from `sheet`: the sheet-scoped name
+    /// first, then the workbook-scoped one (case-insensitive).
+    pub fn resolve_defined_name(&self, sheet: usize, name: &str) -> Option<&DefinedName> {
+        self.sheet_defined_names(sheet)
+            .find(|n| n.name.eq_ignore_ascii_case(name))
+            .or_else(|| {
+                self.defined_names
+                    .iter()
+                    .find(|n| n.local_sheet_id.is_none() && n.name.eq_ignore_ascii_case(name))
+            })
+    }
+
+    /// Every table of every worksheet as `(sheet index, table)`.
+    pub fn tables(&self) -> impl Iterator<Item = (usize, &Table)> {
+        (0..self.sheets.len()).flat_map(|i| {
+            self.sheet(i)
+                .into_iter()
+                .flat_map(move |ws| ws.tables().iter().map(move |t| (i, t)))
+        })
+    }
+
+    /// A table by name or display name (case-insensitive).
+    pub fn table_by_name(&self, name: &str) -> Option<(usize, &Table)> {
+        self.tables().find(|(_, t)| {
+            t.name.eq_ignore_ascii_case(name) || t.display_name.eq_ignore_ascii_case(name)
+        })
     }
 
     /// True when dates count from 1904 (`workbookPr date1904`).
@@ -594,7 +663,7 @@ impl Workbook {
         Ok(())
     }
 
-    /// Sets the height in points (0..=409) of rows `first..=last` and returns the previous
+    /// Sets the height in points (0..=409.5) of rows `first..=last` and returns the previous
     /// state for [`Self::restore_row_heights`]. A height of 0 hides the rows and a positive
     /// height shows them; every row at once sets the sheet's default row height. Only that
     /// sheet's part changes.

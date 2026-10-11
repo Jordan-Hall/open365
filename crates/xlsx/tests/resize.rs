@@ -209,7 +209,7 @@ fn limits_and_ranges_are_validated_without_changing_anything() {
             Err(XlsxError::UnsupportedEdit(_))
         ));
     }
-    for points in [-1.0, 409.5, f64::NAN] {
+    for points in [-1.0, 409.6, f64::NAN] {
         assert!(wb.set_row_height(0, 1, 1, points).is_err());
     }
     assert!(wb.set_column_width(0, 0, 1, 5.0).is_err());
@@ -228,7 +228,7 @@ fn limits_and_ranges_are_validated_without_changing_anything() {
     wb.set_column_width(0, 1, 1, 0.0).expect("0");
     wb.set_column_width(0, 1, 1, 255.0).expect("255");
     wb.set_row_height(0, 1, 1, 0.0).expect("0");
-    wb.set_row_height(0, 1, 1, 409.0).expect("409");
+    wb.set_row_height(0, 1, 1, 409.5).expect("409.5");
     assert_ne!(sheet_text(&mut wb), before);
 }
 

@@ -123,7 +123,7 @@ pub enum Command {
         last: u32,
         width: f64,
     },
-    /// Sets the height of rows `first..=last` (1-based, inclusive) in points: 0..=409.
+    /// Sets the height of rows `first..=last` (1-based, inclusive) in points: 0..=409.5.
     SetRowHeight {
         sheet: usize,
         first: u32,

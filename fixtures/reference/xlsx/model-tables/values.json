@@ -1,0 +1,186 @@
+{
+  "source": "fixtures/xlsx/model-tables.xlsx",
+  "sheets": [
+    {
+      "name": "Data",
+      "visible": -1,
+      "usedRange": "A1:D7",
+      "truncatedAt2000": false,
+      "cells": {
+        "A1": {
+          "value2": "Item",
+          "text": "Item",
+          "formula": null
+        },
+        "B1": {
+          "value2": "Qty",
+          "text": "Qty",
+          "formula": null
+        },
+        "C1": {
+          "value2": "Price",
+          "text": "Price",
+          "formula": null
+        },
+        "D1": {
+          "value2": "Total",
+          "text": "Total",
+          "formula": null
+        },
+        "A2": {
+          "value2": "pen",
+          "text": "pen",
+          "formula": null
+        },
+        "B2": {
+          "value2": 1.0,
+          "text": "1",
+          "formula": null
+        },
+        "C2": {
+          "value2": 1.5,
+          "text": "1.5",
+          "formula": null
+        },
+        "D2": {
+          "value2": 1.5,
+          "text": "1.5",
+          "formula": "=[@Qty]*[@Price]"
+        },
+        "A3": {
+          "value2": "ink",
+          "text": "ink",
+          "formula": null
+        },
+        "B3": {
+          "value2": 2.0,
+          "text": "2",
+          "formula": null
+        },
+        "C3": {
+          "value2": 3.0,
+          "text": "3",
+          "formula": null
+        },
+        "D3": {
+          "value2": 6.0,
+          "text": "6",
+          "formula": "=[@Qty]*[@Price]"
+        },
+        "A4": {
+          "value2": "pad",
+          "text": "pad",
+          "formula": null
+        },
+        "B4": {
+          "value2": 3.0,
+          "text": "3",
+          "formula": null
+        },
+        "C4": {
+          "value2": 4.5,
+          "text": "4.5",
+          "formula": null
+        },
+        "D4": {
+          "value2": 13.5,
+          "text": "13.5",
+          "formula": "=[@Qty]*[@Price]"
+        },
+        "A5": {
+          "value2": "cap",
+          "text": "cap",
+          "formula": null
+        },
+        "B5": {
+          "value2": 4.0,
+          "text": "4",
+          "formula": null
+        },
+        "C5": {
+          "value2": 6.0,
+          "text": "6",
+          "formula": null
+        },
+        "D5": {
+          "value2": 24.0,
+          "text": "24",
+          "formula": "=[@Qty]*[@Price]"
+        },
+        "A6": {
+          "value2": "tab",
+          "text": "tab",
+          "formula": null
+        },
+        "B6": {
+          "value2": 5.0,
+          "text": "5",
+          "formula": null
+        },
+        "C6": {
+          "value2": 7.5,
+          "text": "7.5",
+          "formula": null
+        },
+        "D6": {
+          "value2": 37.5,
+          "text": "37.5",
+          "formula": "=[@Qty]*[@Price]"
+        },
+        "B7": {
+          "value2": 15.0,
+          "text": "15",
+          "formula": "=SUBTOTAL(109,[Qty])"
+        },
+        "D7": {
+          "value2": 82.5,
+          "text": "82.5",
+          "formula": "=SUBTOTAL(109,[Total])"
+        }
+      }
+    },
+    {
+      "name": "Other",
+      "visible": -1,
+      "usedRange": "A1:D3",
+      "truncatedAt2000": false,
+      "cells": {
+        "A1": {
+          "value2": "Key",
+          "text": "Key",
+          "formula": null
+        },
+        "B1": {
+          "value2": "Val",
+          "text": "Val",
+          "formula": null
+        },
+        "D1": {
+          "value2": 112.5,
+          "text": "112.5",
+          "formula": "=SUM(SalesTbl[Total])+SUM(Lookup[Val])"
+        },
+        "A2": {
+          "value2": "a",
+          "text": "a",
+          "formula": null
+        },
+        "B2": {
+          "value2": 10.0,
+          "text": "10",
+          "formula": null
+        },
+        "A3": {
+          "value2": "b",
+          "text": "b",
+          "formula": null
+        },
+        "B3": {
+          "value2": 20.0,
+          "text": "20",
+          "formula": null
+        }
+      }
+    }
+  ]
+}

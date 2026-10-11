@@ -19,9 +19,9 @@ use super::{Attr, ElementHead, Row, Worksheet, XlsxError, XmlElement, format_num
 use crate::refs::{MAX_COL, MAX_ROW};
 use crate::xml::RawXml;
 
-/// Excel allows a column at most 255 characters wide and a row at most 409 points tall.
+/// Excel allows a column at most 255 characters wide and a row at most 409.5 points tall.
 pub const MAX_COLUMN_WIDTH: f64 = 255.0;
-pub const MAX_ROW_HEIGHT: f64 = 409.0;
+pub const MAX_ROW_HEIGHT: f64 = 409.5;
 /// Most rows one height edit creates `row` elements for.
 const MAX_ROW_SPAN: u32 = 16_384;
 

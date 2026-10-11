@@ -25,6 +25,7 @@ mod refs;
 mod sheet;
 mod sst;
 mod styles;
+mod tables;
 mod workbook;
 mod xml;
 
@@ -46,11 +47,13 @@ pub use refs::{
     shift_formula,
 };
 pub use sheet::{
-    Cell, CellError, CellValue, ColumnsSnapshot, Formula, FormulaKind, MAX_COLUMN_WIDTH,
-    MAX_ROW_HEIGHT, Rect, Row, RowHeightsSnapshot, Worksheet, format_number,
+    ArrayFormula, ArrayRole, Cell, CellError, CellValue, ColumnsSnapshot, Formula, FormulaKind,
+    MAX_COLUMN_WIDTH, MAX_ROW_HEIGHT, Rect, Row, RowHeightsSnapshot, SharedFormulaRef, Worksheet,
+    format_number,
 };
 pub use sst::{SharedStrings, decode_xstring, encode_xstring};
 pub use styles::{Styles, builtin_number_format};
+pub use tables::{Table, TableColumn, TableStyle};
 pub use workbook::{
     CellInput, DefinedName, DroppedItem, SheetInfo, SheetKind, SheetState, Workbook, WorkbookKind,
 };

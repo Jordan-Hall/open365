@@ -1,0 +1,5 @@
+feature = "model-tables"
+made_with = "Microsoft Excel 20430 (Windows)"
+author = "project member"
+expect_dropped = []
+notes = "two tables, calculated column, totals row, global/hidden/sheet-scoped names with comment"

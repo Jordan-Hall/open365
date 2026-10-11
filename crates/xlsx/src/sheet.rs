@@ -10,6 +10,7 @@ use quick_xml::events::{BytesStart, Event};
 use crate::XlsxError;
 use crate::refs::{MAX_COL, MAX_ROW, parse_cell_ref, parse_range, shift_formula};
 use crate::sst::{decode_xstring, encode_xstring, item_text};
+use crate::tables::Table;
 use crate::xml::{
     Attr, ElementHead, Parser, RawXml, XmlElement, check_end, escape_text, is_blank, push_entity,
     write_attrs, write_head, xml_err,
@@ -121,6 +122,44 @@ impl CellValue {
             Self::IsoDate(_) => Some("d"),
         }
     }
+}
+
+/// A legacy array formula: the master cell, its range and the formula text.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ArrayFormula {
+    /// Master cell `(row, col)`, the only cell that stores the text.
+    pub master: (u32, u32),
+    /// Cells the array covers, including the master.
+    pub range: Rect,
+    /// Formula text without `=`.
+    pub text: String,
+    /// True when the master carries a dynamic-array metadata index (`cm`).
+    pub dynamic: bool,
+}
+
+/// What a cell is within an array formula.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ArrayRole {
+    Master,
+    /// Part of the array anchored at `master`.
+    Member {
+        master: (u32, u32),
+    },
+}
+
+/// A cell's place in a shared-formula group.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SharedFormulaRef {
+    pub si: u32,
+    pub master: (u32, u32),
+    /// The master's formula text (without `=`), before shifting.
+    pub master_text: String,
+    /// The `ref` range the master declares, when present.
+    pub master_range: Option<Rect>,
+    pub is_master: bool,
+    /// Offset of this cell from the master (0 for the master).
+    pub row_offset: i64,
+    pub col_offset: i64,
 }
 
 /// How a formula is stored.
@@ -266,6 +305,10 @@ pub struct Worksheet {
     shared_masters: HashMap<u32, (u32, u32)>,
     /// Array formula and data table ranges: cells inside cannot be edited one by one.
     locked: Vec<Rect>,
+    /// Legacy array formulas (master cell has text), in row-major order.
+    arrays: Vec<ArrayFormula>,
+    /// Tables of the sheet, set by the workbook from the sheet relationships.
+    tables: Vec<Table>,
     /// Descriptions of content the reader could not represent.
     dropped: Vec<String>,
 }
@@ -1145,6 +1188,8 @@ impl Worksheet {
             after,
             shared_masters: HashMap::new(),
             locked: Vec::new(),
+            arrays: Vec::new(),
+            tables: Vec::new(),
             dropped: cx.dropped,
         };
         ws.index_formulas();
@@ -1155,6 +1200,7 @@ impl Worksheet {
     fn index_formulas(&mut self) {
         self.shared_masters.clear();
         self.locked.clear();
+        self.arrays.clear();
         for row in &self.rows {
             for cell in &row.cells {
                 let Some(f) = &cell.formula else { continue };
@@ -1168,6 +1214,14 @@ impl Worksheet {
                             .and_then(parse_range)
                             .unwrap_or((row.r, cell.col, row.r, cell.col));
                         self.locked.push(rect);
+                        if !f.text.is_empty() {
+                            self.arrays.push(ArrayFormula {
+                                master: (row.r, cell.col),
+                                range: rect,
+                                text: f.text.clone(),
+                                dynamic: f.attrs.iter().any(|a| a.ns.is_none() && a.name == "cm"),
+                            });
+                        }
                     }
                     FormulaKind::DataTable => {
                         let rect = f
@@ -1233,8 +1287,17 @@ impl Worksheet {
 
     /// Formula text of a cell, without `=`. A shared-formula dependent is expanded by
     /// shifting the master's relative references.
+    ///
+    /// A non-master cell of a legacy array formula (stored with an empty `f`) has no
+    /// formula of its own: it returns `None`; see [`Worksheet::array_role`].
     pub fn formula_text(&self, row: u32, col: u32) -> Option<String> {
         let f = self.cell(row, col)?.formula.as_deref()?;
+        if f.text.is_empty()
+            && !matches!(f.kind, FormulaKind::Shared { .. })
+            && matches!(self.array_role(row, col), Some(ArrayRole::Member { .. }))
+        {
+            return None;
+        }
         if let FormulaKind::Shared { si, .. } = &f.kind
             && f.text.is_empty()
         {
@@ -1247,6 +1310,71 @@ impl Worksheet {
             ));
         }
         Some(f.text.clone())
+    }
+
+    /// Legacy array formulas (`t="array"` with a master that has text), row-major.
+    pub fn array_formulas(&self) -> &[ArrayFormula] {
+        &self.arrays
+    }
+
+    /// The array formula that covers `(row, col)`, if any.
+    pub fn array_formula_at(&self, row: u32, col: u32) -> Option<&ArrayFormula> {
+        self.arrays.iter().find(|a| {
+            let (r1, c1, r2, c2) = a.range;
+            (r1..=r2).contains(&row) && (c1..=c2).contains(&col)
+        })
+    }
+
+    /// Whether `(row, col)` is an array formula's master, or "part of array X".
+    pub fn array_role(&self, row: u32, col: u32) -> Option<ArrayRole> {
+        let a = self.array_formula_at(row, col)?;
+        Some(if a.master == (row, col) {
+            ArrayRole::Master
+        } else {
+            ArrayRole::Member { master: a.master }
+        })
+    }
+
+    /// How `(row, col)` relates to its shared-formula group: the master, or a dependent
+    /// with its offset from the master.
+    pub fn shared_formula(&self, row: u32, col: u32) -> Option<SharedFormulaRef> {
+        let f = self.cell(row, col)?.formula.as_deref()?;
+        let FormulaKind::Shared { si, .. } = &f.kind else {
+            return None;
+        };
+        let (mr, mc) = self.shared_master(*si)?;
+        let master = self.cell(mr, mc)?.formula.as_deref()?;
+        let master_range = match &master.kind {
+            FormulaKind::Shared { range, .. } => range.as_deref().and_then(parse_range),
+            _ => None,
+        };
+        Some(SharedFormulaRef {
+            si: *si,
+            master: (mr, mc),
+            master_text: master.text.clone(),
+            master_range,
+            is_master: (mr, mc) == (row, col),
+            row_offset: i64::from(row) - i64::from(mr),
+            col_offset: i64::from(col) - i64::from(mc),
+        })
+    }
+
+    /// Tables (`xl/tables/tableN.xml`) the sheet relates to, in relationship order.
+    pub fn tables(&self) -> &[Table] {
+        &self.tables
+    }
+
+    /// The table whose range contains `(row, col)`.
+    pub fn table_at(&self, row: u32, col: u32) -> Option<&Table> {
+        self.tables.iter().find(|t| {
+            t.rect.is_some_and(|(r1, c1, r2, c2)| {
+                (r1..=r2).contains(&row) && (c1..=c2).contains(&col)
+            })
+        })
+    }
+
+    pub(crate) fn set_tables(&mut self, tables: Vec<Table>) {
+        self.tables = tables;
     }
 
     /// Root children before `sheetData`, in order.

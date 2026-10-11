@@ -221,6 +221,10 @@ pub(crate) fn build_engine(wb: &Workbook, keep: &dyn Fn(usize, u32, u32) -> bool
             if cell.formula.is_some() {
                 // Seed the cached value so the engine starts from the file's results.
                 engine.set_value(&info.name, row, col, to_calc_value(&cell.value));
+                // Non-master cells of a legacy array formula have no text (`None`), so
+                // they keep their cached values. The engine has no array formula or
+                // sheet-scoped name support yet: see docs/architecture/xlsx-model.md,
+                // "What calc needs".
                 if let Some(text) = ws.formula_text(row, col) {
                     // An unparseable formula keeps its cached value as a constant.
                     let _ = engine.set_formula(&info.name, row, col, &text);
@@ -230,6 +234,7 @@ pub(crate) fn build_engine(wb: &Workbook, keep: &dyn Fn(usize, u32, u32) -> bool
             }
         }
     }
+    // Only workbook-scoped names: `Engine::define_name` has no sheet scope.
     for name in wb.defined_names() {
         if name.local_sheet_id.is_none() {
             let _ = engine.define_name(&name.name, &name.formula);

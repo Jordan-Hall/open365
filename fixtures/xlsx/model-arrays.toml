@@ -1,0 +1,5 @@
+feature = "model-arrays"
+made_with = "Microsoft Excel 20430 (Windows)"
+author = "project member"
+expect_dropped = []
+notes = "row array D4:F4, column array A6:A8, single-cell array B10, shared formula B12:B17"

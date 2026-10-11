@@ -1,0 +1,138 @@
+{
+  "source": "fixtures/xlsx/model-arrays.xlsx",
+  "sheets": [
+    {
+      "name": "Calc",
+      "visible": -1,
+      "usedRange": "A1:F17",
+      "truncatedAt2000": false,
+      "cells": {
+        "A1": {
+          "value2": 1.0,
+          "text": "1",
+          "formula": null
+        },
+        "B1": {
+          "value2": 2.0,
+          "text": "2",
+          "formula": null
+        },
+        "C1": {
+          "value2": 3.0,
+          "text": "3",
+          "formula": null
+        },
+        "A2": {
+          "value2": 10.0,
+          "text": "10",
+          "formula": null
+        },
+        "B2": {
+          "value2": 20.0,
+          "text": "20",
+          "formula": null
+        },
+        "C2": {
+          "value2": 30.0,
+          "text": "30",
+          "formula": null
+        },
+        "D4": {
+          "value2": 2.0,
+          "text": "2",
+          "formula": "=A1:C1*2"
+        },
+        "E4": {
+          "value2": 4.0,
+          "text": "4",
+          "formula": "=A1:C1*2"
+        },
+        "F4": {
+          "value2": 6.0,
+          "text": "6",
+          "formula": "=A1:C1*2"
+        },
+        "A6": {
+          "value2": 1.0,
+          "text": "1",
+          "formula": "=TRANSPOSE(A1:C1)"
+        },
+        "A7": {
+          "value2": 2.0,
+          "text": "2",
+          "formula": "=TRANSPOSE(A1:C1)"
+        },
+        "A8": {
+          "value2": 3.0,
+          "text": "3",
+          "formula": "=TRANSPOSE(A1:C1)"
+        },
+        "B10": {
+          "value2": 140.0,
+          "text": "140",
+          "formula": "=SUM(A1:C1*A2:C2)"
+        },
+        "A12": {
+          "value2": 1.0,
+          "text": "1",
+          "formula": null
+        },
+        "B12": {
+          "value2": 3.0,
+          "text": "3",
+          "formula": "=A12*2+1"
+        },
+        "A13": {
+          "value2": 2.0,
+          "text": "2",
+          "formula": null
+        },
+        "B13": {
+          "value2": 5.0,
+          "text": "5",
+          "formula": "=A13*2+1"
+        },
+        "A14": {
+          "value2": 3.0,
+          "text": "3",
+          "formula": null
+        },
+        "B14": {
+          "value2": 7.0,
+          "text": "7",
+          "formula": "=A14*2+1"
+        },
+        "A15": {
+          "value2": 4.0,
+          "text": "4",
+          "formula": null
+        },
+        "B15": {
+          "value2": 9.0,
+          "text": "9",
+          "formula": "=A15*2+1"
+        },
+        "A16": {
+          "value2": 5.0,
+          "text": "5",
+          "formula": null
+        },
+        "B16": {
+          "value2": 11.0,
+          "text": "11",
+          "formula": "=A16*2+1"
+        },
+        "A17": {
+          "value2": 6.0,
+          "text": "6",
+          "formula": null
+        },
+        "B17": {
+          "value2": 13.0,
+          "text": "13",
+          "formula": "=A17*2+1"
+        }
+      }
+    }
+  ]
+}
