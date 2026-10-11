@@ -11,7 +11,9 @@ use egui::{Context, Key, KeyboardShortcut, Modifiers, RichText, Ui, ViewportComm
 use open365_commands::{Alignment, Command, Target};
 use open365_pdf::PdfMetadata;
 
+use crate::clipboard::ClipboardState;
 use crate::doc_view::{DocView, Toggle};
+use crate::find::FindDialog;
 use crate::fonts::FontBook;
 use crate::grid_view::{GridView, Resize};
 
@@ -24,6 +26,8 @@ const UNDO: KeyboardShortcut = KeyboardShortcut::new(Modifiers::COMMAND, Key::Z)
 const REDO: KeyboardShortcut = KeyboardShortcut::new(Modifiers::COMMAND, Key::Y);
 const REDO_ALT: KeyboardShortcut =
     KeyboardShortcut::new(Modifiers::COMMAND.plus(Modifiers::SHIFT), Key::Z);
+const FIND: KeyboardShortcut = KeyboardShortcut::new(Modifiers::COMMAND, Key::F);
+const REPLACE: KeyboardShortcut = KeyboardShortcut::new(Modifiers::COMMAND, Key::H);
 const BOLD: KeyboardShortcut = KeyboardShortcut::new(Modifiers::COMMAND, Key::B);
 const ITALIC: KeyboardShortcut = KeyboardShortcut::new(Modifiers::COMMAND, Key::I);
 const UNDERLINE: KeyboardShortcut = KeyboardShortcut::new(Modifiers::COMMAND, Key::U);
@@ -146,6 +150,8 @@ pub struct App {
     target: Option<Target>,
     pub doc: DocView,
     pub grid: GridView,
+    pub find: FindDialog,
+    pub clipboard: ClipboardState,
     status: String,
     title: String,
     fonts: Rc<RefCell<FontBook>>,
@@ -160,6 +166,8 @@ impl App {
             target: None,
             doc: DocView::new(),
             grid: GridView::with_fonts(Rc::clone(&fonts)),
+            find: FindDialog::new(),
+            clipboard: ClipboardState::default(),
             status: "Open a .docx or .xlsx file (Ctrl+O)".to_owned(),
             title: String::new(),
             fonts,
@@ -490,8 +498,88 @@ impl App {
         }
     }
 
+    /// Copy, cut and paste (Ctrl+C, Ctrl+X, Ctrl+V arrive as events). They are taken here so
+    /// the views do not also act on them; text boxes that have the keyboard keep theirs.
+    fn clipboard_events(&mut self, ctx: &Context) {
+        if self.find.text_focused || self.grid.is_editing() || ctx.current_pass_index() != 0 {
+            return;
+        }
+        let Some(target) = &mut self.target else {
+            return;
+        };
+        let is_docx = target.docx().is_some();
+        if is_docx && !ctx.memory(|m| m.has_focus(self.doc.id())) {
+            return;
+        }
+        let events: Vec<egui::Event> = ctx.input_mut(|i| {
+            let mut taken = Vec::new();
+            i.events.retain(|e| {
+                let ours = matches!(
+                    e,
+                    egui::Event::Copy | egui::Event::Cut | egui::Event::Paste(_)
+                );
+                if ours {
+                    taken.push(e.clone());
+                }
+                !ours
+            });
+            taken
+        });
+        for event in events {
+            let status = match (event, is_docx) {
+                (egui::Event::Copy, true) => {
+                    self.clipboard.copy_doc(target, &self.doc);
+                    None
+                }
+                (egui::Event::Cut, true) => {
+                    if self.clipboard.copy_doc(target, &self.doc) {
+                        self.doc.delete_selection(target);
+                    }
+                    None
+                }
+                (egui::Event::Paste(text), true) => {
+                    self.doc.paste_text(target, &text);
+                    None
+                }
+                (egui::Event::Copy, false) => {
+                    Some(if self.clipboard.copy_grid(target, &self.grid) {
+                        "Copied".to_owned()
+                    } else {
+                        "That range is too large to copy".to_owned()
+                    })
+                }
+                (egui::Event::Cut, false) => Some(self.clipboard.cut_grid(target, &mut self.grid)),
+                (egui::Event::Paste(text), false) => {
+                    Some(self.clipboard.paste_grid(target, &mut self.grid, &text))
+                }
+                _ => None,
+            };
+            if let Some(status) = status {
+                self.status = status;
+            }
+        }
+    }
+
+    fn find_dialog(&mut self, ctx: &Context) {
+        let is_docx = self.target.as_ref().is_some_and(|t| t.docx().is_some());
+        if let Some(action) = self.find.ui(ctx, is_docx)
+            && let Some(target) = &mut self.target
+        {
+            self.status = self.find.run(action, target, &mut self.doc, &mut self.grid);
+        }
+    }
+
     fn shortcuts(&mut self, ctx: &Context) {
         let take = |s: &KeyboardShortcut| ctx.input_mut(|i| i.consume_shortcut(s));
+        if self.target.is_some() {
+            if take(&FIND) {
+                self.find.show_dialog(false);
+            }
+            if take(&REPLACE) {
+                self.find.show_dialog(true);
+            }
+        }
+        self.clipboard_events(ctx);
         if take(&OPEN) {
             self.open_dialog();
         }
@@ -828,6 +916,7 @@ impl App {
         if let Some(s) = self.doc.status.take().or_else(|| self.grid.status.take()) {
             self.status = s;
         }
+        self.find_dialog(&ctx);
         self.apply_resizes();
         if repaint {
             ctx.request_repaint();

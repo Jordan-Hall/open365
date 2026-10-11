@@ -1,0 +1,12 @@
+{
+  "source": "fixtures/xlsx/chart-doughnut.xlsx",
+  "oracle": "Microsoft Excel via COM, points, origin at the chart area top left",
+  "excel_build": "20430",
+  "object": {"width":384,"height":259.20001220703125},
+  "chart_area": {"width":379,"height":254.2},
+  "plot_inside": {"left":59.71023622047244,"top":37.97503937007874,"width":206.22496062992127,"height":206.22496062992127},
+  "plot_outer": {"left":59.71023622047244,"top":37.97503937007874,"width":206.22496062992127,"height":206.22496062992127},
+  "legend": {"left":329.64535433070864,"top":95.88023622047244,"width":44.35464566929134,"height":90.41456692913385},
+  "title": {"left":163.23496062992126,"top":2,"width":49.53,"height":24.97503937007874},
+  "value_axis": null
+}

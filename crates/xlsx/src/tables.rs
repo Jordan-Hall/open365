@@ -1,6 +1,7 @@
 //! Read-only model of table parts (`xl/tables/tableN.xml`). The part stays untouched in
 //! the package, so tables round-trip byte-identical (ADR-001).
 
+use crate::XlsxError;
 use crate::refs::parse_range;
 use crate::sheet::Rect;
 use crate::xml::{self, XmlElement};
@@ -155,4 +156,175 @@ fn parse_column(e: &XmlElement) -> TableColumn {
             .and_then(|f| f.head.attr("array"))
             .is_some_and(|v| matches!(v.trim(), "1" | "true")),
     }
+}
+
+/// What a structural edit did to a table part.
+#[derive(Debug)]
+pub(crate) enum Restructured {
+    /// The edit deleted every cell of the table.
+    Removed,
+    /// The part's new bytes, and the header cells of columns the edit added (`(row, col, name)`).
+    Updated {
+        bytes: Vec<u8>,
+        new_headers: Vec<(u32, u32, String)>,
+    },
+}
+
+fn set_element_text(el: &mut XmlElement, text: &str) {
+    el.children = vec![crate::xml::RawXml::Text(text.to_owned())];
+}
+
+/// Rewrites a table part for an insert or delete of rows or columns on its sheet (`edit`, when that sheet is
+/// the one edited) and for references into the edited sheet inside its formulas (`shifter`, with `home`
+/// the sheet the table is on).
+pub(crate) fn restructure(
+    part: &str,
+    bytes: &[u8],
+    edit: Option<&crate::structure::StructEdit>,
+    shifter: &dyn crate::structure::FormulaShifter,
+    home: &str,
+) -> Result<Restructured, XlsxError> {
+    use crate::structure::{EditAxis, shift_range_text};
+    use crate::xml::{Attr, RawXml};
+
+    let mut parsed = xml::parse(bytes)?;
+    let Some(table) = Table::parse(part, bytes) else {
+        return Ok(Restructured::Updated {
+            bytes: bytes.to_vec(),
+            new_headers: Vec::new(),
+        });
+    };
+    let mut new_headers = Vec::new();
+    if let (Some(edit), Some(rect)) = (edit, table.rect) {
+        let Some(mut new_rect) = edit.map_rect(rect) else {
+            return Ok(Restructured::Removed);
+        };
+        let (r1, c1, r2, c2) = rect;
+        if edit.axis == EditAxis::Rows && edit.delete {
+            // A table keeps one data row, whatever is deleted.
+            let min_rows = table.header_row_count + table.totals_row_count + 1;
+            if new_rect.2 + 1 < new_rect.0 + min_rows {
+                new_rect.2 = new_rect.0 + min_rows - 1;
+            }
+        }
+        let columns = parsed.root.children.iter_mut().find_map(|c| match c {
+            RawXml::Element(e) if e.head.is_main("tableColumns") => Some(e),
+            _ => None,
+        });
+        if let Some(columns) = columns {
+            let (at, end) = edit.span();
+            if edit.axis == EditAxis::Cols && edit.delete {
+                let mut index = 0u32;
+                columns.children.retain(|child| {
+                    let Some(e) = child.as_element() else {
+                        return true;
+                    };
+                    if !e.head.is_main("tableColumn") {
+                        return true;
+                    }
+                    let col = c1 + index;
+                    index += 1;
+                    !(at..=end).contains(&col)
+                });
+            } else if edit.axis == EditAxis::Cols && c1 < at && at <= c2 {
+                let mut taken: Vec<String> = columns
+                    .elements()
+                    .filter_map(|e| e.head.attr("name").map(str::to_lowercase))
+                    .collect();
+                let first_id = columns
+                    .elements()
+                    .filter_map(|e| e.head.attr("id").and_then(|v| v.parse::<u32>().ok()))
+                    .max()
+                    .unwrap_or(0)
+                    + 1;
+                let position = columns
+                    .children
+                    .iter()
+                    .enumerate()
+                    .filter(|(_, c)| {
+                        c.as_element()
+                            .is_some_and(|e| e.head.is_main("tableColumn"))
+                    })
+                    .map(|(i, _)| i)
+                    .nth((at - c1) as usize)
+                    .unwrap_or(columns.children.len());
+                // Excel names a new column after the one on its left: `Col1` gives `Col12`, `Col13`.
+                let left = columns
+                    .elements()
+                    .filter(|e| e.head.is_main("tableColumn"))
+                    .nth((at - c1 - 1) as usize)
+                    .and_then(|e| e.head.attr("name"))
+                    .unwrap_or("Column")
+                    .to_owned();
+                let mut n = 2u32;
+                for k in 0..edit.count {
+                    let name = loop {
+                        let candidate = format!("{left}{n}");
+                        n += 1;
+                        if !taken.contains(&candidate.to_lowercase()) {
+                            break candidate;
+                        }
+                    };
+                    taken.push(name.to_lowercase());
+                    let mut el = columns.sibling("tableColumn");
+                    el.head.attrs = vec![
+                        Attr::plain("id", &(first_id + k).to_string()),
+                        Attr::plain("name", &name),
+                    ];
+                    columns
+                        .children
+                        .insert(position + k as usize, RawXml::Element(el));
+                    if table.header_row_count > 0 {
+                        new_headers.push((r1, at + k, name));
+                    }
+                }
+            }
+            let n = columns
+                .elements()
+                .filter(|e| e.head.is_main("tableColumn"))
+                .count();
+            columns.head.set_attr("count", &n.to_string());
+        }
+        let _ = r2;
+        let text = crate::structure::range_a1(new_rect);
+        parsed.root.head.set_attr("ref", &text);
+        for child in &mut parsed.root.children {
+            if let RawXml::Element(e) = child
+                && (e.head.is_main("autoFilter") || e.head.is_main("sortState"))
+                && let Some(new) = e.head.attr("ref").and_then(|r| shift_range_text(r, edit))
+            {
+                e.head.set_attr("ref", &new);
+                for s in &mut e.children {
+                    if let RawXml::Element(sc) = s
+                        && sc.head.is_main("sortCondition")
+                        && let Some(new) =
+                            sc.head.attr("ref").and_then(|r| shift_range_text(r, edit))
+                    {
+                        sc.head.set_attr("ref", &new);
+                    }
+                }
+            }
+        }
+    }
+    // Formulas of calculated columns and totals rows.
+    fn formulas(el: &mut XmlElement, shifter: &dyn crate::structure::FormulaShifter, home: &str) {
+        let local = el.head.local_name();
+        if local == "calculatedColumnFormula" || local == "totalsRowFormula" {
+            let text = el.own_text();
+            if let Some(new) = shifter.shift(text.trim_start_matches('='), home) {
+                set_element_text(el, &new);
+            }
+            return;
+        }
+        for child in &mut el.children {
+            if let RawXml::Element(c) = child {
+                formulas(c, shifter, home);
+            }
+        }
+    }
+    formulas(&mut parsed.root, shifter, home);
+    Ok(Restructured::Updated {
+        bytes: parsed.to_bytes(),
+        new_headers,
+    })
 }

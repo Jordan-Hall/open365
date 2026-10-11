@@ -8,6 +8,7 @@
 //! Paragraph indices count paragraphs in document order, including those inside tables.
 //! Character offsets are Unicode scalar values.
 
+mod comments;
 mod document;
 mod drawing;
 mod edit;
@@ -20,13 +21,17 @@ mod numbering;
 mod ppr;
 mod props;
 mod ranges;
+mod review;
+mod search;
 mod section;
 mod settings;
 mod styles;
 mod table;
+mod track;
 mod xml;
 mod xmlq;
 
+pub use comments::{Comment, CommentAnchor, NewComment};
 pub use document::{Document, DocumentKind, DroppedItem, HygieneAction};
 pub use drawing::{
     Align, Drawing, EMU_PER_POINT, HorizontalRelativeFrom, ImagePart, Position, TextBox,
@@ -50,6 +55,10 @@ pub use numbering::{
 pub use ppr::Alignment;
 pub use props::{RunPropItem, RunPropKind, RunProps, RunPropsPatch};
 pub use ranges::{DocPos, EditLogEntry, Snapshot};
+pub use review::{
+    FinalParagraph, Revision, RevisionKind, SpanMark, TextSpan, TextView, TrackChanges,
+};
+pub use search::{DocMatch, FindError, FindOptions, find_in_text};
 pub use section::{
     Column, Columns, DocGrid, DocGridType, HeaderFooterRef, HeaderFooterType, Orientation,
     PageMargins, PageSize, Section, SectionType,

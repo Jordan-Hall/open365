@@ -73,8 +73,24 @@ Inline and floating placements match `layout-img-inline`, `layout-img-none`, `la
 - Shapes in `mc:AlternateContent` without text are kept as anchors (one character, wrapping); header/footer ones are not
   emitted as images.
 
-Open: columns (`layout-float-poscol`), `layoutInCell` and floats in table cells (`layout-float-incell*`), clamping at the
+Open: `layoutInCell` and floats in table cells (`layout-float-incell*`), clamping at the
 bottom margin (`layout-float-anchor-bottom`, `-anchor-nextpage`), the lookahead after an incremental restart.
+
+## Section columns (`w:cols`; `props.rs`, `flow.rs`, `float.rs`)
+
+Probes: `tools/office/make-cols-probes.ps1` (`fixtures/docx/layout-cols-*`). The oracle reads multi-column pages from the PDF in
+stream order (Word writes a page column by column; lines of two columns share baselines).
+
+| Rule | Evidence |
+|---|---|
+| Equal columns are `(text width - (n-1) x space) / n` wide at `i x (width + space)`; unequal ones take each `w:col` width and its own `w:space`. Text fills a column to the bottom margin, then the next column from the same top, then the next page. A paragraph laid out for one width is broken again for a column of another width. | `layout-cols-two/-three/-four/-line/-unequal/-unequal-two` (all lines) |
+| A column break (`w:br type=column`) is a character on a line of its own at the end of the column; the text after it starts the next column (a page in a one-column section). | `layout-cols-break` |
+| Section types: continuous sections start below the previous one on the same page (same page size), next-page, odd-page and even-page sections start a page (a blank page is inserted for the wrong parity), a next-column section starts in the next column. Space after the last paragraph and space before the first one still combine as the larger. | `layout-cols-continuous/-nextpage/-newcol` |
+| A continuous break balances the columns of the section it ends, on the section's last page only: each column aims at `content height / n` and takes a line that starts before that share is used up (10 lines and two gaps over two columns: 6 + 4); the height grows until the rest fits in the other columns; widow, orphan and keep rules apply. The next section starts below the tallest column plus the space after its last paragraph (none when the column ends inside a paragraph). The last section of the document and sections before a next-page break are not balanced. | `layout-cols-balance/-balance-pages/-continuous/-mid` |
+| `Column`-relative float positions use the column (`float-poscol`, 235 of 236). Floats wrap per column. | `layout-float-poscol` |
+
+Not done: footnotes in columns (`layout-cols-footnote`, 38 of 63: Word puts the notes under their own column), the `w:sep` line is not drawn,
+tables in unequal columns use the first column's width, documents with columns are always paginated from scratch (no incremental restart).
 
 ## Content controls (`w:sdt`; `para.rs`, `incremental.rs`, `crates/docx/src/flatten.rs`)
 

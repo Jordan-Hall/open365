@@ -17,6 +17,7 @@ use crate::xml::{
 };
 
 mod resize;
+mod structure;
 pub use resize::{ColumnsSnapshot, MAX_COLUMN_WIDTH, MAX_ROW_HEIGHT, RowHeightsSnapshot};
 
 /// A cell error value.

@@ -853,7 +853,7 @@ fn resize_undo_restores_the_previous_width_and_height_and_redo_reapplies() {
 fn resize_limits_follow_excel_and_a_refused_command_changes_nothing() {
     let mut t = basic();
     let before = t.audit_log().commands().len();
-    for width in [-1.0, 255.5, f64::NAN] {
+    for width in [-1.0, 256.0, f64::NAN] {
         let c = Command::SetColumnWidth {
             sheet: 0,
             first: 1,
@@ -877,7 +877,7 @@ fn resize_limits_follow_excel_and_a_refused_command_changes_nothing() {
     assert_eq!(t.audit_log().commands().len(), before);
     assert!(!t.is_dirty());
     assert!(!t.can_undo());
-    for (width, points) in [(0.0, 0.0), (255.0, 409.5)] {
+    for (width, points) in [(0.0, 0.0), (255.0, 409.5), (255.75, 12.0)] {
         apply(
             &mut t,
             Command::SetColumnWidth {

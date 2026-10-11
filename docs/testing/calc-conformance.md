@@ -69,7 +69,7 @@ forms; the corpus has no case for them.
 
 ## Current state
 
-53,965 cases, 53,744 pass, 221 known differences listed in `known-differences.toml` (158 older ones, 47 from the third batch, 14 from the fourth, 2 from the fifth).
+54,762 cases, 54,534 pass, 228 known differences listed in `known-differences.toml` (the older ones plus 8 for `[$-F800]`/`[$-F400]`, the Windows regional long date and time of the oracle machine, which Open365 expands to en-US). The sixth batch added 797 cases: TEXT `aaa`/`aaaa`, `[DBNum1-3]` and Japanese eras (`textloc.*`), ASC, DBCS, JIS, PHONETIC, BAHTTEXT, ENCODEURL and the REGEX functions; `text.fmt_text_only` now passes.
 Older entries: the `**` parse quirk, XLOOKUP array results (no spill), a
 few undocumented Excel quirks, large COMBIN, variance accumulation order, accounting fill, `DB` last period and two `IFERROR`
 over arrays of references. New entries: SINH/TANH below |x| = 1 (last digits) and one `x^-5000` case. The test also fails for a

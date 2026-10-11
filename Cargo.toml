@@ -6,6 +6,7 @@ members = [
     "crates/opc",
     "crates/docx",
     "crates/xlsx",
+    "crates/chart",
     "crates/calc",
     "crates/text",
     "crates/layout",
@@ -31,6 +32,7 @@ open365-locale = { path = "crates/locale" }
 open365-opc = { path = "crates/opc" }
 open365-docx = { path = "crates/docx" }
 open365-xlsx = { path = "crates/xlsx" }
+open365-chart = { path = "crates/chart" }
 open365-calc = { path = "crates/calc" }
 open365-text = { path = "crates/text" }
 open365-layout = { path = "crates/layout" }

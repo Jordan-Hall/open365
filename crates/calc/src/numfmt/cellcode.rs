@@ -92,11 +92,11 @@ fn date_code(section: &Section) -> &'static str {
         .filter_map(|t| match t {
             Tok::Day(_) => Some(C::D),
             Tok::Month(_) => Some(C::M),
-            Tok::Year(_) | Tok::BuddhistYear(_) => Some(C::Y),
+            Tok::Year(_) | Tok::EraYear(_) | Tok::BuddhistYear(_) => Some(C::Y),
             Tok::Hour(_) => Some(C::H),
             Tok::Minute(_) => Some(C::Mi),
             Tok::Second(_) => Some(C::S),
-            Tok::Elapsed(..) | Tok::Era => Some(C::Other),
+            Tok::Elapsed(..) | Tok::Era(_) => Some(C::Other),
             _ => None,
         })
         .collect();

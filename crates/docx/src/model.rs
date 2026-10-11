@@ -548,13 +548,69 @@ fn inlines_from(children: impl Iterator<Item = RawXml>) -> Vec<Inline> {
     children
         .map(|child| match child {
             RawXml::Element(e) if e.head.is_w("r") => Inline::Run(Run::from_xml(e)),
-            RawXml::Element(e) if GROUPS.iter().any(|g| e.head.is_w(g)) => Inline::Group(Group {
-                head: e.head,
-                content: inlines_from(e.children.into_iter()),
-            }),
+            RawXml::Element(e) if GROUPS.iter().any(|g| e.head.is_w(g)) => {
+                let mut content = inlines_from(e.children.into_iter());
+                if e.head.is_w("moveFrom") {
+                    hide_visible_text(&mut content);
+                }
+                Inline::Group(Group {
+                    head: e.head,
+                    content,
+                })
+            }
             other => Inline::Raw(other),
         })
         .collect()
+}
+
+/// Word keeps the text of a `w:moveFrom` in plain `w:t` (not `w:delText`), but it is no
+/// longer part of the visible text. Keeping it as raw run content hides it from every
+/// text and offset calculation and writes it back unchanged.
+fn hide_visible_text(content: &mut [Inline]) {
+    for inline in content {
+        match inline {
+            Inline::Run(run) => {
+                let owner = run.head.clone();
+                for item in &mut run.content {
+                    let element = match item {
+                        RunContent::Text {
+                            text,
+                            preserve_space,
+                            attrs,
+                        } => {
+                            let mut head = owner.sibling("t");
+                            head.attrs.clone_from(attrs);
+                            if *preserve_space {
+                                head.attrs.push(Attr {
+                                    name: "xml:space".to_owned(),
+                                    ns: Some("http://www.w3.org/XML/1998/namespace".into()),
+                                    value: "preserve".to_owned(),
+                                });
+                            }
+                            XmlElement {
+                                head,
+                                children: if text.is_empty() {
+                                    Vec::new()
+                                } else {
+                                    vec![RawXml::Text(std::mem::take(text))]
+                                },
+                            }
+                        }
+                        RunContent::Tab => owner.sibling("tab").into_empty(),
+                        RunContent::Break(b) => {
+                            let mut head = owner.sibling("br");
+                            head.attrs.clone_from(&b.attrs);
+                            head.into_empty()
+                        }
+                        RunContent::Raw(_) => continue,
+                    };
+                    *item = RunContent::Raw(RawXml::Element(element));
+                }
+            }
+            Inline::Group(g) => hide_visible_text(&mut g.content),
+            Inline::Raw(_) => {}
+        }
+    }
 }
 
 fn write_inlines(content: &[Inline], out: &mut String) {

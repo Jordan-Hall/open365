@@ -35,6 +35,12 @@ pub enum DocxError {
     FieldCut,
     #[error("style {0:?} is not defined in the document")]
     UnknownStyle(String),
+    #[error("revision {index} out of range (document has {count})")]
+    NoSuchRevision { index: usize, count: usize },
+    #[error("comment {0} does not exist")]
+    NoSuchComment(u32),
+    #[error("comments cannot be edited: {0}")]
+    CommentsUnavailable(String),
     #[error("{0} item(s) in the dropped-content log; refusing to save silently")]
     DroppedContent(usize),
 }

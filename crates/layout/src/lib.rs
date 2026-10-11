@@ -15,7 +15,7 @@
 //! does; PAGE, NUMPAGES and SECTIONPAGES fields are recomputed in headers and footers, every
 //! other field keeps its cached result. Inline pictures are boxes on the baseline that set the
 //! line height; floating pictures that wrap top and bottom or square displace text; both are
-//! reported in [`Page::images`]. Not supported yet (reported in [`Layout::notes`]): columns,
+//! reported in [`Page::images`]. Section columns (balancing, column breaks) are laid out; not supported yet (reported in [`Layout::notes`]):
 //! right-to-left text, bidi and tight wrap polygons. Pictures in headers, footers and footnotes
 //! are reported in [`Page::header_images`], [`Page::footer_images`] and [`Page::note_images`];
 //! floating ones are positioned against the page but do not displace the text of those stories.

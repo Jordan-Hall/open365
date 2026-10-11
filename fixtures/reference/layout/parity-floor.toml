@@ -48,6 +48,78 @@ total = 39
 matched = 13
 total = 27
 
+[fixtures.layout-cols-balance]
+matched = 51
+total = 51
+
+[fixtures.layout-cols-balance-pages]
+matched = 100
+total = 100
+
+[fixtures.layout-cols-break]
+matched = 78
+total = 78
+
+[fixtures.layout-cols-continuous]
+matched = 75
+total = 75
+
+[fixtures.layout-cols-footnote]
+matched = 38
+total = 63
+
+[fixtures.layout-cols-four]
+matched = 282
+total = 282
+
+[fixtures.layout-cols-line]
+matched = 108
+total = 108
+
+[fixtures.layout-cols-mid]
+matched = 226
+total = 226
+
+[fixtures.layout-cols-newcol]
+matched = 28
+total = 28
+
+[fixtures.layout-cols-nextpage]
+matched = 68
+total = 68
+
+[fixtures.layout-cols-pagebefore]
+matched = 250
+total = 250
+
+[fixtures.layout-cols-pagebreak]
+matched = 58
+total = 58
+
+[fixtures.layout-cols-spacing]
+matched = 154
+total = 154
+
+[fixtures.layout-cols-table]
+matched = 81
+total = 81
+
+[fixtures.layout-cols-three]
+matched = 203
+total = 203
+
+[fixtures.layout-cols-two]
+matched = 120
+total = 120
+
+[fixtures.layout-cols-unequal]
+matched = 168
+total = 168
+
+[fixtures.layout-cols-unequal-two]
+matched = 217
+total = 217
+
 [fixtures.layout-float-align]
 matched = 44
 total = 44
@@ -93,7 +165,7 @@ matched = 26
 total = 26
 
 [fixtures.layout-float-poscol]
-matched = 2
+matched = 235
 total = 236
 
 [fixtures.layout-float-posh]
@@ -356,6 +428,78 @@ total = 39
 matched = 27
 total = 27
 
+[system.layout-cols-balance]
+matched = 51
+total = 51
+
+[system.layout-cols-balance-pages]
+matched = 100
+total = 100
+
+[system.layout-cols-break]
+matched = 78
+total = 78
+
+[system.layout-cols-continuous]
+matched = 75
+total = 75
+
+[system.layout-cols-footnote]
+matched = 38
+total = 63
+
+[system.layout-cols-four]
+matched = 282
+total = 282
+
+[system.layout-cols-line]
+matched = 108
+total = 108
+
+[system.layout-cols-mid]
+matched = 226
+total = 226
+
+[system.layout-cols-newcol]
+matched = 28
+total = 28
+
+[system.layout-cols-nextpage]
+matched = 68
+total = 68
+
+[system.layout-cols-pagebefore]
+matched = 250
+total = 250
+
+[system.layout-cols-pagebreak]
+matched = 58
+total = 58
+
+[system.layout-cols-spacing]
+matched = 154
+total = 154
+
+[system.layout-cols-table]
+matched = 81
+total = 81
+
+[system.layout-cols-three]
+matched = 203
+total = 203
+
+[system.layout-cols-two]
+matched = 120
+total = 120
+
+[system.layout-cols-unequal]
+matched = 168
+total = 168
+
+[system.layout-cols-unequal-two]
+matched = 217
+total = 217
+
 [system.layout-face-multiple]
 matched = 66
 total = 66
@@ -363,6 +507,86 @@ total = 66
 [system.layout-face-typo]
 matched = 8
 total = 8
+
+[system.layout-float-align]
+matched = 44
+total = 44
+
+[system.layout-float-anchor-bottom]
+matched = 41
+total = 67
+
+[system.layout-float-anchor-nextpage]
+matched = 41
+total = 69
+
+[system.layout-float-collide]
+matched = 68
+total = 68
+
+[system.layout-float-collide-compat14]
+matched = 53
+total = 53
+
+[system.layout-float-collide-tb]
+matched = 38
+total = 38
+
+[system.layout-float-dist]
+matched = 77
+total = 78
+
+[system.layout-float-dist-mixed]
+matched = 75
+total = 75
+
+[system.layout-float-incell]
+matched = 9
+total = 38
+
+[system.layout-float-incell-compat14]
+matched = 5
+total = 37
+
+[system.layout-float-pagebreak-anchor]
+matched = 26
+total = 26
+
+[system.layout-float-poscol]
+matched = 235
+total = 236
+
+[system.layout-float-posh]
+matched = 41
+total = 41
+
+[system.layout-float-posv]
+matched = 50
+total = 50
+
+[system.layout-float-posv-line]
+matched = 22
+total = 24
+
+[system.layout-float-wrap-behind-front]
+matched = 25
+total = 25
+
+[system.layout-float-wrap-sides]
+matched = 46
+total = 46
+
+[system.layout-float-wrap-square]
+matched = 43
+total = 43
+
+[system.layout-float-wrap-tight]
+matched = 68
+total = 68
+
+[system.layout-float-wrap-topbottom]
+matched = 36
+total = 36
 
 [system.layout-fn-basic]
 matched = 97
@@ -464,6 +688,10 @@ total = 12
 matched = 383
 total = 383
 
+[system.layout-pbdr-ctx]
+matched = 33
+total = 33
+
 [system.layout-pbdr-edges]
 matched = 58
 total = 58
@@ -472,9 +700,21 @@ total = 58
 matched = 47
 total = 47
 
+[system.layout-pbdr-pages]
+matched = 98
+total = 115
+
 [system.layout-pbdr-styles]
 matched = 40
 total = 50
+
+[system.layout-pbdr-widths]
+matched = 54
+total = 54
+
+[system.layout-sdt]
+matched = 19
+total = 19
 
 [system.layout-sizes]
 matched = 221
@@ -503,6 +743,14 @@ total = 217
 [system.layout-tabs]
 matched = 17
 total = 18
+
+[system.layout-txbx-basic]
+matched = 22
+total = 22
+
+[system.layout-txbx-wrap]
+matched = 65
+total = 66
 
 [system.layout-wrap]
 matched = 34

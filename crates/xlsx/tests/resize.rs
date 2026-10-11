@@ -203,7 +203,9 @@ fn undo_restores_an_earlier_height() {
 fn limits_and_ranges_are_validated_without_changing_anything() {
     let mut wb = workbook_with("", "<sheetData/>");
     let before = sheet_text(&mut wb);
-    for width in [-0.5, 255.5, f64::NAN, f64::INFINITY] {
+    // The cap is 255 characters plus the cell padding (see `Workbook::max_column_width`).
+    let over = wb.max_column_width() + 0.5;
+    for width in [-0.5, over, f64::NAN, f64::INFINITY] {
         assert!(matches!(
             wb.set_column_width(0, 1, 1, width),
             Err(XlsxError::UnsupportedEdit(_))

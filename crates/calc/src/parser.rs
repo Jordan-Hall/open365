@@ -684,6 +684,7 @@ impl Parser {
                     t.pos,
                 )
             }
+            Tok::Error(ErrorKind::Ref) => Ok(Ast::DeadRef { sheet }),
             Tok::Error(e) => Ok(Ast::Error(e)),
             _ => self.unexpected(&t),
         }
@@ -954,7 +955,13 @@ mod tests {
             Ast::Area(a) => assert_eq!(a.sheet.as_deref(), Some("Sheet1")),
             other => panic!("{other:?}"),
         }
-        assert_eq!(p("Sheet1!#REF!"), Ast::Error(ErrorKind::Ref));
+        assert_eq!(
+            p("Sheet1!#REF!"),
+            Ast::DeadRef {
+                sheet: "Sheet1".into()
+            }
+        );
+        assert_eq!(rt("Sheet1!#REF!"), "Sheet1!#REF!");
         assert_eq!(kind("'abc"), ParseErrorKind::UnterminatedSheetName);
         assert_eq!(kind("'abc'A1"), ParseErrorKind::UnterminatedSheetName);
     }

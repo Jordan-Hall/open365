@@ -1,0 +1,12 @@
+{
+  "source": "fixtures/xlsx/chart-holdout-column-titles.xlsx",
+  "oracle": "Microsoft Excel via COM, points, origin at the chart area top left",
+  "excel_build": "20430",
+  "object": {"width":480,"height":302.3999938964844},
+  "chart_area": {"width":475,"height":297.4},
+  "plot_inside": {"left":43.120866141732286,"top":38.07755905511811,"width":421.8791338582677,"height":189.9828346456693},
+  "plot_outer": {"left":22.20503937007874,"top":37.97503937007874,"width":442.79496062992126,"height":210.13700787401575},
+  "legend": {"left":197.65748031496062,"top":274.3170866141732,"width":76.68496062992126,"height":18.08291338582677},
+  "title": {"left":132.64748031496063,"top":2,"width":206.70496062992126,"height":24.97503937007874},
+  "value_axis": {"min":0,"max":25,"major":5}
+}

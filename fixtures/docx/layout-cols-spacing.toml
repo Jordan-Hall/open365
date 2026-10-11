@@ -1,0 +1,5 @@
+feature = "layout-cols"
+made_with = "Microsoft Word 16.0.20430 (Windows)"
+author = "project member"
+expect_dropped = []
+notes = "two columns with space before and after, exact and 1.5 line spacing, and a centred heading: carry-over of space at a column top"

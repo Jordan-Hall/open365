@@ -182,6 +182,21 @@ pub(crate) struct Anchored {
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct Frame {
     pub section: SectionProps,
+    /// Left and right edge of the text column the paragraph is in (page coordinates).
+    pub col: (f64, f64),
+}
+
+impl Frame {
+    /// The frame of a section without columns: the column is the margin box.
+    pub(crate) fn new(section: SectionProps) -> Self {
+        Self {
+            col: (
+                section.margin_left + section.gutter,
+                section.page_width - section.margin_right,
+            ),
+            section,
+        }
+    }
 }
 
 /// Side of the square the coordinates of a wrap polygon are in.
@@ -225,6 +240,7 @@ fn needs_line(d: &Drawing) -> bool {
 fn horizontal_base(
     rel: HorizontalRelativeFrom,
     s: &SectionProps,
+    col: (f64, f64),
     at: Option<AnchorPoint>,
 ) -> (f64, f64) {
     let margin = (s.margin_left + s.gutter, s.page_width - s.margin_right);
@@ -239,7 +255,8 @@ fn horizontal_base(
         HorizontalRelativeFrom::Character => {
             at.map_or(margin, |a| (a.x, a.x + margin.1 - margin.0))
         }
-        HorizontalRelativeFrom::Margin | HorizontalRelativeFrom::Column => margin,
+        HorizontalRelativeFrom::Margin => margin,
+        HorizontalRelativeFrom::Column => col,
     }
 }
 
@@ -289,7 +306,7 @@ pub(crate) fn place(
 ) -> Anchored {
     let s = &frame.section;
     let (w, h) = d.size_pt();
-    let hb = horizontal_base(d.horizontal.0, s, at);
+    let hb = horizontal_base(d.horizontal.0, s, frame.col, at);
     let vb = vertical_base(d.vertical.0, s, para_top, at);
     let [el, et, er, eb] = d.effect_extent_pt();
     let x = along(d.horizontal.1, hb, w, er);
@@ -413,15 +430,16 @@ pub(crate) fn dynamic_lines(
     #[allow(clippy::needless_range_loop)]
     for i in 0..anchors.len() {
         if !deferred[i] {
-            separate_one(&mut anchors, &flags, i, floats, &frame.section);
+            separate_one(&mut anchors, &flags, i, floats, frame.col);
         }
     }
     let mut all: Vec<Float> = floats.to_vec();
     all.extend(anchors.iter().filter_map(|a| a.float.clone()));
     let mut placed: Vec<bool> = deferred.iter().map(|d| !d).collect();
 
-    let s = &frame.section;
-    let (area_l, area_r) = (s.margin_left + s.gutter, s.page_width - s.margin_right);
+    let (area_l, area_r) = frame.col;
+    // The paragraph was laid out at its unit's width; the column may be narrower or wider.
+    let delta = para.fill.text_width - (area_r - area_l);
     let builder = para.builder();
     let n = para.atoms.len();
     let mut lines: Vec<LineBox> = Vec::new();
@@ -430,7 +448,8 @@ pub(crate) fn dynamic_lines(
     while a0 < n {
         let first = a0 == 0;
         let mut y = cursor;
-        let mut est = builder.fill_in(a0, first, (0.0, 0.0)).height;
+        let whole = (0.0, delta);
+        let mut est = builder.fill_in(a0, first, whole).height;
         let mut row: Vec<LineBox> = Vec::new();
         for _ in 0..16 {
             let (top, bottom) = (y, y + est);
@@ -445,7 +464,7 @@ pub(crate) fn dynamic_lines(
                 .max_by(|a, b| a.y1.total_cmp(&b.y1))
             {
                 y = f.y1;
-                est = builder.fill_in(a0, first, (0.0, 0.0)).height;
+                est = builder.fill_in(a0, first, whole).height;
                 continue;
             }
             let squares: Vec<&Float> = hits
@@ -462,7 +481,7 @@ pub(crate) fn dynamic_lines(
                 if at >= n {
                     break;
                 }
-                let inset = ((l - area_l).max(0.0), (area_r - r).max(0.0));
+                let inset = ((l - area_l).max(0.0), (area_r - r).max(0.0) + delta);
                 let seg_first = first && row.is_empty();
                 let line = builder.fill_in(at, seg_first, inset);
                 // The first word must fit in the span, or the span stays empty.
@@ -476,7 +495,7 @@ pub(crate) fn dynamic_lines(
                 // Nowhere beside the pictures: below them.
                 let below = squares.iter().map(|f| f.y1).fold(y, f64::max);
                 y = if below > y + 1e-6 { below } else { y + est };
-                est = builder.fill_in(a0, first, (0.0, 0.0)).height;
+                est = builder.fill_in(a0, first, whole).height;
                 continue;
             }
             let h = row.iter().map(|l| l.height).fold(0.0, f64::max);
@@ -487,7 +506,7 @@ pub(crate) fn dynamic_lines(
             break;
         }
         if row.is_empty() {
-            row.push(builder.fill_in(a0, first, (0.0, 0.0)));
+            row.push(builder.fill_in(a0, first, whole));
         }
         let h = row.iter().map(|l| l.height).fold(0.0, f64::max);
         let base = row.iter().map(|l| l.baseline_off).fold(0.0, f64::max);
@@ -517,7 +536,7 @@ pub(crate) fn dynamic_lines(
             );
             std::mem::swap(&mut anchors[k], &mut a);
             placed[k] = true;
-            separate_one(&mut anchors, &flags, k, &all, &frame.section);
+            separate_one(&mut anchors, &flags, k, &all, frame.col);
             all.extend(anchors[k].float.clone());
         }
         for (i, mut line) in row.into_iter().enumerate() {
@@ -605,9 +624,9 @@ fn separate_one(
     flags: &[AnchorFlags],
     i: usize,
     page: &[Float],
-    s: &SectionProps,
+    col: (f64, f64),
 ) {
-    let (area_l, area_r) = (s.margin_left + s.gutter, s.page_width - s.margin_right);
+    let (area_l, area_r) = col;
     if flags.get(i).is_none_or(|f| f.allow_overlap) || anchors[i].float.is_none() {
         return;
     }

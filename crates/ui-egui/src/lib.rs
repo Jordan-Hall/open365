@@ -6,8 +6,10 @@
 
 mod a11y;
 mod app;
+mod clipboard;
 mod doc_view;
 mod docmodel;
+mod find;
 mod fonts;
 mod grid_cf;
 mod grid_text;
@@ -17,7 +19,9 @@ mod parts;
 use std::path::PathBuf;
 
 pub use app::{App, print_command};
+pub use clipboard::{ClipboardBackend, ClipboardContents, ClipboardState, MemoryClipboard};
 pub use doc_view::{DocPos, DocView, Toggle};
+pub use find::{FindAction, FindDialog};
 pub use grid_view::{GridView, PaintedCell, Resize};
 
 /// Opens the main window and runs until it closes. `initial` is a file to open at start-up.

@@ -1,0 +1,133 @@
+{
+  "source": "fixtures/xlsx/insdel-format.xlsx",
+  "sheets": [
+    {
+      "name": "F",
+      "visible": -1,
+      "usedRange": "A1:E6",
+      "truncatedAt2000": false,
+      "cells": {
+        "A1": {
+          "value2": 11.0,
+          "text": "11",
+          "formula": null
+        },
+        "B1": {
+          "value2": 12.0,
+          "text": "12",
+          "formula": null
+        },
+        "C1": {
+          "value2": 13.0,
+          "text": "#",
+          "formula": null
+        },
+        "D1": {
+          "value2": 14.0,
+          "text": "14",
+          "formula": null
+        },
+        "A2": {
+          "value2": 21.0,
+          "text": "21",
+          "formula": null
+        },
+        "B2": {
+          "value2": 22.0,
+          "text": "22",
+          "formula": null
+        },
+        "C2": {
+          "value2": 23.0,
+          "text": "#",
+          "formula": null
+        },
+        "D2": {
+          "value2": 24.0,
+          "text": "24",
+          "formula": null
+        },
+        "A3": {
+          "value2": 31.0,
+          "text": "31",
+          "formula": null
+        },
+        "B3": {
+          "value2": 32.0,
+          "text": "32.00",
+          "formula": null
+        },
+        "C3": {
+          "value2": 33.0,
+          "text": "#",
+          "formula": null
+        },
+        "D3": {
+          "value2": 34.0,
+          "text": "34",
+          "formula": null
+        },
+        "A4": {
+          "value2": 41.0,
+          "text": "41",
+          "formula": null
+        },
+        "B4": {
+          "value2": 42.0,
+          "text": "42.00",
+          "formula": null
+        },
+        "C4": {
+          "value2": 43.0,
+          "text": "#",
+          "formula": null
+        },
+        "D4": {
+          "value2": 44.0,
+          "text": "44",
+          "formula": null
+        },
+        "A5": {
+          "value2": 51.0,
+          "text": "51",
+          "formula": null
+        },
+        "B5": {
+          "value2": 52.0,
+          "text": "52.00",
+          "formula": null
+        },
+        "C5": {
+          "value2": 53.0,
+          "text": "#",
+          "formula": null
+        },
+        "D5": {
+          "value2": 54.0,
+          "text": "54",
+          "formula": null
+        },
+        "A6": {
+          "value2": 61.0,
+          "text": "61",
+          "formula": null
+        },
+        "B6": {
+          "value2": 62.0,
+          "text": "62",
+          "formula": null
+        },
+        "C6": {
+          "value2": 63.0,
+          "text": "#",
+          "formula": null
+        },
+        "D6": {
+          "value2": 64.0,
+          "text": "64",
+          "formula": null
+        }
+      }
+    }
+  ]
+}

@@ -629,6 +629,7 @@ impl Evaluator<'_, '_> {
             Ast::Text(t) => Arg::Value(Value::Text(t.clone())),
             Ast::Bool(b) => Arg::Value(Value::Bool(*b)),
             Ast::Error(e) => Arg::error(*e),
+            Ast::DeadRef { .. } => Arg::error(ErrorKind::Ref),
             Ast::Missing => Arg::Missing,
             Ast::Ref(r) => self.eval_ref(r),
             Ast::Area(a) => self.eval_area(a),

@@ -81,6 +81,52 @@ pub(crate) struct Out {
     fill: Option<(usize, char)>,
     /// `*x` fill is ignored (the `TEXT` function).
     no_fill: bool,
+    /// `[DBNum1]` to `[DBNum3]` under a CJK language prefix: the numerals that replace the ASCII digits of
+    /// numbers and dates (literal text and names keep theirs).
+    digits: Option<[char; 10]>,
+    /// `[DBNum1]`: an unpadded date part of 10 or more is written in tens (`十五`).
+    tens: bool,
+}
+
+/// The numerals of `[DBNum1]` (`n` = 1), `[DBNum2]` (2) and `[DBNum3]` (3) under a language prefix, measured in
+/// Excel. Other languages leave the digits alone.
+fn dbnum_digits(n: u8, lcid: u32) -> Option<[char; 10]> {
+    let table: &[char; 10] = match (lcid & 0xFFFF, n) {
+        (0x411, 1) => &[
+            '\u{3007}', '\u{4e00}', '\u{4e8c}', '\u{4e09}', '\u{56db}', '\u{4e94}', '\u{516d}',
+            '\u{4e03}', '\u{516b}', '\u{4e5d}',
+        ],
+        (0x411, 2) => &[
+            '\u{3007}', '\u{58f1}', '\u{5f10}', '\u{53c2}', '\u{56db}', '\u{4f0d}', '\u{516d}',
+            '\u{4e03}', '\u{516b}', '\u{4e5d}',
+        ],
+        (0x412, 1) => &[
+            '\u{ff10}', '\u{4e00}', '\u{4e8c}', '\u{4e09}', '\u{56db}', '\u{4e94}', '\u{f9d1}',
+            '\u{4e03}', '\u{516b}', '\u{4e5d}',
+        ],
+        (0x412, 2) => &[
+            '\u{f9b2}', '\u{58f9}', '\u{8cb3}', '\u{f96b}', '\u{56db}', '\u{4f0d}', '\u{f9d1}',
+            '\u{4e03}', '\u{516b}', '\u{4e5d}',
+        ],
+        (0x404 | 0xc04 | 0x1404 | 0x804 | 0x1004, 1) => &[
+            '\u{25cb}', '\u{4e00}', '\u{4e8c}', '\u{4e09}', '\u{56db}', '\u{4e94}', '\u{516d}',
+            '\u{4e03}', '\u{516b}', '\u{4e5d}',
+        ],
+        (0x404 | 0xc04 | 0x1404, 2) => &[
+            '\u{96f6}', '\u{58f9}', '\u{8cb3}', '\u{53c3}', '\u{8086}', '\u{4f0d}', '\u{9678}',
+            '\u{67d2}', '\u{634c}', '\u{7396}',
+        ],
+        (0x804 | 0x1004, 2) => &[
+            '\u{96f6}', '\u{58f9}', '\u{8d30}', '\u{53c1}', '\u{8086}', '\u{4f0d}', '\u{9646}',
+            '\u{67d2}', '\u{634c}', '\u{7396}',
+        ],
+        (0x411 | 0x412 | 0x404 | 0xc04 | 0x1404 | 0x804 | 0x1004, 3) => &[
+            '\u{ff10}', '\u{ff11}', '\u{ff12}', '\u{ff13}', '\u{ff14}', '\u{ff15}', '\u{ff16}',
+            '\u{ff17}', '\u{ff18}', '\u{ff19}',
+        ],
+        _ => return None,
+    };
+    Some(*table)
 }
 
 impl Out {
@@ -90,12 +136,51 @@ impl Out {
             width: 0.0,
             fill: None,
             no_fill: target == Target::Function,
+            digits: None,
+            tens: false,
         }
     }
 
+    /// Text produced from a number or date part: its digits become the section's numerals (see `digits`).
     pub(crate) fn push(&mut self, s: &str) {
+        match self.digits {
+            Some(table) if s.chars().any(|c| c.is_ascii_digit()) => {
+                let mapped: String = s
+                    .chars()
+                    .map(|c| match c.to_digit(10) {
+                        Some(d) if c.is_ascii_digit() => table[d as usize],
+                        _ => c,
+                    })
+                    .collect();
+                self.push_lit(&mapped);
+            }
+            _ => self.push_lit(s),
+        }
+    }
+
+    /// Literal text and names: pushed as they are.
+    pub(crate) fn push_lit(&mut self, s: &str) {
         self.text.push_str(s);
         self.width += s.chars().map(glyph_units).sum::<f64>();
+    }
+
+    /// An unpadded date part (`d`, `m`, `h`).
+    pub(crate) fn push_unpadded(&mut self, n: i64) {
+        match self.digits {
+            Some(table) if self.tens && n >= 10 => {
+                let (t, u) = ((n / 10) as usize, (n % 10) as usize);
+                let mut s = String::new();
+                if t > 1 {
+                    s.push(table[t]);
+                }
+                s.push('\u{5341}');
+                if u > 0 {
+                    s.push(table[u]);
+                }
+                self.push_lit(&s);
+            }
+            _ => self.push(&n.to_string()),
+        }
     }
 
     /// `_x`: a space. Excel reserves the width of a space whatever `x` is (measured: `_W` and `_(` cost the same).
@@ -422,6 +507,11 @@ fn render_section(
     out: &mut Out,
 ) -> bool {
     use parse::Tok;
+    out.digits = sec
+        .dbnum
+        .zip(sec.lcid)
+        .and_then(|(n, lcid)| dbnum_digits(n, lcid));
+    out.tens = sec.dbnum == Some(1);
     match sec.kind {
         Kind::Date => {
             // The 1900 system has no negative dates; the 1904 system shows the magnitude with a minus sign.
@@ -446,7 +536,7 @@ fn render_section(
                         out.push(&general);
                         shown = true;
                     }
-                    Tok::Lit(s) => out.push(s),
+                    Tok::Lit(s) => out.push_lit(s),
                     Tok::Pad(c) => out.pad(*c),
                     Tok::Fill(c) => out.fill(*c),
                     _ => {}
@@ -465,7 +555,7 @@ fn render_section(
                 }
                 for tok in &sec.toks {
                     match tok {
-                        Tok::Lit(s) => out.push(s),
+                        Tok::Lit(s) => out.push_lit(s),
                         Tok::Pad(c) => out.pad(*c),
                         Tok::Fill(c) => out.fill(*c),
                         Tok::Percent => out.push("%"),

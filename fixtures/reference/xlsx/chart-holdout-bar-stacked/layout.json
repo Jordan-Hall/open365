@@ -1,0 +1,12 @@
+{
+  "source": "fixtures/xlsx/chart-holdout-bar-stacked.xlsx",
+  "oracle": "Microsoft Excel via COM, points, origin at the chart area top left",
+  "excel_build": "20430",
+  "object": {"width":624,"height":417.6000061035156},
+  "chart_area": {"width":619,"height":412.6},
+  "plot_inside": {"left":39.14598425196851,"top":62.05795275590552,"width":564.7840157480315,"height":326.4903937007874},
+  "plot_outer": {"left":7,"top":62.05795275590552,"width":602,"height":340.5420472440945},
+  "legend": {"left":243.9448031496063,"top":32.97503937007874,"width":128.1103937007874,"height":18.08291338582677},
+  "title": {"left":267.2849606299213,"top":2,"width":81.43,"height":24.97503937007874},
+  "value_axis": {"min":0,"max":50,"major":5}
+}

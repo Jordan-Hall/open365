@@ -1,0 +1,51 @@
+rev	0	Insert	Reviewer A	beta 
+rev	1	Delete	Reviewer A	delta 
+rev	2	Insert	Reviewer B	two
+rev	3	Delete	Reviewer B	 three
+rev	4	Insert	Reviewer A	keep gonetail
+rev	5	Delete	Reviewer B	gone
+rev	6	Insert	Reviewer A	bold plain
+rev	7	Insert	Reviewer A	xy
+rev	8	Delete	Reviewer A	whole paragraph deleted text
+markup	0	Alpha beta gamma delta epsilon
+markup	1	One two three four
+markup	2	keep gonetail
+markup	3	bold plain
+markup	4	xy end
+markup	5	whole paragraph deleted text
+final	0	Alpha beta gamma epsilon
+final	1	One two four
+final	2	keep tail
+final	3	bold plain
+final	4	xy end
+final	5	
+accept	0	Alpha beta gamma epsilon	0
+accept	1	One two four	0
+accept	2	keep tail	0
+accept	3	bold plain	0
+accept	4	xy end	0
+accept	5		0
+reject	0	Alpha gamma delta epsilon	0
+reject	1	One  three four	0
+reject	2		0
+reject	3		0
+reject	4	 end	0
+reject	5	whole paragraph deleted text	0
+accept1	0	Alpha beta gamma delta epsilon\u241eOne two three four\u241ekeep gonetail\u241ebold plain\u241exy end\u241ewhole paragraph deleted text
+reject1	0	Alpha gamma delta epsilon\u241eOne two three four\u241ekeep gonetail\u241ebold plain\u241exy end\u241ewhole paragraph deleted text
+accept1	1	Alpha beta gamma epsilon\u241eOne two three four\u241ekeep gonetail\u241ebold plain\u241exy end\u241ewhole paragraph deleted text
+reject1	1	Alpha beta gamma delta epsilon\u241eOne two three four\u241ekeep gonetail\u241ebold plain\u241exy end\u241ewhole paragraph deleted text
+accept1	2	Alpha beta gamma delta epsilon\u241eOne two three four\u241ekeep gonetail\u241ebold plain\u241exy end\u241ewhole paragraph deleted text
+reject1	2	Alpha beta gamma delta epsilon\u241eOne  three four\u241ekeep gonetail\u241ebold plain\u241exy end\u241ewhole paragraph deleted text
+accept1	3	Alpha beta gamma delta epsilon\u241eOne two four\u241ekeep gonetail\u241ebold plain\u241exy end\u241ewhole paragraph deleted text
+reject1	3	Alpha beta gamma delta epsilon\u241eOne two three four\u241ekeep gonetail\u241ebold plain\u241exy end\u241ewhole paragraph deleted text
+accept1	4	Alpha beta gamma delta epsilon\u241eOne two three four\u241ekeep gonetail\u241ebold plain\u241exy end\u241ewhole paragraph deleted text
+reject1	4	Alpha beta gamma delta epsilon\u241eOne two three four\u241e\u241ebold plain\u241exy end\u241ewhole paragraph deleted text
+accept1	5	Alpha beta gamma delta epsilon\u241eOne two three four\u241ekeep tail\u241ebold plain\u241exy end\u241ewhole paragraph deleted text
+reject1	5	Alpha beta gamma delta epsilon\u241eOne two three four\u241ekeep gonetail\u241ebold plain\u241exy end\u241ewhole paragraph deleted text
+accept1	6	Alpha beta gamma delta epsilon\u241eOne two three four\u241ekeep gonetail\u241ebold plain\u241exy end\u241ewhole paragraph deleted text
+reject1	6	Alpha beta gamma delta epsilon\u241eOne two three four\u241ekeep gonetail\u241e\u241exy end\u241ewhole paragraph deleted text
+accept1	7	Alpha beta gamma delta epsilon\u241eOne two three four\u241ekeep gonetail\u241ebold plain\u241exy end\u241ewhole paragraph deleted text
+reject1	7	Alpha beta gamma delta epsilon\u241eOne two three four\u241ekeep gonetail\u241ebold plain\u241e end\u241ewhole paragraph deleted text
+accept1	8	Alpha beta gamma delta epsilon\u241eOne two three four\u241ekeep gonetail\u241ebold plain\u241exy end\u241e
+reject1	8	Alpha beta gamma delta epsilon\u241eOne two three four\u241ekeep gonetail\u241ebold plain\u241exy end\u241ewhole paragraph deleted text

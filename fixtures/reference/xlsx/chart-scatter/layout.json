@@ -1,0 +1,12 @@
+{
+  "source": "fixtures/xlsx/chart-scatter.xlsx",
+  "oracle": "Microsoft Excel via COM, points, origin at the chart area top left",
+  "excel_build": "20430",
+  "object": {"width":384,"height":259.20001220703125},
+  "chart_area": {"width":379,"height":254.2},
+  "plot_inside": {"left":21.915826771653542,"top":38.07755905511811,"width":342.01417322834646,"height":192.0707874015748},
+  "plot_outer": {"left":7,"top":37.97503937007874,"width":362,"height":206.22496062992127},
+  "legend": null,
+  "title": {"left":158.91748031496064,"top":2,"width":58.16496062992126,"height":24.97503937007874},
+  "value_axis": {"min":0,"max":18,"major":2}
+}

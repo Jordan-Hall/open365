@@ -16,6 +16,7 @@
 //! implies.
 
 mod conditional;
+mod drawing;
 mod error;
 mod fast;
 mod format;
@@ -24,6 +25,7 @@ mod parts;
 mod refs;
 mod sheet;
 mod sst;
+mod structure;
 mod styles;
 mod tables;
 mod workbook;
@@ -33,6 +35,7 @@ pub use conditional::{
     CellIsOp, CfBlock, CfKind, CfRule, Cfvo, CfvoKind, DataBarAxis, DataBarDirection, DataBarExt,
     Dxf, DxfBorder, DxfFill, DxfFont, TimePeriod,
 };
+pub use drawing::{Anchor, AnchorMarker, DrawingChart, EMU_PER_POINT, EditAs, RectPt};
 pub use error::XlsxError;
 pub use format::{
     Alignment, Border, BorderEdge, BorderStyle, CellFormat, Color, ColorSource, Fill, FillPattern,
@@ -53,6 +56,7 @@ pub use sheet::{
     format_number,
 };
 pub use sst::{SharedStrings, decode_xstring, encode_xstring};
+pub use structure::{EditAxis, FormulaShifter, StructEdit};
 pub use styles::{Styles, builtin_number_format};
 pub use tables::{Table, TableColumn, TableStyle};
 pub use workbook::{

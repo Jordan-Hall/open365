@@ -136,6 +136,9 @@ pub struct Document {
     settings: Settings,
     kind: DocumentKind,
     pub(crate) edit_log: Vec<EditLogEntry>,
+    pub(crate) tracking: Option<crate::review::TrackChanges>,
+    pub(crate) next_annotation_id: Option<u64>,
+    pub(crate) comments: crate::comments::CommentParts,
 }
 
 impl Document {
@@ -165,6 +168,7 @@ impl Document {
         let numbering = load_numbering(&package, &main_part);
         let settings = load_settings(&package, &main_part);
         let kind = detect_kind(&package, &main_part);
+        let comments = crate::comments::CommentParts::load(&package, &main_part);
         Ok(Self {
             package,
             main_part,
@@ -180,6 +184,9 @@ impl Document {
             settings,
             kind,
             edit_log: Vec::new(),
+            tracking: None,
+            next_annotation_id: None,
+            comments,
         })
     }
 
@@ -360,7 +367,7 @@ impl Document {
 
     /// True when the main story changed since opening or the last save.
     pub fn is_dirty(&self) -> bool {
-        self.dirty
+        self.dirty || self.comments.is_dirty()
     }
 
     /// Number of body-level paragraphs in document order. Paragraphs inside tables are
@@ -388,6 +395,9 @@ impl Document {
         text: &str,
     ) -> Result<(), DocxError> {
         self.check_paragraph(para_idx)?;
+        if let Some(track) = self.tracking.clone() {
+            return self.tracked_insert_text(para_idx, char_offset, text, &track);
+        }
         let changed = {
             let paragraph = self.paragraph_mut(para_idx)?;
             let before = paragraph.char_len();
@@ -513,6 +523,7 @@ impl Document {
             self.package.set_part(self.main_part.clone(), bytes);
             self.dirty = false;
         }
+        self.comments.flush(&mut self.package, &self.main_part)?;
         if let Some(styles) = &mut self.styles
             && styles.is_dirty()
         {

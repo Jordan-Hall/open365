@@ -1,0 +1,32 @@
+rev	0	Insert	Reviewer A	
+rev	1	Delete	Reviewer A	
+rev	2	Delete	Reviewer A	
+markup	0	First paragraph
+markup	1	Second paragraph
+markup	2	Third paragraph
+markup	3	Fourth paragraph
+markup	4	
+markup	5	Sixth paragraph
+markup	6	Last
+final	0	First paragraph
+final	1	Second paragraph
+final	2	Third paragraphFourth paragraph
+final	3	Sixth paragraph
+final	4	Last
+accept	0	First paragraph	1
+accept	1	Second paragraph	2
+accept	2	Third paragraphFourth paragraph	2
+accept	3	Sixth paragraph	2
+accept	4	Last	0
+reject	0	First paragraphSecond paragraph	2
+reject	1	Third paragraph	0
+reject	2	Fourth paragraph	2
+reject	3		1
+reject	4	Sixth paragraph	2
+reject	5	Last	0
+accept1	0	First paragraph\u241eSecond paragraph\u241eThird paragraph\u241eFourth paragraph\u241e\u241eSixth paragraph\u241eLast
+reject1	0	First paragraphSecond paragraph\u241eThird paragraph\u241eFourth paragraph\u241e\u241eSixth paragraph\u241eLast
+accept1	1	First paragraph\u241eSecond paragraph\u241eThird paragraphFourth paragraph\u241e\u241eSixth paragraph\u241eLast
+reject1	1	First paragraph\u241eSecond paragraph\u241eThird paragraph\u241eFourth paragraph\u241e\u241eSixth paragraph\u241eLast
+accept1	2	First paragraph\u241eSecond paragraph\u241eThird paragraph\u241eFourth paragraph\u241eSixth paragraph\u241eLast
+reject1	2	First paragraph\u241eSecond paragraph\u241eThird paragraph\u241eFourth paragraph\u241e\u241eSixth paragraph\u241eLast

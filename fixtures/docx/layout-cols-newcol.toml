@@ -1,0 +1,5 @@
+feature = "layout-cols"
+made_with = "Microsoft Word 16.0.20430 (Windows)"
+author = "project member"
+expect_dropped = []
+notes = "a section that starts in the next column (w:type nextColumn) after a two column section"

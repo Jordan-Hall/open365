@@ -1,0 +1,5 @@
+feature = "layout-cols"
+made_with = "Microsoft Word 16.0.20430 (Windows)"
+author = "project member"
+expect_dropped = []
+notes = "two equal columns, 36 pt apart: text fills the first column to the bottom margin, then the second, then the next page"

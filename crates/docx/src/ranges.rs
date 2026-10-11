@@ -51,7 +51,7 @@ pub struct EditLogEntry {
 /// One hop into a container: a table cell (block index, table child index, row child
 /// index) or the content of a block-level control (block index, control child index).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum Step {
+pub(crate) enum Step {
     Cell {
         block: usize,
         child: usize,
@@ -63,7 +63,7 @@ enum Step {
     },
 }
 
-type Path = Vec<Step>;
+pub(crate) type Path = Vec<Step>;
 
 /// Index of paragraph number `target` within its container; `path` leads to the container.
 fn find_paragraph(
@@ -120,14 +120,14 @@ fn find_paragraph(
     None
 }
 
-fn locate_paragraph(body: &Body, para: usize) -> Option<(Path, usize)> {
+pub(crate) fn locate_paragraph(body: &Body, para: usize) -> Option<(Path, usize)> {
     let mut path = Vec::new();
     let mut seen = 0;
     let index = find_paragraph(&body.blocks, &mut seen, para, &mut path)?;
     Some((path, index))
 }
 
-fn container_mut<'a>(body: &'a mut Body, path: &[Step]) -> Option<&'a mut Vec<Block>> {
+pub(crate) fn container_mut<'a>(body: &'a mut Body, path: &[Step]) -> Option<&'a mut Vec<Block>> {
     let mut blocks = &mut body.blocks;
     for step in path {
         blocks = match *step {
@@ -157,7 +157,7 @@ fn container_mut<'a>(body: &'a mut Body, path: &[Step]) -> Option<&'a mut Vec<Bl
     Some(blocks)
 }
 
-fn container<'a>(body: &'a Body, path: &[Step]) -> Option<&'a Vec<Block>> {
+pub(crate) fn container<'a>(body: &'a Body, path: &[Step]) -> Option<&'a Vec<Block>> {
     let mut blocks = &body.blocks;
     for step in path {
         blocks = match *step {
@@ -688,7 +688,7 @@ fn strip_identity(p: &mut Paragraph) {
 // ---------------------------------------------------------------------------
 
 impl Document {
-    fn check_pos(&self, pos: DocPos) -> Result<(), DocxError> {
+    pub(crate) fn check_pos(&self, pos: DocPos) -> Result<(), DocxError> {
         let count = self.paragraph_count();
         let para = self
             .paragraph(pos.para)
@@ -730,6 +730,9 @@ impl Document {
         self.check_pos(e)?;
         if s == e {
             return Ok(());
+        }
+        if let Some(track) = self.tracking.clone() {
+            return self.tracked_delete_range(s, e, &track);
         }
         let plan = {
             let paragraphs = self.body().paragraphs();
@@ -857,6 +860,7 @@ impl Document {
     /// mark. A section break stays with the second half.
     pub fn split_paragraph(&mut self, pos: DocPos) -> Result<(), DocxError> {
         self.check_pos(pos)?;
+        let track = self.tracking.clone();
         let (path, bi) = locate_paragraph(self.body(), pos.para)
             .ok_or_else(|| DocxError::UnsupportedRange("paragraph not found".to_owned()))?;
         let body = self.body_mut();
@@ -889,6 +893,9 @@ impl Document {
             tail.set_mark_run_props(&caret_props);
         }
         blocks.insert(bi + 1, Block::Paragraph(tail));
+        if let Some(track) = track {
+            self.mark_split_inserted(pos.para, &track)?;
+        }
         self.edited();
         Ok(())
     }

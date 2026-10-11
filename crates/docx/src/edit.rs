@@ -8,7 +8,7 @@ use crate::model::{Break, BreakKind, Inline, Paragraph, Run, RunContent};
 use crate::props::{RunProps, RunPropsPatch};
 
 /// What a string to insert turns into.
-enum Piece {
+pub(crate) enum Piece {
     Text(String),
     Tab,
     Break,
@@ -20,7 +20,7 @@ fn is_xml_char(c: char) -> bool {
 }
 
 /// Splits `text` into text, tab and break pieces. `\r\n` and `\r` become one break.
-fn pieces_of(text: &str) -> Result<Vec<Piece>, DocxError> {
+pub(crate) fn pieces_of(text: &str) -> Result<Vec<Piece>, DocxError> {
     let mut pieces = Vec::new();
     let mut current = String::new();
     let mut chars = text.chars().peekable();
@@ -85,7 +85,7 @@ fn text_item(text: String) -> RunContent {
 }
 
 impl Run {
-    fn items_for(&self, pieces: Vec<Piece>) -> Vec<RunContent> {
+    pub(crate) fn items_for(&self, pieces: Vec<Piece>) -> Vec<RunContent> {
         pieces
             .into_iter()
             .map(|piece| match piece {
@@ -246,7 +246,7 @@ fn run_at_mut<'a>(content: &'a mut [Inline], path: &[usize]) -> Option<&'a mut R
 }
 
 /// Ensures a run boundary at `offset`. Returns true once the boundary exists.
-fn split_runs_at(content: &mut Vec<Inline>, offset: usize, acc: &mut usize) -> bool {
+pub(crate) fn split_runs_at(content: &mut Vec<Inline>, offset: usize, acc: &mut usize) -> bool {
     let mut i = 0;
     while i < content.len() {
         match &mut content[i] {

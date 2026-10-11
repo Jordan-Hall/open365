@@ -109,7 +109,7 @@ fn place(
         // Floating pictures sit against the page; they do not displace the text of a furniture
         // story.
         if let Some(sp) = section {
-            let frame = FloatFrame { section: *sp };
+            let frame = FloatFrame::new(*sp);
             for o in pl.objects.iter().filter(|o| !o.inline()) {
                 let mut im = float::place(&o.drawing, o.atom, &frame, y, 0, None, None, None).image;
                 im.source = source.clone();

@@ -123,7 +123,7 @@ fn emit_plain(sec: &Section, toks: &[Tok], int: &str, frac: &str, out: &mut Out)
 /// Tokens that print the same in every kind of numeric section.
 fn emit_common(tok: &Tok, out: &mut Out) {
     match tok {
-        Tok::Lit(s) => out.push(s),
+        Tok::Lit(s) => out.push_lit(s),
         Tok::Pad(c) => out.pad(*c),
         Tok::Fill(c) => out.fill(*c),
         Tok::Percent => out.push("%"),

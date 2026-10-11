@@ -1,0 +1,5 @@
+feature = "layout-cols"
+made_with = "Microsoft Word 16.0.20430 (Windows)"
+author = "project member"
+expect_dropped = []
+notes = "balancing at a continuous break: short sections of 2 to 7 paragraphs in two and three columns, paragraphs of different line counts"

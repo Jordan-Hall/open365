@@ -1,0 +1,133 @@
+{
+  "source": "fixtures/xlsx/chart-holdout-column-titles.xlsx",
+  "sheets": [
+    {
+      "name": "Data",
+      "visible": -1,
+      "usedRange": "A1:D6",
+      "truncatedAt2000": false,
+      "cells": {
+        "A1": {
+          "value2": "Region",
+          "text": "Region",
+          "formula": null
+        },
+        "B1": {
+          "value2": "Alpha",
+          "text": "Alpha",
+          "formula": null
+        },
+        "C1": {
+          "value2": "Beta",
+          "text": "Beta",
+          "formula": null
+        },
+        "D1": {
+          "value2": "Gamma",
+          "text": "Gamma",
+          "formula": null
+        },
+        "A2": {
+          "value2": "North",
+          "text": "North",
+          "formula": null
+        },
+        "B2": {
+          "value2": 12.0,
+          "text": "12",
+          "formula": null
+        },
+        "C2": {
+          "value2": 8.0,
+          "text": "8",
+          "formula": null
+        },
+        "D2": {
+          "value2": 5.0,
+          "text": "5",
+          "formula": null
+        },
+        "A3": {
+          "value2": "South",
+          "text": "South",
+          "formula": null
+        },
+        "B3": {
+          "value2": 19.0,
+          "text": "19",
+          "formula": null
+        },
+        "C3": {
+          "value2": 14.0,
+          "text": "14",
+          "formula": null
+        },
+        "D3": {
+          "value2": 6.0,
+          "text": "6",
+          "formula": null
+        },
+        "A4": {
+          "value2": "East",
+          "text": "East",
+          "formula": null
+        },
+        "B4": {
+          "value2": 7.0,
+          "text": "7",
+          "formula": null
+        },
+        "C4": {
+          "value2": 11.0,
+          "text": "11",
+          "formula": null
+        },
+        "D4": {
+          "value2": 13.0,
+          "text": "13",
+          "formula": null
+        },
+        "A5": {
+          "value2": "West",
+          "text": "West",
+          "formula": null
+        },
+        "B5": {
+          "value2": 15.0,
+          "text": "15",
+          "formula": null
+        },
+        "C5": {
+          "value2": 9.0,
+          "text": "9",
+          "formula": null
+        },
+        "D5": {
+          "value2": 10.0,
+          "text": "10",
+          "formula": null
+        },
+        "A6": {
+          "value2": "Centre",
+          "text": "Centre",
+          "formula": null
+        },
+        "B6": {
+          "value2": 22.0,
+          "text": "22",
+          "formula": null
+        },
+        "C6": {
+          "value2": 17.0,
+          "text": "17",
+          "formula": null
+        },
+        "D6": {
+          "value2": 4.0,
+          "text": "4",
+          "formula": null
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,12 @@
+{
+  "source": "fixtures/xlsx/chart-holdout-line-left.xlsx",
+  "oracle": "Microsoft Excel via COM, points, origin at the chart area top left",
+  "excel_build": "20430",
+  "object": {"width":288,"height":158.39999389648438},
+  "chart_area": {"width":283,"height":153.4},
+  "plot_inside": {"left":81.2959842519685,"top":7.10251968503937,"width":191.7040157480315,"height":122.24582677165354},
+  "plot_outer": {"left":66.38015748031496,"top":7,"width":206.61984251968505,"height":136.4},
+  "legend": {"left":2,"top":57.11708661417323,"width":53.38015748031496,"height":36.16582677165354},
+  "title": null,
+  "value_axis": {"min":0,"max":25,"major":5}
+}

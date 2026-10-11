@@ -133,10 +133,6 @@ id = "text.fmt_bool"
 reason = "TEXT(1,TRUE): the format text is `TRUE`; Excel's TEXT refuses it (#VALUE!, an uppercase `E` is not a format letter) while Open365's format parser reads `E` as the era year."
 
 [[difference]]
-id = "text.fmt_text_only"
-reason = "TEXT(5,\"abc\") is `a43c` in Excel (`b` is the Buddhist-calendar year, `a` and `c` literals); numfmt has no `b` code and refuses the format, so Open365 returns #VALUE!."
-
-[[difference]]
 id = "text.fmt_invalid3"
 reason = "TEXT refuses four decimals on seconds (`ss.0000`, #VALUE!); numfmt accepts any number of them."
 
@@ -888,3 +884,35 @@ reason = "CELL(\"format\",J20) in J20 itself: Excel reads the format without eva
 [[difference]]
 id = "cellfmt.c0620"
 reason = "Same as cellfmt.c0619 (a reference to the formula's own cell in CELL with a value-independent info type)."
+
+[[difference]]
+id = "textloc.093"
+reason = "[$-F800] and [$-F400] are the Windows regional long date and time of the oracle machine (en-GB: `dd mmmm yyyy`, `hh:mm:ss`); Open365 expands them to the en-US forms."
+
+[[difference]]
+id = "textloc.094"
+reason = "[$-F800] and [$-F400] are the Windows regional long date and time of the oracle machine (en-GB: `dd mmmm yyyy`, `hh:mm:ss`); Open365 expands them to the en-US forms."
+
+[[difference]]
+id = "textloc.095"
+reason = "[$-F800] and [$-F400] are the Windows regional long date and time of the oracle machine (en-GB: `dd mmmm yyyy`, `hh:mm:ss`); Open365 expands them to the en-US forms."
+
+[[difference]]
+id = "textloc.096"
+reason = "[$-F800] and [$-F400] are the Windows regional long date and time of the oracle machine (en-GB: `dd mmmm yyyy`, `hh:mm:ss`); Open365 expands them to the en-US forms."
+
+[[difference]]
+id = "textloc.097"
+reason = "[$-F800] and [$-F400] are the Windows regional long date and time of the oracle machine (en-GB: `dd mmmm yyyy`, `hh:mm:ss`); Open365 expands them to the en-US forms."
+
+[[difference]]
+id = "textloc.098"
+reason = "[$-F800] and [$-F400] are the Windows regional long date and time of the oracle machine (en-GB: `dd mmmm yyyy`, `hh:mm:ss`); Open365 expands them to the en-US forms."
+
+[[difference]]
+id = "textloc.099"
+reason = "[$-F800] and [$-F400] are the Windows regional long date and time of the oracle machine (en-GB: `dd mmmm yyyy`, `hh:mm:ss`); Open365 expands them to the en-US forms."
+
+[[difference]]
+id = "textloc.100"
+reason = "[$-F800] and [$-F400] are the Windows regional long date and time of the oracle machine (en-GB: `dd mmmm yyyy`, `hh:mm:ss`); Open365 expands them to the en-US forms."

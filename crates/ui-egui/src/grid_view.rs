@@ -1472,7 +1472,7 @@ impl GridView {
             let drag_size = |d: &ResizeDrag, pos: Pos2| {
                 let along = if d.cols { pos.x } else { pos.y };
                 let max = if d.cols {
-                    layout.geo.metrics().col_px(MAX_COL_WIDTH_CHARS)
+                    max_col_px(layout.geo.metrics())
                 } else {
                     layout.geo.metrics().row_px(MAX_ROW_HEIGHT_PT)
                 };
@@ -1874,14 +1874,14 @@ impl GridView {
         }
     }
 
-    /// The right-click menu of a header: Hide, Unhide and the size dialog.
+    /// The right-click menu of a header: Insert, Delete, Hide, Unhide and the size dialog.
     fn header_menu(&mut self, ctx: &Context, target: &mut Target) {
         let Some(menu) = self.menu else { return };
         let sheet = self.sheet;
         let mut chosen: Option<&'static str> = None;
         let items: &[&'static str] = match menu.header {
-            Header::Col(_) => &["Hide", "Unhide", "Column Width..."],
-            Header::Row(_) => &["Hide", "Unhide", "Row Height..."],
+            Header::Col(_) => &["Insert", "Delete", "Hide", "Unhide", "Column Width..."],
+            Header::Row(_) => &["Insert", "Delete", "Hide", "Unhide", "Row Height..."],
             Header::Corner => &["Column Width...", "Row Height..."],
         };
         let area = egui::Area::new(Id::new("open365-header-menu"))
@@ -1912,6 +1912,51 @@ impl GridView {
         let Some(item) = chosen else { return };
         let header = menu.header;
         match item {
+            "Insert" | "Delete" => {
+                let cols = matches!(header, Header::Col(_));
+                let (first, last) = self.header_range(header, cols);
+                let count = last - first + 1;
+                let what = if cols {
+                    columns_text(first, last)
+                } else {
+                    rows_text(first, last)
+                };
+                let (command, done) = match (item, cols) {
+                    ("Insert", true) => (
+                        Command::InsertColumns {
+                            sheet,
+                            at: first,
+                            count,
+                        },
+                        format!("Inserted {what}"),
+                    ),
+                    ("Insert", false) => (
+                        Command::InsertRows {
+                            sheet,
+                            at: first,
+                            count,
+                        },
+                        format!("Inserted {what}"),
+                    ),
+                    (_, true) => (
+                        Command::DeleteColumns {
+                            sheet,
+                            at: first,
+                            count,
+                        },
+                        format!("Deleted {what}"),
+                    ),
+                    (_, false) => (
+                        Command::DeleteRows {
+                            sheet,
+                            at: first,
+                            count,
+                        },
+                        format!("Deleted {what}"),
+                    ),
+                };
+                self.apply_header_command(target, command, done);
+            }
             "Hide" | "Unhide" => {
                 let cols = matches!(header, Header::Col(_));
                 let (first, last) = self.header_range(header, cols);
@@ -2586,6 +2631,11 @@ fn format_size(v: f64) -> String {
     t.trim_end_matches('0').trim_end_matches('.').to_owned()
 }
 
+/// The widest column Excel allows in pixels: 255 characters plus the cell padding (2302 px for 9 px digits).
+fn max_col_px(metrics: GridMetrics) -> u32 {
+    metrics.col_px(MAX_COL_WIDTH_CHARS) + metrics.padding()
+}
+
 /// The stored column width (characters, cell padding included) that is `px` pixels wide.
 fn column_width_for_px(metrics: GridMetrics, px: u32) -> f64 {
     if px == 0 {
@@ -2768,7 +2818,7 @@ fn fit_columns(
         .into_iter()
         .map(|(col, w)| {
             let px = excel_fit_px(w.ceil() as u32, metrics.mdw);
-            (col, px.min(metrics.col_px(MAX_COL_WIDTH_CHARS)))
+            (col, px.min(max_col_px(metrics)))
         })
         .collect();
     if !widths.iter().any(|(c, _)| *c == clicked) {

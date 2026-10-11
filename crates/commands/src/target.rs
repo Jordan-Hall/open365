@@ -37,6 +37,10 @@ enum Inverse {
         col: u32,
         before: Option<CellSnapshot>,
     },
+    /// Undo by writing the previous cells back (newest last); a `None` cannot be restored.
+    Cells(Vec<(CellRef, Option<CellSnapshot>)>),
+    /// Undo by putting the whole workbook back (insert or delete of rows or columns).
+    Workbook(Box<Workbook>),
     /// Undo by putting the previous `cols` element back.
     Columns {
         sheet: usize,
@@ -72,6 +76,8 @@ pub struct Target {
     revision: u64,
     /// Edit-log entries the last edit added, taken by `apply`.
     notes: Vec<String>,
+    /// Replacements the last replace-all made, taken by `apply`.
+    replaced: usize,
     pdf_options: PdfOptions,
 }
 
@@ -88,6 +94,7 @@ impl Target {
             saved_state: 0,
             revision: 0,
             notes: Vec::new(),
+            replaced: 0,
             pdf_options: PdfOptions::default(),
         }
     }
@@ -204,6 +211,7 @@ impl Target {
             self.export_pdf_to(path, *overwrite, effect)?
         } else {
             self.notes.clear();
+            self.replaced = 0;
             let (inverse, changed_cells) = self.run_edit(&command)?;
             let state_before = self.state;
             self.state = self.next_state;
@@ -223,6 +231,7 @@ impl Target {
                 bytes_written: 0,
                 pages: 0,
                 notes: std::mem::take(&mut self.notes),
+                replaced: std::mem::take(&mut self.replaced),
             }
         };
         self.audit.0.push(command);
@@ -272,6 +281,19 @@ impl Target {
                 };
                 x.restore(*sheet, *row, *col, before)?
             }
+            Inverse::Cells(before) => {
+                let Content::Xlsx(x) = &mut self.content else {
+                    return Err(CommandError::NotUndoable);
+                };
+                x.undo_many(before)?
+            }
+            Inverse::Workbook(before) => {
+                let Content::Xlsx(x) = &mut self.content else {
+                    return Err(CommandError::NotUndoable);
+                };
+                x.restore_workbook((**before).clone());
+                Vec::new()
+            }
             Inverse::Columns { sheet, before } => {
                 let Content::Xlsx(x) = &mut self.content else {
                     return Err(CommandError::NotUndoable);
@@ -319,12 +341,33 @@ impl Target {
                     Err(_) => Inverse::DocxReplay,
                 };
                 let log_len = s.doc.edit_log().len();
-                replay_docx(&mut s.doc, command)?;
+                self.replaced = replay_docx(&mut s.doc, command)?;
                 self.notes = s.doc.edit_log()[log_len..]
                     .iter()
                     .map(|e| e.description.clone())
                     .collect();
                 Ok((inverse, Vec::new()))
+            }
+            (Content::Xlsx(x), Command::XlsxReplaceAll { find, replacement }) => {
+                let plan = crate::find::xlsx_replace_plan(&x.workbook, find, replacement);
+                let entries: Vec<(CellRef, String)> =
+                    plan.iter().map(|p| (p.cell, p.text.clone())).collect();
+                let done = x.enter_many(&entries, true)?;
+                self.replaced = done.applied.iter().map(|&i| plan[i].occurrences).sum();
+                Ok((Inverse::Cells(done.before), done.changed))
+            }
+            (
+                Content::Xlsx(x),
+                Command::XlsxPaste {
+                    sheet,
+                    row,
+                    col,
+                    rows,
+                },
+            ) => {
+                let entries = paste_entries(*sheet, *row, *col, rows)?;
+                let done = x.enter_many(&entries, false)?;
+                Ok((Inverse::Cells(done.before), done.changed))
             }
             (
                 Content::Xlsx(x),
@@ -367,6 +410,15 @@ impl Target {
                     },
                     changed,
                 ))
+            }
+            (Content::Xlsx(x), command) if crate::structure::edit_of(command).is_some() => {
+                let Some((sheet, edit)) = crate::structure::edit_of(command) else {
+                    return Err(CommandError::NotUndoable);
+                };
+                let before = Box::new(x.workbook.clone());
+                let (changed, notes) = x.edit_structure(sheet, edit)?;
+                self.notes = notes;
+                Ok((Inverse::Workbook(before), changed))
             }
             (
                 Content::Xlsx(x),
@@ -479,6 +531,7 @@ impl Target {
             bytes_written: bytes.len(),
             pages: 0,
             notes: Vec::new(),
+            replaced: 0,
         })
     }
 
@@ -503,6 +556,7 @@ impl Target {
             bytes_written: rendered.bytes.len(),
             pages: rendered.pages,
             notes: rendered.warnings,
+            replaced: 0,
         })
     }
 }
@@ -515,6 +569,7 @@ fn edit_outcome(changed_cells: Vec<CellRef>) -> Outcome {
         bytes_written: 0,
         pages: 0,
         notes: Vec::new(),
+        replaced: 0,
     }
 }
 
@@ -534,6 +589,7 @@ fn is_docx_edit(command: &Command) -> bool {
             | Command::DocxSetParagraphStyle { .. }
             | Command::DocxSetAlignment { .. }
             | Command::DocxReplaceRange { .. }
+            | Command::DocxReplaceAll { .. }
     )
 }
 
@@ -560,13 +616,47 @@ fn capture_docx(doc: &Document, command: &Command) -> Result<Vec<Snapshot>, Comm
             let (s, e) = ordered(*start, *end);
             (s.para..=e.para).map(one).collect::<Result<Vec<_>, _>>()?
         }
+        // Replacements stay inside their paragraph, so each affected paragraph is saved alone.
+        Command::DocxReplaceAll {
+            find,
+            match_case,
+            whole_word,
+            wildcards,
+            ..
+        } => {
+            let opts = open365_docx::FindOptions {
+                pattern: find.clone(),
+                match_case: *match_case,
+                whole_word: *whole_word,
+                wildcards: *wildcards,
+            };
+            let mut paras: Vec<usize> = doc.find_all(&opts)?.iter().map(|m| m.para).collect();
+            paras.dedup();
+            paras.into_iter().map(one).collect::<Result<Vec<_>, _>>()?
+        }
         _ => return Err(CommandError::NotUndoable),
     };
     Ok(snapshots)
 }
 
-fn replay_docx(doc: &mut Document, command: &Command) -> Result<(), CommandError> {
+/// Replays a DOCX edit; gives the number of replacements for a replace-all, else 0.
+fn replay_docx(doc: &mut Document, command: &Command) -> Result<usize, CommandError> {
     match command {
+        Command::DocxReplaceAll {
+            find,
+            replacement,
+            match_case,
+            whole_word,
+            wildcards,
+        } => {
+            let opts = open365_docx::FindOptions {
+                pattern: find.clone(),
+                match_case: *match_case,
+                whole_word: *whole_word,
+                wildcards: *wildcards,
+            };
+            return Ok(doc.replace_all(&opts, replacement)?);
+        }
         Command::DocxInsertText { para, offset, text } => doc.insert_text(*para, *offset, text)?,
         Command::DocxSetBold {
             para,
@@ -586,7 +676,52 @@ fn replay_docx(doc: &mut Document, command: &Command) -> Result<(), CommandError
         }
         _ => {}
     }
-    Ok(())
+    Ok(0)
+}
+
+/// Largest paste, in cells.
+const MAX_PASTE_CELLS: usize = 1_000_000;
+
+/// The cell/text pairs of a pasted block whose top-left cell is `(row, col)`.
+fn paste_entries(
+    sheet: usize,
+    row: u32,
+    col: u32,
+    rows: &[Vec<String>],
+) -> Result<Vec<(CellRef, String)>, CommandError> {
+    let cells: usize = rows.iter().map(Vec::len).sum();
+    if cells > MAX_PASTE_CELLS {
+        return Err(CommandError::Paste(format!(
+            "{cells} cells is more than the {MAX_PASTE_CELLS} a paste may hold"
+        )));
+    }
+    let mut out = Vec::with_capacity(cells);
+    for (dr, line) in rows.iter().enumerate() {
+        for (dc, text) in line.iter().enumerate() {
+            let (Some(r), Some(c)) = (
+                u32::try_from(dr).ok().and_then(|d| row.checked_add(d)),
+                u32::try_from(dc).ok().and_then(|d| col.checked_add(d)),
+            ) else {
+                return Err(CommandError::Paste(
+                    "the block runs off the sheet".to_owned(),
+                ));
+            };
+            if r > open365_xlsx::MAX_ROW || c > open365_xlsx::MAX_COL {
+                return Err(CommandError::Paste(
+                    "the block runs off the sheet".to_owned(),
+                ));
+            }
+            out.push((
+                CellRef {
+                    sheet,
+                    row: r,
+                    col: c,
+                },
+                text.clone(),
+            ));
+        }
+    }
+    Ok(out)
 }
 
 /// Writes to a sibling temporary file, then renames over `path`, so a failed write never

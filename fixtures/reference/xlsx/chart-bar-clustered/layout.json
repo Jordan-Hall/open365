@@ -1,0 +1,12 @@
+{
+  "source": "fixtures/xlsx/chart-bar-clustered.xlsx",
+  "oracle": "Microsoft Excel via COM, points, origin at the chart area top left",
+  "excel_build": "20430",
+  "object": {"width":384,"height":259.20001220703125},
+  "chart_area": {"width":379,"height":254.2},
+  "plot_inside": {"left":39.14598425196851,"top":7,"width":269.92952755905515,"height":223.1483464566929},
+  "plot_outer": {"left":7,"top":7,"width":307.1455118110236,"height":237.2},
+  "legend": {"left":325.1455118110236,"top":98.4755905511811,"width":48.854488188976376,"height":54.24874015748031},
+  "title": null,
+  "value_axis": {"min":0,"max":25,"major":5}
+}

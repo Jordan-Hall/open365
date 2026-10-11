@@ -36,7 +36,7 @@ also in another category counts in both (the legacy names repeat), so the catego
 
 **Date and time** (0): none
 
-**Text** (4): ASC, BAHTTEXT, DBCS, PHONETIC
+**Text** (0): none
 
 **Lookup and reference** (2): GETPIVOTDATA, RTD
 
@@ -50,7 +50,7 @@ also in another category counts in both (the legacy names repeat), so the catego
 
 **Compatibility (legacy names)** (31): BETADIST, BETAINV, BINOMDIST, CHIDIST, CHIINV, CHITEST, CONFIDENCE, COVAR, CRITBINOM, EXPONDIST, FDIST, FINV, FORECAST, FTEST, GAMMADIST, GAMMAINV, HYPGEOMDIST, LOGINV, LOGNORMDIST, NEGBINOMDIST, NORMDIST, NORMINV, NORMSDIST, NORMSINV, PERCENTRANK, POISSON, TDIST, TINV, TTEST, WEIBULL, ZTEST
 
-**Web, cube, other** (25): ENCODEURL, FILTERXML, WEBSERVICE, CUBEKPIMEMBER, CUBEMEMBER, CUBEMEMBERPROPERTY, CUBERANKEDMEMBER, CUBESET, CUBESETCOUNT, CUBEVALUE, IMAGE, STOCKHISTORY, TRIMRANGE, GROUPBY, PIVOTBY, PERCENTOF, REGEXTEST, REGEXEXTRACT, REGEXREPLACE, CALL, DETECTLANGUAGE, EUROCONVERT, JIS, REGISTER.ID, TRANSLATE
+**Web, cube, other** (25): FILTERXML, WEBSERVICE, CUBEKPIMEMBER, CUBEMEMBER, CUBEMEMBERPROPERTY, CUBERANKEDMEMBER, CUBESET, CUBESETCOUNT, CUBEVALUE, IMAGE, STOCKHISTORY, TRIMRANGE, GROUPBY, PIVOTBY, PERCENTOF, CALL, DETECTLANGUAGE, EUROCONVERT, JIS, REGISTER.ID, TRANSLATE
 
 ## Fifth batch (this change): CELL, INFO, SHEET, SHEETS
 
@@ -59,8 +59,7 @@ SHEET, SHEETS. Every information and logical function of the page is now registe
 `CellStyle` (number format, horizontal alignment, locked), column widths and `CellSource::{cell_style, column_width, sheet_position,
 sheet_count}`; the oracle and the conformance test accept a case field `styles`. Findings and residue are in `calc-conformance.md`.
 
-Not done: ASC, DBCS, BAHTTEXT, PHONETIC, JIS, ENCODEURL, REGEXTEST, REGEXEXTRACT, REGEXREPLACE (group 2) and the statistical group 3 were not
-started; the probe corpora for them were written but their results were not reviewed. `XMATCH`/`XLOOKUP` `match_mode` 3 (regular expression)
+Done since: ASC, DBCS, BAHTTEXT, PHONETIC, ENCODEURL, REGEXTEST, REGEXEXTRACT, REGEXREPLACE (see `calc-regex.md`; JIS is `#NAME?` in the oracle Excel). Not done: the statistical group 3. `XMATCH`/`XLOOKUP` `match_mode` 3 (regular expression)
 is unchanged.
 
 ## Fourth batch: lambdas, LET, XMATCH, FORMULATEXT

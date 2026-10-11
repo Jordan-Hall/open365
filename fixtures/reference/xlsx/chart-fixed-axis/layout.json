@@ -1,0 +1,12 @@
+{
+  "source": "fixtures/xlsx/chart-fixed-axis.xlsx",
+  "oracle": "Microsoft Excel via COM, points, origin at the chart area top left",
+  "excel_build": "20430",
+  "object": {"width":384,"height":259.20001220703125},
+  "chart_area": {"width":379,"height":254.2},
+  "plot_inside": {"left":43.120866141732286,"top":38.07755905511811,"width":325.8791338582677,"height":170.86574803149605},
+  "plot_outer": {"left":22.20503937007874,"top":37.97503937007874,"width":346.79496062992126,"height":191.01992125984253},
+  "legend": null,
+  "title": {"left":165.38,"top":2,"width":45.24,"height":24.97503937007874},
+  "value_axis": {"min":0,"max":40,"major":10}
+}

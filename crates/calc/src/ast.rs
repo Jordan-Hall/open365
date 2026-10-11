@@ -185,6 +185,11 @@ pub enum Ast {
     Ref(CellRef),
     /// Area reference.
     Area(AreaRef),
+    /// A sheet-qualified reference whose cells were deleted: `Sheet2!#REF!`. Evaluates to `#REF!`.
+    DeadRef {
+        /// Sheet qualifier as written.
+        sheet: String,
+    },
     /// Defined name.
     Name(String),
     /// Structured table reference such as `Sales[[#This Row],[Qty]]`, resolved when evaluated.
@@ -447,6 +452,10 @@ fn write_ast(ast: &Ast, out: &mut String) {
                     write_row(a.row2, a.row2_abs, out);
                 }
             }
+        }
+        Ast::DeadRef { sheet } => {
+            write_sheet_prefix(Some(sheet), out);
+            out.push_str("#REF!");
         }
         Ast::Name(n) => out.push_str(n),
         Ast::Structured { table, spec } => {

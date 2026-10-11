@@ -1,0 +1,5 @@
+feature = "layout-cols"
+made_with = "Microsoft Word 16.0.20430 (Windows)"
+author = "project member"
+expect_dropped = []
+notes = "three equal columns, 18 pt apart, left aligned, with a keep-with-next heading and justified paragraphs"

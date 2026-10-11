@@ -1,0 +1,5 @@
+feature = "insdel-refs"
+made_with = "Microsoft Excel 20430 (Windows)"
+author = "project member"
+expect_dropped = []
+notes = "reference shifting under insert and delete of rows and columns: relative, absolute, mixed, range, whole row and column, other sheet, names, table, array formula, conditional format, validation, merge"

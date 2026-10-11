@@ -173,6 +173,7 @@ function Read-PdfPages([string]$pdf) {
     if ($env:O365_ORACLE_DUMP_DIR) { [IO.File]::WriteAllText((Join-Path $env:O365_ORACLE_DUMP_DIR ("page{0}.txt" -f ($pages.Count + 1))), $content) }
     $cells = New-Object System.Collections.Generic.List[object]
     $rows = New-Object System.Collections.Generic.List[object]
+    $seqRows = New-Object System.Collections.Generic.List[object]
     $images = New-Object System.Collections.Generic.List[object]
     $clip = -1; $font = $null; $fsize = ''; $tx = 0.0; $ty = 0.0; $fill = '000000'; $fills = New-Object System.Collections.Generic.List[object]
     $byKey = @{}
@@ -211,12 +212,18 @@ function Read-PdfPages([string]$pdf) {
         }
         $yb = [math]::Round($ph - $ty, 3)
         $key = "$clip|$yb"
+        # Rows in stream order (Word writes a page column by column): consecutive runs on one baseline, moving right.
+        # Used instead of `rows` when a section has several columns, whose lines share baselines.
+        $lastSeq = if ($seqRows.Count -gt 0) { $seqRows[$seqRows.Count - 1] } else { $null }
+        if ($lastSeq -and $lastSeq.key -eq $key -and $tx -gt $lastSeq.lastX) { $lastSeq.parts.Add(@{ x = $tx; text = $s }); $lastSeq.lastX = $tx }
+        else { $sq = @{ key = $key; y = $ph - $ty; x = $tx; lastX = $tx; clip = $clip; size = $fsize; parts = (New-Object System.Collections.Generic.List[object]) }; $sq.parts.Add(@{ x = $tx; text = $s }); $seqRows.Add($sq) }
         if ($byKey.ContainsKey($key)) { $r = $byKey[$key]; $r.parts.Add(@{ x = $tx; text = $s }); if ($tx -lt $r.x) { $r.x = $tx } }
         else { $r = @{ y = $ph - $ty; x = $tx; clip = $clip; size = $fsize; parts = (New-Object System.Collections.Generic.List[object]) }; $r.parts.Add(@{ x = $tx; text = $s }); $byKey[$key] = $r; $rows.Add($r) }
       }
     }
     foreach ($r in $rows) { $r['text'] = (($r.parts | Sort-Object { $_.x } | ForEach-Object { $_.text }) -join '').Trim() }
-    $pages.Add(@{ pw = $pw; ph = $ph; rows = $rows; cells = $cells; images = $images; fills = $fills })
+    foreach ($r in $seqRows) { $r['text'] = (($r.parts | Sort-Object { $_.x } | ForEach-Object { $_.text }) -join '').Trim() }
+    $pages.Add(@{ pw = $pw; ph = $ph; rows = $rows; seqrows = $seqRows; cells = $cells; images = $images; fills = $fills })
   }
   , $pages
 }
@@ -261,6 +268,8 @@ function Ref-Layout($f) {
     $pane = $w.ActiveWindow.Panes.Item(1)
     $pcount = [int]$pane.Pages.Count
     $hasTables = [int]$doc.Tables.Count -gt 0
+    $multiCol = $false
+    foreach ($sec in $doc.Sections) { if ([int]$sec.PageSetup.TextColumns.Count -gt 1) { $multiCol = $true; break } }
     $lines = New-Object System.Collections.Generic.List[object]
     # Text boxes: one story (StoryType 5, offsets from 0) per box, listed in anchor order by StoryRanges(5).
     # A box gets its index in that list as `frame`.
@@ -380,6 +389,8 @@ function Ref-Layout($f) {
           $inked = @($inked | Sort-Object @{ Expression = { Story-Rank $_ } }, @{ Expression = { $_.start } })
         }
         $rows = @($pg.rows | Where-Object { $_.clip -lt 0 } | Sort-Object { $_.y })
+        # Columns: lines of two columns share a baseline, so the rows come in stream (column by column) order.
+        if ($multiCol) { $rows = @($pg.seqrows | Where-Object { $_.clip -lt 0 }) }
         # Superscript marks (note references) are separate small rows just above their line: not lines.
         if (@($inked | Where-Object { $_.Contains('story') -or $_.text -match '[]' }).Count -gt 0) {
           $rows = @($rows | Where-Object {
@@ -400,6 +411,9 @@ function Ref-Layout($f) {
           # Separators draw a rule, not a glyph: pair the rest.
           $inkedText = @($inked | Where-Object { -not ($_.Contains('story') -and $_.story -in 12, 13, 15, 16) })
           if ($inkedText.Count -eq $rows.Count) { $inked = $inkedText }
+          # A line of nothing but a column break (or page break) draws no glyph.
+          $inkedGlyph = @($inked | Where-Object { -not ($_.text -match '^[\x0c\x0e]+$') })
+          if ($inkedGlyph.Count -eq $rows.Count) { $inked = $inkedGlyph }
         }
         if ($emitFloats -and $inked.Count -gt $rows.Count -and @($inked | Where-Object { $_.Contains('story') }).Count -eq 0) {
           # Text wrapped around a float: Word lists each segment of a line as a line of its own, the PDF has one row per

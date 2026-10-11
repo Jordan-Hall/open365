@@ -1,0 +1,4602 @@
+{
+  "fixture": "fixtures/xlsx/find-cells.xlsx",
+  "app": "Microsoft Excel 16.0",
+  "replace": [
+    {
+      "name": "part",
+      "find": "apple",
+      "replacement": "pear",
+      "scope": "sheet",
+      "sheet": 0,
+      "lookAt": "part",
+      "matchCase": false,
+      "cells": [
+        "S1!A1",
+        "S1!B1",
+        "S1!C1",
+        "S1!D2",
+        "S1!E2",
+        "S1!C3",
+        "S1!D3",
+        "S1!E3"
+      ],
+      "result": [
+        {
+          "cell": "S1!A1",
+          "formula": "pear"
+        },
+        {
+          "cell": "S1!B1",
+          "formula": "pear pie"
+        },
+        {
+          "cell": "S1!C1",
+          "formula": "pear"
+        },
+        {
+          "cell": "S1!D1",
+          "formula": "123"
+        },
+        {
+          "cell": "S1!E1",
+          "formula": "=A1&\"x\""
+        },
+        {
+          "cell": "S1!F1",
+          "formula": "a*b"
+        },
+        {
+          "cell": "S1!G1",
+          "formula": "axb"
+        },
+        {
+          "cell": "S1!H1",
+          "formula": "TRUE"
+        },
+        {
+          "cell": "S1!A2",
+          "formula": "12"
+        },
+        {
+          "cell": "S1!B2",
+          "formula": "=SUM(A2:A3)"
+        },
+        {
+          "cell": "S1!C2",
+          "formula": "banana"
+        },
+        {
+          "cell": "S1!D2",
+          "formula": "pear pear"
+        },
+        {
+          "cell": "S1!E2",
+          "formula": "pinepear"
+        },
+        {
+          "cell": "S1!F2",
+          "formula": "a?b"
+        },
+        {
+          "cell": "S1!G2",
+          "formula": "A1"
+        },
+        {
+          "cell": "S1!H2",
+          "formula": "0.5"
+        },
+        {
+          "cell": "S1!A3",
+          "formula": "=A2*2"
+        },
+        {
+          "cell": "S1!B3",
+          "formula": "~tilde"
+        },
+        {
+          "cell": "S1!C3",
+          "formula": "pear"
+        },
+        {
+          "cell": "S1!D3",
+          "formula": "12 pears"
+        },
+        {
+          "cell": "S1!E3",
+          "formula": "=IF(A2>1,\"pear\",\"none\")"
+        },
+        {
+          "cell": "S1!F3",
+          "formula": "1.5"
+        },
+        {
+          "cell": "S1!A4",
+          "formula": "  space "
+        },
+        {
+          "cell": "S1!B4",
+          "formula": "x"
+        },
+        {
+          "cell": "S2!A1",
+          "formula": "apple"
+        },
+        {
+          "cell": "S2!B1",
+          "formula": "12"
+        },
+        {
+          "cell": "S2!C1",
+          "formula": "='S1'!A1&\"!\""
+        },
+        {
+          "cell": "S2!A2",
+          "formula": "Apple tree"
+        },
+        {
+          "cell": "S2!B2",
+          "formula": "grape"
+        },
+        {
+          "cell": "S3!A1",
+          "formula": "no match"
+        },
+        {
+          "cell": "S3!B1",
+          "formula": "apple"
+        }
+      ]
+    },
+    {
+      "name": "part-match-case",
+      "find": "apple",
+      "replacement": "pear",
+      "scope": "sheet",
+      "sheet": 0,
+      "lookAt": "part",
+      "matchCase": true,
+      "cells": [
+        "S1!B1",
+        "S1!E2",
+        "S1!D3",
+        "S1!E3"
+      ],
+      "result": [
+        {
+          "cell": "S1!A1",
+          "formula": "Apple"
+        },
+        {
+          "cell": "S1!B1",
+          "formula": "pear pie"
+        },
+        {
+          "cell": "S1!C1",
+          "formula": "APPLE"
+        },
+        {
+          "cell": "S1!D1",
+          "formula": "123"
+        },
+        {
+          "cell": "S1!E1",
+          "formula": "=A1&\"x\""
+        },
+        {
+          "cell": "S1!F1",
+          "formula": "a*b"
+        },
+        {
+          "cell": "S1!G1",
+          "formula": "axb"
+        },
+        {
+          "cell": "S1!H1",
+          "formula": "TRUE"
+        },
+        {
+          "cell": "S1!A2",
+          "formula": "12"
+        },
+        {
+          "cell": "S1!B2",
+          "formula": "=SUM(A2:A3)"
+        },
+        {
+          "cell": "S1!C2",
+          "formula": "banana"
+        },
+        {
+          "cell": "S1!D2",
+          "formula": "Apple Apple"
+        },
+        {
+          "cell": "S1!E2",
+          "formula": "pinepear"
+        },
+        {
+          "cell": "S1!F2",
+          "formula": "a?b"
+        },
+        {
+          "cell": "S1!G2",
+          "formula": "A1"
+        },
+        {
+          "cell": "S1!H2",
+          "formula": "0.5"
+        },
+        {
+          "cell": "S1!A3",
+          "formula": "=A2*2"
+        },
+        {
+          "cell": "S1!B3",
+          "formula": "~tilde"
+        },
+        {
+          "cell": "S1!C3",
+          "formula": "Apple"
+        },
+        {
+          "cell": "S1!D3",
+          "formula": "12 pears"
+        },
+        {
+          "cell": "S1!E3",
+          "formula": "=IF(A2>1,\"pear\",\"none\")"
+        },
+        {
+          "cell": "S1!F3",
+          "formula": "1.5"
+        },
+        {
+          "cell": "S1!A4",
+          "formula": "  space "
+        },
+        {
+          "cell": "S1!B4",
+          "formula": "x"
+        },
+        {
+          "cell": "S2!A1",
+          "formula": "apple"
+        },
+        {
+          "cell": "S2!B1",
+          "formula": "12"
+        },
+        {
+          "cell": "S2!C1",
+          "formula": "='S1'!A1&\"!\""
+        },
+        {
+          "cell": "S2!A2",
+          "formula": "Apple tree"
+        },
+        {
+          "cell": "S2!B2",
+          "formula": "grape"
+        },
+        {
+          "cell": "S3!A1",
+          "formula": "no match"
+        },
+        {
+          "cell": "S3!B1",
+          "formula": "apple"
+        }
+      ]
+    },
+    {
+      "name": "whole",
+      "find": "apple",
+      "replacement": "pear",
+      "scope": "sheet",
+      "sheet": 0,
+      "lookAt": "whole",
+      "matchCase": false,
+      "cells": [
+        "S1!A1",
+        "S1!C1",
+        "S1!C3"
+      ],
+      "result": [
+        {
+          "cell": "S1!A1",
+          "formula": "pear"
+        },
+        {
+          "cell": "S1!B1",
+          "formula": "apple pie"
+        },
+        {
+          "cell": "S1!C1",
+          "formula": "pear"
+        },
+        {
+          "cell": "S1!D1",
+          "formula": "123"
+        },
+        {
+          "cell": "S1!E1",
+          "formula": "=A1&\"x\""
+        },
+        {
+          "cell": "S1!F1",
+          "formula": "a*b"
+        },
+        {
+          "cell": "S1!G1",
+          "formula": "axb"
+        },
+        {
+          "cell": "S1!H1",
+          "formula": "TRUE"
+        },
+        {
+          "cell": "S1!A2",
+          "formula": "12"
+        },
+        {
+          "cell": "S1!B2",
+          "formula": "=SUM(A2:A3)"
+        },
+        {
+          "cell": "S1!C2",
+          "formula": "banana"
+        },
+        {
+          "cell": "S1!D2",
+          "formula": "Apple Apple"
+        },
+        {
+          "cell": "S1!E2",
+          "formula": "pineapple"
+        },
+        {
+          "cell": "S1!F2",
+          "formula": "a?b"
+        },
+        {
+          "cell": "S1!G2",
+          "formula": "A1"
+        },
+        {
+          "cell": "S1!H2",
+          "formula": "0.5"
+        },
+        {
+          "cell": "S1!A3",
+          "formula": "=A2*2"
+        },
+        {
+          "cell": "S1!B3",
+          "formula": "~tilde"
+        },
+        {
+          "cell": "S1!C3",
+          "formula": "pear"
+        },
+        {
+          "cell": "S1!D3",
+          "formula": "12 apples"
+        },
+        {
+          "cell": "S1!E3",
+          "formula": "=IF(A2>1,\"apple\",\"none\")"
+        },
+        {
+          "cell": "S1!F3",
+          "formula": "1.5"
+        },
+        {
+          "cell": "S1!A4",
+          "formula": "  space "
+        },
+        {
+          "cell": "S1!B4",
+          "formula": "x"
+        },
+        {
+          "cell": "S2!A1",
+          "formula": "apple"
+        },
+        {
+          "cell": "S2!B1",
+          "formula": "12"
+        },
+        {
+          "cell": "S2!C1",
+          "formula": "='S1'!A1&\"!\""
+        },
+        {
+          "cell": "S2!A2",
+          "formula": "Apple tree"
+        },
+        {
+          "cell": "S2!B2",
+          "formula": "grape"
+        },
+        {
+          "cell": "S3!A1",
+          "formula": "no match"
+        },
+        {
+          "cell": "S3!B1",
+          "formula": "apple"
+        }
+      ]
+    },
+    {
+      "name": "whole-match-case",
+      "find": "Apple",
+      "replacement": "pear",
+      "scope": "sheet",
+      "sheet": 0,
+      "lookAt": "whole",
+      "matchCase": true,
+      "cells": [
+        "S1!A1",
+        "S1!C3"
+      ],
+      "result": [
+        {
+          "cell": "S1!A1",
+          "formula": "pear"
+        },
+        {
+          "cell": "S1!B1",
+          "formula": "apple pie"
+        },
+        {
+          "cell": "S1!C1",
+          "formula": "APPLE"
+        },
+        {
+          "cell": "S1!D1",
+          "formula": "123"
+        },
+        {
+          "cell": "S1!E1",
+          "formula": "=A1&\"x\""
+        },
+        {
+          "cell": "S1!F1",
+          "formula": "a*b"
+        },
+        {
+          "cell": "S1!G1",
+          "formula": "axb"
+        },
+        {
+          "cell": "S1!H1",
+          "formula": "TRUE"
+        },
+        {
+          "cell": "S1!A2",
+          "formula": "12"
+        },
+        {
+          "cell": "S1!B2",
+          "formula": "=SUM(A2:A3)"
+        },
+        {
+          "cell": "S1!C2",
+          "formula": "banana"
+        },
+        {
+          "cell": "S1!D2",
+          "formula": "Apple Apple"
+        },
+        {
+          "cell": "S1!E2",
+          "formula": "pineapple"
+        },
+        {
+          "cell": "S1!F2",
+          "formula": "a?b"
+        },
+        {
+          "cell": "S1!G2",
+          "formula": "A1"
+        },
+        {
+          "cell": "S1!H2",
+          "formula": "0.5"
+        },
+        {
+          "cell": "S1!A3",
+          "formula": "=A2*2"
+        },
+        {
+          "cell": "S1!B3",
+          "formula": "~tilde"
+        },
+        {
+          "cell": "S1!C3",
+          "formula": "pear"
+        },
+        {
+          "cell": "S1!D3",
+          "formula": "12 apples"
+        },
+        {
+          "cell": "S1!E3",
+          "formula": "=IF(A2>1,\"apple\",\"none\")"
+        },
+        {
+          "cell": "S1!F3",
+          "formula": "1.5"
+        },
+        {
+          "cell": "S1!A4",
+          "formula": "  space "
+        },
+        {
+          "cell": "S1!B4",
+          "formula": "x"
+        },
+        {
+          "cell": "S2!A1",
+          "formula": "apple"
+        },
+        {
+          "cell": "S2!B1",
+          "formula": "12"
+        },
+        {
+          "cell": "S2!C1",
+          "formula": "='S1'!A1&\"!\""
+        },
+        {
+          "cell": "S2!A2",
+          "formula": "Apple tree"
+        },
+        {
+          "cell": "S2!B2",
+          "formula": "grape"
+        },
+        {
+          "cell": "S3!A1",
+          "formula": "no match"
+        },
+        {
+          "cell": "S3!B1",
+          "formula": "apple"
+        }
+      ]
+    },
+    {
+      "name": "workbook-part",
+      "find": "apple",
+      "replacement": "pear",
+      "scope": "workbook",
+      "sheet": 0,
+      "lookAt": "part",
+      "matchCase": false,
+      "cells": [
+        "S1!A1",
+        "S1!B1",
+        "S1!C1",
+        "S1!D2",
+        "S1!E2",
+        "S1!C3",
+        "S1!D3",
+        "S1!E3",
+        "S2!A1",
+        "S2!A2",
+        "S3!B1"
+      ],
+      "result": [
+        {
+          "cell": "S1!A1",
+          "formula": "pear"
+        },
+        {
+          "cell": "S1!B1",
+          "formula": "pear pie"
+        },
+        {
+          "cell": "S1!C1",
+          "formula": "pear"
+        },
+        {
+          "cell": "S1!D1",
+          "formula": "123"
+        },
+        {
+          "cell": "S1!E1",
+          "formula": "=A1&\"x\""
+        },
+        {
+          "cell": "S1!F1",
+          "formula": "a*b"
+        },
+        {
+          "cell": "S1!G1",
+          "formula": "axb"
+        },
+        {
+          "cell": "S1!H1",
+          "formula": "TRUE"
+        },
+        {
+          "cell": "S1!A2",
+          "formula": "12"
+        },
+        {
+          "cell": "S1!B2",
+          "formula": "=SUM(A2:A3)"
+        },
+        {
+          "cell": "S1!C2",
+          "formula": "banana"
+        },
+        {
+          "cell": "S1!D2",
+          "formula": "pear pear"
+        },
+        {
+          "cell": "S1!E2",
+          "formula": "pinepear"
+        },
+        {
+          "cell": "S1!F2",
+          "formula": "a?b"
+        },
+        {
+          "cell": "S1!G2",
+          "formula": "A1"
+        },
+        {
+          "cell": "S1!H2",
+          "formula": "0.5"
+        },
+        {
+          "cell": "S1!A3",
+          "formula": "=A2*2"
+        },
+        {
+          "cell": "S1!B3",
+          "formula": "~tilde"
+        },
+        {
+          "cell": "S1!C3",
+          "formula": "pear"
+        },
+        {
+          "cell": "S1!D3",
+          "formula": "12 pears"
+        },
+        {
+          "cell": "S1!E3",
+          "formula": "=IF(A2>1,\"pear\",\"none\")"
+        },
+        {
+          "cell": "S1!F3",
+          "formula": "1.5"
+        },
+        {
+          "cell": "S1!A4",
+          "formula": "  space "
+        },
+        {
+          "cell": "S1!B4",
+          "formula": "x"
+        },
+        {
+          "cell": "S2!A1",
+          "formula": "pear"
+        },
+        {
+          "cell": "S2!B1",
+          "formula": "12"
+        },
+        {
+          "cell": "S2!C1",
+          "formula": "='S1'!A1&\"!\""
+        },
+        {
+          "cell": "S2!A2",
+          "formula": "pear tree"
+        },
+        {
+          "cell": "S2!B2",
+          "formula": "grape"
+        },
+        {
+          "cell": "S3!A1",
+          "formula": "no match"
+        },
+        {
+          "cell": "S3!B1",
+          "formula": "pear"
+        }
+      ]
+    },
+    {
+      "name": "workbook-whole",
+      "find": "apple",
+      "replacement": "pear",
+      "scope": "workbook",
+      "sheet": 0,
+      "lookAt": "whole",
+      "matchCase": false,
+      "cells": [
+        "S1!A1",
+        "S1!C1",
+        "S1!C3",
+        "S2!A1",
+        "S3!B1"
+      ],
+      "result": [
+        {
+          "cell": "S1!A1",
+          "formula": "pear"
+        },
+        {
+          "cell": "S1!B1",
+          "formula": "apple pie"
+        },
+        {
+          "cell": "S1!C1",
+          "formula": "pear"
+        },
+        {
+          "cell": "S1!D1",
+          "formula": "123"
+        },
+        {
+          "cell": "S1!E1",
+          "formula": "=A1&\"x\""
+        },
+        {
+          "cell": "S1!F1",
+          "formula": "a*b"
+        },
+        {
+          "cell": "S1!G1",
+          "formula": "axb"
+        },
+        {
+          "cell": "S1!H1",
+          "formula": "TRUE"
+        },
+        {
+          "cell": "S1!A2",
+          "formula": "12"
+        },
+        {
+          "cell": "S1!B2",
+          "formula": "=SUM(A2:A3)"
+        },
+        {
+          "cell": "S1!C2",
+          "formula": "banana"
+        },
+        {
+          "cell": "S1!D2",
+          "formula": "Apple Apple"
+        },
+        {
+          "cell": "S1!E2",
+          "formula": "pineapple"
+        },
+        {
+          "cell": "S1!F2",
+          "formula": "a?b"
+        },
+        {
+          "cell": "S1!G2",
+          "formula": "A1"
+        },
+        {
+          "cell": "S1!H2",
+          "formula": "0.5"
+        },
+        {
+          "cell": "S1!A3",
+          "formula": "=A2*2"
+        },
+        {
+          "cell": "S1!B3",
+          "formula": "~tilde"
+        },
+        {
+          "cell": "S1!C3",
+          "formula": "pear"
+        },
+        {
+          "cell": "S1!D3",
+          "formula": "12 apples"
+        },
+        {
+          "cell": "S1!E3",
+          "formula": "=IF(A2>1,\"apple\",\"none\")"
+        },
+        {
+          "cell": "S1!F3",
+          "formula": "1.5"
+        },
+        {
+          "cell": "S1!A4",
+          "formula": "  space "
+        },
+        {
+          "cell": "S1!B4",
+          "formula": "x"
+        },
+        {
+          "cell": "S2!A1",
+          "formula": "pear"
+        },
+        {
+          "cell": "S2!B1",
+          "formula": "12"
+        },
+        {
+          "cell": "S2!C1",
+          "formula": "='S1'!A1&\"!\""
+        },
+        {
+          "cell": "S2!A2",
+          "formula": "Apple tree"
+        },
+        {
+          "cell": "S2!B2",
+          "formula": "grape"
+        },
+        {
+          "cell": "S3!A1",
+          "formula": "no match"
+        },
+        {
+          "cell": "S3!B1",
+          "formula": "pear"
+        }
+      ]
+    },
+    {
+      "name": "workbook-numbers",
+      "find": "12",
+      "replacement": "77",
+      "scope": "workbook",
+      "sheet": 0,
+      "lookAt": "part",
+      "matchCase": false,
+      "cells": [
+        "S1!D1",
+        "S1!A2",
+        "S1!D3",
+        "S2!B1"
+      ],
+      "result": [
+        {
+          "cell": "S1!A1",
+          "formula": "Apple"
+        },
+        {
+          "cell": "S1!B1",
+          "formula": "apple pie"
+        },
+        {
+          "cell": "S1!C1",
+          "formula": "APPLE"
+        },
+        {
+          "cell": "S1!D1",
+          "formula": "773"
+        },
+        {
+          "cell": "S1!E1",
+          "formula": "=A1&\"x\""
+        },
+        {
+          "cell": "S1!F1",
+          "formula": "a*b"
+        },
+        {
+          "cell": "S1!G1",
+          "formula": "axb"
+        },
+        {
+          "cell": "S1!H1",
+          "formula": "TRUE"
+        },
+        {
+          "cell": "S1!A2",
+          "formula": "77"
+        },
+        {
+          "cell": "S1!B2",
+          "formula": "=SUM(A2:A3)"
+        },
+        {
+          "cell": "S1!C2",
+          "formula": "banana"
+        },
+        {
+          "cell": "S1!D2",
+          "formula": "Apple Apple"
+        },
+        {
+          "cell": "S1!E2",
+          "formula": "pineapple"
+        },
+        {
+          "cell": "S1!F2",
+          "formula": "a?b"
+        },
+        {
+          "cell": "S1!G2",
+          "formula": "A1"
+        },
+        {
+          "cell": "S1!H2",
+          "formula": "0.5"
+        },
+        {
+          "cell": "S1!A3",
+          "formula": "=A2*2"
+        },
+        {
+          "cell": "S1!B3",
+          "formula": "~tilde"
+        },
+        {
+          "cell": "S1!C3",
+          "formula": "Apple"
+        },
+        {
+          "cell": "S1!D3",
+          "formula": "77 apples"
+        },
+        {
+          "cell": "S1!E3",
+          "formula": "=IF(A2>1,\"apple\",\"none\")"
+        },
+        {
+          "cell": "S1!F3",
+          "formula": "1.5"
+        },
+        {
+          "cell": "S1!A4",
+          "formula": "  space "
+        },
+        {
+          "cell": "S1!B4",
+          "formula": "x"
+        },
+        {
+          "cell": "S2!A1",
+          "formula": "apple"
+        },
+        {
+          "cell": "S2!B1",
+          "formula": "77"
+        },
+        {
+          "cell": "S2!C1",
+          "formula": "='S1'!A1&\"!\""
+        },
+        {
+          "cell": "S2!A2",
+          "formula": "Apple tree"
+        },
+        {
+          "cell": "S2!B2",
+          "formula": "grape"
+        },
+        {
+          "cell": "S3!A1",
+          "formula": "no match"
+        },
+        {
+          "cell": "S3!B1",
+          "formula": "apple"
+        }
+      ]
+    },
+    {
+      "name": "delete",
+      "find": "apple",
+      "replacement": "",
+      "scope": "sheet",
+      "sheet": 0,
+      "lookAt": "part",
+      "matchCase": false,
+      "cells": [
+        "S1!A1",
+        "S1!B1",
+        "S1!C1",
+        "S1!D2",
+        "S1!E2",
+        "S1!C3",
+        "S1!D3",
+        "S1!E3"
+      ],
+      "result": [
+        {
+          "cell": "S1!B1",
+          "formula": " pie"
+        },
+        {
+          "cell": "S1!D1",
+          "formula": "123"
+        },
+        {
+          "cell": "S1!E1",
+          "formula": "=A1&\"x\""
+        },
+        {
+          "cell": "S1!F1",
+          "formula": "a*b"
+        },
+        {
+          "cell": "S1!G1",
+          "formula": "axb"
+        },
+        {
+          "cell": "S1!H1",
+          "formula": "TRUE"
+        },
+        {
+          "cell": "S1!A2",
+          "formula": "12"
+        },
+        {
+          "cell": "S1!B2",
+          "formula": "=SUM(A2:A3)"
+        },
+        {
+          "cell": "S1!C2",
+          "formula": "banana"
+        },
+        {
+          "cell": "S1!D2",
+          "formula": " "
+        },
+        {
+          "cell": "S1!E2",
+          "formula": "pine"
+        },
+        {
+          "cell": "S1!F2",
+          "formula": "a?b"
+        },
+        {
+          "cell": "S1!G2",
+          "formula": "A1"
+        },
+        {
+          "cell": "S1!H2",
+          "formula": "0.5"
+        },
+        {
+          "cell": "S1!A3",
+          "formula": "=A2*2"
+        },
+        {
+          "cell": "S1!B3",
+          "formula": "~tilde"
+        },
+        {
+          "cell": "S1!D3",
+          "formula": "12 s"
+        },
+        {
+          "cell": "S1!E3",
+          "formula": "=IF(A2>1,\"\",\"none\")"
+        },
+        {
+          "cell": "S1!F3",
+          "formula": "1.5"
+        },
+        {
+          "cell": "S1!A4",
+          "formula": "  space "
+        },
+        {
+          "cell": "S1!B4",
+          "formula": "x"
+        },
+        {
+          "cell": "S2!A1",
+          "formula": "apple"
+        },
+        {
+          "cell": "S2!B1",
+          "formula": "12"
+        },
+        {
+          "cell": "S2!C1",
+          "formula": "='S1'!A1&\"!\""
+        },
+        {
+          "cell": "S2!A2",
+          "formula": "Apple tree"
+        },
+        {
+          "cell": "S2!B2",
+          "formula": "grape"
+        },
+        {
+          "cell": "S3!A1",
+          "formula": "no match"
+        },
+        {
+          "cell": "S3!B1",
+          "formula": "apple"
+        }
+      ]
+    },
+    {
+      "name": "two-in-a-cell",
+      "find": "Apple",
+      "replacement": "X",
+      "scope": "sheet",
+      "sheet": 0,
+      "lookAt": "part",
+      "matchCase": true,
+      "cells": [
+        "S1!A1",
+        "S1!D2",
+        "S1!C3"
+      ],
+      "result": [
+        {
+          "cell": "S1!A1",
+          "formula": "X"
+        },
+        {
+          "cell": "S1!B1",
+          "formula": "apple pie"
+        },
+        {
+          "cell": "S1!C1",
+          "formula": "APPLE"
+        },
+        {
+          "cell": "S1!D1",
+          "formula": "123"
+        },
+        {
+          "cell": "S1!E1",
+          "formula": "=A1&\"x\""
+        },
+        {
+          "cell": "S1!F1",
+          "formula": "a*b"
+        },
+        {
+          "cell": "S1!G1",
+          "formula": "axb"
+        },
+        {
+          "cell": "S1!H1",
+          "formula": "TRUE"
+        },
+        {
+          "cell": "S1!A2",
+          "formula": "12"
+        },
+        {
+          "cell": "S1!B2",
+          "formula": "=SUM(A2:A3)"
+        },
+        {
+          "cell": "S1!C2",
+          "formula": "banana"
+        },
+        {
+          "cell": "S1!D2",
+          "formula": "X X"
+        },
+        {
+          "cell": "S1!E2",
+          "formula": "pineapple"
+        },
+        {
+          "cell": "S1!F2",
+          "formula": "a?b"
+        },
+        {
+          "cell": "S1!G2",
+          "formula": "A1"
+        },
+        {
+          "cell": "S1!H2",
+          "formula": "0.5"
+        },
+        {
+          "cell": "S1!A3",
+          "formula": "=A2*2"
+        },
+        {
+          "cell": "S1!B3",
+          "formula": "~tilde"
+        },
+        {
+          "cell": "S1!C3",
+          "formula": "X"
+        },
+        {
+          "cell": "S1!D3",
+          "formula": "12 apples"
+        },
+        {
+          "cell": "S1!E3",
+          "formula": "=IF(A2>1,\"apple\",\"none\")"
+        },
+        {
+          "cell": "S1!F3",
+          "formula": "1.5"
+        },
+        {
+          "cell": "S1!A4",
+          "formula": "  space "
+        },
+        {
+          "cell": "S1!B4",
+          "formula": "x"
+        },
+        {
+          "cell": "S2!A1",
+          "formula": "apple"
+        },
+        {
+          "cell": "S2!B1",
+          "formula": "12"
+        },
+        {
+          "cell": "S2!C1",
+          "formula": "='S1'!A1&\"!\""
+        },
+        {
+          "cell": "S2!A2",
+          "formula": "Apple tree"
+        },
+        {
+          "cell": "S2!B2",
+          "formula": "grape"
+        },
+        {
+          "cell": "S3!A1",
+          "formula": "no match"
+        },
+        {
+          "cell": "S3!B1",
+          "formula": "apple"
+        }
+      ]
+    },
+    {
+      "name": "star-part",
+      "find": "a*e",
+      "replacement": "Z",
+      "scope": "sheet",
+      "sheet": 0,
+      "lookAt": "part",
+      "matchCase": false,
+      "cells": [
+        "S1!A1",
+        "S1!B1",
+        "S1!C1",
+        "S1!D2",
+        "S1!E2",
+        "S1!C3",
+        "S1!D3",
+        "S1!E3",
+        "S1!A4"
+      ],
+      "result": [
+        {
+          "cell": "S1!A1",
+          "formula": "Z"
+        },
+        {
+          "cell": "S1!B1",
+          "formula": "Z pie"
+        },
+        {
+          "cell": "S1!C1",
+          "formula": "Z"
+        },
+        {
+          "cell": "S1!D1",
+          "formula": "123"
+        },
+        {
+          "cell": "S1!E1",
+          "formula": "=A1&\"x\""
+        },
+        {
+          "cell": "S1!F1",
+          "formula": "a*b"
+        },
+        {
+          "cell": "S1!G1",
+          "formula": "axb"
+        },
+        {
+          "cell": "S1!H1",
+          "formula": "TRUE"
+        },
+        {
+          "cell": "S1!A2",
+          "formula": "12"
+        },
+        {
+          "cell": "S1!B2",
+          "formula": "=SUM(A2:A3)"
+        },
+        {
+          "cell": "S1!C2",
+          "formula": "banana"
+        },
+        {
+          "cell": "S1!D2",
+          "formula": "Z Z"
+        },
+        {
+          "cell": "S1!E2",
+          "formula": "pineZ"
+        },
+        {
+          "cell": "S1!F2",
+          "formula": "a?b"
+        },
+        {
+          "cell": "S1!G2",
+          "formula": "A1"
+        },
+        {
+          "cell": "S1!H2",
+          "formula": "0.5"
+        },
+        {
+          "cell": "S1!A3",
+          "formula": "=A2*2"
+        },
+        {
+          "cell": "S1!B3",
+          "formula": "~tilde"
+        },
+        {
+          "cell": "S1!C3",
+          "formula": "Z"
+        },
+        {
+          "cell": "S1!D3",
+          "formula": "12 Zs"
+        },
+        {
+          "cell": "S1!E3",
+          "formula": "=IF(A2>1,\"apple\",\"none\")"
+        },
+        {
+          "cell": "S1!F3",
+          "formula": "1.5"
+        },
+        {
+          "cell": "S1!A4",
+          "formula": "  space "
+        },
+        {
+          "cell": "S1!B4",
+          "formula": "x"
+        },
+        {
+          "cell": "S2!A1",
+          "formula": "apple"
+        },
+        {
+          "cell": "S2!B1",
+          "formula": "12"
+        },
+        {
+          "cell": "S2!C1",
+          "formula": "='S1'!A1&\"!\""
+        },
+        {
+          "cell": "S2!A2",
+          "formula": "Apple tree"
+        },
+        {
+          "cell": "S2!B2",
+          "formula": "grape"
+        },
+        {
+          "cell": "S3!A1",
+          "formula": "no match"
+        },
+        {
+          "cell": "S3!B1",
+          "formula": "apple"
+        }
+      ]
+    },
+    {
+      "name": "star-whole",
+      "find": "a*e",
+      "replacement": "Z",
+      "scope": "sheet",
+      "sheet": 0,
+      "lookAt": "whole",
+      "matchCase": false,
+      "cells": [
+        "S1!A1",
+        "S1!B1",
+        "S1!C1",
+        "S1!D2",
+        "S1!C3"
+      ],
+      "result": [
+        {
+          "cell": "S1!A1",
+          "formula": "Z"
+        },
+        {
+          "cell": "S1!B1",
+          "formula": "Z"
+        },
+        {
+          "cell": "S1!C1",
+          "formula": "Z"
+        },
+        {
+          "cell": "S1!D1",
+          "formula": "123"
+        },
+        {
+          "cell": "S1!E1",
+          "formula": "=A1&\"x\""
+        },
+        {
+          "cell": "S1!F1",
+          "formula": "a*b"
+        },
+        {
+          "cell": "S1!G1",
+          "formula": "axb"
+        },
+        {
+          "cell": "S1!H1",
+          "formula": "TRUE"
+        },
+        {
+          "cell": "S1!A2",
+          "formula": "12"
+        },
+        {
+          "cell": "S1!B2",
+          "formula": "=SUM(A2:A3)"
+        },
+        {
+          "cell": "S1!C2",
+          "formula": "banana"
+        },
+        {
+          "cell": "S1!D2",
+          "formula": "Z"
+        },
+        {
+          "cell": "S1!E2",
+          "formula": "pineapple"
+        },
+        {
+          "cell": "S1!F2",
+          "formula": "a?b"
+        },
+        {
+          "cell": "S1!G2",
+          "formula": "A1"
+        },
+        {
+          "cell": "S1!H2",
+          "formula": "0.5"
+        },
+        {
+          "cell": "S1!A3",
+          "formula": "=A2*2"
+        },
+        {
+          "cell": "S1!B3",
+          "formula": "~tilde"
+        },
+        {
+          "cell": "S1!C3",
+          "formula": "Z"
+        },
+        {
+          "cell": "S1!D3",
+          "formula": "12 apples"
+        },
+        {
+          "cell": "S1!E3",
+          "formula": "=IF(A2>1,\"apple\",\"none\")"
+        },
+        {
+          "cell": "S1!F3",
+          "formula": "1.5"
+        },
+        {
+          "cell": "S1!A4",
+          "formula": "  space "
+        },
+        {
+          "cell": "S1!B4",
+          "formula": "x"
+        },
+        {
+          "cell": "S2!A1",
+          "formula": "apple"
+        },
+        {
+          "cell": "S2!B1",
+          "formula": "12"
+        },
+        {
+          "cell": "S2!C1",
+          "formula": "='S1'!A1&\"!\""
+        },
+        {
+          "cell": "S2!A2",
+          "formula": "Apple tree"
+        },
+        {
+          "cell": "S2!B2",
+          "formula": "grape"
+        },
+        {
+          "cell": "S3!A1",
+          "formula": "no match"
+        },
+        {
+          "cell": "S3!B1",
+          "formula": "apple"
+        }
+      ]
+    },
+    {
+      "name": "qmark-part",
+      "find": "ap?le",
+      "replacement": "Z",
+      "scope": "sheet",
+      "sheet": 0,
+      "lookAt": "part",
+      "matchCase": false,
+      "cells": [
+        "S1!A1",
+        "S1!B1",
+        "S1!C1",
+        "S1!D2",
+        "S1!E2",
+        "S1!C3",
+        "S1!D3",
+        "S1!E3"
+      ],
+      "result": [
+        {
+          "cell": "S1!A1",
+          "formula": "Z"
+        },
+        {
+          "cell": "S1!B1",
+          "formula": "Z pie"
+        },
+        {
+          "cell": "S1!C1",
+          "formula": "Z"
+        },
+        {
+          "cell": "S1!D1",
+          "formula": "123"
+        },
+        {
+          "cell": "S1!E1",
+          "formula": "=A1&\"x\""
+        },
+        {
+          "cell": "S1!F1",
+          "formula": "a*b"
+        },
+        {
+          "cell": "S1!G1",
+          "formula": "axb"
+        },
+        {
+          "cell": "S1!H1",
+          "formula": "TRUE"
+        },
+        {
+          "cell": "S1!A2",
+          "formula": "12"
+        },
+        {
+          "cell": "S1!B2",
+          "formula": "=SUM(A2:A3)"
+        },
+        {
+          "cell": "S1!C2",
+          "formula": "banana"
+        },
+        {
+          "cell": "S1!D2",
+          "formula": "Z Z"
+        },
+        {
+          "cell": "S1!E2",
+          "formula": "pineZ"
+        },
+        {
+          "cell": "S1!F2",
+          "formula": "a?b"
+        },
+        {
+          "cell": "S1!G2",
+          "formula": "A1"
+        },
+        {
+          "cell": "S1!H2",
+          "formula": "0.5"
+        },
+        {
+          "cell": "S1!A3",
+          "formula": "=A2*2"
+        },
+        {
+          "cell": "S1!B3",
+          "formula": "~tilde"
+        },
+        {
+          "cell": "S1!C3",
+          "formula": "Z"
+        },
+        {
+          "cell": "S1!D3",
+          "formula": "12 Zs"
+        },
+        {
+          "cell": "S1!E3",
+          "formula": "=IF(A2>1,\"Z\",\"none\")"
+        },
+        {
+          "cell": "S1!F3",
+          "formula": "1.5"
+        },
+        {
+          "cell": "S1!A4",
+          "formula": "  space "
+        },
+        {
+          "cell": "S1!B4",
+          "formula": "x"
+        },
+        {
+          "cell": "S2!A1",
+          "formula": "apple"
+        },
+        {
+          "cell": "S2!B1",
+          "formula": "12"
+        },
+        {
+          "cell": "S2!C1",
+          "formula": "='S1'!A1&\"!\""
+        },
+        {
+          "cell": "S2!A2",
+          "formula": "Apple tree"
+        },
+        {
+          "cell": "S2!B2",
+          "formula": "grape"
+        },
+        {
+          "cell": "S3!A1",
+          "formula": "no match"
+        },
+        {
+          "cell": "S3!B1",
+          "formula": "apple"
+        }
+      ]
+    },
+    {
+      "name": "qmark-whole",
+      "find": "a?b",
+      "replacement": "Z",
+      "scope": "sheet",
+      "sheet": 0,
+      "lookAt": "whole",
+      "matchCase": false,
+      "cells": [
+        "S1!F1",
+        "S1!G1",
+        "S1!F2"
+      ],
+      "result": [
+        {
+          "cell": "S1!A1",
+          "formula": "Apple"
+        },
+        {
+          "cell": "S1!B1",
+          "formula": "apple pie"
+        },
+        {
+          "cell": "S1!C1",
+          "formula": "APPLE"
+        },
+        {
+          "cell": "S1!D1",
+          "formula": "123"
+        },
+        {
+          "cell": "S1!E1",
+          "formula": "=A1&\"x\""
+        },
+        {
+          "cell": "S1!F1",
+          "formula": "Z"
+        },
+        {
+          "cell": "S1!G1",
+          "formula": "Z"
+        },
+        {
+          "cell": "S1!H1",
+          "formula": "TRUE"
+        },
+        {
+          "cell": "S1!A2",
+          "formula": "12"
+        },
+        {
+          "cell": "S1!B2",
+          "formula": "=SUM(A2:A3)"
+        },
+        {
+          "cell": "S1!C2",
+          "formula": "banana"
+        },
+        {
+          "cell": "S1!D2",
+          "formula": "Apple Apple"
+        },
+        {
+          "cell": "S1!E2",
+          "formula": "pineapple"
+        },
+        {
+          "cell": "S1!F2",
+          "formula": "Z"
+        },
+        {
+          "cell": "S1!G2",
+          "formula": "A1"
+        },
+        {
+          "cell": "S1!H2",
+          "formula": "0.5"
+        },
+        {
+          "cell": "S1!A3",
+          "formula": "=A2*2"
+        },
+        {
+          "cell": "S1!B3",
+          "formula": "~tilde"
+        },
+        {
+          "cell": "S1!C3",
+          "formula": "Apple"
+        },
+        {
+          "cell": "S1!D3",
+          "formula": "12 apples"
+        },
+        {
+          "cell": "S1!E3",
+          "formula": "=IF(A2>1,\"apple\",\"none\")"
+        },
+        {
+          "cell": "S1!F3",
+          "formula": "1.5"
+        },
+        {
+          "cell": "S1!A4",
+          "formula": "  space "
+        },
+        {
+          "cell": "S1!B4",
+          "formula": "x"
+        },
+        {
+          "cell": "S2!A1",
+          "formula": "apple"
+        },
+        {
+          "cell": "S2!B1",
+          "formula": "12"
+        },
+        {
+          "cell": "S2!C1",
+          "formula": "='S1'!A1&\"!\""
+        },
+        {
+          "cell": "S2!A2",
+          "formula": "Apple tree"
+        },
+        {
+          "cell": "S2!B2",
+          "formula": "grape"
+        },
+        {
+          "cell": "S3!A1",
+          "formula": "no match"
+        },
+        {
+          "cell": "S3!B1",
+          "formula": "apple"
+        }
+      ]
+    },
+    {
+      "name": "escaped-star",
+      "find": "a~*b",
+      "replacement": "Z",
+      "scope": "sheet",
+      "sheet": 0,
+      "lookAt": "part",
+      "matchCase": false,
+      "cells": [
+        "S1!F1"
+      ],
+      "result": [
+        {
+          "cell": "S1!A1",
+          "formula": "Apple"
+        },
+        {
+          "cell": "S1!B1",
+          "formula": "apple pie"
+        },
+        {
+          "cell": "S1!C1",
+          "formula": "APPLE"
+        },
+        {
+          "cell": "S1!D1",
+          "formula": "123"
+        },
+        {
+          "cell": "S1!E1",
+          "formula": "=A1&\"x\""
+        },
+        {
+          "cell": "S1!F1",
+          "formula": "Z"
+        },
+        {
+          "cell": "S1!G1",
+          "formula": "axb"
+        },
+        {
+          "cell": "S1!H1",
+          "formula": "TRUE"
+        },
+        {
+          "cell": "S1!A2",
+          "formula": "12"
+        },
+        {
+          "cell": "S1!B2",
+          "formula": "=SUM(A2:A3)"
+        },
+        {
+          "cell": "S1!C2",
+          "formula": "banana"
+        },
+        {
+          "cell": "S1!D2",
+          "formula": "Apple Apple"
+        },
+        {
+          "cell": "S1!E2",
+          "formula": "pineapple"
+        },
+        {
+          "cell": "S1!F2",
+          "formula": "a?b"
+        },
+        {
+          "cell": "S1!G2",
+          "formula": "A1"
+        },
+        {
+          "cell": "S1!H2",
+          "formula": "0.5"
+        },
+        {
+          "cell": "S1!A3",
+          "formula": "=A2*2"
+        },
+        {
+          "cell": "S1!B3",
+          "formula": "~tilde"
+        },
+        {
+          "cell": "S1!C3",
+          "formula": "Apple"
+        },
+        {
+          "cell": "S1!D3",
+          "formula": "12 apples"
+        },
+        {
+          "cell": "S1!E3",
+          "formula": "=IF(A2>1,\"apple\",\"none\")"
+        },
+        {
+          "cell": "S1!F3",
+          "formula": "1.5"
+        },
+        {
+          "cell": "S1!A4",
+          "formula": "  space "
+        },
+        {
+          "cell": "S1!B4",
+          "formula": "x"
+        },
+        {
+          "cell": "S2!A1",
+          "formula": "apple"
+        },
+        {
+          "cell": "S2!B1",
+          "formula": "12"
+        },
+        {
+          "cell": "S2!C1",
+          "formula": "='S1'!A1&\"!\""
+        },
+        {
+          "cell": "S2!A2",
+          "formula": "Apple tree"
+        },
+        {
+          "cell": "S2!B2",
+          "formula": "grape"
+        },
+        {
+          "cell": "S3!A1",
+          "formula": "no match"
+        },
+        {
+          "cell": "S3!B1",
+          "formula": "apple"
+        }
+      ]
+    },
+    {
+      "name": "escaped-qmark",
+      "find": "a~?b",
+      "replacement": "Z",
+      "scope": "sheet",
+      "sheet": 0,
+      "lookAt": "part",
+      "matchCase": false,
+      "cells": [
+        "S1!F2"
+      ],
+      "result": [
+        {
+          "cell": "S1!A1",
+          "formula": "Apple"
+        },
+        {
+          "cell": "S1!B1",
+          "formula": "apple pie"
+        },
+        {
+          "cell": "S1!C1",
+          "formula": "APPLE"
+        },
+        {
+          "cell": "S1!D1",
+          "formula": "123"
+        },
+        {
+          "cell": "S1!E1",
+          "formula": "=A1&\"x\""
+        },
+        {
+          "cell": "S1!F1",
+          "formula": "a*b"
+        },
+        {
+          "cell": "S1!G1",
+          "formula": "axb"
+        },
+        {
+          "cell": "S1!H1",
+          "formula": "TRUE"
+        },
+        {
+          "cell": "S1!A2",
+          "formula": "12"
+        },
+        {
+          "cell": "S1!B2",
+          "formula": "=SUM(A2:A3)"
+        },
+        {
+          "cell": "S1!C2",
+          "formula": "banana"
+        },
+        {
+          "cell": "S1!D2",
+          "formula": "Apple Apple"
+        },
+        {
+          "cell": "S1!E2",
+          "formula": "pineapple"
+        },
+        {
+          "cell": "S1!F2",
+          "formula": "Z"
+        },
+        {
+          "cell": "S1!G2",
+          "formula": "A1"
+        },
+        {
+          "cell": "S1!H2",
+          "formula": "0.5"
+        },
+        {
+          "cell": "S1!A3",
+          "formula": "=A2*2"
+        },
+        {
+          "cell": "S1!B3",
+          "formula": "~tilde"
+        },
+        {
+          "cell": "S1!C3",
+          "formula": "Apple"
+        },
+        {
+          "cell": "S1!D3",
+          "formula": "12 apples"
+        },
+        {
+          "cell": "S1!E3",
+          "formula": "=IF(A2>1,\"apple\",\"none\")"
+        },
+        {
+          "cell": "S1!F3",
+          "formula": "1.5"
+        },
+        {
+          "cell": "S1!A4",
+          "formula": "  space "
+        },
+        {
+          "cell": "S1!B4",
+          "formula": "x"
+        },
+        {
+          "cell": "S2!A1",
+          "formula": "apple"
+        },
+        {
+          "cell": "S2!B1",
+          "formula": "12"
+        },
+        {
+          "cell": "S2!C1",
+          "formula": "='S1'!A1&\"!\""
+        },
+        {
+          "cell": "S2!A2",
+          "formula": "Apple tree"
+        },
+        {
+          "cell": "S2!B2",
+          "formula": "grape"
+        },
+        {
+          "cell": "S3!A1",
+          "formula": "no match"
+        },
+        {
+          "cell": "S3!B1",
+          "formula": "apple"
+        }
+      ]
+    },
+    {
+      "name": "escaped-tilde",
+      "find": "~~tilde",
+      "replacement": "Z",
+      "scope": "sheet",
+      "sheet": 0,
+      "lookAt": "part",
+      "matchCase": false,
+      "cells": [
+        "S1!B3"
+      ],
+      "result": [
+        {
+          "cell": "S1!A1",
+          "formula": "Apple"
+        },
+        {
+          "cell": "S1!B1",
+          "formula": "apple pie"
+        },
+        {
+          "cell": "S1!C1",
+          "formula": "APPLE"
+        },
+        {
+          "cell": "S1!D1",
+          "formula": "123"
+        },
+        {
+          "cell": "S1!E1",
+          "formula": "=A1&\"x\""
+        },
+        {
+          "cell": "S1!F1",
+          "formula": "a*b"
+        },
+        {
+          "cell": "S1!G1",
+          "formula": "axb"
+        },
+        {
+          "cell": "S1!H1",
+          "formula": "TRUE"
+        },
+        {
+          "cell": "S1!A2",
+          "formula": "12"
+        },
+        {
+          "cell": "S1!B2",
+          "formula": "=SUM(A2:A3)"
+        },
+        {
+          "cell": "S1!C2",
+          "formula": "banana"
+        },
+        {
+          "cell": "S1!D2",
+          "formula": "Apple Apple"
+        },
+        {
+          "cell": "S1!E2",
+          "formula": "pineapple"
+        },
+        {
+          "cell": "S1!F2",
+          "formula": "a?b"
+        },
+        {
+          "cell": "S1!G2",
+          "formula": "A1"
+        },
+        {
+          "cell": "S1!H2",
+          "formula": "0.5"
+        },
+        {
+          "cell": "S1!A3",
+          "formula": "=A2*2"
+        },
+        {
+          "cell": "S1!B3",
+          "formula": "Z"
+        },
+        {
+          "cell": "S1!C3",
+          "formula": "Apple"
+        },
+        {
+          "cell": "S1!D3",
+          "formula": "12 apples"
+        },
+        {
+          "cell": "S1!E3",
+          "formula": "=IF(A2>1,\"apple\",\"none\")"
+        },
+        {
+          "cell": "S1!F3",
+          "formula": "1.5"
+        },
+        {
+          "cell": "S1!A4",
+          "formula": "  space "
+        },
+        {
+          "cell": "S1!B4",
+          "formula": "x"
+        },
+        {
+          "cell": "S2!A1",
+          "formula": "apple"
+        },
+        {
+          "cell": "S2!B1",
+          "formula": "12"
+        },
+        {
+          "cell": "S2!C1",
+          "formula": "='S1'!A1&\"!\""
+        },
+        {
+          "cell": "S2!A2",
+          "formula": "Apple tree"
+        },
+        {
+          "cell": "S2!B2",
+          "formula": "grape"
+        },
+        {
+          "cell": "S3!A1",
+          "formula": "no match"
+        },
+        {
+          "cell": "S3!B1",
+          "formula": "apple"
+        }
+      ]
+    },
+    {
+      "name": "star-lazy",
+      "find": "a*p",
+      "replacement": "Z",
+      "scope": "sheet",
+      "sheet": 0,
+      "lookAt": "part",
+      "matchCase": true,
+      "cells": [
+        "S1!B1",
+        "S1!E2",
+        "S1!D3",
+        "S1!E3"
+      ],
+      "result": [
+        {
+          "cell": "S1!A1",
+          "formula": "Apple"
+        },
+        {
+          "cell": "S1!B1",
+          "formula": "Zple pie"
+        },
+        {
+          "cell": "S1!C1",
+          "formula": "APPLE"
+        },
+        {
+          "cell": "S1!D1",
+          "formula": "123"
+        },
+        {
+          "cell": "S1!E1",
+          "formula": "=A1&\"x\""
+        },
+        {
+          "cell": "S1!F1",
+          "formula": "a*b"
+        },
+        {
+          "cell": "S1!G1",
+          "formula": "axb"
+        },
+        {
+          "cell": "S1!H1",
+          "formula": "TRUE"
+        },
+        {
+          "cell": "S1!A2",
+          "formula": "12"
+        },
+        {
+          "cell": "S1!B2",
+          "formula": "=SUM(A2:A3)"
+        },
+        {
+          "cell": "S1!C2",
+          "formula": "banana"
+        },
+        {
+          "cell": "S1!D2",
+          "formula": "Apple Apple"
+        },
+        {
+          "cell": "S1!E2",
+          "formula": "pineZple"
+        },
+        {
+          "cell": "S1!F2",
+          "formula": "a?b"
+        },
+        {
+          "cell": "S1!G2",
+          "formula": "A1"
+        },
+        {
+          "cell": "S1!H2",
+          "formula": "0.5"
+        },
+        {
+          "cell": "S1!A3",
+          "formula": "=A2*2"
+        },
+        {
+          "cell": "S1!B3",
+          "formula": "~tilde"
+        },
+        {
+          "cell": "S1!C3",
+          "formula": "Apple"
+        },
+        {
+          "cell": "S1!D3",
+          "formula": "12 Zples"
+        },
+        {
+          "cell": "S1!E3",
+          "formula": "=IF(A2>1,\"Zple\",\"none\")"
+        },
+        {
+          "cell": "S1!F3",
+          "formula": "1.5"
+        },
+        {
+          "cell": "S1!A4",
+          "formula": "  space "
+        },
+        {
+          "cell": "S1!B4",
+          "formula": "x"
+        },
+        {
+          "cell": "S2!A1",
+          "formula": "apple"
+        },
+        {
+          "cell": "S2!B1",
+          "formula": "12"
+        },
+        {
+          "cell": "S2!C1",
+          "formula": "='S1'!A1&\"!\""
+        },
+        {
+          "cell": "S2!A2",
+          "formula": "Apple tree"
+        },
+        {
+          "cell": "S2!B2",
+          "formula": "grape"
+        },
+        {
+          "cell": "S3!A1",
+          "formula": "no match"
+        },
+        {
+          "cell": "S3!B1",
+          "formula": "apple"
+        }
+      ]
+    },
+    {
+      "name": "numbers-part",
+      "find": "1",
+      "replacement": "9",
+      "scope": "sheet",
+      "sheet": 0,
+      "lookAt": "part",
+      "matchCase": false,
+      "cells": [
+        "S1!D1",
+        "S1!E1",
+        "S1!A2",
+        "S1!G2",
+        "S1!D3",
+        "S1!E3",
+        "S1!F3"
+      ],
+      "result": [
+        {
+          "cell": "S1!A1",
+          "formula": "Apple"
+        },
+        {
+          "cell": "S1!B1",
+          "formula": "apple pie"
+        },
+        {
+          "cell": "S1!C1",
+          "formula": "APPLE"
+        },
+        {
+          "cell": "S1!D1",
+          "formula": "923"
+        },
+        {
+          "cell": "S1!E1",
+          "formula": "=A9&\"x\""
+        },
+        {
+          "cell": "S1!F1",
+          "formula": "a*b"
+        },
+        {
+          "cell": "S1!G1",
+          "formula": "axb"
+        },
+        {
+          "cell": "S1!H1",
+          "formula": "TRUE"
+        },
+        {
+          "cell": "S1!A2",
+          "formula": "92"
+        },
+        {
+          "cell": "S1!B2",
+          "formula": "=SUM(A2:A3)"
+        },
+        {
+          "cell": "S1!C2",
+          "formula": "banana"
+        },
+        {
+          "cell": "S1!D2",
+          "formula": "Apple Apple"
+        },
+        {
+          "cell": "S1!E2",
+          "formula": "pineapple"
+        },
+        {
+          "cell": "S1!F2",
+          "formula": "a?b"
+        },
+        {
+          "cell": "S1!G2",
+          "formula": "A9"
+        },
+        {
+          "cell": "S1!H2",
+          "formula": "0.5"
+        },
+        {
+          "cell": "S1!A3",
+          "formula": "=A2*2"
+        },
+        {
+          "cell": "S1!B3",
+          "formula": "~tilde"
+        },
+        {
+          "cell": "S1!C3",
+          "formula": "Apple"
+        },
+        {
+          "cell": "S1!D3",
+          "formula": "92 apples"
+        },
+        {
+          "cell": "S1!E3",
+          "formula": "=IF(A2>9,\"apple\",\"none\")"
+        },
+        {
+          "cell": "S1!F3",
+          "formula": "9.5"
+        },
+        {
+          "cell": "S1!A4",
+          "formula": "  space "
+        },
+        {
+          "cell": "S1!B4",
+          "formula": "x"
+        },
+        {
+          "cell": "S2!A1",
+          "formula": "apple"
+        },
+        {
+          "cell": "S2!B1",
+          "formula": "12"
+        },
+        {
+          "cell": "S2!C1",
+          "formula": "='S1'!A1&\"!\""
+        },
+        {
+          "cell": "S2!A2",
+          "formula": "Apple tree"
+        },
+        {
+          "cell": "S2!B2",
+          "formula": "grape"
+        },
+        {
+          "cell": "S3!A1",
+          "formula": "no match"
+        },
+        {
+          "cell": "S3!B1",
+          "formula": "apple"
+        }
+      ]
+    },
+    {
+      "name": "numbers-whole",
+      "find": "12",
+      "replacement": "7",
+      "scope": "sheet",
+      "sheet": 0,
+      "lookAt": "whole",
+      "matchCase": false,
+      "cells": [
+        "S1!A2"
+      ],
+      "result": [
+        {
+          "cell": "S1!A1",
+          "formula": "Apple"
+        },
+        {
+          "cell": "S1!B1",
+          "formula": "apple pie"
+        },
+        {
+          "cell": "S1!C1",
+          "formula": "APPLE"
+        },
+        {
+          "cell": "S1!D1",
+          "formula": "123"
+        },
+        {
+          "cell": "S1!E1",
+          "formula": "=A1&\"x\""
+        },
+        {
+          "cell": "S1!F1",
+          "formula": "a*b"
+        },
+        {
+          "cell": "S1!G1",
+          "formula": "axb"
+        },
+        {
+          "cell": "S1!H1",
+          "formula": "TRUE"
+        },
+        {
+          "cell": "S1!A2",
+          "formula": "7"
+        },
+        {
+          "cell": "S1!B2",
+          "formula": "=SUM(A2:A3)"
+        },
+        {
+          "cell": "S1!C2",
+          "formula": "banana"
+        },
+        {
+          "cell": "S1!D2",
+          "formula": "Apple Apple"
+        },
+        {
+          "cell": "S1!E2",
+          "formula": "pineapple"
+        },
+        {
+          "cell": "S1!F2",
+          "formula": "a?b"
+        },
+        {
+          "cell": "S1!G2",
+          "formula": "A1"
+        },
+        {
+          "cell": "S1!H2",
+          "formula": "0.5"
+        },
+        {
+          "cell": "S1!A3",
+          "formula": "=A2*2"
+        },
+        {
+          "cell": "S1!B3",
+          "formula": "~tilde"
+        },
+        {
+          "cell": "S1!C3",
+          "formula": "Apple"
+        },
+        {
+          "cell": "S1!D3",
+          "formula": "12 apples"
+        },
+        {
+          "cell": "S1!E3",
+          "formula": "=IF(A2>1,\"apple\",\"none\")"
+        },
+        {
+          "cell": "S1!F3",
+          "formula": "1.5"
+        },
+        {
+          "cell": "S1!A4",
+          "formula": "  space "
+        },
+        {
+          "cell": "S1!B4",
+          "formula": "x"
+        },
+        {
+          "cell": "S2!A1",
+          "formula": "apple"
+        },
+        {
+          "cell": "S2!B1",
+          "formula": "12"
+        },
+        {
+          "cell": "S2!C1",
+          "formula": "='S1'!A1&\"!\""
+        },
+        {
+          "cell": "S2!A2",
+          "formula": "Apple tree"
+        },
+        {
+          "cell": "S2!B2",
+          "formula": "grape"
+        },
+        {
+          "cell": "S3!A1",
+          "formula": "no match"
+        },
+        {
+          "cell": "S3!B1",
+          "formula": "apple"
+        }
+      ]
+    },
+    {
+      "name": "decimal",
+      "find": "1.5",
+      "replacement": "2.5",
+      "scope": "sheet",
+      "sheet": 0,
+      "lookAt": "whole",
+      "matchCase": false,
+      "cells": [
+        "S1!F3"
+      ],
+      "result": [
+        {
+          "cell": "S1!A1",
+          "formula": "Apple"
+        },
+        {
+          "cell": "S1!B1",
+          "formula": "apple pie"
+        },
+        {
+          "cell": "S1!C1",
+          "formula": "APPLE"
+        },
+        {
+          "cell": "S1!D1",
+          "formula": "123"
+        },
+        {
+          "cell": "S1!E1",
+          "formula": "=A1&\"x\""
+        },
+        {
+          "cell": "S1!F1",
+          "formula": "a*b"
+        },
+        {
+          "cell": "S1!G1",
+          "formula": "axb"
+        },
+        {
+          "cell": "S1!H1",
+          "formula": "TRUE"
+        },
+        {
+          "cell": "S1!A2",
+          "formula": "12"
+        },
+        {
+          "cell": "S1!B2",
+          "formula": "=SUM(A2:A3)"
+        },
+        {
+          "cell": "S1!C2",
+          "formula": "banana"
+        },
+        {
+          "cell": "S1!D2",
+          "formula": "Apple Apple"
+        },
+        {
+          "cell": "S1!E2",
+          "formula": "pineapple"
+        },
+        {
+          "cell": "S1!F2",
+          "formula": "a?b"
+        },
+        {
+          "cell": "S1!G2",
+          "formula": "A1"
+        },
+        {
+          "cell": "S1!H2",
+          "formula": "0.5"
+        },
+        {
+          "cell": "S1!A3",
+          "formula": "=A2*2"
+        },
+        {
+          "cell": "S1!B3",
+          "formula": "~tilde"
+        },
+        {
+          "cell": "S1!C3",
+          "formula": "Apple"
+        },
+        {
+          "cell": "S1!D3",
+          "formula": "12 apples"
+        },
+        {
+          "cell": "S1!E3",
+          "formula": "=IF(A2>1,\"apple\",\"none\")"
+        },
+        {
+          "cell": "S1!F3",
+          "formula": "2.5"
+        },
+        {
+          "cell": "S1!A4",
+          "formula": "  space "
+        },
+        {
+          "cell": "S1!B4",
+          "formula": "x"
+        },
+        {
+          "cell": "S2!A1",
+          "formula": "apple"
+        },
+        {
+          "cell": "S2!B1",
+          "formula": "12"
+        },
+        {
+          "cell": "S2!C1",
+          "formula": "='S1'!A1&\"!\""
+        },
+        {
+          "cell": "S2!A2",
+          "formula": "Apple tree"
+        },
+        {
+          "cell": "S2!B2",
+          "formula": "grape"
+        },
+        {
+          "cell": "S3!A1",
+          "formula": "no match"
+        },
+        {
+          "cell": "S3!B1",
+          "formula": "apple"
+        }
+      ]
+    },
+    {
+      "name": "formula-text",
+      "find": "A2",
+      "replacement": "A3",
+      "scope": "sheet",
+      "sheet": 0,
+      "lookAt": "part",
+      "matchCase": false,
+      "cells": [
+        "S1!B2",
+        "S1!A3",
+        "S1!E3"
+      ],
+      "result": [
+        {
+          "cell": "S1!A1",
+          "formula": "Apple"
+        },
+        {
+          "cell": "S1!B1",
+          "formula": "apple pie"
+        },
+        {
+          "cell": "S1!C1",
+          "formula": "APPLE"
+        },
+        {
+          "cell": "S1!D1",
+          "formula": "123"
+        },
+        {
+          "cell": "S1!E1",
+          "formula": "=A1&\"x\""
+        },
+        {
+          "cell": "S1!F1",
+          "formula": "a*b"
+        },
+        {
+          "cell": "S1!G1",
+          "formula": "axb"
+        },
+        {
+          "cell": "S1!H1",
+          "formula": "TRUE"
+        },
+        {
+          "cell": "S1!A2",
+          "formula": "12"
+        },
+        {
+          "cell": "S1!B2",
+          "formula": "=SUM(A3:A3)"
+        },
+        {
+          "cell": "S1!C2",
+          "formula": "banana"
+        },
+        {
+          "cell": "S1!D2",
+          "formula": "Apple Apple"
+        },
+        {
+          "cell": "S1!E2",
+          "formula": "pineapple"
+        },
+        {
+          "cell": "S1!F2",
+          "formula": "a?b"
+        },
+        {
+          "cell": "S1!G2",
+          "formula": "A1"
+        },
+        {
+          "cell": "S1!H2",
+          "formula": "0.5"
+        },
+        {
+          "cell": "S1!A3",
+          "formula": "=A3*2"
+        },
+        {
+          "cell": "S1!B3",
+          "formula": "~tilde"
+        },
+        {
+          "cell": "S1!C3",
+          "formula": "Apple"
+        },
+        {
+          "cell": "S1!D3",
+          "formula": "12 apples"
+        },
+        {
+          "cell": "S1!E3",
+          "formula": "=IF(A3>1,\"apple\",\"none\")"
+        },
+        {
+          "cell": "S1!F3",
+          "formula": "1.5"
+        },
+        {
+          "cell": "S1!A4",
+          "formula": "  space "
+        },
+        {
+          "cell": "S1!B4",
+          "formula": "x"
+        },
+        {
+          "cell": "S2!A1",
+          "formula": "apple"
+        },
+        {
+          "cell": "S2!B1",
+          "formula": "12"
+        },
+        {
+          "cell": "S2!C1",
+          "formula": "='S1'!A1&\"!\""
+        },
+        {
+          "cell": "S2!A2",
+          "formula": "Apple tree"
+        },
+        {
+          "cell": "S2!B2",
+          "formula": "grape"
+        },
+        {
+          "cell": "S3!A1",
+          "formula": "no match"
+        },
+        {
+          "cell": "S3!B1",
+          "formula": "apple"
+        }
+      ]
+    },
+    {
+      "name": "formula-function",
+      "find": "SUM",
+      "replacement": "AVERAGE",
+      "scope": "sheet",
+      "sheet": 0,
+      "lookAt": "part",
+      "matchCase": false,
+      "cells": [
+        "S1!B2"
+      ],
+      "result": [
+        {
+          "cell": "S1!A1",
+          "formula": "Apple"
+        },
+        {
+          "cell": "S1!B1",
+          "formula": "apple pie"
+        },
+        {
+          "cell": "S1!C1",
+          "formula": "APPLE"
+        },
+        {
+          "cell": "S1!D1",
+          "formula": "123"
+        },
+        {
+          "cell": "S1!E1",
+          "formula": "=A1&\"x\""
+        },
+        {
+          "cell": "S1!F1",
+          "formula": "a*b"
+        },
+        {
+          "cell": "S1!G1",
+          "formula": "axb"
+        },
+        {
+          "cell": "S1!H1",
+          "formula": "TRUE"
+        },
+        {
+          "cell": "S1!A2",
+          "formula": "12"
+        },
+        {
+          "cell": "S1!B2",
+          "formula": "=AVERAGE(A2:A3)"
+        },
+        {
+          "cell": "S1!C2",
+          "formula": "banana"
+        },
+        {
+          "cell": "S1!D2",
+          "formula": "Apple Apple"
+        },
+        {
+          "cell": "S1!E2",
+          "formula": "pineapple"
+        },
+        {
+          "cell": "S1!F2",
+          "formula": "a?b"
+        },
+        {
+          "cell": "S1!G2",
+          "formula": "A1"
+        },
+        {
+          "cell": "S1!H2",
+          "formula": "0.5"
+        },
+        {
+          "cell": "S1!A3",
+          "formula": "=A2*2"
+        },
+        {
+          "cell": "S1!B3",
+          "formula": "~tilde"
+        },
+        {
+          "cell": "S1!C3",
+          "formula": "Apple"
+        },
+        {
+          "cell": "S1!D3",
+          "formula": "12 apples"
+        },
+        {
+          "cell": "S1!E3",
+          "formula": "=IF(A2>1,\"apple\",\"none\")"
+        },
+        {
+          "cell": "S1!F3",
+          "formula": "1.5"
+        },
+        {
+          "cell": "S1!A4",
+          "formula": "  space "
+        },
+        {
+          "cell": "S1!B4",
+          "formula": "x"
+        },
+        {
+          "cell": "S2!A1",
+          "formula": "apple"
+        },
+        {
+          "cell": "S2!B1",
+          "formula": "12"
+        },
+        {
+          "cell": "S2!C1",
+          "formula": "='S1'!A1&\"!\""
+        },
+        {
+          "cell": "S2!A2",
+          "formula": "Apple tree"
+        },
+        {
+          "cell": "S2!B2",
+          "formula": "grape"
+        },
+        {
+          "cell": "S3!A1",
+          "formula": "no match"
+        },
+        {
+          "cell": "S3!B1",
+          "formula": "apple"
+        }
+      ]
+    },
+    {
+      "name": "formula-entire",
+      "find": "=A2*2",
+      "replacement": "=A2*3",
+      "scope": "sheet",
+      "sheet": 0,
+      "lookAt": "whole",
+      "matchCase": false,
+      "cells": [
+        "S1!A3"
+      ],
+      "result": [
+        {
+          "cell": "S1!A1",
+          "formula": "Apple"
+        },
+        {
+          "cell": "S1!B1",
+          "formula": "apple pie"
+        },
+        {
+          "cell": "S1!C1",
+          "formula": "APPLE"
+        },
+        {
+          "cell": "S1!D1",
+          "formula": "123"
+        },
+        {
+          "cell": "S1!E1",
+          "formula": "=A1&\"x\""
+        },
+        {
+          "cell": "S1!F1",
+          "formula": "a*b"
+        },
+        {
+          "cell": "S1!G1",
+          "formula": "axb"
+        },
+        {
+          "cell": "S1!H1",
+          "formula": "TRUE"
+        },
+        {
+          "cell": "S1!A2",
+          "formula": "12"
+        },
+        {
+          "cell": "S1!B2",
+          "formula": "=SUM(A2:A3)"
+        },
+        {
+          "cell": "S1!C2",
+          "formula": "banana"
+        },
+        {
+          "cell": "S1!D2",
+          "formula": "Apple Apple"
+        },
+        {
+          "cell": "S1!E2",
+          "formula": "pineapple"
+        },
+        {
+          "cell": "S1!F2",
+          "formula": "a?b"
+        },
+        {
+          "cell": "S1!G2",
+          "formula": "A1"
+        },
+        {
+          "cell": "S1!H2",
+          "formula": "0.5"
+        },
+        {
+          "cell": "S1!A3",
+          "formula": "=A2*3"
+        },
+        {
+          "cell": "S1!B3",
+          "formula": "~tilde"
+        },
+        {
+          "cell": "S1!C3",
+          "formula": "Apple"
+        },
+        {
+          "cell": "S1!D3",
+          "formula": "12 apples"
+        },
+        {
+          "cell": "S1!E3",
+          "formula": "=IF(A2>1,\"apple\",\"none\")"
+        },
+        {
+          "cell": "S1!F3",
+          "formula": "1.5"
+        },
+        {
+          "cell": "S1!A4",
+          "formula": "  space "
+        },
+        {
+          "cell": "S1!B4",
+          "formula": "x"
+        },
+        {
+          "cell": "S2!A1",
+          "formula": "apple"
+        },
+        {
+          "cell": "S2!B1",
+          "formula": "12"
+        },
+        {
+          "cell": "S2!C1",
+          "formula": "='S1'!A1&\"!\""
+        },
+        {
+          "cell": "S2!A2",
+          "formula": "Apple tree"
+        },
+        {
+          "cell": "S2!B2",
+          "formula": "grape"
+        },
+        {
+          "cell": "S3!A1",
+          "formula": "no match"
+        },
+        {
+          "cell": "S3!B1",
+          "formula": "apple"
+        }
+      ]
+    },
+    {
+      "name": "formula-equals",
+      "find": "=",
+      "replacement": "",
+      "scope": "sheet",
+      "sheet": 0,
+      "lookAt": "part",
+      "matchCase": false,
+      "cells": [
+        "S1!E1",
+        "S1!B2",
+        "S1!A3",
+        "S1!E3"
+      ],
+      "result": [
+        {
+          "cell": "S1!A1",
+          "formula": "Apple"
+        },
+        {
+          "cell": "S1!B1",
+          "formula": "apple pie"
+        },
+        {
+          "cell": "S1!C1",
+          "formula": "APPLE"
+        },
+        {
+          "cell": "S1!D1",
+          "formula": "123"
+        },
+        {
+          "cell": "S1!E1",
+          "formula": "A1&\"x\""
+        },
+        {
+          "cell": "S1!F1",
+          "formula": "a*b"
+        },
+        {
+          "cell": "S1!G1",
+          "formula": "axb"
+        },
+        {
+          "cell": "S1!H1",
+          "formula": "TRUE"
+        },
+        {
+          "cell": "S1!A2",
+          "formula": "12"
+        },
+        {
+          "cell": "S1!B2",
+          "formula": "SUM(A2:A3)"
+        },
+        {
+          "cell": "S1!C2",
+          "formula": "banana"
+        },
+        {
+          "cell": "S1!D2",
+          "formula": "Apple Apple"
+        },
+        {
+          "cell": "S1!E2",
+          "formula": "pineapple"
+        },
+        {
+          "cell": "S1!F2",
+          "formula": "a?b"
+        },
+        {
+          "cell": "S1!G2",
+          "formula": "A1"
+        },
+        {
+          "cell": "S1!H2",
+          "formula": "0.5"
+        },
+        {
+          "cell": "S1!A3",
+          "formula": "A2*2"
+        },
+        {
+          "cell": "S1!B3",
+          "formula": "~tilde"
+        },
+        {
+          "cell": "S1!C3",
+          "formula": "Apple"
+        },
+        {
+          "cell": "S1!D3",
+          "formula": "12 apples"
+        },
+        {
+          "cell": "S1!E3",
+          "formula": "IF(A2>1,\"apple\",\"none\")"
+        },
+        {
+          "cell": "S1!F3",
+          "formula": "1.5"
+        },
+        {
+          "cell": "S1!A4",
+          "formula": "  space "
+        },
+        {
+          "cell": "S1!B4",
+          "formula": "x"
+        },
+        {
+          "cell": "S2!A1",
+          "formula": "apple"
+        },
+        {
+          "cell": "S2!B1",
+          "formula": "12"
+        },
+        {
+          "cell": "S2!C1",
+          "formula": "='S1'!A1&\"!\""
+        },
+        {
+          "cell": "S2!A2",
+          "formula": "Apple tree"
+        },
+        {
+          "cell": "S2!B2",
+          "formula": "grape"
+        },
+        {
+          "cell": "S3!A1",
+          "formula": "no match"
+        },
+        {
+          "cell": "S3!B1",
+          "formula": "apple"
+        }
+      ]
+    },
+    {
+      "name": "boolean",
+      "find": "TRUE",
+      "replacement": "x",
+      "scope": "sheet",
+      "sheet": 0,
+      "lookAt": "part",
+      "matchCase": false,
+      "cells": [
+        "S1!H1"
+      ],
+      "result": [
+        {
+          "cell": "S1!A1",
+          "formula": "Apple"
+        },
+        {
+          "cell": "S1!B1",
+          "formula": "apple pie"
+        },
+        {
+          "cell": "S1!C1",
+          "formula": "APPLE"
+        },
+        {
+          "cell": "S1!D1",
+          "formula": "123"
+        },
+        {
+          "cell": "S1!E1",
+          "formula": "=A1&\"x\""
+        },
+        {
+          "cell": "S1!F1",
+          "formula": "a*b"
+        },
+        {
+          "cell": "S1!G1",
+          "formula": "axb"
+        },
+        {
+          "cell": "S1!H1",
+          "formula": "x"
+        },
+        {
+          "cell": "S1!A2",
+          "formula": "12"
+        },
+        {
+          "cell": "S1!B2",
+          "formula": "=SUM(A2:A3)"
+        },
+        {
+          "cell": "S1!C2",
+          "formula": "banana"
+        },
+        {
+          "cell": "S1!D2",
+          "formula": "Apple Apple"
+        },
+        {
+          "cell": "S1!E2",
+          "formula": "pineapple"
+        },
+        {
+          "cell": "S1!F2",
+          "formula": "a?b"
+        },
+        {
+          "cell": "S1!G2",
+          "formula": "A1"
+        },
+        {
+          "cell": "S1!H2",
+          "formula": "0.5"
+        },
+        {
+          "cell": "S1!A3",
+          "formula": "=A2*2"
+        },
+        {
+          "cell": "S1!B3",
+          "formula": "~tilde"
+        },
+        {
+          "cell": "S1!C3",
+          "formula": "Apple"
+        },
+        {
+          "cell": "S1!D3",
+          "formula": "12 apples"
+        },
+        {
+          "cell": "S1!E3",
+          "formula": "=IF(A2>1,\"apple\",\"none\")"
+        },
+        {
+          "cell": "S1!F3",
+          "formula": "1.5"
+        },
+        {
+          "cell": "S1!A4",
+          "formula": "  space "
+        },
+        {
+          "cell": "S1!B4",
+          "formula": "x"
+        },
+        {
+          "cell": "S2!A1",
+          "formula": "apple"
+        },
+        {
+          "cell": "S2!B1",
+          "formula": "12"
+        },
+        {
+          "cell": "S2!C1",
+          "formula": "='S1'!A1&\"!\""
+        },
+        {
+          "cell": "S2!A2",
+          "formula": "Apple tree"
+        },
+        {
+          "cell": "S2!B2",
+          "formula": "grape"
+        },
+        {
+          "cell": "S3!A1",
+          "formula": "no match"
+        },
+        {
+          "cell": "S3!B1",
+          "formula": "apple"
+        }
+      ]
+    },
+    {
+      "name": "boolean-whole",
+      "find": "true",
+      "replacement": "x",
+      "scope": "sheet",
+      "sheet": 0,
+      "lookAt": "whole",
+      "matchCase": false,
+      "cells": [
+        "S1!H1"
+      ],
+      "result": [
+        {
+          "cell": "S1!A1",
+          "formula": "Apple"
+        },
+        {
+          "cell": "S1!B1",
+          "formula": "apple pie"
+        },
+        {
+          "cell": "S1!C1",
+          "formula": "APPLE"
+        },
+        {
+          "cell": "S1!D1",
+          "formula": "123"
+        },
+        {
+          "cell": "S1!E1",
+          "formula": "=A1&\"x\""
+        },
+        {
+          "cell": "S1!F1",
+          "formula": "a*b"
+        },
+        {
+          "cell": "S1!G1",
+          "formula": "axb"
+        },
+        {
+          "cell": "S1!H1",
+          "formula": "x"
+        },
+        {
+          "cell": "S1!A2",
+          "formula": "12"
+        },
+        {
+          "cell": "S1!B2",
+          "formula": "=SUM(A2:A3)"
+        },
+        {
+          "cell": "S1!C2",
+          "formula": "banana"
+        },
+        {
+          "cell": "S1!D2",
+          "formula": "Apple Apple"
+        },
+        {
+          "cell": "S1!E2",
+          "formula": "pineapple"
+        },
+        {
+          "cell": "S1!F2",
+          "formula": "a?b"
+        },
+        {
+          "cell": "S1!G2",
+          "formula": "A1"
+        },
+        {
+          "cell": "S1!H2",
+          "formula": "0.5"
+        },
+        {
+          "cell": "S1!A3",
+          "formula": "=A2*2"
+        },
+        {
+          "cell": "S1!B3",
+          "formula": "~tilde"
+        },
+        {
+          "cell": "S1!C3",
+          "formula": "Apple"
+        },
+        {
+          "cell": "S1!D3",
+          "formula": "12 apples"
+        },
+        {
+          "cell": "S1!E3",
+          "formula": "=IF(A2>1,\"apple\",\"none\")"
+        },
+        {
+          "cell": "S1!F3",
+          "formula": "1.5"
+        },
+        {
+          "cell": "S1!A4",
+          "formula": "  space "
+        },
+        {
+          "cell": "S1!B4",
+          "formula": "x"
+        },
+        {
+          "cell": "S2!A1",
+          "formula": "apple"
+        },
+        {
+          "cell": "S2!B1",
+          "formula": "12"
+        },
+        {
+          "cell": "S2!C1",
+          "formula": "='S1'!A1&\"!\""
+        },
+        {
+          "cell": "S2!A2",
+          "formula": "Apple tree"
+        },
+        {
+          "cell": "S2!B2",
+          "formula": "grape"
+        },
+        {
+          "cell": "S3!A1",
+          "formula": "no match"
+        },
+        {
+          "cell": "S3!B1",
+          "formula": "apple"
+        }
+      ]
+    },
+    {
+      "name": "to-number",
+      "find": "pie",
+      "replacement": "",
+      "scope": "sheet",
+      "sheet": 0,
+      "lookAt": "part",
+      "matchCase": false,
+      "cells": [
+        "S1!B1"
+      ],
+      "result": [
+        {
+          "cell": "S1!A1",
+          "formula": "Apple"
+        },
+        {
+          "cell": "S1!B1",
+          "formula": "apple "
+        },
+        {
+          "cell": "S1!C1",
+          "formula": "APPLE"
+        },
+        {
+          "cell": "S1!D1",
+          "formula": "123"
+        },
+        {
+          "cell": "S1!E1",
+          "formula": "=A1&\"x\""
+        },
+        {
+          "cell": "S1!F1",
+          "formula": "a*b"
+        },
+        {
+          "cell": "S1!G1",
+          "formula": "axb"
+        },
+        {
+          "cell": "S1!H1",
+          "formula": "TRUE"
+        },
+        {
+          "cell": "S1!A2",
+          "formula": "12"
+        },
+        {
+          "cell": "S1!B2",
+          "formula": "=SUM(A2:A3)"
+        },
+        {
+          "cell": "S1!C2",
+          "formula": "banana"
+        },
+        {
+          "cell": "S1!D2",
+          "formula": "Apple Apple"
+        },
+        {
+          "cell": "S1!E2",
+          "formula": "pineapple"
+        },
+        {
+          "cell": "S1!F2",
+          "formula": "a?b"
+        },
+        {
+          "cell": "S1!G2",
+          "formula": "A1"
+        },
+        {
+          "cell": "S1!H2",
+          "formula": "0.5"
+        },
+        {
+          "cell": "S1!A3",
+          "formula": "=A2*2"
+        },
+        {
+          "cell": "S1!B3",
+          "formula": "~tilde"
+        },
+        {
+          "cell": "S1!C3",
+          "formula": "Apple"
+        },
+        {
+          "cell": "S1!D3",
+          "formula": "12 apples"
+        },
+        {
+          "cell": "S1!E3",
+          "formula": "=IF(A2>1,\"apple\",\"none\")"
+        },
+        {
+          "cell": "S1!F3",
+          "formula": "1.5"
+        },
+        {
+          "cell": "S1!A4",
+          "formula": "  space "
+        },
+        {
+          "cell": "S1!B4",
+          "formula": "x"
+        },
+        {
+          "cell": "S2!A1",
+          "formula": "apple"
+        },
+        {
+          "cell": "S2!B1",
+          "formula": "12"
+        },
+        {
+          "cell": "S2!C1",
+          "formula": "='S1'!A1&\"!\""
+        },
+        {
+          "cell": "S2!A2",
+          "formula": "Apple tree"
+        },
+        {
+          "cell": "S2!B2",
+          "formula": "grape"
+        },
+        {
+          "cell": "S3!A1",
+          "formula": "no match"
+        },
+        {
+          "cell": "S3!B1",
+          "formula": "apple"
+        }
+      ]
+    },
+    {
+      "name": "to-number-2",
+      "find": "Apple",
+      "replacement": "5",
+      "scope": "sheet",
+      "sheet": 0,
+      "lookAt": "whole",
+      "matchCase": true,
+      "cells": [
+        "S1!A1",
+        "S1!C3"
+      ],
+      "result": [
+        {
+          "cell": "S1!A1",
+          "formula": "5"
+        },
+        {
+          "cell": "S1!B1",
+          "formula": "apple pie"
+        },
+        {
+          "cell": "S1!C1",
+          "formula": "APPLE"
+        },
+        {
+          "cell": "S1!D1",
+          "formula": "123"
+        },
+        {
+          "cell": "S1!E1",
+          "formula": "=A1&\"x\""
+        },
+        {
+          "cell": "S1!F1",
+          "formula": "a*b"
+        },
+        {
+          "cell": "S1!G1",
+          "formula": "axb"
+        },
+        {
+          "cell": "S1!H1",
+          "formula": "TRUE"
+        },
+        {
+          "cell": "S1!A2",
+          "formula": "12"
+        },
+        {
+          "cell": "S1!B2",
+          "formula": "=SUM(A2:A3)"
+        },
+        {
+          "cell": "S1!C2",
+          "formula": "banana"
+        },
+        {
+          "cell": "S1!D2",
+          "formula": "Apple Apple"
+        },
+        {
+          "cell": "S1!E2",
+          "formula": "pineapple"
+        },
+        {
+          "cell": "S1!F2",
+          "formula": "a?b"
+        },
+        {
+          "cell": "S1!G2",
+          "formula": "A1"
+        },
+        {
+          "cell": "S1!H2",
+          "formula": "0.5"
+        },
+        {
+          "cell": "S1!A3",
+          "formula": "=A2*2"
+        },
+        {
+          "cell": "S1!B3",
+          "formula": "~tilde"
+        },
+        {
+          "cell": "S1!C3",
+          "formula": "5"
+        },
+        {
+          "cell": "S1!D3",
+          "formula": "12 apples"
+        },
+        {
+          "cell": "S1!E3",
+          "formula": "=IF(A2>1,\"apple\",\"none\")"
+        },
+        {
+          "cell": "S1!F3",
+          "formula": "1.5"
+        },
+        {
+          "cell": "S1!A4",
+          "formula": "  space "
+        },
+        {
+          "cell": "S1!B4",
+          "formula": "x"
+        },
+        {
+          "cell": "S2!A1",
+          "formula": "apple"
+        },
+        {
+          "cell": "S2!B1",
+          "formula": "12"
+        },
+        {
+          "cell": "S2!C1",
+          "formula": "='S1'!A1&\"!\""
+        },
+        {
+          "cell": "S2!A2",
+          "formula": "Apple tree"
+        },
+        {
+          "cell": "S2!B2",
+          "formula": "grape"
+        },
+        {
+          "cell": "S3!A1",
+          "formula": "no match"
+        },
+        {
+          "cell": "S3!B1",
+          "formula": "apple"
+        }
+      ]
+    },
+    {
+      "name": "to-formula",
+      "find": "Apple",
+      "replacement": "=1+1",
+      "scope": "sheet",
+      "sheet": 0,
+      "lookAt": "whole",
+      "matchCase": true,
+      "cells": [
+        "S1!A1",
+        "S1!C3"
+      ],
+      "result": [
+        {
+          "cell": "S1!A1",
+          "formula": "=1+1"
+        },
+        {
+          "cell": "S1!B1",
+          "formula": "apple pie"
+        },
+        {
+          "cell": "S1!C1",
+          "formula": "APPLE"
+        },
+        {
+          "cell": "S1!D1",
+          "formula": "123"
+        },
+        {
+          "cell": "S1!E1",
+          "formula": "=A1&\"x\""
+        },
+        {
+          "cell": "S1!F1",
+          "formula": "a*b"
+        },
+        {
+          "cell": "S1!G1",
+          "formula": "axb"
+        },
+        {
+          "cell": "S1!H1",
+          "formula": "TRUE"
+        },
+        {
+          "cell": "S1!A2",
+          "formula": "12"
+        },
+        {
+          "cell": "S1!B2",
+          "formula": "=SUM(A2:A3)"
+        },
+        {
+          "cell": "S1!C2",
+          "formula": "banana"
+        },
+        {
+          "cell": "S1!D2",
+          "formula": "Apple Apple"
+        },
+        {
+          "cell": "S1!E2",
+          "formula": "pineapple"
+        },
+        {
+          "cell": "S1!F2",
+          "formula": "a?b"
+        },
+        {
+          "cell": "S1!G2",
+          "formula": "A1"
+        },
+        {
+          "cell": "S1!H2",
+          "formula": "0.5"
+        },
+        {
+          "cell": "S1!A3",
+          "formula": "=A2*2"
+        },
+        {
+          "cell": "S1!B3",
+          "formula": "~tilde"
+        },
+        {
+          "cell": "S1!C3",
+          "formula": "=1+1"
+        },
+        {
+          "cell": "S1!D3",
+          "formula": "12 apples"
+        },
+        {
+          "cell": "S1!E3",
+          "formula": "=IF(A2>1,\"apple\",\"none\")"
+        },
+        {
+          "cell": "S1!F3",
+          "formula": "1.5"
+        },
+        {
+          "cell": "S1!A4",
+          "formula": "  space "
+        },
+        {
+          "cell": "S1!B4",
+          "formula": "x"
+        },
+        {
+          "cell": "S2!A1",
+          "formula": "apple"
+        },
+        {
+          "cell": "S2!B1",
+          "formula": "12"
+        },
+        {
+          "cell": "S2!C1",
+          "formula": "='S1'!A1&\"!\""
+        },
+        {
+          "cell": "S2!A2",
+          "formula": "Apple tree"
+        },
+        {
+          "cell": "S2!B2",
+          "formula": "grape"
+        },
+        {
+          "cell": "S3!A1",
+          "formula": "no match"
+        },
+        {
+          "cell": "S3!B1",
+          "formula": "apple"
+        }
+      ]
+    },
+    {
+      "name": "spaces",
+      "find": " ",
+      "replacement": "_",
+      "scope": "sheet",
+      "sheet": 0,
+      "lookAt": "part",
+      "matchCase": false,
+      "cells": [
+        "S1!B1",
+        "S1!D2",
+        "S1!D3",
+        "S1!A4"
+      ],
+      "result": [
+        {
+          "cell": "S1!A1",
+          "formula": "Apple"
+        },
+        {
+          "cell": "S1!B1",
+          "formula": "apple_pie"
+        },
+        {
+          "cell": "S1!C1",
+          "formula": "APPLE"
+        },
+        {
+          "cell": "S1!D1",
+          "formula": "123"
+        },
+        {
+          "cell": "S1!E1",
+          "formula": "=A1&\"x\""
+        },
+        {
+          "cell": "S1!F1",
+          "formula": "a*b"
+        },
+        {
+          "cell": "S1!G1",
+          "formula": "axb"
+        },
+        {
+          "cell": "S1!H1",
+          "formula": "TRUE"
+        },
+        {
+          "cell": "S1!A2",
+          "formula": "12"
+        },
+        {
+          "cell": "S1!B2",
+          "formula": "=SUM(A2:A3)"
+        },
+        {
+          "cell": "S1!C2",
+          "formula": "banana"
+        },
+        {
+          "cell": "S1!D2",
+          "formula": "Apple_Apple"
+        },
+        {
+          "cell": "S1!E2",
+          "formula": "pineapple"
+        },
+        {
+          "cell": "S1!F2",
+          "formula": "a?b"
+        },
+        {
+          "cell": "S1!G2",
+          "formula": "A1"
+        },
+        {
+          "cell": "S1!H2",
+          "formula": "0.5"
+        },
+        {
+          "cell": "S1!A3",
+          "formula": "=A2*2"
+        },
+        {
+          "cell": "S1!B3",
+          "formula": "~tilde"
+        },
+        {
+          "cell": "S1!C3",
+          "formula": "Apple"
+        },
+        {
+          "cell": "S1!D3",
+          "formula": "12_apples"
+        },
+        {
+          "cell": "S1!E3",
+          "formula": "=IF(A2>1,\"apple\",\"none\")"
+        },
+        {
+          "cell": "S1!F3",
+          "formula": "1.5"
+        },
+        {
+          "cell": "S1!A4",
+          "formula": "__space_"
+        },
+        {
+          "cell": "S1!B4",
+          "formula": "x"
+        },
+        {
+          "cell": "S2!A1",
+          "formula": "apple"
+        },
+        {
+          "cell": "S2!B1",
+          "formula": "12"
+        },
+        {
+          "cell": "S2!C1",
+          "formula": "='S1'!A1&\"!\""
+        },
+        {
+          "cell": "S2!A2",
+          "formula": "Apple tree"
+        },
+        {
+          "cell": "S2!B2",
+          "formula": "grape"
+        },
+        {
+          "cell": "S3!A1",
+          "formula": "no match"
+        },
+        {
+          "cell": "S3!B1",
+          "formula": "apple"
+        }
+      ]
+    },
+    {
+      "name": "replacement-star-literal",
+      "find": "apple",
+      "replacement": "a*",
+      "scope": "sheet",
+      "sheet": 0,
+      "lookAt": "part",
+      "matchCase": false,
+      "cells": [
+        "S1!A1",
+        "S1!B1",
+        "S1!C1",
+        "S1!D2",
+        "S1!E2",
+        "S1!C3",
+        "S1!D3",
+        "S1!E3"
+      ],
+      "result": [
+        {
+          "cell": "S1!A1",
+          "formula": "a*"
+        },
+        {
+          "cell": "S1!B1",
+          "formula": "a* pie"
+        },
+        {
+          "cell": "S1!C1",
+          "formula": "a*"
+        },
+        {
+          "cell": "S1!D1",
+          "formula": "123"
+        },
+        {
+          "cell": "S1!E1",
+          "formula": "=A1&\"x\""
+        },
+        {
+          "cell": "S1!F1",
+          "formula": "a*b"
+        },
+        {
+          "cell": "S1!G1",
+          "formula": "axb"
+        },
+        {
+          "cell": "S1!H1",
+          "formula": "TRUE"
+        },
+        {
+          "cell": "S1!A2",
+          "formula": "12"
+        },
+        {
+          "cell": "S1!B2",
+          "formula": "=SUM(A2:A3)"
+        },
+        {
+          "cell": "S1!C2",
+          "formula": "banana"
+        },
+        {
+          "cell": "S1!D2",
+          "formula": "a* a*"
+        },
+        {
+          "cell": "S1!E2",
+          "formula": "pinea*"
+        },
+        {
+          "cell": "S1!F2",
+          "formula": "a?b"
+        },
+        {
+          "cell": "S1!G2",
+          "formula": "A1"
+        },
+        {
+          "cell": "S1!H2",
+          "formula": "0.5"
+        },
+        {
+          "cell": "S1!A3",
+          "formula": "=A2*2"
+        },
+        {
+          "cell": "S1!B3",
+          "formula": "~tilde"
+        },
+        {
+          "cell": "S1!C3",
+          "formula": "a*"
+        },
+        {
+          "cell": "S1!D3",
+          "formula": "12 a*s"
+        },
+        {
+          "cell": "S1!E3",
+          "formula": "=IF(A2>1,\"a*\",\"none\")"
+        },
+        {
+          "cell": "S1!F3",
+          "formula": "1.5"
+        },
+        {
+          "cell": "S1!A4",
+          "formula": "  space "
+        },
+        {
+          "cell": "S1!B4",
+          "formula": "x"
+        },
+        {
+          "cell": "S2!A1",
+          "formula": "apple"
+        },
+        {
+          "cell": "S2!B1",
+          "formula": "12"
+        },
+        {
+          "cell": "S2!C1",
+          "formula": "='S1'!A1&\"!\""
+        },
+        {
+          "cell": "S2!A2",
+          "formula": "Apple tree"
+        },
+        {
+          "cell": "S2!B2",
+          "formula": "grape"
+        },
+        {
+          "cell": "S3!A1",
+          "formula": "no match"
+        },
+        {
+          "cell": "S3!B1",
+          "formula": "apple"
+        }
+      ]
+    }
+  ],
+  "find": [
+    {
+      "name": "rows",
+      "find": "apple",
+      "scope": "sheet",
+      "sheet": 0,
+      "lookIn": "formulas",
+      "lookAt": "part",
+      "searchOrder": "rows",
+      "matchCase": false,
+      "hits": [
+        "S1!A1",
+        "S1!B1",
+        "S1!C1",
+        "S1!D2",
+        "S1!E2",
+        "S1!C3",
+        "S1!D3",
+        "S1!E3"
+      ]
+    },
+    {
+      "name": "columns",
+      "find": "apple",
+      "scope": "sheet",
+      "sheet": 0,
+      "lookIn": "formulas",
+      "lookAt": "part",
+      "searchOrder": "columns",
+      "matchCase": false,
+      "hits": [
+        "S1!A1",
+        "S1!B1",
+        "S1!C1",
+        "S1!C3",
+        "S1!D2",
+        "S1!D3",
+        "S1!E2",
+        "S1!E3"
+      ]
+    },
+    {
+      "name": "workbook-rows",
+      "find": "apple",
+      "scope": "workbook",
+      "sheet": 0,
+      "lookIn": "formulas",
+      "lookAt": "part",
+      "searchOrder": "rows",
+      "matchCase": false,
+      "hits": [
+        "S1!A1",
+        "S1!B1",
+        "S1!C1",
+        "S1!D2",
+        "S1!E2",
+        "S1!C3",
+        "S1!D3",
+        "S1!E3",
+        "S2!A1",
+        "S2!A2",
+        "S3!B1"
+      ]
+    },
+    {
+      "name": "workbook-columns",
+      "find": "apple",
+      "scope": "workbook",
+      "sheet": 0,
+      "lookIn": "formulas",
+      "lookAt": "part",
+      "searchOrder": "columns",
+      "matchCase": false,
+      "hits": [
+        "S1!A1",
+        "S1!B1",
+        "S1!C1",
+        "S1!C3",
+        "S1!D2",
+        "S1!D3",
+        "S1!E2",
+        "S1!E3",
+        "S2!A1",
+        "S2!A2",
+        "S3!B1"
+      ]
+    },
+    {
+      "name": "whole-match-case",
+      "find": "Apple",
+      "scope": "sheet",
+      "sheet": 0,
+      "lookIn": "formulas",
+      "lookAt": "whole",
+      "searchOrder": "rows",
+      "matchCase": true,
+      "hits": [
+        "S1!A1",
+        "S1!C3"
+      ]
+    },
+    {
+      "name": "formulas-a2",
+      "find": "A2",
+      "scope": "sheet",
+      "sheet": 0,
+      "lookIn": "formulas",
+      "lookAt": "part",
+      "searchOrder": "rows",
+      "matchCase": false,
+      "hits": [
+        "S1!B2",
+        "S1!A3",
+        "S1!E3"
+      ]
+    },
+    {
+      "name": "values-a2",
+      "find": "A2",
+      "scope": "sheet",
+      "sheet": 0,
+      "lookIn": "values",
+      "lookAt": "part",
+      "searchOrder": "rows",
+      "matchCase": false,
+      "hits": []
+    },
+    {
+      "name": "values-numbers",
+      "find": "12",
+      "scope": "sheet",
+      "sheet": 0,
+      "lookIn": "values",
+      "lookAt": "part",
+      "searchOrder": "rows",
+      "matchCase": false,
+      "hits": [
+        "S1!D1",
+        "S1!A2",
+        "S1!D3"
+      ]
+    },
+    {
+      "name": "formulas-numbers",
+      "find": "12",
+      "scope": "sheet",
+      "sheet": 0,
+      "lookIn": "formulas",
+      "lookAt": "part",
+      "searchOrder": "rows",
+      "matchCase": false,
+      "hits": [
+        "S1!D1",
+        "S1!A2",
+        "S1!D3"
+      ]
+    },
+    {
+      "name": "values-formula-result",
+      "find": "applex",
+      "scope": "sheet",
+      "sheet": 0,
+      "lookIn": "values",
+      "lookAt": "part",
+      "searchOrder": "rows",
+      "matchCase": false,
+      "hits": [
+        "S1!E1"
+      ]
+    },
+    {
+      "name": "formulas-formula-result",
+      "find": "applex",
+      "scope": "sheet",
+      "sheet": 0,
+      "lookIn": "formulas",
+      "lookAt": "part",
+      "searchOrder": "rows",
+      "matchCase": false,
+      "hits": []
+    },
+    {
+      "name": "values-whole",
+      "find": "apple",
+      "scope": "sheet",
+      "sheet": 0,
+      "lookIn": "values",
+      "lookAt": "whole",
+      "searchOrder": "rows",
+      "matchCase": false,
+      "hits": [
+        "S1!A1",
+        "S1!C1",
+        "S1!C3",
+        "S1!E3"
+      ]
+    },
+    {
+      "name": "values-boolean",
+      "find": "true",
+      "scope": "sheet",
+      "sheet": 0,
+      "lookIn": "values",
+      "lookAt": "whole",
+      "searchOrder": "rows",
+      "matchCase": false,
+      "hits": [
+        "S1!H1"
+      ]
+    },
+    {
+      "name": "star",
+      "find": "a*e",
+      "scope": "sheet",
+      "sheet": 0,
+      "lookIn": "values",
+      "lookAt": "part",
+      "searchOrder": "columns",
+      "matchCase": false,
+      "hits": [
+        "S1!A1",
+        "S1!A4",
+        "S1!B1",
+        "S1!C1",
+        "S1!C3",
+        "S1!D2",
+        "S1!D3",
+        "S1!E1",
+        "S1!E2",
+        "S1!E3"
+      ]
+    },
+    {
+      "name": "none",
+      "find": "zzz",
+      "scope": "sheet",
+      "sheet": 0,
+      "lookIn": "formulas",
+      "lookAt": "part",
+      "searchOrder": "rows",
+      "matchCase": false,
+      "hits": []
+    }
+  ]
+}

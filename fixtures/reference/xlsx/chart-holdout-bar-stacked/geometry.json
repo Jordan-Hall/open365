@@ -1,0 +1,9 @@
+{
+  "source": "fixtures/xlsx/chart-holdout-bar-stacked.xlsx",
+  "oracle": "Microsoft Excel via COM, Range.Width / Range.Height in points at 100% zoom",
+  "dpi": 120,
+  "excel_build": "20430",
+  "sheets": [
+    {"name": "Data", "col_widths_pt": [48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48], "row_heights_pt": [14.4, 14.4, 14.4, 14.4, 14.4, 14.4, 14.4, 14.4, 14.4, 14.4, 14.4, 14.4]}
+  ]
+}

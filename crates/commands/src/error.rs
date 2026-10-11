@@ -35,6 +35,10 @@ pub enum CommandError {
     NothingToRedo,
     #[error("the last edit cannot be undone (its previous content is not restorable)")]
     NotUndoable,
+    #[error("find and replace: {0}")]
+    Find(#[from] open365_docx::FindError),
+    #[error("paste: {0}")]
+    Paste(String),
     #[error("invalid command log: {0}")]
     Log(String),
 }

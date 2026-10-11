@@ -79,8 +79,11 @@ pub(super) enum Tok {
     },
     /// Buddhist-era year (`b`, `bb`, `bbbb`).
     BuddhistYear(usize),
-    /// Era name (`g`, `gg`, `ggg`): empty in the reference locale.
-    Era,
+    /// Era name (`g` the Latin initial, `gg` the first character, `ggg` the full name): only the Japanese
+    /// locale (`[$-411]`) has eras; elsewhere it is empty.
+    Era(usize),
+    /// Era year (`e`, `ee`): the Japanese era year under `[$-411]`, the four-digit year elsewhere.
+    EraYear(usize),
     /// `[h]`, `[m]` or `[s]` with the number of letters.
     Elapsed(char, usize),
     /// Fractional seconds: `.0`, `.00`, `.000`.
@@ -109,6 +112,8 @@ pub(super) struct Section {
     pub has_ampm: bool,
     /// The language of a `[$-LCID]` prefix (calendar and number-shape bits removed): names in a date section.
     pub lcid: Option<u32>,
+    /// `[DBNum1]` to `[DBNum3]`: digits are written with CJK numerals (only under the CJK language prefixes).
+    pub dbnum: Option<u8>,
 }
 
 /// A parsed format code.
@@ -199,6 +204,7 @@ struct Tokenizer<'a> {
     out: Vec<Tok>,
     cond: Option<Cond>,
     lcid: Option<u32>,
+    dbnum: Option<u8>,
     _src: &'a str,
 }
 
@@ -210,6 +216,7 @@ impl<'a> Tokenizer<'a> {
             out: Vec::new(),
             cond: None,
             lcid: None,
+            dbnum: None,
             _src: src,
         }
     }
@@ -373,8 +380,17 @@ impl<'a> Tokenizer<'a> {
                             short: true,
                             upper: c == 'A',
                         });
+                    } else if self.peek(1).is_some_and(|x| x.eq_ignore_ascii_case(&'a'))
+                        && self.peek(2).is_some_and(|x| x.eq_ignore_ascii_case(&'a'))
+                    {
+                        // `aaa` and `aaaa` are the weekday name; the locale decides how it differs from
+                        // `ddd` and `dddd` (identical in English).
+                        let n = self.run_of(c);
+                        self.out.push(Tok::Day(if n == 3 { 3 } else { 4 }));
                     } else {
-                        return Err(FormatError::new("unexpected letter"));
+                        // One or two `a` are plain letters.
+                        self.pos += 1;
+                        self.lit(&c.to_string());
                     }
                 }
                 ' ' | '$' | '-' | '+' | '(' | ')' | ':' | '!' | '^' | '&' | '\'' | '~' | '{'
@@ -383,16 +399,16 @@ impl<'a> Tokenizer<'a> {
                     self.lit(&c.to_string());
                 }
                 'e' | 'E' => {
-                    self.run_of(c);
-                    self.out.push(Tok::Year(4));
+                    let n = self.run_of(c);
+                    self.out.push(Tok::EraYear(n));
                 }
                 'b' | 'B' => {
                     let n = self.run_of(c);
                     self.out.push(Tok::BuddhistYear(n));
                 }
                 'g' | 'G' => {
-                    self.run_of(c);
-                    self.out.push(Tok::Era);
+                    let n = self.run_of(c);
+                    self.out.push(Tok::Era(n));
                 }
                 c if c.is_ascii_alphabetic() && !matches!(c.to_ascii_lowercase(), 'n') => {
                     self.pos += 1;
@@ -469,6 +485,17 @@ impl<'a> Tokenizer<'a> {
             return Ok(());
         }
         let lower = body.to_ascii_lowercase();
+        if let Some(n) = lower.strip_prefix("dbnum") {
+            // Only 1 to 4 exist; 4 changes nothing in the measured locales.
+            return match n {
+                "1" | "2" | "3" => {
+                    self.dbnum = n.parse().ok();
+                    Ok(())
+                }
+                "4" => Ok(()),
+                _ => Err(FormatError::new("unknown DBNum code")),
+            };
+        }
         let letter = lower.chars().next().unwrap_or(' ');
         if matches!(letter, 'h' | 'm' | 's') && lower.chars().all(|c| c == letter) {
             self.out.push(Tok::Elapsed(letter, lower.len()));
@@ -494,7 +521,8 @@ fn classify(toks: &[Tok]) -> Kind {
                 | Tok::AmPm { .. }
                 | Tok::Elapsed(..)
                 | Tok::BuddhistYear(_)
-                | Tok::Era
+                | Tok::Era(_)
+                | Tok::EraYear(_)
         )
     });
     if date {
@@ -514,6 +542,7 @@ fn finish_section(
     mut toks: Vec<Tok>,
     cond: Option<Cond>,
     lcid: Option<u32>,
+    dbnum: Option<u8>,
 ) -> Result<Section, FormatError> {
     let kind = classify(&toks);
     let mut grouping = false;
@@ -654,6 +683,7 @@ fn finish_section(
         percents,
         has_ampm,
         lcid,
+        dbnum,
     })
 }
 
@@ -696,6 +726,7 @@ impl NumberFormat {
             tk.tokenize()?;
             let cond = tk.cond;
             let lcid = tk.lcid;
+            let dbnum = tk.dbnum;
             let mut toks = tk.out;
             // Fractional seconds are recognised here, where the token order is known.
             let mut i = 0;
@@ -713,7 +744,7 @@ impl NumberFormat {
                 }
                 i += 1;
             }
-            sections.push(finish_section(toks, cond, lcid)?);
+            sections.push(finish_section(toks, cond, lcid, dbnum)?);
         }
         Ok(NumberFormat { sections })
     }

@@ -1,0 +1,14 @@
+rev	0	MovedFrom	Reviewer A	Moved sentence. 
+rev	1	MovedTo	Reviewer A	Moved sentence. 
+markup	0	Moved sentence. Stay A. 
+markup	1	Stay B. Moved sentence. 
+final	0	Stay A. 
+final	1	Stay B. Moved sentence. 
+accept	0	Stay A. 	0
+accept	1	Stay B. Moved sentence. 	0
+reject	0	Moved sentence. Stay A. 	0
+reject	1	Stay B. 	0
+accept1	0	Stay A. \u241eStay B. Moved sentence. 
+reject1	0	Moved sentence. Stay A. \u241eStay B. 
+accept1	1	Stay A. \u241eStay B. Moved sentence. 
+reject1	1	Moved sentence. Stay A. \u241eStay B. 

@@ -1,0 +1,11 @@
+{
+  "source": "fixtures/xlsx/find-cells.xlsx",
+  "oracle": "Microsoft Excel via COM, Range.Width / Range.Height in points at 100% zoom",
+  "dpi": 120,
+  "excel_build": "20430",
+  "sheets": [
+    {"name": "S1", "col_widths_pt": [48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48], "row_heights_pt": [14.4, 14.4, 14.4, 14.4, 14.4, 14.4, 14.4, 14.4, 14.4, 14.4, 14.4, 14.4]},
+    {"name": "S2", "col_widths_pt": [48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48], "row_heights_pt": [14.4, 14.4, 14.4, 14.4, 14.4, 14.4, 14.4, 14.4, 14.4, 14.4, 14.4, 14.4]},
+    {"name": "S3", "col_widths_pt": [48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48], "row_heights_pt": [14.4, 14.4, 14.4, 14.4, 14.4, 14.4, 14.4, 14.4, 14.4, 14.4, 14.4, 14.4]}
+  ]
+}

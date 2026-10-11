@@ -562,7 +562,12 @@ fn walk(ast: &Ast, ctx: &WalkCtx<'_>, out: &mut Deps, depth: u32, shift: Option<
                 walk(item, ctx, out, depth, shift);
             }
         }
-        Ast::Number(_) | Ast::Text(_) | Ast::Bool(_) | Ast::Error(_) | Ast::Missing => {}
+        Ast::Number(_)
+        | Ast::Text(_)
+        | Ast::Bool(_)
+        | Ast::Error(_)
+        | Ast::DeadRef { .. }
+        | Ast::Missing => {}
     }
 }
 

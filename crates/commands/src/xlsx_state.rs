@@ -34,6 +34,14 @@ impl CellSnapshot {
     }
 }
 
+/// The result of entering many cells at once.
+#[derive(Debug, Default)]
+pub(crate) struct ManyEdit {
+    pub before: Vec<(CellRef, Option<CellSnapshot>)>,
+    pub changed: Vec<CellRef>,
+    pub applied: Vec<usize>,
+}
+
 #[derive(Debug)]
 pub(crate) struct XlsxState {
     pub workbook: Workbook,
@@ -90,6 +98,78 @@ impl XlsxState {
         }
     }
 
+    /// Enters text as typed into a cell: `=...` is a formula, anything else a constant.
+    pub fn enter(
+        &mut self,
+        sheet: usize,
+        row: u32,
+        col: u32,
+        text: &str,
+    ) -> Result<Vec<CellRef>, CommandError> {
+        if text.trim_start().starts_with('=') {
+            self.set_formula(sheet, row, col, text.trim_start())
+        } else if !text.is_empty() && text.trim().is_empty() {
+            // Blanks typed into a cell stay as text (Excel keeps " "); only "" clears.
+            self.set_value(sheet, row, col, &CellEntry::Text(text.to_owned()))
+        } else {
+            self.set_value(sheet, row, col, &CellEntry::from_user_text(text))
+        }
+    }
+
+    /// Enters many cells as one edit. With `lenient`, a cell the workbook refuses (a formula
+    /// that does not parse) is skipped; otherwise the first refusal puts every cell back and is
+    /// returned. Gives, per applied entry, the cell before it, plus the cells that changed and
+    /// the indexes of the entries applied.
+    pub fn enter_many(
+        &mut self,
+        entries: &[(CellRef, String)],
+        lenient: bool,
+    ) -> Result<ManyEdit, CommandError> {
+        let mut done = ManyEdit::default();
+        for (i, (cell, text)) in entries.iter().enumerate() {
+            let before = self.capture(cell.sheet, cell.row, cell.col);
+            match self.enter(cell.sheet, cell.row, cell.col, text) {
+                Ok(changed) => {
+                    done.before.push((*cell, before));
+                    for c in changed {
+                        if !done.changed.contains(&c) {
+                            done.changed.push(c);
+                        }
+                    }
+                    done.applied.push(i);
+                }
+                Err(_) if lenient => {}
+                Err(e) => {
+                    self.undo_many(&done.before)?;
+                    return Err(e);
+                }
+            }
+        }
+        Ok(done)
+    }
+
+    /// Puts cells captured by [`XlsxState::enter_many`] back, newest first. Nothing changes if
+    /// any of them cannot be restored.
+    pub fn undo_many(
+        &mut self,
+        before: &[(CellRef, Option<CellSnapshot>)],
+    ) -> Result<Vec<CellRef>, CommandError> {
+        if before.iter().any(|(_, snap)| snap.is_none()) {
+            return Err(CommandError::NotUndoable);
+        }
+        let mut changed = Vec::new();
+        for (cell, snap) in before.iter().rev() {
+            if let Some(snap) = snap {
+                for c in self.restore(cell.sheet, cell.row, cell.col, snap)? {
+                    if !changed.contains(&c) {
+                        changed.push(c);
+                    }
+                }
+            }
+        }
+        Ok(changed)
+    }
+
     pub fn set_value(
         &mut self,
         sheet: usize,
@@ -142,6 +222,49 @@ impl XlsxState {
         Ok(changed)
     }
 
+    /// Inserts or deletes rows or columns, then recalculates what the edit may have changed. The engine is
+    /// rebuilt from the edited workbook. Returns the cells whose cached result changed and notes for the outcome.
+    pub fn edit_structure(
+        &mut self,
+        sheet: usize,
+        edit: open365_xlsx::StructEdit,
+    ) -> Result<(Vec<CellRef>, Vec<String>), CommandError> {
+        let applied = crate::structure::apply(&mut self.workbook, sheet, edit)?;
+        self.engine = None;
+        self.ensure_engine();
+        if let Some(engine) = self.engine.as_mut() {
+            // Re-entering a formula marks it and its dependents dirty.
+            for &(s, row, col) in &applied.recalc {
+                let Some(name) = self.workbook.sheets().get(s).map(|i| i.name.clone()) else {
+                    continue;
+                };
+                let Some(ws) = self.workbook.sheet(s) else {
+                    continue;
+                };
+                match ws.array_formula_at(row, col) {
+                    Some(a) if a.master == (row, col) => {
+                        let _ = engine.set_array_formula(&name, a.range, &a.text);
+                    }
+                    Some(_) => {}
+                    None => {
+                        if let Some(text) = ws.formula_text(row, col) {
+                            let _ = engine.set_formula(&name, row, col, &text);
+                        }
+                    }
+                }
+            }
+        }
+        let mut changed = Vec::new();
+        self.recalc(&mut changed)?;
+        Ok((changed, applied.notes))
+    }
+
+    /// Puts a workbook captured before an edit back. The engine is rebuilt when next needed.
+    pub fn restore_workbook(&mut self, workbook: Workbook) {
+        self.workbook = workbook;
+        self.engine = None;
+    }
+
     fn sheet_name(&self, sheet: usize) -> Option<String> {
         self.workbook.sheets().get(sheet).map(|s| s.name.clone())
     }
@@ -179,19 +302,16 @@ impl XlsxState {
             else {
                 continue;
             };
-            let Some(text) = self.workbook.formula_text(sheet, addr.row, addr.col) else {
-                continue;
-            };
             let cached = to_cell_value(&value);
             let same = self
                 .workbook
                 .cell(sheet, addr.row, addr.col)
-                .is_some_and(|c| c.value == cached);
+                .is_none_or(|c| c.value == cached);
             if same {
                 continue;
             }
             self.workbook
-                .set_cell_formula(sheet, addr.row, addr.col, &text, Some(cached))?;
+                .set_cached_value(sheet, addr.row, addr.col, cached)?;
             let r = CellRef {
                 sheet,
                 row: addr.row,

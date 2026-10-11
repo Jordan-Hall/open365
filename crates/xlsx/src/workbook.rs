@@ -154,7 +154,7 @@ pub enum CellInput {
     Empty,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct SheetEntry {
     info: SheetInfo,
     part: PartName,
@@ -165,7 +165,7 @@ struct SheetEntry {
 /// A SpreadsheetML workbook: the OPC package plus a typed model of the workbook part,
 /// every worksheet, the shared strings and the number-format tables. Every other part
 /// is untouched and written back byte-identical.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Workbook {
     package: Package,
     workbook_part: PartName,
@@ -185,6 +185,8 @@ pub struct Workbook {
     hygiene: Vec<HygieneAction>,
     kind: WorkbookKind,
 }
+
+mod structure;
 
 fn is_true(v: &str) -> bool {
     matches!(v.trim(), "1" | "true")
@@ -591,7 +593,8 @@ impl Workbook {
         entry.data.as_mut().ok_or(XlsxError::NotAWorksheet(sheet))
     }
 
-    /// Sets the stored width (characters, padding included; 0..=255) of columns
+    /// Sets the stored width (characters, padding included; up to 255 plus the padding, see
+    /// [`Self::max_column_width`]) of columns
     /// `first..=last` and returns the previous `cols` state for [`Self::restore_columns`].
     /// A width of 0 hides the columns (as in Excel) and a positive width shows them; every
     /// column at once sets the sheet's default width. Only that sheet's part changes.
@@ -602,12 +605,27 @@ impl Workbook {
         last: u32,
         width: f64,
     ) -> Result<ColumnsSnapshot, XlsxError> {
-        if !width.is_finite() || !(0.0..=MAX_COLUMN_WIDTH).contains(&width) {
+        let max = self.max_column_width();
+        if !width.is_finite() || !(0.0..=max).contains(&width) {
             return Err(XlsxError::UnsupportedEdit(format!(
-                "column width {width} is outside 0..={MAX_COLUMN_WIDTH}"
+                "column width {width} is outside 0..={max}"
             )));
         }
         self.edit_columns(sheet, |ws| ws.set_column_width(first, last, width))
+    }
+
+    /// The largest stored column width: 255 characters of text plus the cell padding. Excel's cap counts the
+    /// padding (2302 px for 9 px digits), and the padding in characters depends on the display scale, so the
+    /// widest ratio of the common scales (96, 120, 144 and 192 dpi) is allowed.
+    pub fn max_column_width(&self) -> f64 {
+        let padding = [96, 120, 144, 192]
+            .into_iter()
+            .map(|dpi| {
+                let m = GridMetrics::for_styles(&self.styles, dpi);
+                f64::from(m.padding()) / f64::from(m.mdw)
+            })
+            .fold(0.0, f64::max);
+        MAX_COLUMN_WIDTH + padding
     }
 
     /// Hides columns `first..=last`; their stored widths are kept.

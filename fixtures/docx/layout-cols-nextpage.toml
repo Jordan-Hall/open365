@@ -1,0 +1,5 @@
+feature = "layout-cols"
+made_with = "Microsoft Word 16.0.20430 (Windows)"
+author = "project member"
+expect_dropped = []
+notes = "columns before and after a next-page section break (no balancing), then an odd-page break, then a continuous change back to one column"

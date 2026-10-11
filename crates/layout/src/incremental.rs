@@ -26,6 +26,7 @@ use crate::flow::{Checkpoint, Env, FlowItem, Previous, Resume, paginate};
 use crate::furniture::{Furniture, NoteStore, note_order};
 use crate::numbering::{Labeler, ListLabel, NumberingState};
 use crate::para::{Context, FieldEnv};
+use crate::props::SectionCols;
 use crate::{
     FontUse, Layout, LayoutOptions, LineMetricModel, Page, SectionProps, StoryKind, collect_items,
 };
@@ -47,6 +48,7 @@ struct Fingerprint {
 struct State {
     fingerprint: Fingerprint,
     sections: Vec<SectionProps>,
+    cols: Vec<SectionCols>,
     /// The body's paragraph and table blocks as laid out.
     blocks: Vec<Block>,
     items: Vec<FlowItem>,
@@ -198,18 +200,20 @@ impl IncrementalLayout {
         let sections: Vec<SectionProps> = doc_sections.iter().map(SectionProps::from).collect();
         let furniture = Furniture::new(doc, &doc_sections, &sections, &ctx);
         let note_store = NoteStore::new(doc, &sections, &order, &ctx);
+        let cols: Vec<SectionCols> = doc_sections
+            .iter()
+            .zip(&sections)
+            .map(|(s, p)| SectionCols::from_section(s, p.text_width()))
+            .collect();
+        // Balancing rewrites pages that already exist, so documents with columns are always
+        // paginated from the start.
+        let multicol = cols.iter().any(SectionCols::is_multi);
         let env = Env {
             sections: &sections,
+            cols: &cols,
             furniture: &furniture,
             notes: &note_store,
         };
-        for (i, s) in doc_sections.iter().enumerate() {
-            if s.columns.count > 1 && !layout.notes.iter().any(|n| n.starts_with("columns")) {
-                layout
-                    .notes
-                    .push(format!("columns are ignored (section {i})"));
-            }
-        }
         // Block-level content controls are unwrapped: their paragraphs are laid out in place.
         // `Section::end_paragraph` counts the addressable paragraphs only.
         let flat = flatten_content_controls(&doc.body().blocks);
@@ -267,7 +271,7 @@ impl IncrementalLayout {
         let prev = self
             .state
             .take()
-            .filter(|s| s.fingerprint == fp && s.sections == sections);
+            .filter(|s| s.fingerprint == fp && s.sections == sections && s.cols == cols);
         stats.blocks = blocks.len();
         stats.full = prev.is_none();
         let mut prev = prev;
@@ -308,8 +312,16 @@ impl IncrementalLayout {
                 story = 0;
                 section = sections.len().saturating_sub(1);
             }
-            let sect = sections.get(section).copied().unwrap_or_default();
-            let width = sect.text_width();
+            let width = cols.get(section).map_or_else(
+                || {
+                    sections
+                        .get(section)
+                        .copied()
+                        .unwrap_or_default()
+                        .text_width()
+                },
+                SectionCols::first_width,
+            );
             let candidate = if i < pre {
                 Some(i)
             } else if i >= n - suf {
@@ -427,6 +439,7 @@ impl IncrementalLayout {
                     frames: Vec::new(),
                     ..pg.clone()
                 });
+                let current = current.filter(|_| !multicol);
                 let Some(current) = current else {
                     // The cache and the layout disagree: start over.
                     let out = paginate(&items, &env, None, None);
@@ -445,6 +458,7 @@ impl IncrementalLayout {
                     self.state = Some(State {
                         fingerprint: fp,
                         sections: sections.clone(),
+                        cols: cols.clone(),
                         blocks: new_blocks,
                         items,
                         checkpoints,
@@ -547,6 +561,7 @@ impl IncrementalLayout {
         self.state = Some(State {
             fingerprint: fp,
             sections: sections.clone(),
+            cols: cols.clone(),
             blocks: new_blocks,
             items,
             checkpoints,

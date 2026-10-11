@@ -451,6 +451,22 @@ impl RunProps {
         Some(XmlElement { head, children })
     }
 
+    /// Removes and returns the `w:rPrChange` child.
+    pub(crate) fn take_rpr_change(&mut self) -> Option<XmlElement> {
+        let pos = self.items.iter().position(
+            |i| matches!(i, RunPropItem::Raw(RawXml::Element(e)) if e.head.is_w("rPrChange")),
+        )?;
+        match self.items.remove(pos) {
+            RunPropItem::Raw(RawXml::Element(e)) => Some(e),
+            _ => None,
+        }
+    }
+
+    /// True when the `w:rPr` has at least one child.
+    pub(crate) fn has_items(&self) -> bool {
+        !self.items.is_empty()
+    }
+
     /// A copy without revision-tracking children (`w:ins`, `w:del`, `w:rPrChange`...), which
     /// describe one specific change and must not be copied to other text.
     pub(crate) fn without_tracking(&self) -> Self {

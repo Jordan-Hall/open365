@@ -33,7 +33,12 @@ pub(super) fn render_date(
     let calendar = sec.toks.iter().any(|t| {
         matches!(
             t,
-            Tok::Year(_) | Tok::Month(_) | Tok::Day(_) | Tok::BuddhistYear(_)
+            Tok::Year(_)
+                | Tok::Month(_)
+                | Tok::Day(_)
+                | Tok::BuddhistYear(_)
+                | Tok::Era(_)
+                | Tok::EraYear(_)
         )
     });
     // Everything except the elapsed minute and second counters stops at 9999-12-31.
@@ -88,7 +93,7 @@ pub(super) fn render_date(
     let elapsed_secs = days * 86_400.0 + secs_total;
     for tok in &sec.toks {
         match tok {
-            Tok::Lit(s) => out.push(s),
+            Tok::Lit(s) => out.push_lit(s),
             Tok::Pad(c) => out.pad(*c),
             Tok::Fill(c) => out.fill(*c),
             Tok::Year(n) => {
@@ -101,18 +106,18 @@ pub(super) fn render_date(
             Tok::Month(n) => {
                 let m = (ymd.1.clamp(1, 12) - 1) as usize;
                 match n {
-                    1 => out.push(&ymd.1.to_string()),
+                    1 => out.push_unpadded(ymd.1),
                     2 => out.push(&format!("{:02}", ymd.1)),
-                    3 => out.push(&loc.month_abbr[m]),
-                    5 => out.push(&loc.month_full[m].chars().take(1).collect::<String>()),
-                    _ => out.push(&loc.month_full[m]),
+                    3 => out.push_lit(&loc.month_abbr[m]),
+                    5 => out.push_lit(&loc.month_full[m].chars().take(1).collect::<String>()),
+                    _ => out.push_lit(&loc.month_full[m]),
                 }
             }
             Tok::Day(n) => match n {
-                1 => out.push(&ymd.2.to_string()),
+                1 => out.push_unpadded(ymd.2),
                 2 => out.push(&format!("{:02}", ymd.2)),
-                3 => out.push(&loc.day_abbr[weekday]),
-                _ => out.push(&loc.day_full[weekday]),
+                3 => out.push_lit(&loc.day_abbr[weekday]),
+                _ => out.push_lit(&loc.day_full[weekday]),
             },
             Tok::Hour(n) => {
                 let mut h = hour24 as i64;
@@ -125,21 +130,21 @@ pub(super) fn render_date(
                 if *n >= 2 {
                     out.push(&format!("{h:02}"));
                 } else {
-                    out.push(&h.to_string());
+                    out.push_unpadded(h);
                 }
             }
             Tok::Minute(n) => {
                 if *n >= 2 {
                     out.push(&format!("{:02}", minute as i64));
                 } else {
-                    out.push(&(minute as i64).to_string());
+                    out.push_unpadded(minute as i64);
                 }
             }
             Tok::Second(n) => {
                 if *n >= 2 {
                     out.push(&format!("{:02}", second as i64));
                 } else {
-                    out.push(&(second as i64).to_string());
+                    out.push_unpadded(second as i64);
                 }
             }
             Tok::SubSec(n) => {
@@ -151,22 +156,47 @@ pub(super) fn render_date(
                 // `AM/PM` is always upper case; `a/p` keeps the case written in the format code.
                 let full = if pm { &loc.pm } else { &loc.am };
                 if !*short {
-                    out.push(full);
+                    out.push_lit(full);
                 } else {
                     let s: String = full.chars().take(1).collect();
                     if *upper {
-                        out.push(&s);
+                        out.push_lit(&s);
                     } else {
-                        out.push(&s.to_lowercase());
+                        out.push_lit(&s.to_lowercase());
                     }
                 }
             }
             Tok::BuddhistYear(n) => {
-                let y = ymd.0 + 543;
+                // With a `[$-LCID]` prefix `b` is the Gregorian year (measured for every language tried).
+                let y = if sec.lcid.is_some() {
+                    ymd.0
+                } else {
+                    ymd.0 + 543
+                };
                 if *n <= 2 {
                     out.push(&format!("{:02}", y.rem_euclid(100)));
                 } else {
                     out.push(&format!("{y:04}"));
+                }
+            }
+            Tok::Era(n) if sec.lcid.is_some_and(|l| l & 0xFFFF == 0x411) => {
+                let (kanji, initial, _) = japanese_era(ymd);
+                match n {
+                    1 => out.push_lit(initial),
+                    2 => out.push_lit(&kanji.chars().take(1).collect::<String>()),
+                    _ => out.push_lit(kanji),
+                }
+            }
+            Tok::EraYear(n) => {
+                if sec.lcid.is_some_and(|l| l & 0xFFFF == 0x411) {
+                    let (_, _, year) = japanese_era(ymd);
+                    if *n >= 2 {
+                        out.push(&format!("{year:02}"));
+                    } else {
+                        out.push(&year.to_string());
+                    }
+                } else {
+                    out.push(&format!("{:04}", ymd.0));
                 }
             }
             Tok::Elapsed(kind, n) => {
@@ -181,4 +211,22 @@ pub(super) fn render_date(
         }
     }
     true
+}
+
+/// The Japanese era of a date: the name, its Latin initial and the year within the era (the first year is 1).
+/// Dates before the Meiji era (which starts on 8 September 1868) cannot occur: the serial numbers start in 1900.
+fn japanese_era(ymd: (i64, i64, i64)) -> (&'static str, &'static str, i64) {
+    const ERAS: [((i64, i64, i64), &str, &str); 5] = [
+        ((2019, 5, 1), "\u{4ee4}\u{548c}", "R"),
+        ((1989, 1, 8), "\u{5e73}\u{6210}", "H"),
+        ((1926, 12, 25), "\u{662d}\u{548c}", "S"),
+        ((1912, 7, 30), "\u{5927}\u{6b63}", "T"),
+        ((1868, 9, 8), "\u{660e}\u{6cbb}", "M"),
+    ];
+    for (start, kanji, initial) in ERAS {
+        if ymd >= start {
+            return (kanji, initial, ymd.0 - start.0 + 1);
+        }
+    }
+    ("\u{660e}\u{6cbb}", "M", ymd.0 - 1867)
 }

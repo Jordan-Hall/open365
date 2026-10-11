@@ -310,8 +310,12 @@ pub(crate) struct LineBox {
     pub lead: f64,
     /// Atom x positions (text-area coordinates), parallel to `atoms`.
     pub xs: Vec<f64>,
-    /// True when the line ends with a page break; the next line starts a page.
+    /// True when the line ends with a page or column break; the next line starts a page (or a
+    /// column, see `column_break_after`).
     pub page_break_after: bool,
+    /// The break is a column break (`w:br w:type="column"`): the next line starts the next
+    /// column, or a page in a single-column section.
+    pub column_break_after: bool,
     /// Spacing below the text of the line that a page need not have room for: a multiple above
     /// one adds `(m - 1)` font heights under the descent, and Word keeps the line on the page
     /// when its text fits (layout-face-multiple).
@@ -1176,6 +1180,7 @@ impl LineBuilder<'_> {
                 lead: 0.0,
                 xs: Vec::new(),
                 page_break_after: false,
+                column_break_after: false,
                 slack: 0.0,
             });
         }
@@ -1288,6 +1293,7 @@ impl LineBuilder<'_> {
         let mut end = n;
         let mut forced = false;
         let mut page_break_after = false;
+        let mut column_break_after = false;
         let justify = self.props.alignment == Alignment::Justify;
         let mut space_sum = 0.0;
         while i < n {
@@ -1325,6 +1331,7 @@ impl LineBuilder<'_> {
                 AtomClass::LineBreak | AtomClass::PageBreak | AtomClass::Mark => {
                     if a.class == AtomClass::PageBreak {
                         page_break_after = true;
+                        column_break_after = a.ch == '\u{e}';
                         // The paragraph mark right after a page break stays on this line.
                         if i < n && self.atoms[i].class == AtomClass::Mark {
                             xs.push(x);
@@ -1500,6 +1507,7 @@ impl LineBuilder<'_> {
             lead: 0.0,
             xs,
             page_break_after,
+            column_break_after,
             slack,
         }
     }

@@ -1,0 +1,12 @@
+{
+  "source": "fixtures/xlsx/chart-column-percent.xlsx",
+  "oracle": "Microsoft Excel via COM, points, origin at the chart area top left",
+  "excel_build": "20430",
+  "object": {"width":384,"height":259.20001220703125},
+  "chart_area": {"width":379,"height":254.2},
+  "plot_inside": {"left":34.13582677165354,"top":31.18543307086614,"width":334.86417322834643,"height":198.96291338582677},
+  "plot_outer": {"left":7,"top":31.08291338582677,"width":362,"height":213.11708661417322},
+  "legend": {"left":123.9448031496063,"top":2,"width":128.1103937007874,"height":18.08291338582677},
+  "title": null,
+  "value_axis": {"min":0,"max":1,"major":0.1}
+}

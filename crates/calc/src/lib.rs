@@ -14,6 +14,7 @@ pub mod functions;
 pub mod graph;
 pub mod numfmt;
 pub mod parser;
+pub mod refshift;
 pub mod style;
 pub mod tables;
 pub mod value;

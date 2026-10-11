@@ -1,0 +1,5 @@
+feature = "layout-cols"
+made_with = "Microsoft Word 16.0.20430 (Windows)"
+author = "project member"
+expect_dropped = []
+notes = "single column intro, continuous break to two columns (balanced by the next continuous break), single column, then three columns to the end (not balanced)"

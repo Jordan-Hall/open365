@@ -1,0 +1,879 @@
+{
+  "source": "fixtures/xlsx/insdel-refs.xlsx",
+  "sheets": [
+    {
+      "name": "S",
+      "visible": -1,
+      "usedRange": "A1:P42",
+      "truncatedAt2000": false,
+      "cells": {
+        "A1": {
+          "value2": 11.0,
+          "text": "11",
+          "formula": null
+        },
+        "B1": {
+          "value2": 12.0,
+          "text": "12",
+          "formula": null
+        },
+        "C1": {
+          "value2": 13.0,
+          "text": "13",
+          "formula": null
+        },
+        "D1": {
+          "value2": 14.0,
+          "text": "14",
+          "formula": null
+        },
+        "E1": {
+          "value2": 15.0,
+          "text": "15",
+          "formula": null
+        },
+        "F1": {
+          "value2": 16.0,
+          "text": "16",
+          "formula": null
+        },
+        "G1": {
+          "value2": 17.0,
+          "text": "17",
+          "formula": null
+        },
+        "H1": {
+          "value2": 18.0,
+          "text": "18",
+          "formula": null
+        },
+        "N1": {
+          "value2": 33.0,
+          "text": "33",
+          "formula": "=C3"
+        },
+        "A2": {
+          "value2": 21.0,
+          "text": "21",
+          "formula": null
+        },
+        "B2": {
+          "value2": 22.0,
+          "text": "22",
+          "formula": null
+        },
+        "C2": {
+          "value2": 23.0,
+          "text": "23",
+          "formula": null
+        },
+        "D2": {
+          "value2": 24.0,
+          "text": "24",
+          "formula": null
+        },
+        "E2": {
+          "value2": 25.0,
+          "text": "25",
+          "formula": null
+        },
+        "F2": {
+          "value2": 26.0,
+          "text": "26",
+          "formula": null
+        },
+        "G2": {
+          "value2": 27.0,
+          "text": "27",
+          "formula": null
+        },
+        "H2": {
+          "value2": 28.0,
+          "text": "28",
+          "formula": null
+        },
+        "N2": {
+          "value2": 33.0,
+          "text": "33",
+          "formula": "=$C$3"
+        },
+        "A3": {
+          "value2": 31.0,
+          "text": "31",
+          "formula": null
+        },
+        "B3": {
+          "value2": 32.0,
+          "text": "32",
+          "formula": null
+        },
+        "C3": {
+          "value2": 33.0,
+          "text": "33",
+          "formula": null
+        },
+        "D3": {
+          "value2": 34.0,
+          "text": "34",
+          "formula": null
+        },
+        "E3": {
+          "value2": 35.0,
+          "text": "35",
+          "formula": null
+        },
+        "F3": {
+          "value2": 36.0,
+          "text": "36",
+          "formula": null
+        },
+        "G3": {
+          "value2": 37.0,
+          "text": "37",
+          "formula": null
+        },
+        "H3": {
+          "value2": 38.0,
+          "text": "38",
+          "formula": null
+        },
+        "N3": {
+          "value2": 33.0,
+          "text": "33",
+          "formula": "=$C3"
+        },
+        "A4": {
+          "value2": 41.0,
+          "text": "41",
+          "formula": null
+        },
+        "B4": {
+          "value2": 42.0,
+          "text": "42",
+          "formula": null
+        },
+        "C4": {
+          "value2": 43.0,
+          "text": "43",
+          "formula": null
+        },
+        "D4": {
+          "value2": 44.0,
+          "text": "44",
+          "formula": null
+        },
+        "E4": {
+          "value2": 45.0,
+          "text": "45",
+          "formula": null
+        },
+        "F4": {
+          "value2": 46.0,
+          "text": "46",
+          "formula": null
+        },
+        "G4": {
+          "value2": 47.0,
+          "text": "47",
+          "formula": null
+        },
+        "H4": {
+          "value2": 48.0,
+          "text": "48",
+          "formula": null
+        },
+        "N4": {
+          "value2": 33.0,
+          "text": "33",
+          "formula": "=C$3"
+        },
+        "A5": {
+          "value2": 51.0,
+          "text": "51",
+          "formula": null
+        },
+        "B5": {
+          "value2": 52.0,
+          "text": "52",
+          "formula": null
+        },
+        "C5": {
+          "value2": 53.0,
+          "text": "53",
+          "formula": null
+        },
+        "D5": {
+          "value2": 54.0,
+          "text": "54",
+          "formula": null
+        },
+        "E5": {
+          "value2": 55.0,
+          "text": "55",
+          "formula": null
+        },
+        "F5": {
+          "value2": 56.0,
+          "text": "56",
+          "formula": null
+        },
+        "G5": {
+          "value2": 57.0,
+          "text": "57",
+          "formula": null
+        },
+        "H5": {
+          "value2": 58.0,
+          "text": "58",
+          "formula": null
+        },
+        "N5": {
+          "value2": 1806.0,
+          "text": "1806",
+          "formula": "=SUM(C3:F9)"
+        },
+        "A6": {
+          "value2": 61.0,
+          "text": "61",
+          "formula": null
+        },
+        "B6": {
+          "value2": 62.0,
+          "text": "62",
+          "formula": null
+        },
+        "C6": {
+          "value2": 63.0,
+          "text": "63",
+          "formula": null
+        },
+        "D6": {
+          "value2": 64.0,
+          "text": "64",
+          "formula": null
+        },
+        "E6": {
+          "value2": 65.0,
+          "text": "65",
+          "formula": null
+        },
+        "F6": {
+          "value2": 66.0,
+          "text": "66",
+          "formula": null
+        },
+        "G6": {
+          "value2": 67.0,
+          "text": "67",
+          "formula": null
+        },
+        "H6": {
+          "value2": 68.0,
+          "text": "68",
+          "formula": null
+        },
+        "N6": {
+          "value2": 1806.0,
+          "text": "1806",
+          "formula": "=SUM($C$3:$F$9)"
+        },
+        "A7": {
+          "value2": 71.0,
+          "text": "71",
+          "formula": null
+        },
+        "B7": {
+          "value2": 72.0,
+          "text": "72",
+          "formula": null
+        },
+        "C7": {
+          "value2": 73.0,
+          "text": "73",
+          "formula": null
+        },
+        "D7": {
+          "value2": 74.0,
+          "text": "74",
+          "formula": null
+        },
+        "E7": {
+          "value2": 75.0,
+          "text": "75",
+          "formula": null
+        },
+        "F7": {
+          "value2": 76.0,
+          "text": "76",
+          "formula": null
+        },
+        "G7": {
+          "value2": 77.0,
+          "text": "77",
+          "formula": null
+        },
+        "H7": {
+          "value2": 78.0,
+          "text": "78",
+          "formula": null
+        },
+        "N7": {
+          "value2": 9828.0,
+          "text": "9828",
+          "formula": "=SUM(C:C)"
+        },
+        "A8": {
+          "value2": 81.0,
+          "text": "81",
+          "formula": null
+        },
+        "B8": {
+          "value2": 82.0,
+          "text": "82",
+          "formula": null
+        },
+        "C8": {
+          "value2": 83.0,
+          "text": "83",
+          "formula": null
+        },
+        "D8": {
+          "value2": 84.0,
+          "text": "84",
+          "formula": null
+        },
+        "E8": {
+          "value2": 85.0,
+          "text": "85",
+          "formula": null
+        },
+        "F8": {
+          "value2": 86.0,
+          "text": "86",
+          "formula": null
+        },
+        "G8": {
+          "value2": 87.0,
+          "text": "87",
+          "formula": null
+        },
+        "H8": {
+          "value2": 88.0,
+          "text": "88",
+          "formula": null
+        },
+        "N8": {
+          "value2": 2940.0,
+          "text": "2940",
+          "formula": "=SUM(3:5)"
+        },
+        "A9": {
+          "value2": 91.0,
+          "text": "91",
+          "formula": null
+        },
+        "B9": {
+          "value2": 92.0,
+          "text": "92",
+          "formula": null
+        },
+        "C9": {
+          "value2": 93.0,
+          "text": "93",
+          "formula": null
+        },
+        "D9": {
+          "value2": 94.0,
+          "text": "94",
+          "formula": null
+        },
+        "E9": {
+          "value2": 95.0,
+          "text": "95",
+          "formula": null
+        },
+        "F9": {
+          "value2": 96.0,
+          "text": "96",
+          "formula": null
+        },
+        "G9": {
+          "value2": 97.0,
+          "text": "97",
+          "formula": null
+        },
+        "H9": {
+          "value2": 98.0,
+          "text": "98",
+          "formula": null
+        },
+        "N9": {
+          "value2": 29532.0,
+          "text": "29532",
+          "formula": "=SUM(C:E)"
+        },
+        "A10": {
+          "value2": 101.0,
+          "text": "101",
+          "formula": null
+        },
+        "B10": {
+          "value2": 102.0,
+          "text": "102",
+          "formula": null
+        },
+        "C10": {
+          "value2": 103.0,
+          "text": "103",
+          "formula": null
+        },
+        "D10": {
+          "value2": 104.0,
+          "text": "104",
+          "formula": null
+        },
+        "E10": {
+          "value2": 105.0,
+          "text": "105",
+          "formula": null
+        },
+        "F10": {
+          "value2": 106.0,
+          "text": "106",
+          "formula": null
+        },
+        "G10": {
+          "value2": 107.0,
+          "text": "107",
+          "formula": null
+        },
+        "H10": {
+          "value2": 108.0,
+          "text": "108",
+          "formula": null
+        },
+        "N10": {
+          "value2": 441.0,
+          "text": "441",
+          "formula": "=SUM(C3:C9)"
+        },
+        "A11": {
+          "value2": 111.0,
+          "text": "111",
+          "formula": null
+        },
+        "B11": {
+          "value2": 112.0,
+          "text": "112",
+          "formula": null
+        },
+        "C11": {
+          "value2": 113.0,
+          "text": "113",
+          "formula": null
+        },
+        "D11": {
+          "value2": 114.0,
+          "text": "114",
+          "formula": null
+        },
+        "E11": {
+          "value2": 115.0,
+          "text": "115",
+          "formula": null
+        },
+        "F11": {
+          "value2": 116.0,
+          "text": "116",
+          "formula": null
+        },
+        "G11": {
+          "value2": 117.0,
+          "text": "117",
+          "formula": null
+        },
+        "H11": {
+          "value2": 118.0,
+          "text": "118",
+          "formula": null
+        },
+        "N11": {
+          "value2": 129.0,
+          "text": "129",
+          "formula": "=C3+F9"
+        },
+        "A12": {
+          "value2": 121.0,
+          "text": "121",
+          "formula": null
+        },
+        "B12": {
+          "value2": 122.0,
+          "text": "122",
+          "formula": null
+        },
+        "C12": {
+          "value2": 123.0,
+          "text": "123",
+          "formula": null
+        },
+        "D12": {
+          "value2": 124.0,
+          "text": "124",
+          "formula": null
+        },
+        "E12": {
+          "value2": 125.0,
+          "text": "125",
+          "formula": null
+        },
+        "F12": {
+          "value2": 126.0,
+          "text": "126",
+          "formula": null
+        },
+        "G12": {
+          "value2": 127.0,
+          "text": "127",
+          "formula": null
+        },
+        "H12": {
+          "value2": 128.0,
+          "text": "128",
+          "formula": null
+        },
+        "N12": {
+          "value2": 129.0,
+          "text": "129",
+          "formula": "=SUM(C3,F9)"
+        },
+        "N13": {
+          "value2": 138.0,
+          "text": "138",
+          "formula": "=SUM(C3:F3)"
+        },
+        "N14": {
+          "value2": 44.0,
+          "text": "44",
+          "formula": "=INDEX(C3:F9,2,2)"
+        },
+        "N15": {
+          "value2": 44.0,
+          "text": "44",
+          "formula": "=OFFSET(C3,1,1)"
+        },
+        "N16": {
+          "value2": 264.0,
+          "text": "264",
+          "formula": "=SUM((C3:C5,E3:E5))"
+        },
+        "N17": {
+          "value2": 238.0,
+          "text": "238",
+          "formula": "=SUM(D4:E8 C5:F6)"
+        },
+        "N18": {
+          "value2": 1806.0,
+          "text": "1806",
+          "formula": "=SUM(RngAll)"
+        },
+        "N19": {
+          "value2": 0.0,
+          "text": "0",
+          "formula": "=SUM(RelRng)"
+        },
+        "C20": {
+          "value2": "Col1",
+          "text": "Col1",
+          "formula": null
+        },
+        "D20": {
+          "value2": "Col2",
+          "text": "Col2",
+          "formula": null
+        },
+        "E20": {
+          "value2": "Col3",
+          "text": "Col3",
+          "formula": null
+        },
+        "N20": {
+          "value2": 34.0,
+          "text": "34",
+          "formula": "=CellOne+1"
+        },
+        "C21": {
+          "value2": 2103.0,
+          "text": "2103",
+          "formula": null
+        },
+        "D21": {
+          "value2": 2104.0,
+          "text": "2104",
+          "formula": null
+        },
+        "E21": {
+          "value2": 2105.0,
+          "text": "2105",
+          "formula": null
+        },
+        "N21": {
+          "value2": 67.0,
+          "text": "67",
+          "formula": "=CalcNm"
+        },
+        "C22": {
+          "value2": 2203.0,
+          "text": "2203",
+          "formula": null
+        },
+        "D22": {
+          "value2": 2204.0,
+          "text": "2204",
+          "formula": null
+        },
+        "E22": {
+          "value2": 2205.0,
+          "text": "2205",
+          "formula": null
+        },
+        "N22": {
+          "value2": 33.0,
+          "text": "33",
+          "formula": "=S!C3"
+        },
+        "C23": {
+          "value2": 2303.0,
+          "text": "2303",
+          "formula": null
+        },
+        "D23": {
+          "value2": 2304.0,
+          "text": "2304",
+          "formula": null
+        },
+        "E23": {
+          "value2": 2305.0,
+          "text": "2305",
+          "formula": null
+        },
+        "N23": {
+          "value2": 1806.0,
+          "text": "1806",
+          "formula": "=SUM(S!C3:F9)"
+        },
+        "C24": {
+          "value2": 2403.0,
+          "text": "2403",
+          "formula": null
+        },
+        "D24": {
+          "value2": 2404.0,
+          "text": "2404",
+          "formula": null
+        },
+        "E24": {
+          "value2": 2405.0,
+          "text": "2405",
+          "formula": null
+        },
+        "N24": {
+          "value2": 5.0,
+          "text": "5",
+          "formula": "=ROW(C5)"
+        },
+        "N25": {
+          "value2": 6.0,
+          "text": "6",
+          "formula": "=COLUMN(F9)"
+        },
+        "N26": {
+          "value2": 9016.0,
+          "text": "9016",
+          "formula": "=SUM(Tbl[Col2])"
+        },
+        "N27": {
+          "value2": 4.0,
+          "text": "4",
+          "formula": "=ROWS(Tbl)"
+        },
+        "N28": {
+          "value2": 6.0,
+          "text": "6",
+          "formula": "=SUM(O!B1:B3)"
+        },
+        "N29": {
+          "value2": 33.0,
+          "text": "33",
+          "formula": "=O!A1"
+        },
+        "N30": {
+          "value2": 320.0,
+          "text": "320",
+          "formula": "=SUM(ScopedNm)"
+        },
+        "N31": {
+          "value2": 441.0,
+          "text": "441",
+          "formula": "=SUM(C3:C9)"
+        },
+        "N32": {
+          "value2": 1806.0,
+          "text": "1806",
+          "formula": "=SUM($C3:F$9)"
+        },
+        "N33": {
+          "value2": 6672.0,
+          "text": "6672",
+          "formula": "=SUM(A1:H12)"
+        },
+        "N34": {
+          "value2": 33720.0,
+          "text": "33720",
+          "formula": "=SUM(A:H)"
+        },
+        "N35": {
+          "value2": 53415.0,
+          "text": "53415",
+          "formula": "=SUM(1:12)"
+        },
+        "P40": {
+          "value2": 66.0,
+          "text": "66",
+          "formula": "=C3:C5*2"
+        },
+        "P41": {
+          "value2": 86.0,
+          "text": "86",
+          "formula": "=C3:C5*2"
+        },
+        "P42": {
+          "value2": 106.0,
+          "text": "106",
+          "formula": "=C3:C5*2"
+        }
+      }
+    },
+    {
+      "name": "O",
+      "visible": -1,
+      "usedRange": "A1:B14",
+      "truncatedAt2000": false,
+      "cells": {
+        "A1": {
+          "value2": 33.0,
+          "text": "33",
+          "formula": "=S!C3"
+        },
+        "B1": {
+          "value2": 1.0,
+          "text": "1",
+          "formula": null
+        },
+        "A2": {
+          "value2": 1806.0,
+          "text": "1806",
+          "formula": "=SUM(S!C3:F9)"
+        },
+        "B2": {
+          "value2": 2.0,
+          "text": "2",
+          "formula": null
+        },
+        "A3": {
+          "value2": 33.0,
+          "text": "33",
+          "formula": "=S!$C$3"
+        },
+        "B3": {
+          "value2": 3.0,
+          "text": "3",
+          "formula": null
+        },
+        "A4": {
+          "value2": 9828.0,
+          "text": "9828",
+          "formula": "=SUM(S!C:C)"
+        },
+        "A5": {
+          "value2": 2940.0,
+          "text": "2940",
+          "formula": "=SUM(S!3:5)"
+        },
+        "A6": {
+          "value2": 3612.0,
+          "text": "3612",
+          "formula": "=SUM(S!C3:F9)*2"
+        },
+        "A7": {
+          "value2": 1806.0,
+          "text": "1806",
+          "formula": "=SUM(RngAll)"
+        },
+        "A8": {
+          "value2": 1.0,
+          "text": "1",
+          "formula": "=B1"
+        },
+        "A9": {
+          "value2": 320.0,
+          "text": "320",
+          "formula": "=SUM(S!ScopedNm)"
+        },
+        "A10": {
+          "value2": 33.0,
+          "text": "33",
+          "formula": "=S!N1"
+        },
+        "A11": {
+          "value2": 44.0,
+          "text": "44",
+          "formula": "=INDEX(S!C3:F9,2,2)"
+        },
+        "A12": {
+          "value2": 1817.0,
+          "text": "1817",
+          "formula": "=SUM(S!C3:F9,S!A1)"
+        },
+        "A13": {
+          "value2": 135.0,
+          "text": "135",
+          "formula": "=SUM(S!C3:C5)+SUM(B1:B3)"
+        },
+        "A14": {
+          "value2": 7.0,
+          "text": "7",
+          "formula": null
+        }
+      }
+    },
+    {
+      "name": "Q R",
+      "visible": -1,
+      "usedRange": "A1:B2",
+      "truncatedAt2000": false,
+      "cells": {
+        "A1": {
+          "value2": 34.0,
+          "text": "34",
+          "formula": "=S!C3+O!B1"
+        },
+        "B1": {
+          "value2": 5.0,
+          "text": "5",
+          "formula": null
+        },
+        "A2": {
+          "value2": 11.0,
+          "text": "11",
+          "formula": "=SUM('Q R'!B1:B2)"
+        },
+        "B2": {
+          "value2": 6.0,
+          "text": "6",
+          "formula": null
+        }
+      }
+    }
+  ]
+}

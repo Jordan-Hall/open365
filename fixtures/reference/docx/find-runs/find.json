@@ -1,0 +1,5404 @@
+{
+  "fixture": "fixtures/docx/find-runs.docx",
+  "app": "Microsoft Word 16.0",
+  "base": [
+    {
+      "text": "The Cat sat on the cat mat. CAT cat.",
+      "fmt": "000001100000000002222000000000000000"
+    },
+    {
+      "text": "concatenate category cat-like scatter concat.",
+      "fmt": "000000000000000000000000000000000000000000000"
+    },
+    {
+      "text": "Hello World hello world HELLO",
+      "fmt": "00019999800000000000000000000"
+    },
+    {
+      "text": "alpha1 beta22 gamma333 delta",
+      "fmt": "0000000000000000000000000000"
+    },
+    {
+      "text": "foo_bar foo-bar foo bar foobar",
+      "fmt": "000111000000000000000000000000"
+    },
+    {
+      "text": "tab\tseparated and line\nbreak",
+      "fmt": "0000000000000000000000000000"
+    },
+    {
+      "text": "a*b a?b axxb a b",
+      "fmt": "0000000000000000"
+    },
+    {
+      "text": "[bracket] (paren) caret^ back\\slash",
+      "fmt": "00000000000000000000000000000000000"
+    },
+    {
+      "text": "\u00dcn\u00ef c\u00f6de \u00dcN\u00cf \u00fcn\u00ef",
+      "fmt": "0000000000000000"
+    },
+    {
+      "text": "foobar and foobar",
+      "fmt": "00011104440000111"
+    },
+    {
+      "text": "x1 x12 x123 x1234",
+      "fmt": "00004000000000000"
+    },
+    {
+      "text": "  leading and trailing  ",
+      "fmt": "000000000000000000000000"
+    },
+    {
+      "text": "word Word WORD wOrd WOrD a A Ab AB",
+      "fmt": "0000000000000000000000000000000000"
+    },
+    {
+      "text": "cat in table",
+      "fmt": "000000000000"
+    },
+    {
+      "text": "Cat Cat",
+      "fmt": "0000000"
+    },
+    {
+      "text": "no match",
+      "fmt": "00000000"
+    },
+    {
+      "text": "concat",
+      "fmt": "000000"
+    }
+  ],
+  "scenarios": [
+    {
+      "name": "plain",
+      "find": "cat",
+      "replace": "dog",
+      "matchCase": false,
+      "wholeWord": false,
+      "wildcards": false,
+      "count": 13,
+      "paragraphs": [
+        {
+          "text": "The Dog sat on the dog mat. DOG dog.",
+          "fmt": "000000000000000002222200000000000000"
+        },
+        {
+          "text": "condogenate dogegory dog-like sdogter condog.",
+          "fmt": "000000000000000000000000000000000000000000000"
+        },
+        {
+          "text": "Hello World hello world HELLO",
+          "fmt": "00019999800000000000000000000"
+        },
+        {
+          "text": "alpha1 beta22 gamma333 delta",
+          "fmt": "0000000000000000000000000000"
+        },
+        {
+          "text": "foo_bar foo-bar foo bar foobar",
+          "fmt": "000111000000000000000000000000"
+        },
+        {
+          "text": "tab\tseparated and line\nbreak",
+          "fmt": "0000000000000000000000000000"
+        },
+        {
+          "text": "a*b a?b axxb a b",
+          "fmt": "0000000000000000"
+        },
+        {
+          "text": "[bracket] (paren) caret^ back\\slash",
+          "fmt": "00000000000000000000000000000000000"
+        },
+        {
+          "text": "\u00dcn\u00ef c\u00f6de \u00dcN\u00cf \u00fcn\u00ef",
+          "fmt": "0000000000000000"
+        },
+        {
+          "text": "foobar and foobar",
+          "fmt": "00011104440000111"
+        },
+        {
+          "text": "x1 x12 x123 x1234",
+          "fmt": "00004000000000000"
+        },
+        {
+          "text": "  leading and trailing  ",
+          "fmt": "000000000000000000000000"
+        },
+        {
+          "text": "word Word WORD wOrd WOrD a A Ab AB",
+          "fmt": "0000000000000000000000000000000000"
+        },
+        {
+          "text": "dog in table",
+          "fmt": "000000000000"
+        },
+        {
+          "text": "Dog Dog",
+          "fmt": "0000000"
+        },
+        {
+          "text": "no match",
+          "fmt": "00000000"
+        },
+        {
+          "text": "condog",
+          "fmt": "000000"
+        }
+      ]
+    },
+    {
+      "name": "match-case",
+      "find": "cat",
+      "replace": "dog",
+      "matchCase": true,
+      "wholeWord": false,
+      "wildcards": false,
+      "count": 9,
+      "paragraphs": [
+        {
+          "text": "The Cat sat on the dog mat. CAT dog.",
+          "fmt": "000001100000000002222200000000000000"
+        },
+        {
+          "text": "condogenate dogegory dog-like sdogter condog.",
+          "fmt": "000000000000000000000000000000000000000000000"
+        },
+        {
+          "text": "Hello World hello world HELLO",
+          "fmt": "00019999800000000000000000000"
+        },
+        {
+          "text": "alpha1 beta22 gamma333 delta",
+          "fmt": "0000000000000000000000000000"
+        },
+        {
+          "text": "foo_bar foo-bar foo bar foobar",
+          "fmt": "000111000000000000000000000000"
+        },
+        {
+          "text": "tab\tseparated and line\nbreak",
+          "fmt": "0000000000000000000000000000"
+        },
+        {
+          "text": "a*b a?b axxb a b",
+          "fmt": "0000000000000000"
+        },
+        {
+          "text": "[bracket] (paren) caret^ back\\slash",
+          "fmt": "00000000000000000000000000000000000"
+        },
+        {
+          "text": "\u00dcn\u00ef c\u00f6de \u00dcN\u00cf \u00fcn\u00ef",
+          "fmt": "0000000000000000"
+        },
+        {
+          "text": "foobar and foobar",
+          "fmt": "00011104440000111"
+        },
+        {
+          "text": "x1 x12 x123 x1234",
+          "fmt": "00004000000000000"
+        },
+        {
+          "text": "  leading and trailing  ",
+          "fmt": "000000000000000000000000"
+        },
+        {
+          "text": "word Word WORD wOrd WOrD a A Ab AB",
+          "fmt": "0000000000000000000000000000000000"
+        },
+        {
+          "text": "dog in table",
+          "fmt": "000000000000"
+        },
+        {
+          "text": "Cat Cat",
+          "fmt": "0000000"
+        },
+        {
+          "text": "no match",
+          "fmt": "00000000"
+        },
+        {
+          "text": "condog",
+          "fmt": "000000"
+        }
+      ]
+    },
+    {
+      "name": "whole-word",
+      "find": "cat",
+      "replace": "dog",
+      "matchCase": false,
+      "wholeWord": true,
+      "wildcards": false,
+      "count": 8,
+      "paragraphs": [
+        {
+          "text": "The Dog sat on the dog mat. DOG dog.",
+          "fmt": "000000000000000002222200000000000000"
+        },
+        {
+          "text": "concatenate category dog-like scatter concat.",
+          "fmt": "000000000000000000000000000000000000000000000"
+        },
+        {
+          "text": "Hello World hello world HELLO",
+          "fmt": "00019999800000000000000000000"
+        },
+        {
+          "text": "alpha1 beta22 gamma333 delta",
+          "fmt": "0000000000000000000000000000"
+        },
+        {
+          "text": "foo_bar foo-bar foo bar foobar",
+          "fmt": "000111000000000000000000000000"
+        },
+        {
+          "text": "tab\tseparated and line\nbreak",
+          "fmt": "0000000000000000000000000000"
+        },
+        {
+          "text": "a*b a?b axxb a b",
+          "fmt": "0000000000000000"
+        },
+        {
+          "text": "[bracket] (paren) caret^ back\\slash",
+          "fmt": "00000000000000000000000000000000000"
+        },
+        {
+          "text": "\u00dcn\u00ef c\u00f6de \u00dcN\u00cf \u00fcn\u00ef",
+          "fmt": "0000000000000000"
+        },
+        {
+          "text": "foobar and foobar",
+          "fmt": "00011104440000111"
+        },
+        {
+          "text": "x1 x12 x123 x1234",
+          "fmt": "00004000000000000"
+        },
+        {
+          "text": "  leading and trailing  ",
+          "fmt": "000000000000000000000000"
+        },
+        {
+          "text": "word Word WORD wOrd WOrD a A Ab AB",
+          "fmt": "0000000000000000000000000000000000"
+        },
+        {
+          "text": "dog in table",
+          "fmt": "000000000000"
+        },
+        {
+          "text": "Dog Dog",
+          "fmt": "0000000"
+        },
+        {
+          "text": "no match",
+          "fmt": "00000000"
+        },
+        {
+          "text": "concat",
+          "fmt": "000000"
+        }
+      ]
+    },
+    {
+      "name": "whole-word-match-case",
+      "find": "cat",
+      "replace": "dog",
+      "matchCase": true,
+      "wholeWord": true,
+      "wildcards": false,
+      "count": 4,
+      "paragraphs": [
+        {
+          "text": "The Cat sat on the dog mat. CAT dog.",
+          "fmt": "000001100000000002222200000000000000"
+        },
+        {
+          "text": "concatenate category dog-like scatter concat.",
+          "fmt": "000000000000000000000000000000000000000000000"
+        },
+        {
+          "text": "Hello World hello world HELLO",
+          "fmt": "00019999800000000000000000000"
+        },
+        {
+          "text": "alpha1 beta22 gamma333 delta",
+          "fmt": "0000000000000000000000000000"
+        },
+        {
+          "text": "foo_bar foo-bar foo bar foobar",
+          "fmt": "000111000000000000000000000000"
+        },
+        {
+          "text": "tab\tseparated and line\nbreak",
+          "fmt": "0000000000000000000000000000"
+        },
+        {
+          "text": "a*b a?b axxb a b",
+          "fmt": "0000000000000000"
+        },
+        {
+          "text": "[bracket] (paren) caret^ back\\slash",
+          "fmt": "00000000000000000000000000000000000"
+        },
+        {
+          "text": "\u00dcn\u00ef c\u00f6de \u00dcN\u00cf \u00fcn\u00ef",
+          "fmt": "0000000000000000"
+        },
+        {
+          "text": "foobar and foobar",
+          "fmt": "00011104440000111"
+        },
+        {
+          "text": "x1 x12 x123 x1234",
+          "fmt": "00004000000000000"
+        },
+        {
+          "text": "  leading and trailing  ",
+          "fmt": "000000000000000000000000"
+        },
+        {
+          "text": "word Word WORD wOrd WOrD a A Ab AB",
+          "fmt": "0000000000000000000000000000000000"
+        },
+        {
+          "text": "dog in table",
+          "fmt": "000000000000"
+        },
+        {
+          "text": "Cat Cat",
+          "fmt": "0000000"
+        },
+        {
+          "text": "no match",
+          "fmt": "00000000"
+        },
+        {
+          "text": "concat",
+          "fmt": "000000"
+        }
+      ]
+    },
+    {
+      "name": "delete",
+      "find": "cat",
+      "replace": "",
+      "matchCase": false,
+      "wholeWord": false,
+      "wildcards": false,
+      "count": 13,
+      "paragraphs": [
+        {
+          "text": "The  sat on the  mat.  .",
+          "fmt": "000000000000002200000000"
+        },
+        {
+          "text": "conenate egory -like ster con.",
+          "fmt": "000000000000000000000000000000"
+        },
+        {
+          "text": "Hello World hello world HELLO",
+          "fmt": "00019999800000000000000000000"
+        },
+        {
+          "text": "alpha1 beta22 gamma333 delta",
+          "fmt": "0000000000000000000000000000"
+        },
+        {
+          "text": "foo_bar foo-bar foo bar foobar",
+          "fmt": "000111000000000000000000000000"
+        },
+        {
+          "text": "tab\tseparated and line\nbreak",
+          "fmt": "0000000000000000000000000000"
+        },
+        {
+          "text": "a*b a?b axxb a b",
+          "fmt": "0000000000000000"
+        },
+        {
+          "text": "[bracket] (paren) caret^ back\\slash",
+          "fmt": "00000000000000000000000000000000000"
+        },
+        {
+          "text": "\u00dcn\u00ef c\u00f6de \u00dcN\u00cf \u00fcn\u00ef",
+          "fmt": "0000000000000000"
+        },
+        {
+          "text": "foobar and foobar",
+          "fmt": "00011104440000111"
+        },
+        {
+          "text": "x1 x12 x123 x1234",
+          "fmt": "00004000000000000"
+        },
+        {
+          "text": "  leading and trailing  ",
+          "fmt": "000000000000000000000000"
+        },
+        {
+          "text": "word Word WORD wOrd WOrD a A Ab AB",
+          "fmt": "0000000000000000000000000000000000"
+        },
+        {
+          "text": " in table",
+          "fmt": "000000000"
+        },
+        {
+          "text": " ",
+          "fmt": "0"
+        },
+        {
+          "text": "no match",
+          "fmt": "00000000"
+        },
+        {
+          "text": "con",
+          "fmt": "000"
+        }
+      ]
+    },
+    {
+      "name": "found-text-code",
+      "find": "cat",
+      "replace": "[^&]",
+      "matchCase": false,
+      "wholeWord": false,
+      "wildcards": false,
+      "count": 13,
+      "paragraphs": [
+        {
+          "text": "The [Cat] sat on the [cat] mat. [CAT] [cat].",
+          "fmt": "00000011000000000002222202000000000000000000"
+        },
+        {
+          "text": "con[cat]enate [cat]egory [cat]-like s[cat]ter con[cat].",
+          "fmt": "0000000000000000000000000000000000000000000000000000000"
+        },
+        {
+          "text": "Hello World hello world HELLO",
+          "fmt": "00019999800000000000000000000"
+        },
+        {
+          "text": "alpha1 beta22 gamma333 delta",
+          "fmt": "0000000000000000000000000000"
+        },
+        {
+          "text": "foo_bar foo-bar foo bar foobar",
+          "fmt": "000111000000000000000000000000"
+        },
+        {
+          "text": "tab\tseparated and line\nbreak",
+          "fmt": "0000000000000000000000000000"
+        },
+        {
+          "text": "a*b a?b axxb a b",
+          "fmt": "0000000000000000"
+        },
+        {
+          "text": "[bracket] (paren) caret^ back\\slash",
+          "fmt": "00000000000000000000000000000000000"
+        },
+        {
+          "text": "\u00dcn\u00ef c\u00f6de \u00dcN\u00cf \u00fcn\u00ef",
+          "fmt": "0000000000000000"
+        },
+        {
+          "text": "foobar and foobar",
+          "fmt": "00011104440000111"
+        },
+        {
+          "text": "x1 x12 x123 x1234",
+          "fmt": "00004000000000000"
+        },
+        {
+          "text": "  leading and trailing  ",
+          "fmt": "000000000000000000000000"
+        },
+        {
+          "text": "word Word WORD wOrd WOrD a A Ab AB",
+          "fmt": "0000000000000000000000000000000000"
+        },
+        {
+          "text": "[cat] in table",
+          "fmt": "00000000000000"
+        },
+        {
+          "text": "[Cat] [Cat]",
+          "fmt": "00000000000"
+        },
+        {
+          "text": "no match",
+          "fmt": "00000000"
+        },
+        {
+          "text": "con[cat]",
+          "fmt": "00000000"
+        }
+      ]
+    },
+    {
+      "name": "grows",
+      "find": "cat",
+      "replace": "cats",
+      "matchCase": false,
+      "wholeWord": false,
+      "wildcards": false,
+      "count": 13,
+      "paragraphs": [
+        {
+          "text": "The Cats sat on the cats mat. CATS cats.",
+          "fmt": "0000000000000000002222220000000000000000"
+        },
+        {
+          "text": "concatsenate catsegory cats-like scatster concats.",
+          "fmt": "00000000000000000000000000000000000000000000000000"
+        },
+        {
+          "text": "Hello World hello world HELLO",
+          "fmt": "00019999800000000000000000000"
+        },
+        {
+          "text": "alpha1 beta22 gamma333 delta",
+          "fmt": "0000000000000000000000000000"
+        },
+        {
+          "text": "foo_bar foo-bar foo bar foobar",
+          "fmt": "000111000000000000000000000000"
+        },
+        {
+          "text": "tab\tseparated and line\nbreak",
+          "fmt": "0000000000000000000000000000"
+        },
+        {
+          "text": "a*b a?b axxb a b",
+          "fmt": "0000000000000000"
+        },
+        {
+          "text": "[bracket] (paren) caret^ back\\slash",
+          "fmt": "00000000000000000000000000000000000"
+        },
+        {
+          "text": "\u00dcn\u00ef c\u00f6de \u00dcN\u00cf \u00fcn\u00ef",
+          "fmt": "0000000000000000"
+        },
+        {
+          "text": "foobar and foobar",
+          "fmt": "00011104440000111"
+        },
+        {
+          "text": "x1 x12 x123 x1234",
+          "fmt": "00004000000000000"
+        },
+        {
+          "text": "  leading and trailing  ",
+          "fmt": "000000000000000000000000"
+        },
+        {
+          "text": "word Word WORD wOrd WOrD a A Ab AB",
+          "fmt": "0000000000000000000000000000000000"
+        },
+        {
+          "text": "cats in table",
+          "fmt": "0000000000000"
+        },
+        {
+          "text": "Cats Cats",
+          "fmt": "000000000"
+        },
+        {
+          "text": "no match",
+          "fmt": "00000000"
+        },
+        {
+          "text": "concats",
+          "fmt": "0000000"
+        }
+      ]
+    },
+    {
+      "name": "spans-runs",
+      "find": "Cat sat",
+      "replace": "Dog",
+      "matchCase": false,
+      "wholeWord": false,
+      "wildcards": false,
+      "count": 1,
+      "paragraphs": [
+        {
+          "text": "The Dog on the cat mat. CAT cat.",
+          "fmt": "00000000000002222000000000000000"
+        },
+        {
+          "text": "concatenate category cat-like scatter concat.",
+          "fmt": "000000000000000000000000000000000000000000000"
+        },
+        {
+          "text": "Hello World hello world HELLO",
+          "fmt": "00019999800000000000000000000"
+        },
+        {
+          "text": "alpha1 beta22 gamma333 delta",
+          "fmt": "0000000000000000000000000000"
+        },
+        {
+          "text": "foo_bar foo-bar foo bar foobar",
+          "fmt": "000111000000000000000000000000"
+        },
+        {
+          "text": "tab\tseparated and line\nbreak",
+          "fmt": "0000000000000000000000000000"
+        },
+        {
+          "text": "a*b a?b axxb a b",
+          "fmt": "0000000000000000"
+        },
+        {
+          "text": "[bracket] (paren) caret^ back\\slash",
+          "fmt": "00000000000000000000000000000000000"
+        },
+        {
+          "text": "\u00dcn\u00ef c\u00f6de \u00dcN\u00cf \u00fcn\u00ef",
+          "fmt": "0000000000000000"
+        },
+        {
+          "text": "foobar and foobar",
+          "fmt": "00011104440000111"
+        },
+        {
+          "text": "x1 x12 x123 x1234",
+          "fmt": "00004000000000000"
+        },
+        {
+          "text": "  leading and trailing  ",
+          "fmt": "000000000000000000000000"
+        },
+        {
+          "text": "word Word WORD wOrd WOrD a A Ab AB",
+          "fmt": "0000000000000000000000000000000000"
+        },
+        {
+          "text": "cat in table",
+          "fmt": "000000000000"
+        },
+        {
+          "text": "Cat Cat",
+          "fmt": "0000000"
+        },
+        {
+          "text": "no match",
+          "fmt": "00000000"
+        },
+        {
+          "text": "concat",
+          "fmt": "000000"
+        }
+      ]
+    },
+    {
+      "name": "spans-runs-2",
+      "find": "e cat",
+      "replace": "E",
+      "matchCase": false,
+      "wholeWord": false,
+      "wildcards": false,
+      "count": 3,
+      "paragraphs": [
+        {
+          "text": "ThE sat on thE mat. CAT cat.",
+          "fmt": "0000000000000200000000000000"
+        },
+        {
+          "text": "concatenatEegory cat-like scatter concat.",
+          "fmt": "00000000000000000000000000000000000000000"
+        },
+        {
+          "text": "Hello World hello world HELLO",
+          "fmt": "00019999800000000000000000000"
+        },
+        {
+          "text": "alpha1 beta22 gamma333 delta",
+          "fmt": "0000000000000000000000000000"
+        },
+        {
+          "text": "foo_bar foo-bar foo bar foobar",
+          "fmt": "000111000000000000000000000000"
+        },
+        {
+          "text": "tab\tseparated and line\nbreak",
+          "fmt": "0000000000000000000000000000"
+        },
+        {
+          "text": "a*b a?b axxb a b",
+          "fmt": "0000000000000000"
+        },
+        {
+          "text": "[bracket] (paren) caret^ back\\slash",
+          "fmt": "00000000000000000000000000000000000"
+        },
+        {
+          "text": "\u00dcn\u00ef c\u00f6de \u00dcN\u00cf \u00fcn\u00ef",
+          "fmt": "0000000000000000"
+        },
+        {
+          "text": "foobar and foobar",
+          "fmt": "00011104440000111"
+        },
+        {
+          "text": "x1 x12 x123 x1234",
+          "fmt": "00004000000000000"
+        },
+        {
+          "text": "  leading and trailing  ",
+          "fmt": "000000000000000000000000"
+        },
+        {
+          "text": "word Word WORD wOrd WOrD a A Ab AB",
+          "fmt": "0000000000000000000000000000000000"
+        },
+        {
+          "text": "cat in table",
+          "fmt": "000000000000"
+        },
+        {
+          "text": "Cat Cat",
+          "fmt": "0000000"
+        },
+        {
+          "text": "no match",
+          "fmt": "00000000"
+        },
+        {
+          "text": "concat",
+          "fmt": "000000"
+        }
+      ]
+    },
+    {
+      "name": "first-run-format",
+      "find": "obar",
+      "replace": "ZZ",
+      "matchCase": false,
+      "wholeWord": false,
+      "wildcards": false,
+      "count": 3,
+      "paragraphs": [
+        {
+          "text": "The Cat sat on the cat mat. CAT cat.",
+          "fmt": "000001100000000002222000000000000000"
+        },
+        {
+          "text": "concatenate category cat-like scatter concat.",
+          "fmt": "000000000000000000000000000000000000000000000"
+        },
+        {
+          "text": "Hello World hello world HELLO",
+          "fmt": "00019999800000000000000000000"
+        },
+        {
+          "text": "alpha1 beta22 gamma333 delta",
+          "fmt": "0000000000000000000000000000"
+        },
+        {
+          "text": "foo_bar foo-bar foo bar foZZ",
+          "fmt": "0001110000000000000000000000"
+        },
+        {
+          "text": "tab\tseparated and line\nbreak",
+          "fmt": "0000000000000000000000000000"
+        },
+        {
+          "text": "a*b a?b axxb a b",
+          "fmt": "0000000000000000"
+        },
+        {
+          "text": "[bracket] (paren) caret^ back\\slash",
+          "fmt": "00000000000000000000000000000000000"
+        },
+        {
+          "text": "\u00dcn\u00ef c\u00f6de \u00dcN\u00cf \u00fcn\u00ef",
+          "fmt": "0000000000000000"
+        },
+        {
+          "text": "foZZ and foZZ",
+          "fmt": "0000044400000"
+        },
+        {
+          "text": "x1 x12 x123 x1234",
+          "fmt": "00004000000000000"
+        },
+        {
+          "text": "  leading and trailing  ",
+          "fmt": "000000000000000000000000"
+        },
+        {
+          "text": "word Word WORD wOrd WOrD a A Ab AB",
+          "fmt": "0000000000000000000000000000000000"
+        },
+        {
+          "text": "cat in table",
+          "fmt": "000000000000"
+        },
+        {
+          "text": "Cat Cat",
+          "fmt": "0000000"
+        },
+        {
+          "text": "no match",
+          "fmt": "00000000"
+        },
+        {
+          "text": "concat",
+          "fmt": "000000"
+        }
+      ]
+    },
+    {
+      "name": "first-run-format-bold",
+      "find": "ar and f",
+      "replace": "Q",
+      "matchCase": false,
+      "wholeWord": false,
+      "wildcards": false,
+      "count": 1,
+      "paragraphs": [
+        {
+          "text": "The Cat sat on the cat mat. CAT cat.",
+          "fmt": "000001100000000002222000000000000000"
+        },
+        {
+          "text": "concatenate category cat-like scatter concat.",
+          "fmt": "000000000000000000000000000000000000000000000"
+        },
+        {
+          "text": "Hello World hello world HELLO",
+          "fmt": "00019999800000000000000000000"
+        },
+        {
+          "text": "alpha1 beta22 gamma333 delta",
+          "fmt": "0000000000000000000000000000"
+        },
+        {
+          "text": "foo_bar foo-bar foo bar foobar",
+          "fmt": "000111000000000000000000000000"
+        },
+        {
+          "text": "tab\tseparated and line\nbreak",
+          "fmt": "0000000000000000000000000000"
+        },
+        {
+          "text": "a*b a?b axxb a b",
+          "fmt": "0000000000000000"
+        },
+        {
+          "text": "[bracket] (paren) caret^ back\\slash",
+          "fmt": "00000000000000000000000000000000000"
+        },
+        {
+          "text": "\u00dcn\u00ef c\u00f6de \u00dcN\u00cf \u00fcn\u00ef",
+          "fmt": "0000000000000000"
+        },
+        {
+          "text": "foobQoobar",
+          "fmt": "0001100111"
+        },
+        {
+          "text": "x1 x12 x123 x1234",
+          "fmt": "00004000000000000"
+        },
+        {
+          "text": "  leading and trailing  ",
+          "fmt": "000000000000000000000000"
+        },
+        {
+          "text": "word Word WORD wOrd WOrD a A Ab AB",
+          "fmt": "0000000000000000000000000000000000"
+        },
+        {
+          "text": "cat in table",
+          "fmt": "000000000000"
+        },
+        {
+          "text": "Cat Cat",
+          "fmt": "0000000"
+        },
+        {
+          "text": "no match",
+          "fmt": "00000000"
+        },
+        {
+          "text": "concat",
+          "fmt": "000000"
+        }
+      ]
+    },
+    {
+      "name": "single-char",
+      "find": "x",
+      "replace": "yy",
+      "matchCase": false,
+      "wholeWord": false,
+      "wildcards": false,
+      "count": 6,
+      "paragraphs": [
+        {
+          "text": "The Cat sat on the cat mat. CAT cat.",
+          "fmt": "000001100000000002222000000000000000"
+        },
+        {
+          "text": "concatenate category cat-like scatter concat.",
+          "fmt": "000000000000000000000000000000000000000000000"
+        },
+        {
+          "text": "Hello World hello world HELLO",
+          "fmt": "00019999800000000000000000000"
+        },
+        {
+          "text": "alpha1 beta22 gamma333 delta",
+          "fmt": "0000000000000000000000000000"
+        },
+        {
+          "text": "foo_bar foo-bar foo bar foobar",
+          "fmt": "000111000000000000000000000000"
+        },
+        {
+          "text": "tab\tseparated and line\nbreak",
+          "fmt": "0000000000000000000000000000"
+        },
+        {
+          "text": "a*b a?b ayyyyb a b",
+          "fmt": "000000000000000000"
+        },
+        {
+          "text": "[bracket] (paren) caret^ back\\slash",
+          "fmt": "00000000000000000000000000000000000"
+        },
+        {
+          "text": "\u00dcn\u00ef c\u00f6de \u00dcN\u00cf \u00fcn\u00ef",
+          "fmt": "0000000000000000"
+        },
+        {
+          "text": "foobar and foobar",
+          "fmt": "00011104440000111"
+        },
+        {
+          "text": "yy1 yy12 yy123 yy1234",
+          "fmt": "000000400000000000000"
+        },
+        {
+          "text": "  leading and trailing  ",
+          "fmt": "000000000000000000000000"
+        },
+        {
+          "text": "word Word WORD wOrd WOrD a A Ab AB",
+          "fmt": "0000000000000000000000000000000000"
+        },
+        {
+          "text": "cat in table",
+          "fmt": "000000000000"
+        },
+        {
+          "text": "Cat Cat",
+          "fmt": "0000000"
+        },
+        {
+          "text": "no match",
+          "fmt": "00000000"
+        },
+        {
+          "text": "concat",
+          "fmt": "000000"
+        }
+      ]
+    },
+    {
+      "name": "tab",
+      "find": "^t",
+      "replace": " ",
+      "matchCase": false,
+      "wholeWord": false,
+      "wildcards": false,
+      "count": 1,
+      "paragraphs": [
+        {
+          "text": "The Cat sat on the cat mat. CAT cat.",
+          "fmt": "000001100000000002222000000000000000"
+        },
+        {
+          "text": "concatenate category cat-like scatter concat.",
+          "fmt": "000000000000000000000000000000000000000000000"
+        },
+        {
+          "text": "Hello World hello world HELLO",
+          "fmt": "00019999800000000000000000000"
+        },
+        {
+          "text": "alpha1 beta22 gamma333 delta",
+          "fmt": "0000000000000000000000000000"
+        },
+        {
+          "text": "foo_bar foo-bar foo bar foobar",
+          "fmt": "000111000000000000000000000000"
+        },
+        {
+          "text": "tab separated and line\nbreak",
+          "fmt": "0000000000000000000000000000"
+        },
+        {
+          "text": "a*b a?b axxb a b",
+          "fmt": "0000000000000000"
+        },
+        {
+          "text": "[bracket] (paren) caret^ back\\slash",
+          "fmt": "00000000000000000000000000000000000"
+        },
+        {
+          "text": "\u00dcn\u00ef c\u00f6de \u00dcN\u00cf \u00fcn\u00ef",
+          "fmt": "0000000000000000"
+        },
+        {
+          "text": "foobar and foobar",
+          "fmt": "00011104440000111"
+        },
+        {
+          "text": "x1 x12 x123 x1234",
+          "fmt": "00004000000000000"
+        },
+        {
+          "text": "  leading and trailing  ",
+          "fmt": "000000000000000000000000"
+        },
+        {
+          "text": "word Word WORD wOrd WOrD a A Ab AB",
+          "fmt": "0000000000000000000000000000000000"
+        },
+        {
+          "text": "cat in table",
+          "fmt": "000000000000"
+        },
+        {
+          "text": "Cat Cat",
+          "fmt": "0000000"
+        },
+        {
+          "text": "no match",
+          "fmt": "00000000"
+        },
+        {
+          "text": "concat",
+          "fmt": "000000"
+        }
+      ]
+    },
+    {
+      "name": "tab-in-text",
+      "find": "tab^tsep",
+      "replace": "T",
+      "matchCase": false,
+      "wholeWord": false,
+      "wildcards": false,
+      "count": 1,
+      "paragraphs": [
+        {
+          "text": "The Cat sat on the cat mat. CAT cat.",
+          "fmt": "000001100000000002222000000000000000"
+        },
+        {
+          "text": "concatenate category cat-like scatter concat.",
+          "fmt": "000000000000000000000000000000000000000000000"
+        },
+        {
+          "text": "Hello World hello world HELLO",
+          "fmt": "00019999800000000000000000000"
+        },
+        {
+          "text": "alpha1 beta22 gamma333 delta",
+          "fmt": "0000000000000000000000000000"
+        },
+        {
+          "text": "foo_bar foo-bar foo bar foobar",
+          "fmt": "000111000000000000000000000000"
+        },
+        {
+          "text": "Tarated and line\nbreak",
+          "fmt": "0000000000000000000000"
+        },
+        {
+          "text": "a*b a?b axxb a b",
+          "fmt": "0000000000000000"
+        },
+        {
+          "text": "[bracket] (paren) caret^ back\\slash",
+          "fmt": "00000000000000000000000000000000000"
+        },
+        {
+          "text": "\u00dcn\u00ef c\u00f6de \u00dcN\u00cf \u00fcn\u00ef",
+          "fmt": "0000000000000000"
+        },
+        {
+          "text": "foobar and foobar",
+          "fmt": "00011104440000111"
+        },
+        {
+          "text": "x1 x12 x123 x1234",
+          "fmt": "00004000000000000"
+        },
+        {
+          "text": "  leading and trailing  ",
+          "fmt": "000000000000000000000000"
+        },
+        {
+          "text": "word Word WORD wOrd WOrD a A Ab AB",
+          "fmt": "0000000000000000000000000000000000"
+        },
+        {
+          "text": "cat in table",
+          "fmt": "000000000000"
+        },
+        {
+          "text": "Cat Cat",
+          "fmt": "0000000"
+        },
+        {
+          "text": "no match",
+          "fmt": "00000000"
+        },
+        {
+          "text": "concat",
+          "fmt": "000000"
+        }
+      ]
+    },
+    {
+      "name": "line-break",
+      "find": "^l",
+      "replace": "|",
+      "matchCase": false,
+      "wholeWord": false,
+      "wildcards": false,
+      "count": 1,
+      "paragraphs": [
+        {
+          "text": "The Cat sat on the cat mat. CAT cat.",
+          "fmt": "000001100000000002222000000000000000"
+        },
+        {
+          "text": "concatenate category cat-like scatter concat.",
+          "fmt": "000000000000000000000000000000000000000000000"
+        },
+        {
+          "text": "Hello World hello world HELLO",
+          "fmt": "00019999800000000000000000000"
+        },
+        {
+          "text": "alpha1 beta22 gamma333 delta",
+          "fmt": "0000000000000000000000000000"
+        },
+        {
+          "text": "foo_bar foo-bar foo bar foobar",
+          "fmt": "000111000000000000000000000000"
+        },
+        {
+          "text": "tab\tseparated and line|break",
+          "fmt": "0000000000000000000000000000"
+        },
+        {
+          "text": "a*b a?b axxb a b",
+          "fmt": "0000000000000000"
+        },
+        {
+          "text": "[bracket] (paren) caret^ back\\slash",
+          "fmt": "00000000000000000000000000000000000"
+        },
+        {
+          "text": "\u00dcn\u00ef c\u00f6de \u00dcN\u00cf \u00fcn\u00ef",
+          "fmt": "0000000000000000"
+        },
+        {
+          "text": "foobar and foobar",
+          "fmt": "00011104440000111"
+        },
+        {
+          "text": "x1 x12 x123 x1234",
+          "fmt": "00004000000000000"
+        },
+        {
+          "text": "  leading and trailing  ",
+          "fmt": "000000000000000000000000"
+        },
+        {
+          "text": "word Word WORD wOrd WOrD a A Ab AB",
+          "fmt": "0000000000000000000000000000000000"
+        },
+        {
+          "text": "cat in table",
+          "fmt": "000000000000"
+        },
+        {
+          "text": "Cat Cat",
+          "fmt": "0000000"
+        },
+        {
+          "text": "no match",
+          "fmt": "00000000"
+        },
+        {
+          "text": "concat",
+          "fmt": "000000"
+        }
+      ]
+    },
+    {
+      "name": "caret-literal",
+      "find": "^^",
+      "replace": "!",
+      "matchCase": false,
+      "wholeWord": false,
+      "wildcards": false,
+      "count": 1,
+      "paragraphs": [
+        {
+          "text": "The Cat sat on the cat mat. CAT cat.",
+          "fmt": "000001100000000002222000000000000000"
+        },
+        {
+          "text": "concatenate category cat-like scatter concat.",
+          "fmt": "000000000000000000000000000000000000000000000"
+        },
+        {
+          "text": "Hello World hello world HELLO",
+          "fmt": "00019999800000000000000000000"
+        },
+        {
+          "text": "alpha1 beta22 gamma333 delta",
+          "fmt": "0000000000000000000000000000"
+        },
+        {
+          "text": "foo_bar foo-bar foo bar foobar",
+          "fmt": "000111000000000000000000000000"
+        },
+        {
+          "text": "tab\tseparated and line\nbreak",
+          "fmt": "0000000000000000000000000000"
+        },
+        {
+          "text": "a*b a?b axxb a b",
+          "fmt": "0000000000000000"
+        },
+        {
+          "text": "[bracket] (paren) caret! back\\slash",
+          "fmt": "00000000000000000000000000000000000"
+        },
+        {
+          "text": "\u00dcn\u00ef c\u00f6de \u00dcN\u00cf \u00fcn\u00ef",
+          "fmt": "0000000000000000"
+        },
+        {
+          "text": "foobar and foobar",
+          "fmt": "00011104440000111"
+        },
+        {
+          "text": "x1 x12 x123 x1234",
+          "fmt": "00004000000000000"
+        },
+        {
+          "text": "  leading and trailing  ",
+          "fmt": "000000000000000000000000"
+        },
+        {
+          "text": "word Word WORD wOrd WOrD a A Ab AB",
+          "fmt": "0000000000000000000000000000000000"
+        },
+        {
+          "text": "cat in table",
+          "fmt": "000000000000"
+        },
+        {
+          "text": "Cat Cat",
+          "fmt": "0000000"
+        },
+        {
+          "text": "no match",
+          "fmt": "00000000"
+        },
+        {
+          "text": "concat",
+          "fmt": "000000"
+        }
+      ]
+    },
+    {
+      "name": "replace-tab",
+      "find": " and",
+      "replace": "^t",
+      "matchCase": false,
+      "wholeWord": false,
+      "wildcards": false,
+      "count": 3,
+      "paragraphs": [
+        {
+          "text": "The Cat sat on the cat mat. CAT cat.",
+          "fmt": "000001100000000002222000000000000000"
+        },
+        {
+          "text": "concatenate category cat-like scatter concat.",
+          "fmt": "000000000000000000000000000000000000000000000"
+        },
+        {
+          "text": "Hello World hello world HELLO",
+          "fmt": "00019999800000000000000000000"
+        },
+        {
+          "text": "alpha1 beta22 gamma333 delta",
+          "fmt": "0000000000000000000000000000"
+        },
+        {
+          "text": "foo_bar foo-bar foo bar foobar",
+          "fmt": "000111000000000000000000000000"
+        },
+        {
+          "text": "tab\tseparated\t line\nbreak",
+          "fmt": "0000000000000000000000000"
+        },
+        {
+          "text": "a*b a?b axxb a b",
+          "fmt": "0000000000000000"
+        },
+        {
+          "text": "[bracket] (paren) caret^ back\\slash",
+          "fmt": "00000000000000000000000000000000000"
+        },
+        {
+          "text": "\u00dcn\u00ef c\u00f6de \u00dcN\u00cf \u00fcn\u00ef",
+          "fmt": "0000000000000000"
+        },
+        {
+          "text": "foobar\t foobar",
+          "fmt": "00011100000111"
+        },
+        {
+          "text": "x1 x12 x123 x1234",
+          "fmt": "00004000000000000"
+        },
+        {
+          "text": "  leading\t trailing  ",
+          "fmt": "000000000000000000000"
+        },
+        {
+          "text": "word Word WORD wOrd WOrD a A Ab AB",
+          "fmt": "0000000000000000000000000000000000"
+        },
+        {
+          "text": "cat in table",
+          "fmt": "000000000000"
+        },
+        {
+          "text": "Cat Cat",
+          "fmt": "0000000"
+        },
+        {
+          "text": "no match",
+          "fmt": "00000000"
+        },
+        {
+          "text": "concat",
+          "fmt": "000000"
+        }
+      ]
+    },
+    {
+      "name": "replace-caret",
+      "find": "bracket",
+      "replace": "a^^b",
+      "matchCase": false,
+      "wholeWord": false,
+      "wildcards": false,
+      "count": 1,
+      "paragraphs": [
+        {
+          "text": "The Cat sat on the cat mat. CAT cat.",
+          "fmt": "000001100000000002222000000000000000"
+        },
+        {
+          "text": "concatenate category cat-like scatter concat.",
+          "fmt": "000000000000000000000000000000000000000000000"
+        },
+        {
+          "text": "Hello World hello world HELLO",
+          "fmt": "00019999800000000000000000000"
+        },
+        {
+          "text": "alpha1 beta22 gamma333 delta",
+          "fmt": "0000000000000000000000000000"
+        },
+        {
+          "text": "foo_bar foo-bar foo bar foobar",
+          "fmt": "000111000000000000000000000000"
+        },
+        {
+          "text": "tab\tseparated and line\nbreak",
+          "fmt": "0000000000000000000000000000"
+        },
+        {
+          "text": "a*b a?b axxb a b",
+          "fmt": "0000000000000000"
+        },
+        {
+          "text": "[a^b] (paren) caret^ back\\slash",
+          "fmt": "0000000000000000000000000000000"
+        },
+        {
+          "text": "\u00dcn\u00ef c\u00f6de \u00dcN\u00cf \u00fcn\u00ef",
+          "fmt": "0000000000000000"
+        },
+        {
+          "text": "foobar and foobar",
+          "fmt": "00011104440000111"
+        },
+        {
+          "text": "x1 x12 x123 x1234",
+          "fmt": "00004000000000000"
+        },
+        {
+          "text": "  leading and trailing  ",
+          "fmt": "000000000000000000000000"
+        },
+        {
+          "text": "word Word WORD wOrd WOrD a A Ab AB",
+          "fmt": "0000000000000000000000000000000000"
+        },
+        {
+          "text": "cat in table",
+          "fmt": "000000000000"
+        },
+        {
+          "text": "Cat Cat",
+          "fmt": "0000000"
+        },
+        {
+          "text": "no match",
+          "fmt": "00000000"
+        },
+        {
+          "text": "concat",
+          "fmt": "000000"
+        }
+      ]
+    },
+    {
+      "name": "unicode",
+      "find": "\u00fcn\u00ef",
+      "replace": "X",
+      "matchCase": false,
+      "wholeWord": false,
+      "wildcards": false,
+      "count": 3,
+      "paragraphs": [
+        {
+          "text": "The Cat sat on the cat mat. CAT cat.",
+          "fmt": "000001100000000002222000000000000000"
+        },
+        {
+          "text": "concatenate category cat-like scatter concat.",
+          "fmt": "000000000000000000000000000000000000000000000"
+        },
+        {
+          "text": "Hello World hello world HELLO",
+          "fmt": "00019999800000000000000000000"
+        },
+        {
+          "text": "alpha1 beta22 gamma333 delta",
+          "fmt": "0000000000000000000000000000"
+        },
+        {
+          "text": "foo_bar foo-bar foo bar foobar",
+          "fmt": "000111000000000000000000000000"
+        },
+        {
+          "text": "tab\tseparated and line\nbreak",
+          "fmt": "0000000000000000000000000000"
+        },
+        {
+          "text": "a*b a?b axxb a b",
+          "fmt": "0000000000000000"
+        },
+        {
+          "text": "[bracket] (paren) caret^ back\\slash",
+          "fmt": "00000000000000000000000000000000000"
+        },
+        {
+          "text": "X c\u00f6de X X",
+          "fmt": "0000000000"
+        },
+        {
+          "text": "foobar and foobar",
+          "fmt": "00011104440000111"
+        },
+        {
+          "text": "x1 x12 x123 x1234",
+          "fmt": "00004000000000000"
+        },
+        {
+          "text": "  leading and trailing  ",
+          "fmt": "000000000000000000000000"
+        },
+        {
+          "text": "word Word WORD wOrd WOrD a A Ab AB",
+          "fmt": "0000000000000000000000000000000000"
+        },
+        {
+          "text": "cat in table",
+          "fmt": "000000000000"
+        },
+        {
+          "text": "Cat Cat",
+          "fmt": "0000000"
+        },
+        {
+          "text": "no match",
+          "fmt": "00000000"
+        },
+        {
+          "text": "concat",
+          "fmt": "000000"
+        }
+      ]
+    },
+    {
+      "name": "unicode-match-case",
+      "find": "\u00fcn\u00ef",
+      "replace": "X",
+      "matchCase": true,
+      "wholeWord": false,
+      "wildcards": false,
+      "count": 1,
+      "paragraphs": [
+        {
+          "text": "The Cat sat on the cat mat. CAT cat.",
+          "fmt": "000001100000000002222000000000000000"
+        },
+        {
+          "text": "concatenate category cat-like scatter concat.",
+          "fmt": "000000000000000000000000000000000000000000000"
+        },
+        {
+          "text": "Hello World hello world HELLO",
+          "fmt": "00019999800000000000000000000"
+        },
+        {
+          "text": "alpha1 beta22 gamma333 delta",
+          "fmt": "0000000000000000000000000000"
+        },
+        {
+          "text": "foo_bar foo-bar foo bar foobar",
+          "fmt": "000111000000000000000000000000"
+        },
+        {
+          "text": "tab\tseparated and line\nbreak",
+          "fmt": "0000000000000000000000000000"
+        },
+        {
+          "text": "a*b a?b axxb a b",
+          "fmt": "0000000000000000"
+        },
+        {
+          "text": "[bracket] (paren) caret^ back\\slash",
+          "fmt": "00000000000000000000000000000000000"
+        },
+        {
+          "text": "\u00dcn\u00ef c\u00f6de \u00dcN\u00cf X",
+          "fmt": "00000000000000"
+        },
+        {
+          "text": "foobar and foobar",
+          "fmt": "00011104440000111"
+        },
+        {
+          "text": "x1 x12 x123 x1234",
+          "fmt": "00004000000000000"
+        },
+        {
+          "text": "  leading and trailing  ",
+          "fmt": "000000000000000000000000"
+        },
+        {
+          "text": "word Word WORD wOrd WOrD a A Ab AB",
+          "fmt": "0000000000000000000000000000000000"
+        },
+        {
+          "text": "cat in table",
+          "fmt": "000000000000"
+        },
+        {
+          "text": "Cat Cat",
+          "fmt": "0000000"
+        },
+        {
+          "text": "no match",
+          "fmt": "00000000"
+        },
+        {
+          "text": "concat",
+          "fmt": "000000"
+        }
+      ]
+    },
+    {
+      "name": "star-is-literal",
+      "find": "a*b",
+      "replace": "Z",
+      "matchCase": false,
+      "wholeWord": false,
+      "wildcards": false,
+      "count": 1,
+      "paragraphs": [
+        {
+          "text": "The Cat sat on the cat mat. CAT cat.",
+          "fmt": "000001100000000002222000000000000000"
+        },
+        {
+          "text": "concatenate category cat-like scatter concat.",
+          "fmt": "000000000000000000000000000000000000000000000"
+        },
+        {
+          "text": "Hello World hello world HELLO",
+          "fmt": "00019999800000000000000000000"
+        },
+        {
+          "text": "alpha1 beta22 gamma333 delta",
+          "fmt": "0000000000000000000000000000"
+        },
+        {
+          "text": "foo_bar foo-bar foo bar foobar",
+          "fmt": "000111000000000000000000000000"
+        },
+        {
+          "text": "tab\tseparated and line\nbreak",
+          "fmt": "0000000000000000000000000000"
+        },
+        {
+          "text": "Z a?b axxb a b",
+          "fmt": "00000000000000"
+        },
+        {
+          "text": "[bracket] (paren) caret^ back\\slash",
+          "fmt": "00000000000000000000000000000000000"
+        },
+        {
+          "text": "\u00dcn\u00ef c\u00f6de \u00dcN\u00cf \u00fcn\u00ef",
+          "fmt": "0000000000000000"
+        },
+        {
+          "text": "foobar and foobar",
+          "fmt": "00011104440000111"
+        },
+        {
+          "text": "x1 x12 x123 x1234",
+          "fmt": "00004000000000000"
+        },
+        {
+          "text": "  leading and trailing  ",
+          "fmt": "000000000000000000000000"
+        },
+        {
+          "text": "word Word WORD wOrd WOrD a A Ab AB",
+          "fmt": "0000000000000000000000000000000000"
+        },
+        {
+          "text": "cat in table",
+          "fmt": "000000000000"
+        },
+        {
+          "text": "Cat Cat",
+          "fmt": "0000000"
+        },
+        {
+          "text": "no match",
+          "fmt": "00000000"
+        },
+        {
+          "text": "concat",
+          "fmt": "000000"
+        }
+      ]
+    },
+    {
+      "name": "whole-word-underscore",
+      "find": "foo",
+      "replace": "Z",
+      "matchCase": false,
+      "wholeWord": true,
+      "wildcards": false,
+      "count": 3,
+      "paragraphs": [
+        {
+          "text": "The Cat sat on the cat mat. CAT cat.",
+          "fmt": "000001100000000002222000000000000000"
+        },
+        {
+          "text": "concatenate category cat-like scatter concat.",
+          "fmt": "000000000000000000000000000000000000000000000"
+        },
+        {
+          "text": "Hello World hello world HELLO",
+          "fmt": "00019999800000000000000000000"
+        },
+        {
+          "text": "alpha1 beta22 gamma333 delta",
+          "fmt": "0000000000000000000000000000"
+        },
+        {
+          "text": "Z_bar Z-bar Z bar foobar",
+          "fmt": "011100000000000000000000"
+        },
+        {
+          "text": "tab\tseparated and line\nbreak",
+          "fmt": "0000000000000000000000000000"
+        },
+        {
+          "text": "a*b a?b axxb a b",
+          "fmt": "0000000000000000"
+        },
+        {
+          "text": "[bracket] (paren) caret^ back\\slash",
+          "fmt": "00000000000000000000000000000000000"
+        },
+        {
+          "text": "\u00dcn\u00ef c\u00f6de \u00dcN\u00cf \u00fcn\u00ef",
+          "fmt": "0000000000000000"
+        },
+        {
+          "text": "foobar and foobar",
+          "fmt": "00011104440000111"
+        },
+        {
+          "text": "x1 x12 x123 x1234",
+          "fmt": "00004000000000000"
+        },
+        {
+          "text": "  leading and trailing  ",
+          "fmt": "000000000000000000000000"
+        },
+        {
+          "text": "word Word WORD wOrd WOrD a A Ab AB",
+          "fmt": "0000000000000000000000000000000000"
+        },
+        {
+          "text": "cat in table",
+          "fmt": "000000000000"
+        },
+        {
+          "text": "Cat Cat",
+          "fmt": "0000000"
+        },
+        {
+          "text": "no match",
+          "fmt": "00000000"
+        },
+        {
+          "text": "concat",
+          "fmt": "000000"
+        }
+      ]
+    },
+    {
+      "name": "whole-word-digits",
+      "find": "x1",
+      "replace": "Z",
+      "matchCase": false,
+      "wholeWord": true,
+      "wildcards": false,
+      "count": 1,
+      "paragraphs": [
+        {
+          "text": "The Cat sat on the cat mat. CAT cat.",
+          "fmt": "000001100000000002222000000000000000"
+        },
+        {
+          "text": "concatenate category cat-like scatter concat.",
+          "fmt": "000000000000000000000000000000000000000000000"
+        },
+        {
+          "text": "Hello World hello world HELLO",
+          "fmt": "00019999800000000000000000000"
+        },
+        {
+          "text": "alpha1 beta22 gamma333 delta",
+          "fmt": "0000000000000000000000000000"
+        },
+        {
+          "text": "foo_bar foo-bar foo bar foobar",
+          "fmt": "000111000000000000000000000000"
+        },
+        {
+          "text": "tab\tseparated and line\nbreak",
+          "fmt": "0000000000000000000000000000"
+        },
+        {
+          "text": "a*b a?b axxb a b",
+          "fmt": "0000000000000000"
+        },
+        {
+          "text": "[bracket] (paren) caret^ back\\slash",
+          "fmt": "00000000000000000000000000000000000"
+        },
+        {
+          "text": "\u00dcn\u00ef c\u00f6de \u00dcN\u00cf \u00fcn\u00ef",
+          "fmt": "0000000000000000"
+        },
+        {
+          "text": "foobar and foobar",
+          "fmt": "00011104440000111"
+        },
+        {
+          "text": "Z x12 x123 x1234",
+          "fmt": "0004000000000000"
+        },
+        {
+          "text": "  leading and trailing  ",
+          "fmt": "000000000000000000000000"
+        },
+        {
+          "text": "word Word WORD wOrd WOrD a A Ab AB",
+          "fmt": "0000000000000000000000000000000000"
+        },
+        {
+          "text": "cat in table",
+          "fmt": "000000000000"
+        },
+        {
+          "text": "Cat Cat",
+          "fmt": "0000000"
+        },
+        {
+          "text": "no match",
+          "fmt": "00000000"
+        },
+        {
+          "text": "concat",
+          "fmt": "000000"
+        }
+      ]
+    },
+    {
+      "name": "spaces",
+      "find": "  leading",
+      "replace": "L",
+      "matchCase": false,
+      "wholeWord": false,
+      "wildcards": false,
+      "count": 1,
+      "paragraphs": [
+        {
+          "text": "The Cat sat on the cat mat. CAT cat.",
+          "fmt": "000001100000000002222000000000000000"
+        },
+        {
+          "text": "concatenate category cat-like scatter concat.",
+          "fmt": "000000000000000000000000000000000000000000000"
+        },
+        {
+          "text": "Hello World hello world HELLO",
+          "fmt": "00019999800000000000000000000"
+        },
+        {
+          "text": "alpha1 beta22 gamma333 delta",
+          "fmt": "0000000000000000000000000000"
+        },
+        {
+          "text": "foo_bar foo-bar foo bar foobar",
+          "fmt": "000111000000000000000000000000"
+        },
+        {
+          "text": "tab\tseparated and line\nbreak",
+          "fmt": "0000000000000000000000000000"
+        },
+        {
+          "text": "a*b a?b axxb a b",
+          "fmt": "0000000000000000"
+        },
+        {
+          "text": "[bracket] (paren) caret^ back\\slash",
+          "fmt": "00000000000000000000000000000000000"
+        },
+        {
+          "text": "\u00dcn\u00ef c\u00f6de \u00dcN\u00cf \u00fcn\u00ef",
+          "fmt": "0000000000000000"
+        },
+        {
+          "text": "foobar and foobar",
+          "fmt": "00011104440000111"
+        },
+        {
+          "text": "x1 x12 x123 x1234",
+          "fmt": "00004000000000000"
+        },
+        {
+          "text": "L and trailing  ",
+          "fmt": "0000000000000000"
+        },
+        {
+          "text": "word Word WORD wOrd WOrD a A Ab AB",
+          "fmt": "0000000000000000000000000000000000"
+        },
+        {
+          "text": "cat in table",
+          "fmt": "000000000000"
+        },
+        {
+          "text": "Cat Cat",
+          "fmt": "0000000"
+        },
+        {
+          "text": "no match",
+          "fmt": "00000000"
+        },
+        {
+          "text": "concat",
+          "fmt": "000000"
+        }
+      ]
+    },
+    {
+      "name": "wc-qmark",
+      "find": "a?b",
+      "replace": "Z",
+      "matchCase": false,
+      "wholeWord": false,
+      "wildcards": true,
+      "count": 3,
+      "paragraphs": [
+        {
+          "text": "The Cat sat on the cat mat. CAT cat.",
+          "fmt": "000001100000000002222000000000000000"
+        },
+        {
+          "text": "concatenate category cat-like scatter concat.",
+          "fmt": "000000000000000000000000000000000000000000000"
+        },
+        {
+          "text": "Hello World hello world HELLO",
+          "fmt": "00019999800000000000000000000"
+        },
+        {
+          "text": "alpha1 beta22 gamma333 delta",
+          "fmt": "0000000000000000000000000000"
+        },
+        {
+          "text": "foo_bar foo-bar foo bar foobar",
+          "fmt": "000111000000000000000000000000"
+        },
+        {
+          "text": "tab\tseparated and line\nbreak",
+          "fmt": "0000000000000000000000000000"
+        },
+        {
+          "text": "Z Z axxb Z",
+          "fmt": "0000000000"
+        },
+        {
+          "text": "[bracket] (paren) caret^ back\\slash",
+          "fmt": "00000000000000000000000000000000000"
+        },
+        {
+          "text": "\u00dcn\u00ef c\u00f6de \u00dcN\u00cf \u00fcn\u00ef",
+          "fmt": "0000000000000000"
+        },
+        {
+          "text": "foobar and foobar",
+          "fmt": "00011104440000111"
+        },
+        {
+          "text": "x1 x12 x123 x1234",
+          "fmt": "00004000000000000"
+        },
+        {
+          "text": "  leading and trailing  ",
+          "fmt": "000000000000000000000000"
+        },
+        {
+          "text": "word Word WORD wOrd WOrD a A Ab AB",
+          "fmt": "0000000000000000000000000000000000"
+        },
+        {
+          "text": "cat in table",
+          "fmt": "000000000000"
+        },
+        {
+          "text": "Cat Cat",
+          "fmt": "0000000"
+        },
+        {
+          "text": "no match",
+          "fmt": "00000000"
+        },
+        {
+          "text": "concat",
+          "fmt": "000000"
+        }
+      ]
+    },
+    {
+      "name": "wc-star",
+      "find": "x1*3",
+      "replace": "Z",
+      "matchCase": false,
+      "wholeWord": false,
+      "wildcards": true,
+      "count": 2,
+      "paragraphs": [
+        {
+          "text": "The Cat sat on the cat mat. CAT cat.",
+          "fmt": "000001100000000002222000000000000000"
+        },
+        {
+          "text": "concatenate category cat-like scatter concat.",
+          "fmt": "000000000000000000000000000000000000000000000"
+        },
+        {
+          "text": "Hello World hello world HELLO",
+          "fmt": "00019999800000000000000000000"
+        },
+        {
+          "text": "alpha1 beta22 gamma333 delta",
+          "fmt": "0000000000000000000000000000"
+        },
+        {
+          "text": "foo_bar foo-bar foo bar foobar",
+          "fmt": "000111000000000000000000000000"
+        },
+        {
+          "text": "tab\tseparated and line\nbreak",
+          "fmt": "0000000000000000000000000000"
+        },
+        {
+          "text": "a*b a?b axxb a b",
+          "fmt": "0000000000000000"
+        },
+        {
+          "text": "[bracket] (paren) caret^ back\\slash",
+          "fmt": "00000000000000000000000000000000000"
+        },
+        {
+          "text": "\u00dcn\u00ef c\u00f6de \u00dcN\u00cf \u00fcn\u00ef",
+          "fmt": "0000000000000000"
+        },
+        {
+          "text": "foobar and foobar",
+          "fmt": "00011104440000111"
+        },
+        {
+          "text": "Z Z4",
+          "fmt": "0000"
+        },
+        {
+          "text": "  leading and trailing  ",
+          "fmt": "000000000000000000000000"
+        },
+        {
+          "text": "word Word WORD wOrd WOrD a A Ab AB",
+          "fmt": "0000000000000000000000000000000000"
+        },
+        {
+          "text": "cat in table",
+          "fmt": "000000000000"
+        },
+        {
+          "text": "Cat Cat",
+          "fmt": "0000000"
+        },
+        {
+          "text": "no match",
+          "fmt": "00000000"
+        },
+        {
+          "text": "concat",
+          "fmt": "000000"
+        }
+      ]
+    },
+    {
+      "name": "wc-star-lazy",
+      "find": "f*r",
+      "replace": "Z",
+      "matchCase": false,
+      "wholeWord": false,
+      "wildcards": true,
+      "count": 6,
+      "paragraphs": [
+        {
+          "text": "The Cat sat on the cat mat. CAT cat.",
+          "fmt": "000001100000000002222000000000000000"
+        },
+        {
+          "text": "concatenate category cat-like scatter concat.",
+          "fmt": "000000000000000000000000000000000000000000000"
+        },
+        {
+          "text": "Hello World hello world HELLO",
+          "fmt": "00019999800000000000000000000"
+        },
+        {
+          "text": "alpha1 beta22 gamma333 delta",
+          "fmt": "0000000000000000000000000000"
+        },
+        {
+          "text": "Z Z Z Z",
+          "fmt": "0000000"
+        },
+        {
+          "text": "tab\tseparated and line\nbreak",
+          "fmt": "0000000000000000000000000000"
+        },
+        {
+          "text": "a*b a?b axxb a b",
+          "fmt": "0000000000000000"
+        },
+        {
+          "text": "[bracket] (paren) caret^ back\\slash",
+          "fmt": "00000000000000000000000000000000000"
+        },
+        {
+          "text": "\u00dcn\u00ef c\u00f6de \u00dcN\u00cf \u00fcn\u00ef",
+          "fmt": "0000000000000000"
+        },
+        {
+          "text": "Z and Z",
+          "fmt": "0044400"
+        },
+        {
+          "text": "x1 x12 x123 x1234",
+          "fmt": "00004000000000000"
+        },
+        {
+          "text": "  leading and trailing  ",
+          "fmt": "000000000000000000000000"
+        },
+        {
+          "text": "word Word WORD wOrd WOrD a A Ab AB",
+          "fmt": "0000000000000000000000000000000000"
+        },
+        {
+          "text": "cat in table",
+          "fmt": "000000000000"
+        },
+        {
+          "text": "Cat Cat",
+          "fmt": "0000000"
+        },
+        {
+          "text": "no match",
+          "fmt": "00000000"
+        },
+        {
+          "text": "concat",
+          "fmt": "000000"
+        }
+      ]
+    },
+    {
+      "name": "wc-star-crosses-paragraphs",
+      "find": "i*B",
+      "replace": "Z",
+      "matchCase": false,
+      "wholeWord": false,
+      "wildcards": true,
+      "count": 1,
+      "paragraphs": [
+        {
+          "text": "The Cat sat on the cat mat. CAT cat.",
+          "fmt": "000001100000000002222000000000000000"
+        },
+        {
+          "text": "concatenate category cat-lZ",
+          "fmt": "000000000000000000000000000"
+        },
+        {
+          "text": "cat in table",
+          "fmt": "000000000000"
+        },
+        {
+          "text": "Cat Cat",
+          "fmt": "0000000"
+        },
+        {
+          "text": "no match",
+          "fmt": "00000000"
+        },
+        {
+          "text": "concat",
+          "fmt": "000000"
+        }
+      ]
+    },
+    {
+      "name": "wc-star-prefix",
+      "find": "T*t",
+      "replace": "Z",
+      "matchCase": false,
+      "wholeWord": false,
+      "wildcards": true,
+      "count": 2,
+      "paragraphs": [
+        {
+          "text": "Z sat on the cat mat. CAZ.",
+          "fmt": "00000000000222200000000000"
+        },
+        {
+          "text": "concatenate category cat-like scatter concat.",
+          "fmt": "000000000000000000000000000000000000000000000"
+        },
+        {
+          "text": "Hello World hello world HELLO",
+          "fmt": "00019999800000000000000000000"
+        },
+        {
+          "text": "alpha1 beta22 gamma333 delta",
+          "fmt": "0000000000000000000000000000"
+        },
+        {
+          "text": "foo_bar foo-bar foo bar foobar",
+          "fmt": "000111000000000000000000000000"
+        },
+        {
+          "text": "tab\tseparated and line\nbreak",
+          "fmt": "0000000000000000000000000000"
+        },
+        {
+          "text": "a*b a?b axxb a b",
+          "fmt": "0000000000000000"
+        },
+        {
+          "text": "[bracket] (paren) caret^ back\\slash",
+          "fmt": "00000000000000000000000000000000000"
+        },
+        {
+          "text": "\u00dcn\u00ef c\u00f6de \u00dcN\u00cf \u00fcn\u00ef",
+          "fmt": "0000000000000000"
+        },
+        {
+          "text": "foobar and foobar",
+          "fmt": "00011104440000111"
+        },
+        {
+          "text": "x1 x12 x123 x1234",
+          "fmt": "00004000000000000"
+        },
+        {
+          "text": "  leading and trailing  ",
+          "fmt": "000000000000000000000000"
+        },
+        {
+          "text": "word Word WORD wOrd WOrD a A Ab AB",
+          "fmt": "0000000000000000000000000000000000"
+        },
+        {
+          "text": "cat in table",
+          "fmt": "000000000000"
+        },
+        {
+          "text": "Cat Cat",
+          "fmt": "0000000"
+        },
+        {
+          "text": "no match",
+          "fmt": "00000000"
+        },
+        {
+          "text": "concat",
+          "fmt": "000000"
+        }
+      ]
+    },
+    {
+      "name": "wc-class",
+      "find": "[a-c]at",
+      "replace": "Z",
+      "matchCase": false,
+      "wholeWord": false,
+      "wildcards": true,
+      "count": 9,
+      "paragraphs": [
+        {
+          "text": "The Cat sat on the Z mat. CAT Z.",
+          "fmt": "00000110000000000222000000000000"
+        },
+        {
+          "text": "conZenate Zegory Z-like sZter conZ.",
+          "fmt": "00000000000000000000000000000000000"
+        },
+        {
+          "text": "Hello World hello world HELLO",
+          "fmt": "00019999800000000000000000000"
+        },
+        {
+          "text": "alpha1 beta22 gamma333 delta",
+          "fmt": "0000000000000000000000000000"
+        },
+        {
+          "text": "foo_bar foo-bar foo bar foobar",
+          "fmt": "000111000000000000000000000000"
+        },
+        {
+          "text": "tab\tseparated and line\nbreak",
+          "fmt": "0000000000000000000000000000"
+        },
+        {
+          "text": "a*b a?b axxb a b",
+          "fmt": "0000000000000000"
+        },
+        {
+          "text": "[bracket] (paren) caret^ back\\slash",
+          "fmt": "00000000000000000000000000000000000"
+        },
+        {
+          "text": "\u00dcn\u00ef c\u00f6de \u00dcN\u00cf \u00fcn\u00ef",
+          "fmt": "0000000000000000"
+        },
+        {
+          "text": "foobar and foobar",
+          "fmt": "00011104440000111"
+        },
+        {
+          "text": "x1 x12 x123 x1234",
+          "fmt": "00004000000000000"
+        },
+        {
+          "text": "  leading and trailing  ",
+          "fmt": "000000000000000000000000"
+        },
+        {
+          "text": "word Word WORD wOrd WOrD a A Ab AB",
+          "fmt": "0000000000000000000000000000000000"
+        },
+        {
+          "text": "Z in table",
+          "fmt": "0000000000"
+        },
+        {
+          "text": "Cat Cat",
+          "fmt": "0000000"
+        },
+        {
+          "text": "no match",
+          "fmt": "00000000"
+        },
+        {
+          "text": "conZ",
+          "fmt": "0000"
+        }
+      ]
+    },
+    {
+      "name": "wc-class-list",
+      "find": "[cm]at",
+      "replace": "Z",
+      "matchCase": false,
+      "wholeWord": false,
+      "wildcards": true,
+      "count": 11,
+      "paragraphs": [
+        {
+          "text": "The Cat sat on the Z Z. CAT Z.",
+          "fmt": "000001100000000002220000000000"
+        },
+        {
+          "text": "conZenate Zegory Z-like sZter conZ.",
+          "fmt": "00000000000000000000000000000000000"
+        },
+        {
+          "text": "Hello World hello world HELLO",
+          "fmt": "00019999800000000000000000000"
+        },
+        {
+          "text": "alpha1 beta22 gamma333 delta",
+          "fmt": "0000000000000000000000000000"
+        },
+        {
+          "text": "foo_bar foo-bar foo bar foobar",
+          "fmt": "000111000000000000000000000000"
+        },
+        {
+          "text": "tab\tseparated and line\nbreak",
+          "fmt": "0000000000000000000000000000"
+        },
+        {
+          "text": "a*b a?b axxb a b",
+          "fmt": "0000000000000000"
+        },
+        {
+          "text": "[bracket] (paren) caret^ back\\slash",
+          "fmt": "00000000000000000000000000000000000"
+        },
+        {
+          "text": "\u00dcn\u00ef c\u00f6de \u00dcN\u00cf \u00fcn\u00ef",
+          "fmt": "0000000000000000"
+        },
+        {
+          "text": "foobar and foobar",
+          "fmt": "00011104440000111"
+        },
+        {
+          "text": "x1 x12 x123 x1234",
+          "fmt": "00004000000000000"
+        },
+        {
+          "text": "  leading and trailing  ",
+          "fmt": "000000000000000000000000"
+        },
+        {
+          "text": "word Word WORD wOrd WOrD a A Ab AB",
+          "fmt": "0000000000000000000000000000000000"
+        },
+        {
+          "text": "Z in table",
+          "fmt": "0000000000"
+        },
+        {
+          "text": "Cat Cat",
+          "fmt": "0000000"
+        },
+        {
+          "text": "no Zch",
+          "fmt": "000000"
+        },
+        {
+          "text": "conZ",
+          "fmt": "0000"
+        }
+      ]
+    },
+    {
+      "name": "wc-negated-class",
+      "find": "[!c]at",
+      "replace": "Z",
+      "matchCase": false,
+      "wholeWord": false,
+      "wildcards": true,
+      "count": 8,
+      "paragraphs": [
+        {
+          "text": "The Z Z on the cat Z. CAT cat.",
+          "fmt": "000000000000022220000000000000"
+        },
+        {
+          "text": "concateZe category cat-like scatter concat.",
+          "fmt": "0000000000000000000000000000000000000000000"
+        },
+        {
+          "text": "Hello World hello world HELLO",
+          "fmt": "00019999800000000000000000000"
+        },
+        {
+          "text": "alpha1 beta22 gamma333 delta",
+          "fmt": "0000000000000000000000000000"
+        },
+        {
+          "text": "foo_bar foo-bar foo bar foobar",
+          "fmt": "000111000000000000000000000000"
+        },
+        {
+          "text": "tab\tsepaZed and line\nbreak",
+          "fmt": "00000000000000000000000000"
+        },
+        {
+          "text": "a*b a?b axxb a b",
+          "fmt": "0000000000000000"
+        },
+        {
+          "text": "[bracket] (paren) caret^ back\\slash",
+          "fmt": "00000000000000000000000000000000000"
+        },
+        {
+          "text": "\u00dcn\u00ef c\u00f6de \u00dcN\u00cf \u00fcn\u00ef",
+          "fmt": "0000000000000000"
+        },
+        {
+          "text": "foobar and foobar",
+          "fmt": "00011104440000111"
+        },
+        {
+          "text": "x1 x12 x123 x1234",
+          "fmt": "00004000000000000"
+        },
+        {
+          "text": "  leading and trailing  ",
+          "fmt": "000000000000000000000000"
+        },
+        {
+          "text": "word Word WORD wOrd WOrD a A Ab AB",
+          "fmt": "0000000000000000000000000000000000"
+        },
+        {
+          "text": "cat in table",
+          "fmt": "000000000000"
+        },
+        {
+          "text": "Z Z",
+          "fmt": "000"
+        },
+        {
+          "text": "no Zch",
+          "fmt": "000000"
+        },
+        {
+          "text": "concat",
+          "fmt": "000000"
+        }
+      ]
+    },
+    {
+      "name": "wc-word-start",
+      "find": "<cat",
+      "replace": "Z",
+      "matchCase": false,
+      "wholeWord": false,
+      "wildcards": true,
+      "count": 5,
+      "paragraphs": [
+        {
+          "text": "The Cat sat on the Z mat. CAT Z.",
+          "fmt": "00000110000000000222000000000000"
+        },
+        {
+          "text": "concatenate Zegory Z-like scatter concat.",
+          "fmt": "00000000000000000000000000000000000000000"
+        },
+        {
+          "text": "Hello World hello world HELLO",
+          "fmt": "00019999800000000000000000000"
+        },
+        {
+          "text": "alpha1 beta22 gamma333 delta",
+          "fmt": "0000000000000000000000000000"
+        },
+        {
+          "text": "foo_bar foo-bar foo bar foobar",
+          "fmt": "000111000000000000000000000000"
+        },
+        {
+          "text": "tab\tseparated and line\nbreak",
+          "fmt": "0000000000000000000000000000"
+        },
+        {
+          "text": "a*b a?b axxb a b",
+          "fmt": "0000000000000000"
+        },
+        {
+          "text": "[bracket] (paren) caret^ back\\slash",
+          "fmt": "00000000000000000000000000000000000"
+        },
+        {
+          "text": "\u00dcn\u00ef c\u00f6de \u00dcN\u00cf \u00fcn\u00ef",
+          "fmt": "0000000000000000"
+        },
+        {
+          "text": "foobar and foobar",
+          "fmt": "00011104440000111"
+        },
+        {
+          "text": "x1 x12 x123 x1234",
+          "fmt": "00004000000000000"
+        },
+        {
+          "text": "  leading and trailing  ",
+          "fmt": "000000000000000000000000"
+        },
+        {
+          "text": "word Word WORD wOrd WOrD a A Ab AB",
+          "fmt": "0000000000000000000000000000000000"
+        },
+        {
+          "text": "Z in table",
+          "fmt": "0000000000"
+        },
+        {
+          "text": "Cat Cat",
+          "fmt": "0000000"
+        },
+        {
+          "text": "no match",
+          "fmt": "00000000"
+        },
+        {
+          "text": "concat",
+          "fmt": "000000"
+        }
+      ]
+    },
+    {
+      "name": "wc-word-end",
+      "find": "cat>",
+      "replace": "Z",
+      "matchCase": false,
+      "wholeWord": false,
+      "wildcards": true,
+      "count": 6,
+      "paragraphs": [
+        {
+          "text": "The Cat sat on the Z mat. CAT Z.",
+          "fmt": "00000110000000000222000000000000"
+        },
+        {
+          "text": "concatenate category Z-like scatter conZ.",
+          "fmt": "00000000000000000000000000000000000000000"
+        },
+        {
+          "text": "Hello World hello world HELLO",
+          "fmt": "00019999800000000000000000000"
+        },
+        {
+          "text": "alpha1 beta22 gamma333 delta",
+          "fmt": "0000000000000000000000000000"
+        },
+        {
+          "text": "foo_bar foo-bar foo bar foobar",
+          "fmt": "000111000000000000000000000000"
+        },
+        {
+          "text": "tab\tseparated and line\nbreak",
+          "fmt": "0000000000000000000000000000"
+        },
+        {
+          "text": "a*b a?b axxb a b",
+          "fmt": "0000000000000000"
+        },
+        {
+          "text": "[bracket] (paren) caret^ back\\slash",
+          "fmt": "00000000000000000000000000000000000"
+        },
+        {
+          "text": "\u00dcn\u00ef c\u00f6de \u00dcN\u00cf \u00fcn\u00ef",
+          "fmt": "0000000000000000"
+        },
+        {
+          "text": "foobar and foobar",
+          "fmt": "00011104440000111"
+        },
+        {
+          "text": "x1 x12 x123 x1234",
+          "fmt": "00004000000000000"
+        },
+        {
+          "text": "  leading and trailing  ",
+          "fmt": "000000000000000000000000"
+        },
+        {
+          "text": "word Word WORD wOrd WOrD a A Ab AB",
+          "fmt": "0000000000000000000000000000000000"
+        },
+        {
+          "text": "Z in table",
+          "fmt": "0000000000"
+        },
+        {
+          "text": "Cat Cat",
+          "fmt": "0000000"
+        },
+        {
+          "text": "no match",
+          "fmt": "00000000"
+        },
+        {
+          "text": "conZ",
+          "fmt": "0000"
+        }
+      ]
+    },
+    {
+      "name": "wc-whole-word",
+      "find": "<cat>",
+      "replace": "Z",
+      "matchCase": false,
+      "wholeWord": false,
+      "wildcards": true,
+      "count": 4,
+      "paragraphs": [
+        {
+          "text": "The Cat sat on the Z mat. CAT Z.",
+          "fmt": "00000110000000000222000000000000"
+        },
+        {
+          "text": "concatenate category Z-like scatter concat.",
+          "fmt": "0000000000000000000000000000000000000000000"
+        },
+        {
+          "text": "Hello World hello world HELLO",
+          "fmt": "00019999800000000000000000000"
+        },
+        {
+          "text": "alpha1 beta22 gamma333 delta",
+          "fmt": "0000000000000000000000000000"
+        },
+        {
+          "text": "foo_bar foo-bar foo bar foobar",
+          "fmt": "000111000000000000000000000000"
+        },
+        {
+          "text": "tab\tseparated and line\nbreak",
+          "fmt": "0000000000000000000000000000"
+        },
+        {
+          "text": "a*b a?b axxb a b",
+          "fmt": "0000000000000000"
+        },
+        {
+          "text": "[bracket] (paren) caret^ back\\slash",
+          "fmt": "00000000000000000000000000000000000"
+        },
+        {
+          "text": "\u00dcn\u00ef c\u00f6de \u00dcN\u00cf \u00fcn\u00ef",
+          "fmt": "0000000000000000"
+        },
+        {
+          "text": "foobar and foobar",
+          "fmt": "00011104440000111"
+        },
+        {
+          "text": "x1 x12 x123 x1234",
+          "fmt": "00004000000000000"
+        },
+        {
+          "text": "  leading and trailing  ",
+          "fmt": "000000000000000000000000"
+        },
+        {
+          "text": "word Word WORD wOrd WOrD a A Ab AB",
+          "fmt": "0000000000000000000000000000000000"
+        },
+        {
+          "text": "Z in table",
+          "fmt": "0000000000"
+        },
+        {
+          "text": "Cat Cat",
+          "fmt": "0000000"
+        },
+        {
+          "text": "no match",
+          "fmt": "00000000"
+        },
+        {
+          "text": "concat",
+          "fmt": "000000"
+        }
+      ]
+    },
+    {
+      "name": "wc-at",
+      "find": "x[0-9]@",
+      "replace": "Z",
+      "matchCase": false,
+      "wholeWord": false,
+      "wildcards": true,
+      "count": 4,
+      "paragraphs": [
+        {
+          "text": "The Cat sat on the cat mat. CAT cat.",
+          "fmt": "000001100000000002222000000000000000"
+        },
+        {
+          "text": "concatenate category cat-like scatter concat.",
+          "fmt": "000000000000000000000000000000000000000000000"
+        },
+        {
+          "text": "Hello World hello world HELLO",
+          "fmt": "00019999800000000000000000000"
+        },
+        {
+          "text": "alpha1 beta22 gamma333 delta",
+          "fmt": "0000000000000000000000000000"
+        },
+        {
+          "text": "foo_bar foo-bar foo bar foobar",
+          "fmt": "000111000000000000000000000000"
+        },
+        {
+          "text": "tab\tseparated and line\nbreak",
+          "fmt": "0000000000000000000000000000"
+        },
+        {
+          "text": "a*b a?b axxb a b",
+          "fmt": "0000000000000000"
+        },
+        {
+          "text": "[bracket] (paren) caret^ back\\slash",
+          "fmt": "00000000000000000000000000000000000"
+        },
+        {
+          "text": "\u00dcn\u00ef c\u00f6de \u00dcN\u00cf \u00fcn\u00ef",
+          "fmt": "0000000000000000"
+        },
+        {
+          "text": "foobar and foobar",
+          "fmt": "00011104440000111"
+        },
+        {
+          "text": "Z Z2 Z23 Z234",
+          "fmt": "0000000000000"
+        },
+        {
+          "text": "  leading and trailing  ",
+          "fmt": "000000000000000000000000"
+        },
+        {
+          "text": "word Word WORD wOrd WOrD a A Ab AB",
+          "fmt": "0000000000000000000000000000000000"
+        },
+        {
+          "text": "cat in table",
+          "fmt": "000000000000"
+        },
+        {
+          "text": "Cat Cat",
+          "fmt": "0000000"
+        },
+        {
+          "text": "no match",
+          "fmt": "00000000"
+        },
+        {
+          "text": "concat",
+          "fmt": "000000"
+        }
+      ]
+    },
+    {
+      "name": "wc-count-exact",
+      "find": "[0-9]{2}",
+      "replace": "Z",
+      "matchCase": false,
+      "wholeWord": false,
+      "wildcards": true,
+      "count": 6,
+      "paragraphs": [
+        {
+          "text": "The Cat sat on the cat mat. CAT cat.",
+          "fmt": "000001100000000002222000000000000000"
+        },
+        {
+          "text": "concatenate category cat-like scatter concat.",
+          "fmt": "000000000000000000000000000000000000000000000"
+        },
+        {
+          "text": "Hello World hello world HELLO",
+          "fmt": "00019999800000000000000000000"
+        },
+        {
+          "text": "alpha1 betaZ gammaZ3 delta",
+          "fmt": "00000000000000000000000000"
+        },
+        {
+          "text": "foo_bar foo-bar foo bar foobar",
+          "fmt": "000111000000000000000000000000"
+        },
+        {
+          "text": "tab\tseparated and line\nbreak",
+          "fmt": "0000000000000000000000000000"
+        },
+        {
+          "text": "a*b a?b axxb a b",
+          "fmt": "0000000000000000"
+        },
+        {
+          "text": "[bracket] (paren) caret^ back\\slash",
+          "fmt": "00000000000000000000000000000000000"
+        },
+        {
+          "text": "\u00dcn\u00ef c\u00f6de \u00dcN\u00cf \u00fcn\u00ef",
+          "fmt": "0000000000000000"
+        },
+        {
+          "text": "foobar and foobar",
+          "fmt": "00011104440000111"
+        },
+        {
+          "text": "x1 xZ xZ3 xZZ",
+          "fmt": "0000400000000"
+        },
+        {
+          "text": "  leading and trailing  ",
+          "fmt": "000000000000000000000000"
+        },
+        {
+          "text": "word Word WORD wOrd WOrD a A Ab AB",
+          "fmt": "0000000000000000000000000000000000"
+        },
+        {
+          "text": "cat in table",
+          "fmt": "000000000000"
+        },
+        {
+          "text": "Cat Cat",
+          "fmt": "0000000"
+        },
+        {
+          "text": "no match",
+          "fmt": "00000000"
+        },
+        {
+          "text": "concat",
+          "fmt": "000000"
+        }
+      ]
+    },
+    {
+      "name": "wc-count-min",
+      "find": "[0-9]{2,}",
+      "replace": "Z",
+      "matchCase": false,
+      "wholeWord": false,
+      "wildcards": true,
+      "count": 5,
+      "paragraphs": [
+        {
+          "text": "The Cat sat on the cat mat. CAT cat.",
+          "fmt": "000001100000000002222000000000000000"
+        },
+        {
+          "text": "concatenate category cat-like scatter concat.",
+          "fmt": "000000000000000000000000000000000000000000000"
+        },
+        {
+          "text": "Hello World hello world HELLO",
+          "fmt": "00019999800000000000000000000"
+        },
+        {
+          "text": "alpha1 betaZ gammaZ delta",
+          "fmt": "0000000000000000000000000"
+        },
+        {
+          "text": "foo_bar foo-bar foo bar foobar",
+          "fmt": "000111000000000000000000000000"
+        },
+        {
+          "text": "tab\tseparated and line\nbreak",
+          "fmt": "0000000000000000000000000000"
+        },
+        {
+          "text": "a*b a?b axxb a b",
+          "fmt": "0000000000000000"
+        },
+        {
+          "text": "[bracket] (paren) caret^ back\\slash",
+          "fmt": "00000000000000000000000000000000000"
+        },
+        {
+          "text": "\u00dcn\u00ef c\u00f6de \u00dcN\u00cf \u00fcn\u00ef",
+          "fmt": "0000000000000000"
+        },
+        {
+          "text": "foobar and foobar",
+          "fmt": "00011104440000111"
+        },
+        {
+          "text": "x1 xZ xZ xZ",
+          "fmt": "00004000000"
+        },
+        {
+          "text": "  leading and trailing  ",
+          "fmt": "000000000000000000000000"
+        },
+        {
+          "text": "word Word WORD wOrd WOrD a A Ab AB",
+          "fmt": "0000000000000000000000000000000000"
+        },
+        {
+          "text": "cat in table",
+          "fmt": "000000000000"
+        },
+        {
+          "text": "Cat Cat",
+          "fmt": "0000000"
+        },
+        {
+          "text": "no match",
+          "fmt": "00000000"
+        },
+        {
+          "text": "concat",
+          "fmt": "000000"
+        }
+      ]
+    },
+    {
+      "name": "wc-count-range",
+      "find": "[0-9]{1,2}",
+      "replace": "Z",
+      "matchCase": false,
+      "wholeWord": false,
+      "wildcards": true,
+      "count": 10,
+      "paragraphs": [
+        {
+          "text": "The Cat sat on the cat mat. CAT cat.",
+          "fmt": "000001100000000002222000000000000000"
+        },
+        {
+          "text": "concatenate category cat-like scatter concat.",
+          "fmt": "000000000000000000000000000000000000000000000"
+        },
+        {
+          "text": "Hello World hello world HELLO",
+          "fmt": "00019999800000000000000000000"
+        },
+        {
+          "text": "alphaZ betaZ gammaZZ delta",
+          "fmt": "00000000000000000000000000"
+        },
+        {
+          "text": "foo_bar foo-bar foo bar foobar",
+          "fmt": "000111000000000000000000000000"
+        },
+        {
+          "text": "tab\tseparated and line\nbreak",
+          "fmt": "0000000000000000000000000000"
+        },
+        {
+          "text": "a*b a?b axxb a b",
+          "fmt": "0000000000000000"
+        },
+        {
+          "text": "[bracket] (paren) caret^ back\\slash",
+          "fmt": "00000000000000000000000000000000000"
+        },
+        {
+          "text": "\u00dcn\u00ef c\u00f6de \u00dcN\u00cf \u00fcn\u00ef",
+          "fmt": "0000000000000000"
+        },
+        {
+          "text": "foobar and foobar",
+          "fmt": "00011104440000111"
+        },
+        {
+          "text": "xZ xZ xZZ xZZ",
+          "fmt": "0000400000000"
+        },
+        {
+          "text": "  leading and trailing  ",
+          "fmt": "000000000000000000000000"
+        },
+        {
+          "text": "word Word WORD wOrd WOrD a A Ab AB",
+          "fmt": "0000000000000000000000000000000000"
+        },
+        {
+          "text": "cat in table",
+          "fmt": "000000000000"
+        },
+        {
+          "text": "Cat Cat",
+          "fmt": "0000000"
+        },
+        {
+          "text": "no match",
+          "fmt": "00000000"
+        },
+        {
+          "text": "concat",
+          "fmt": "000000"
+        }
+      ]
+    },
+    {
+      "name": "wc-case-sensitive",
+      "find": "hello",
+      "replace": "Z",
+      "matchCase": false,
+      "wholeWord": false,
+      "wildcards": true,
+      "count": 1,
+      "paragraphs": [
+        {
+          "text": "The Cat sat on the cat mat. CAT cat.",
+          "fmt": "000001100000000002222000000000000000"
+        },
+        {
+          "text": "concatenate category cat-like scatter concat.",
+          "fmt": "000000000000000000000000000000000000000000000"
+        },
+        {
+          "text": "Hello World Z world HELLO",
+          "fmt": "0001999980000000000000000"
+        },
+        {
+          "text": "alpha1 beta22 gamma333 delta",
+          "fmt": "0000000000000000000000000000"
+        },
+        {
+          "text": "foo_bar foo-bar foo bar foobar",
+          "fmt": "000111000000000000000000000000"
+        },
+        {
+          "text": "tab\tseparated and line\nbreak",
+          "fmt": "0000000000000000000000000000"
+        },
+        {
+          "text": "a*b a?b axxb a b",
+          "fmt": "0000000000000000"
+        },
+        {
+          "text": "[bracket] (paren) caret^ back\\slash",
+          "fmt": "00000000000000000000000000000000000"
+        },
+        {
+          "text": "\u00dcn\u00ef c\u00f6de \u00dcN\u00cf \u00fcn\u00ef",
+          "fmt": "0000000000000000"
+        },
+        {
+          "text": "foobar and foobar",
+          "fmt": "00011104440000111"
+        },
+        {
+          "text": "x1 x12 x123 x1234",
+          "fmt": "00004000000000000"
+        },
+        {
+          "text": "  leading and trailing  ",
+          "fmt": "000000000000000000000000"
+        },
+        {
+          "text": "word Word WORD wOrd WOrD a A Ab AB",
+          "fmt": "0000000000000000000000000000000000"
+        },
+        {
+          "text": "cat in table",
+          "fmt": "000000000000"
+        },
+        {
+          "text": "Cat Cat",
+          "fmt": "0000000"
+        },
+        {
+          "text": "no match",
+          "fmt": "00000000"
+        },
+        {
+          "text": "concat",
+          "fmt": "000000"
+        }
+      ]
+    },
+    {
+      "name": "wc-case-sensitive-capital",
+      "find": "Hello",
+      "replace": "Z",
+      "matchCase": false,
+      "wholeWord": false,
+      "wildcards": true,
+      "count": 1,
+      "paragraphs": [
+        {
+          "text": "The Cat sat on the cat mat. CAT cat.",
+          "fmt": "000001100000000002222000000000000000"
+        },
+        {
+          "text": "concatenate category cat-like scatter concat.",
+          "fmt": "000000000000000000000000000000000000000000000"
+        },
+        {
+          "text": "Z World hello world HELLO",
+          "fmt": "0999800000000000000000000"
+        },
+        {
+          "text": "alpha1 beta22 gamma333 delta",
+          "fmt": "0000000000000000000000000000"
+        },
+        {
+          "text": "foo_bar foo-bar foo bar foobar",
+          "fmt": "000111000000000000000000000000"
+        },
+        {
+          "text": "tab\tseparated and line\nbreak",
+          "fmt": "0000000000000000000000000000"
+        },
+        {
+          "text": "a*b a?b axxb a b",
+          "fmt": "0000000000000000"
+        },
+        {
+          "text": "[bracket] (paren) caret^ back\\slash",
+          "fmt": "00000000000000000000000000000000000"
+        },
+        {
+          "text": "\u00dcn\u00ef c\u00f6de \u00dcN\u00cf \u00fcn\u00ef",
+          "fmt": "0000000000000000"
+        },
+        {
+          "text": "foobar and foobar",
+          "fmt": "00011104440000111"
+        },
+        {
+          "text": "x1 x12 x123 x1234",
+          "fmt": "00004000000000000"
+        },
+        {
+          "text": "  leading and trailing  ",
+          "fmt": "000000000000000000000000"
+        },
+        {
+          "text": "word Word WORD wOrd WOrD a A Ab AB",
+          "fmt": "0000000000000000000000000000000000"
+        },
+        {
+          "text": "cat in table",
+          "fmt": "000000000000"
+        },
+        {
+          "text": "Cat Cat",
+          "fmt": "0000000"
+        },
+        {
+          "text": "no match",
+          "fmt": "00000000"
+        },
+        {
+          "text": "concat",
+          "fmt": "000000"
+        }
+      ]
+    },
+    {
+      "name": "wc-escape-star",
+      "find": "a\\*b",
+      "replace": "Z",
+      "matchCase": false,
+      "wholeWord": false,
+      "wildcards": true,
+      "count": 1,
+      "paragraphs": [
+        {
+          "text": "The Cat sat on the cat mat. CAT cat.",
+          "fmt": "000001100000000002222000000000000000"
+        },
+        {
+          "text": "concatenate category cat-like scatter concat.",
+          "fmt": "000000000000000000000000000000000000000000000"
+        },
+        {
+          "text": "Hello World hello world HELLO",
+          "fmt": "00019999800000000000000000000"
+        },
+        {
+          "text": "alpha1 beta22 gamma333 delta",
+          "fmt": "0000000000000000000000000000"
+        },
+        {
+          "text": "foo_bar foo-bar foo bar foobar",
+          "fmt": "000111000000000000000000000000"
+        },
+        {
+          "text": "tab\tseparated and line\nbreak",
+          "fmt": "0000000000000000000000000000"
+        },
+        {
+          "text": "Z a?b axxb a b",
+          "fmt": "00000000000000"
+        },
+        {
+          "text": "[bracket] (paren) caret^ back\\slash",
+          "fmt": "00000000000000000000000000000000000"
+        },
+        {
+          "text": "\u00dcn\u00ef c\u00f6de \u00dcN\u00cf \u00fcn\u00ef",
+          "fmt": "0000000000000000"
+        },
+        {
+          "text": "foobar and foobar",
+          "fmt": "00011104440000111"
+        },
+        {
+          "text": "x1 x12 x123 x1234",
+          "fmt": "00004000000000000"
+        },
+        {
+          "text": "  leading and trailing  ",
+          "fmt": "000000000000000000000000"
+        },
+        {
+          "text": "word Word WORD wOrd WOrD a A Ab AB",
+          "fmt": "0000000000000000000000000000000000"
+        },
+        {
+          "text": "cat in table",
+          "fmt": "000000000000"
+        },
+        {
+          "text": "Cat Cat",
+          "fmt": "0000000"
+        },
+        {
+          "text": "no match",
+          "fmt": "00000000"
+        },
+        {
+          "text": "concat",
+          "fmt": "000000"
+        }
+      ]
+    },
+    {
+      "name": "wc-escape-bracket",
+      "find": "\\[bracket\\]",
+      "replace": "Z",
+      "matchCase": false,
+      "wholeWord": false,
+      "wildcards": true,
+      "count": 1,
+      "paragraphs": [
+        {
+          "text": "The Cat sat on the cat mat. CAT cat.",
+          "fmt": "000001100000000002222000000000000000"
+        },
+        {
+          "text": "concatenate category cat-like scatter concat.",
+          "fmt": "000000000000000000000000000000000000000000000"
+        },
+        {
+          "text": "Hello World hello world HELLO",
+          "fmt": "00019999800000000000000000000"
+        },
+        {
+          "text": "alpha1 beta22 gamma333 delta",
+          "fmt": "0000000000000000000000000000"
+        },
+        {
+          "text": "foo_bar foo-bar foo bar foobar",
+          "fmt": "000111000000000000000000000000"
+        },
+        {
+          "text": "tab\tseparated and line\nbreak",
+          "fmt": "0000000000000000000000000000"
+        },
+        {
+          "text": "a*b a?b axxb a b",
+          "fmt": "0000000000000000"
+        },
+        {
+          "text": "Z (paren) caret^ back\\slash",
+          "fmt": "000000000000000000000000000"
+        },
+        {
+          "text": "\u00dcn\u00ef c\u00f6de \u00dcN\u00cf \u00fcn\u00ef",
+          "fmt": "0000000000000000"
+        },
+        {
+          "text": "foobar and foobar",
+          "fmt": "00011104440000111"
+        },
+        {
+          "text": "x1 x12 x123 x1234",
+          "fmt": "00004000000000000"
+        },
+        {
+          "text": "  leading and trailing  ",
+          "fmt": "000000000000000000000000"
+        },
+        {
+          "text": "word Word WORD wOrd WOrD a A Ab AB",
+          "fmt": "0000000000000000000000000000000000"
+        },
+        {
+          "text": "cat in table",
+          "fmt": "000000000000"
+        },
+        {
+          "text": "Cat Cat",
+          "fmt": "0000000"
+        },
+        {
+          "text": "no match",
+          "fmt": "00000000"
+        },
+        {
+          "text": "concat",
+          "fmt": "000000"
+        }
+      ]
+    },
+    {
+      "name": "wc-found-text-code",
+      "find": "x[0-9]@",
+      "replace": "<^&>",
+      "matchCase": false,
+      "wholeWord": false,
+      "wildcards": true,
+      "count": 4,
+      "paragraphs": [
+        {
+          "text": "The Cat sat on the cat mat. CAT cat.",
+          "fmt": "000001100000000002222000000000000000"
+        },
+        {
+          "text": "concatenate category cat-like scatter concat.",
+          "fmt": "000000000000000000000000000000000000000000000"
+        },
+        {
+          "text": "Hello World hello world HELLO",
+          "fmt": "00019999800000000000000000000"
+        },
+        {
+          "text": "alpha1 beta22 gamma333 delta",
+          "fmt": "0000000000000000000000000000"
+        },
+        {
+          "text": "foo_bar foo-bar foo bar foobar",
+          "fmt": "000111000000000000000000000000"
+        },
+        {
+          "text": "tab\tseparated and line\nbreak",
+          "fmt": "0000000000000000000000000000"
+        },
+        {
+          "text": "a*b a?b axxb a b",
+          "fmt": "0000000000000000"
+        },
+        {
+          "text": "[bracket] (paren) caret^ back\\slash",
+          "fmt": "00000000000000000000000000000000000"
+        },
+        {
+          "text": "\u00dcn\u00ef c\u00f6de \u00dcN\u00cf \u00fcn\u00ef",
+          "fmt": "0000000000000000"
+        },
+        {
+          "text": "foobar and foobar",
+          "fmt": "00011104440000111"
+        },
+        {
+          "text": "<x1> <x1>2 <x1>23 <x1>234",
+          "fmt": "0000000400000000000000000"
+        },
+        {
+          "text": "  leading and trailing  ",
+          "fmt": "000000000000000000000000"
+        },
+        {
+          "text": "word Word WORD wOrd WOrD a A Ab AB",
+          "fmt": "0000000000000000000000000000000000"
+        },
+        {
+          "text": "cat in table",
+          "fmt": "000000000000"
+        },
+        {
+          "text": "Cat Cat",
+          "fmt": "0000000"
+        },
+        {
+          "text": "no match",
+          "fmt": "00000000"
+        },
+        {
+          "text": "concat",
+          "fmt": "000000"
+        }
+      ]
+    },
+    {
+      "name": "wc-at-literal",
+      "find": "fo@",
+      "replace": "Z",
+      "matchCase": false,
+      "wholeWord": false,
+      "wildcards": true,
+      "count": 6,
+      "paragraphs": [
+        {
+          "text": "The Cat sat on the cat mat. CAT cat.",
+          "fmt": "000001100000000002222000000000000000"
+        },
+        {
+          "text": "concatenate category cat-like scatter concat.",
+          "fmt": "000000000000000000000000000000000000000000000"
+        },
+        {
+          "text": "Hello World hello world HELLO",
+          "fmt": "00019999800000000000000000000"
+        },
+        {
+          "text": "alpha1 beta22 gamma333 delta",
+          "fmt": "0000000000000000000000000000"
+        },
+        {
+          "text": "Zo_bar Zo-bar Zo bar Zobar",
+          "fmt": "00111000000000000000000000"
+        },
+        {
+          "text": "tab\tseparated and line\nbreak",
+          "fmt": "0000000000000000000000000000"
+        },
+        {
+          "text": "a*b a?b axxb a b",
+          "fmt": "0000000000000000"
+        },
+        {
+          "text": "[bracket] (paren) caret^ back\\slash",
+          "fmt": "00000000000000000000000000000000000"
+        },
+        {
+          "text": "\u00dcn\u00ef c\u00f6de \u00dcN\u00cf \u00fcn\u00ef",
+          "fmt": "0000000000000000"
+        },
+        {
+          "text": "Zobar and Zobar",
+          "fmt": "001110444000111"
+        },
+        {
+          "text": "x1 x12 x123 x1234",
+          "fmt": "00004000000000000"
+        },
+        {
+          "text": "  leading and trailing  ",
+          "fmt": "000000000000000000000000"
+        },
+        {
+          "text": "word Word WORD wOrd WOrD a A Ab AB",
+          "fmt": "0000000000000000000000000000000000"
+        },
+        {
+          "text": "cat in table",
+          "fmt": "000000000000"
+        },
+        {
+          "text": "Cat Cat",
+          "fmt": "0000000"
+        },
+        {
+          "text": "no match",
+          "fmt": "00000000"
+        },
+        {
+          "text": "concat",
+          "fmt": "000000"
+        }
+      ]
+    },
+    {
+      "name": "wc-at-class",
+      "find": "[o]@",
+      "replace": "Z",
+      "matchCase": false,
+      "wholeWord": false,
+      "wildcards": true,
+      "count": 24,
+      "paragraphs": [
+        {
+          "text": "The Cat sat Zn the cat mat. CAT cat.",
+          "fmt": "000001100000000002222000000000000000"
+        },
+        {
+          "text": "cZncatenate categZry cat-like scatter cZncat.",
+          "fmt": "000000000000000000000000000000000000000000000"
+        },
+        {
+          "text": "HellZ WZrld hellZ wZrld HELLO",
+          "fmt": "00019999800000000000000000000"
+        },
+        {
+          "text": "alpha1 beta22 gamma333 delta",
+          "fmt": "0000000000000000000000000000"
+        },
+        {
+          "text": "fZZ_bar fZZ-bar fZZ bar fZZbar",
+          "fmt": "000111000000000000000000000000"
+        },
+        {
+          "text": "tab\tseparated and line\nbreak",
+          "fmt": "0000000000000000000000000000"
+        },
+        {
+          "text": "a*b a?b axxb a b",
+          "fmt": "0000000000000000"
+        },
+        {
+          "text": "[bracket] (paren) caret^ back\\slash",
+          "fmt": "00000000000000000000000000000000000"
+        },
+        {
+          "text": "\u00dcn\u00ef c\u00f6de \u00dcN\u00cf \u00fcn\u00ef",
+          "fmt": "0000000000000000"
+        },
+        {
+          "text": "fZZbar and fZZbar",
+          "fmt": "00011104440000111"
+        },
+        {
+          "text": "x1 x12 x123 x1234",
+          "fmt": "00004000000000000"
+        },
+        {
+          "text": "  leading and trailing  ",
+          "fmt": "000000000000000000000000"
+        },
+        {
+          "text": "wZrd WZrd WORD wOrd WOrD a A Ab AB",
+          "fmt": "0000000000000000000000000000000000"
+        },
+        {
+          "text": "cat in table",
+          "fmt": "000000000000"
+        },
+        {
+          "text": "Cat Cat",
+          "fmt": "0000000"
+        },
+        {
+          "text": "nZ match",
+          "fmt": "00000000"
+        },
+        {
+          "text": "cZncat",
+          "fmt": "000000"
+        }
+      ]
+    },
+    {
+      "name": "wc-at-any",
+      "find": "f?@",
+      "replace": "Z",
+      "matchCase": false,
+      "wholeWord": false,
+      "wildcards": true,
+      "count": 6,
+      "paragraphs": [
+        {
+          "text": "The Cat sat on the cat mat. CAT cat.",
+          "fmt": "000001100000000002222000000000000000"
+        },
+        {
+          "text": "concatenate category cat-like scatter concat.",
+          "fmt": "000000000000000000000000000000000000000000000"
+        },
+        {
+          "text": "Hello World hello world HELLO",
+          "fmt": "00019999800000000000000000000"
+        },
+        {
+          "text": "alpha1 beta22 gamma333 delta",
+          "fmt": "0000000000000000000000000000"
+        },
+        {
+          "text": "Zoo_bar Zoo-bar Zoo bar Zoobar",
+          "fmt": "000111000000000000000000000000"
+        },
+        {
+          "text": "tab\tseparated and line\nbreak",
+          "fmt": "0000000000000000000000000000"
+        },
+        {
+          "text": "a*b a?b axxb a b",
+          "fmt": "0000000000000000"
+        },
+        {
+          "text": "[bracket] (paren) caret^ back\\slash",
+          "fmt": "00000000000000000000000000000000000"
+        },
+        {
+          "text": "\u00dcn\u00ef c\u00f6de \u00dcN\u00cf \u00fcn\u00ef",
+          "fmt": "0000000000000000"
+        },
+        {
+          "text": "Zoobar and Zoobar",
+          "fmt": "00011104440000111"
+        },
+        {
+          "text": "x1 x12 x123 x1234",
+          "fmt": "00004000000000000"
+        },
+        {
+          "text": "  leading and trailing  ",
+          "fmt": "000000000000000000000000"
+        },
+        {
+          "text": "word Word WORD wOrd WOrD a A Ab AB",
+          "fmt": "0000000000000000000000000000000000"
+        },
+        {
+          "text": "cat in table",
+          "fmt": "000000000000"
+        },
+        {
+          "text": "Cat Cat",
+          "fmt": "0000000"
+        },
+        {
+          "text": "no match",
+          "fmt": "00000000"
+        },
+        {
+          "text": "concat",
+          "fmt": "000000"
+        }
+      ]
+    },
+    {
+      "name": "wc-at-lazy-literal",
+      "find": "fo@_",
+      "replace": "Z",
+      "matchCase": false,
+      "wholeWord": false,
+      "wildcards": true,
+      "count": 1,
+      "paragraphs": [
+        {
+          "text": "The Cat sat on the cat mat. CAT cat.",
+          "fmt": "000001100000000002222000000000000000"
+        },
+        {
+          "text": "concatenate category cat-like scatter concat.",
+          "fmt": "000000000000000000000000000000000000000000000"
+        },
+        {
+          "text": "Hello World hello world HELLO",
+          "fmt": "00019999800000000000000000000"
+        },
+        {
+          "text": "alpha1 beta22 gamma333 delta",
+          "fmt": "0000000000000000000000000000"
+        },
+        {
+          "text": "Zbar foo-bar foo bar foobar",
+          "fmt": "011000000000000000000000000"
+        },
+        {
+          "text": "tab\tseparated and line\nbreak",
+          "fmt": "0000000000000000000000000000"
+        },
+        {
+          "text": "a*b a?b axxb a b",
+          "fmt": "0000000000000000"
+        },
+        {
+          "text": "[bracket] (paren) caret^ back\\slash",
+          "fmt": "00000000000000000000000000000000000"
+        },
+        {
+          "text": "\u00dcn\u00ef c\u00f6de \u00dcN\u00cf \u00fcn\u00ef",
+          "fmt": "0000000000000000"
+        },
+        {
+          "text": "foobar and foobar",
+          "fmt": "00011104440000111"
+        },
+        {
+          "text": "x1 x12 x123 x1234",
+          "fmt": "00004000000000000"
+        },
+        {
+          "text": "  leading and trailing  ",
+          "fmt": "000000000000000000000000"
+        },
+        {
+          "text": "word Word WORD wOrd WOrD a A Ab AB",
+          "fmt": "0000000000000000000000000000000000"
+        },
+        {
+          "text": "cat in table",
+          "fmt": "000000000000"
+        },
+        {
+          "text": "Cat Cat",
+          "fmt": "0000000"
+        },
+        {
+          "text": "no match",
+          "fmt": "00000000"
+        },
+        {
+          "text": "concat",
+          "fmt": "000000"
+        }
+      ]
+    },
+    {
+      "name": "wc-at-lazy-class",
+      "find": "x[0-9]@ ",
+      "replace": "Z",
+      "matchCase": false,
+      "wholeWord": false,
+      "wildcards": true,
+      "count": 3,
+      "paragraphs": [
+        {
+          "text": "The Cat sat on the cat mat. CAT cat.",
+          "fmt": "000001100000000002222000000000000000"
+        },
+        {
+          "text": "concatenate category cat-like scatter concat.",
+          "fmt": "000000000000000000000000000000000000000000000"
+        },
+        {
+          "text": "Hello World hello world HELLO",
+          "fmt": "00019999800000000000000000000"
+        },
+        {
+          "text": "alpha1 beta22 gamma333 delta",
+          "fmt": "0000000000000000000000000000"
+        },
+        {
+          "text": "foo_bar foo-bar foo bar foobar",
+          "fmt": "000111000000000000000000000000"
+        },
+        {
+          "text": "tab\tseparated and line\nbreak",
+          "fmt": "0000000000000000000000000000"
+        },
+        {
+          "text": "a*b a?b axxb a b",
+          "fmt": "0000000000000000"
+        },
+        {
+          "text": "[bracket] (paren) caret^ back\\slash",
+          "fmt": "00000000000000000000000000000000000"
+        },
+        {
+          "text": "\u00dcn\u00ef c\u00f6de \u00dcN\u00cf \u00fcn\u00ef",
+          "fmt": "0000000000000000"
+        },
+        {
+          "text": "foobar and foobar",
+          "fmt": "00011104440000111"
+        },
+        {
+          "text": "ZZZx1234",
+          "fmt": "00000000"
+        },
+        {
+          "text": "  leading and trailing  ",
+          "fmt": "000000000000000000000000"
+        },
+        {
+          "text": "word Word WORD wOrd WOrD a A Ab AB",
+          "fmt": "0000000000000000000000000000000000"
+        },
+        {
+          "text": "cat in table",
+          "fmt": "000000000000"
+        },
+        {
+          "text": "Cat Cat",
+          "fmt": "0000000"
+        },
+        {
+          "text": "no match",
+          "fmt": "00000000"
+        },
+        {
+          "text": "concat",
+          "fmt": "000000"
+        }
+      ]
+    },
+    {
+      "name": "wc-at-lazy-any",
+      "find": "f?@_",
+      "replace": "Z",
+      "matchCase": false,
+      "wholeWord": false,
+      "wildcards": true,
+      "count": 1,
+      "paragraphs": [
+        {
+          "text": "The Cat sat on the cat mat. CAT cat.",
+          "fmt": "000001100000000002222000000000000000"
+        },
+        {
+          "text": "concatenate category cat-like scatter concat.",
+          "fmt": "000000000000000000000000000000000000000000000"
+        },
+        {
+          "text": "Hello World hello world HELLO",
+          "fmt": "00019999800000000000000000000"
+        },
+        {
+          "text": "alpha1 beta22 gamma333 delta",
+          "fmt": "0000000000000000000000000000"
+        },
+        {
+          "text": "Zbar foo-bar foo bar foobar",
+          "fmt": "011000000000000000000000000"
+        },
+        {
+          "text": "tab\tseparated and line\nbreak",
+          "fmt": "0000000000000000000000000000"
+        },
+        {
+          "text": "a*b a?b axxb a b",
+          "fmt": "0000000000000000"
+        },
+        {
+          "text": "[bracket] (paren) caret^ back\\slash",
+          "fmt": "00000000000000000000000000000000000"
+        },
+        {
+          "text": "\u00dcn\u00ef c\u00f6de \u00dcN\u00cf \u00fcn\u00ef",
+          "fmt": "0000000000000000"
+        },
+        {
+          "text": "foobar and foobar",
+          "fmt": "00011104440000111"
+        },
+        {
+          "text": "x1 x12 x123 x1234",
+          "fmt": "00004000000000000"
+        },
+        {
+          "text": "  leading and trailing  ",
+          "fmt": "000000000000000000000000"
+        },
+        {
+          "text": "word Word WORD wOrd WOrD a A Ab AB",
+          "fmt": "0000000000000000000000000000000000"
+        },
+        {
+          "text": "cat in table",
+          "fmt": "000000000000"
+        },
+        {
+          "text": "Cat Cat",
+          "fmt": "0000000"
+        },
+        {
+          "text": "no match",
+          "fmt": "00000000"
+        },
+        {
+          "text": "concat",
+          "fmt": "000000"
+        }
+      ]
+    },
+    {
+      "name": "wc-at-lazy-longer",
+      "find": "a[a-z]@a",
+      "replace": "Z",
+      "matchCase": false,
+      "wholeWord": false,
+      "wildcards": true,
+      "count": 4,
+      "paragraphs": [
+        {
+          "text": "The Cat sat on the cat mat. CAT cat.",
+          "fmt": "000001100000000002222000000000000000"
+        },
+        {
+          "text": "concZte category cat-like scatter concat.",
+          "fmt": "00000000000000000000000000000000000000000"
+        },
+        {
+          "text": "Hello World hello world HELLO",
+          "fmt": "00019999800000000000000000000"
+        },
+        {
+          "text": "Z1 beta22 gZ333 delta",
+          "fmt": "000000000000000000000"
+        },
+        {
+          "text": "foo_bar foo-bar foo bar foobar",
+          "fmt": "000111000000000000000000000000"
+        },
+        {
+          "text": "tab\tsepZted and line\nbreak",
+          "fmt": "00000000000000000000000000"
+        },
+        {
+          "text": "a*b a?b axxb a b",
+          "fmt": "0000000000000000"
+        },
+        {
+          "text": "[bracket] (paren) caret^ back\\slash",
+          "fmt": "00000000000000000000000000000000000"
+        },
+        {
+          "text": "\u00dcn\u00ef c\u00f6de \u00dcN\u00cf \u00fcn\u00ef",
+          "fmt": "0000000000000000"
+        },
+        {
+          "text": "foobar and foobar",
+          "fmt": "00011104440000111"
+        },
+        {
+          "text": "x1 x12 x123 x1234",
+          "fmt": "00004000000000000"
+        },
+        {
+          "text": "  leading and trailing  ",
+          "fmt": "000000000000000000000000"
+        },
+        {
+          "text": "word Word WORD wOrd WOrD a A Ab AB",
+          "fmt": "0000000000000000000000000000000000"
+        },
+        {
+          "text": "cat in table",
+          "fmt": "000000000000"
+        },
+        {
+          "text": "Cat Cat",
+          "fmt": "0000000"
+        },
+        {
+          "text": "no match",
+          "fmt": "00000000"
+        },
+        {
+          "text": "concat",
+          "fmt": "000000"
+        }
+      ]
+    },
+    {
+      "name": "wc-digits-run",
+      "find": "[0-9]@",
+      "replace": "#",
+      "matchCase": false,
+      "wholeWord": false,
+      "wildcards": true,
+      "count": 16,
+      "paragraphs": [
+        {
+          "text": "The Cat sat on the cat mat. CAT cat.",
+          "fmt": "000001100000000002222000000000000000"
+        },
+        {
+          "text": "concatenate category cat-like scatter concat.",
+          "fmt": "000000000000000000000000000000000000000000000"
+        },
+        {
+          "text": "Hello World hello world HELLO",
+          "fmt": "00019999800000000000000000000"
+        },
+        {
+          "text": "alpha# beta## gamma### delta",
+          "fmt": "0000000000000000000000000000"
+        },
+        {
+          "text": "foo_bar foo-bar foo bar foobar",
+          "fmt": "000111000000000000000000000000"
+        },
+        {
+          "text": "tab\tseparated and line\nbreak",
+          "fmt": "0000000000000000000000000000"
+        },
+        {
+          "text": "a*b a?b axxb a b",
+          "fmt": "0000000000000000"
+        },
+        {
+          "text": "[bracket] (paren) caret^ back\\slash",
+          "fmt": "00000000000000000000000000000000000"
+        },
+        {
+          "text": "\u00dcn\u00ef c\u00f6de \u00dcN\u00cf \u00fcn\u00ef",
+          "fmt": "0000000000000000"
+        },
+        {
+          "text": "foobar and foobar",
+          "fmt": "00011104440000111"
+        },
+        {
+          "text": "x# x## x### x####",
+          "fmt": "00004000000000000"
+        },
+        {
+          "text": "  leading and trailing  ",
+          "fmt": "000000000000000000000000"
+        },
+        {
+          "text": "word Word WORD wOrd WOrD a A Ab AB",
+          "fmt": "0000000000000000000000000000000000"
+        },
+        {
+          "text": "cat in table",
+          "fmt": "000000000000"
+        },
+        {
+          "text": "Cat Cat",
+          "fmt": "0000000"
+        },
+        {
+          "text": "no match",
+          "fmt": "00000000"
+        },
+        {
+          "text": "concat",
+          "fmt": "000000"
+        }
+      ]
+    },
+    {
+      "name": "wc-empty-replace",
+      "find": "[0-9]@",
+      "replace": "",
+      "matchCase": false,
+      "wholeWord": false,
+      "wildcards": true,
+      "count": 16,
+      "paragraphs": [
+        {
+          "text": "The Cat sat on the cat mat. CAT cat.",
+          "fmt": "000001100000000002222000000000000000"
+        },
+        {
+          "text": "concatenate category cat-like scatter concat.",
+          "fmt": "000000000000000000000000000000000000000000000"
+        },
+        {
+          "text": "Hello World hello world HELLO",
+          "fmt": "00019999800000000000000000000"
+        },
+        {
+          "text": "alpha beta gamma delta",
+          "fmt": "0000000000000000000000"
+        },
+        {
+          "text": "foo_bar foo-bar foo bar foobar",
+          "fmt": "000111000000000000000000000000"
+        },
+        {
+          "text": "tab\tseparated and line\nbreak",
+          "fmt": "0000000000000000000000000000"
+        },
+        {
+          "text": "a*b a?b axxb a b",
+          "fmt": "0000000000000000"
+        },
+        {
+          "text": "[bracket] (paren) caret^ back\\slash",
+          "fmt": "00000000000000000000000000000000000"
+        },
+        {
+          "text": "\u00dcn\u00ef c\u00f6de \u00dcN\u00cf \u00fcn\u00ef",
+          "fmt": "0000000000000000"
+        },
+        {
+          "text": "foobar and foobar",
+          "fmt": "00011104440000111"
+        },
+        {
+          "text": "x x x x",
+          "fmt": "0000000"
+        },
+        {
+          "text": "  leading and trailing  ",
+          "fmt": "000000000000000000000000"
+        },
+        {
+          "text": "word Word WORD wOrd WOrD a A Ab AB",
+          "fmt": "0000000000000000000000000000000000"
+        },
+        {
+          "text": "cat in table",
+          "fmt": "000000000000"
+        },
+        {
+          "text": "Cat Cat",
+          "fmt": "0000000"
+        },
+        {
+          "text": "no match",
+          "fmt": "00000000"
+        },
+        {
+          "text": "concat",
+          "fmt": "000000"
+        }
+      ]
+    },
+    {
+      "name": "found-text-twice",
+      "find": "Cat",
+      "replace": "<^&^&>",
+      "matchCase": false,
+      "wholeWord": false,
+      "wildcards": false,
+      "count": 13,
+      "paragraphs": [
+        {
+          "text": "The <CatCat> sat on the <catcat> mat. <CATCAT> <catcat>.",
+          "fmt": "00000011011000000000002222202202000000000000000000000000"
+        },
+        {
+          "text": "con<catcat>enate <catcat>egory <catcat>-like s<catcat>ter con<catcat>.",
+          "fmt": "0000000000000000000000000000000000000000000000000000000000000000000000"
+        },
+        {
+          "text": "Hello World hello world HELLO",
+          "fmt": "00019999800000000000000000000"
+        },
+        {
+          "text": "alpha1 beta22 gamma333 delta",
+          "fmt": "0000000000000000000000000000"
+        },
+        {
+          "text": "foo_bar foo-bar foo bar foobar",
+          "fmt": "000111000000000000000000000000"
+        },
+        {
+          "text": "tab\tseparated and line\nbreak",
+          "fmt": "0000000000000000000000000000"
+        },
+        {
+          "text": "a*b a?b axxb a b",
+          "fmt": "0000000000000000"
+        },
+        {
+          "text": "[bracket] (paren) caret^ back\\slash",
+          "fmt": "00000000000000000000000000000000000"
+        },
+        {
+          "text": "\u00dcn\u00ef c\u00f6de \u00dcN\u00cf \u00fcn\u00ef",
+          "fmt": "0000000000000000"
+        },
+        {
+          "text": "foobar and foobar",
+          "fmt": "00011104440000111"
+        },
+        {
+          "text": "x1 x12 x123 x1234",
+          "fmt": "00004000000000000"
+        },
+        {
+          "text": "  leading and trailing  ",
+          "fmt": "000000000000000000000000"
+        },
+        {
+          "text": "word Word WORD wOrd WOrD a A Ab AB",
+          "fmt": "0000000000000000000000000000000000"
+        },
+        {
+          "text": "<catcat> in table",
+          "fmt": "00000000000000000"
+        },
+        {
+          "text": "<CatCat> <CatCat>",
+          "fmt": "00000000000000000"
+        },
+        {
+          "text": "no match",
+          "fmt": "00000000"
+        },
+        {
+          "text": "con<catcat>",
+          "fmt": "00000000000"
+        }
+      ]
+    },
+    {
+      "name": "case-lower",
+      "find": "word",
+      "replace": "dog",
+      "matchCase": false,
+      "wholeWord": false,
+      "wildcards": false,
+      "count": 5,
+      "paragraphs": [
+        {
+          "text": "The Cat sat on the cat mat. CAT cat.",
+          "fmt": "000001100000000002222000000000000000"
+        },
+        {
+          "text": "concatenate category cat-like scatter concat.",
+          "fmt": "000000000000000000000000000000000000000000000"
+        },
+        {
+          "text": "Hello World hello world HELLO",
+          "fmt": "00019999800000000000000000000"
+        },
+        {
+          "text": "alpha1 beta22 gamma333 delta",
+          "fmt": "0000000000000000000000000000"
+        },
+        {
+          "text": "foo_bar foo-bar foo bar foobar",
+          "fmt": "000111000000000000000000000000"
+        },
+        {
+          "text": "tab\tseparated and line\nbreak",
+          "fmt": "0000000000000000000000000000"
+        },
+        {
+          "text": "a*b a?b axxb a b",
+          "fmt": "0000000000000000"
+        },
+        {
+          "text": "[bracket] (paren) caret^ back\\slash",
+          "fmt": "00000000000000000000000000000000000"
+        },
+        {
+          "text": "\u00dcn\u00ef c\u00f6de \u00dcN\u00cf \u00fcn\u00ef",
+          "fmt": "0000000000000000"
+        },
+        {
+          "text": "foobar and foobar",
+          "fmt": "00011104440000111"
+        },
+        {
+          "text": "x1 x12 x123 x1234",
+          "fmt": "00004000000000000"
+        },
+        {
+          "text": "  leading and trailing  ",
+          "fmt": "000000000000000000000000"
+        },
+        {
+          "text": "dog Dog DOG dog Dog a A Ab AB",
+          "fmt": "00000000000000000000000000000"
+        },
+        {
+          "text": "cat in table",
+          "fmt": "000000000000"
+        },
+        {
+          "text": "Cat Cat",
+          "fmt": "0000000"
+        },
+        {
+          "text": "no match",
+          "fmt": "00000000"
+        },
+        {
+          "text": "concat",
+          "fmt": "000000"
+        }
+      ]
+    },
+    {
+      "name": "case-mixed",
+      "find": "word",
+      "replace": "dOg",
+      "matchCase": false,
+      "wholeWord": false,
+      "wildcards": false,
+      "count": 5,
+      "paragraphs": [
+        {
+          "text": "The Cat sat on the cat mat. CAT cat.",
+          "fmt": "000001100000000002222000000000000000"
+        },
+        {
+          "text": "concatenate category cat-like scatter concat.",
+          "fmt": "000000000000000000000000000000000000000000000"
+        },
+        {
+          "text": "Hello World hello world HELLO",
+          "fmt": "00019999800000000000000000000"
+        },
+        {
+          "text": "alpha1 beta22 gamma333 delta",
+          "fmt": "0000000000000000000000000000"
+        },
+        {
+          "text": "foo_bar foo-bar foo bar foobar",
+          "fmt": "000111000000000000000000000000"
+        },
+        {
+          "text": "tab\tseparated and line\nbreak",
+          "fmt": "0000000000000000000000000000"
+        },
+        {
+          "text": "a*b a?b axxb a b",
+          "fmt": "0000000000000000"
+        },
+        {
+          "text": "[bracket] (paren) caret^ back\\slash",
+          "fmt": "00000000000000000000000000000000000"
+        },
+        {
+          "text": "\u00dcn\u00ef c\u00f6de \u00dcN\u00cf \u00fcn\u00ef",
+          "fmt": "0000000000000000"
+        },
+        {
+          "text": "foobar and foobar",
+          "fmt": "00011104440000111"
+        },
+        {
+          "text": "x1 x12 x123 x1234",
+          "fmt": "00004000000000000"
+        },
+        {
+          "text": "  leading and trailing  ",
+          "fmt": "000000000000000000000000"
+        },
+        {
+          "text": "dOg DOg DOG dOg DOg a A Ab AB",
+          "fmt": "00000000000000000000000000000"
+        },
+        {
+          "text": "cat in table",
+          "fmt": "000000000000"
+        },
+        {
+          "text": "Cat Cat",
+          "fmt": "0000000"
+        },
+        {
+          "text": "no match",
+          "fmt": "00000000"
+        },
+        {
+          "text": "concat",
+          "fmt": "000000"
+        }
+      ]
+    },
+    {
+      "name": "case-title",
+      "find": "word",
+      "replace": "Dog",
+      "matchCase": false,
+      "wholeWord": false,
+      "wildcards": false,
+      "count": 5,
+      "paragraphs": [
+        {
+          "text": "The Cat sat on the cat mat. CAT cat.",
+          "fmt": "000001100000000002222000000000000000"
+        },
+        {
+          "text": "concatenate category cat-like scatter concat.",
+          "fmt": "000000000000000000000000000000000000000000000"
+        },
+        {
+          "text": "Hello World hello world HELLO",
+          "fmt": "00019999800000000000000000000"
+        },
+        {
+          "text": "alpha1 beta22 gamma333 delta",
+          "fmt": "0000000000000000000000000000"
+        },
+        {
+          "text": "foo_bar foo-bar foo bar foobar",
+          "fmt": "000111000000000000000000000000"
+        },
+        {
+          "text": "tab\tseparated and line\nbreak",
+          "fmt": "0000000000000000000000000000"
+        },
+        {
+          "text": "a*b a?b axxb a b",
+          "fmt": "0000000000000000"
+        },
+        {
+          "text": "[bracket] (paren) caret^ back\\slash",
+          "fmt": "00000000000000000000000000000000000"
+        },
+        {
+          "text": "\u00dcn\u00ef c\u00f6de \u00dcN\u00cf \u00fcn\u00ef",
+          "fmt": "0000000000000000"
+        },
+        {
+          "text": "foobar and foobar",
+          "fmt": "00011104440000111"
+        },
+        {
+          "text": "x1 x12 x123 x1234",
+          "fmt": "00004000000000000"
+        },
+        {
+          "text": "  leading and trailing  ",
+          "fmt": "000000000000000000000000"
+        },
+        {
+          "text": "Dog Dog DOG Dog Dog a A Ab AB",
+          "fmt": "00000000000000000000000000000"
+        },
+        {
+          "text": "cat in table",
+          "fmt": "000000000000"
+        },
+        {
+          "text": "Cat Cat",
+          "fmt": "0000000"
+        },
+        {
+          "text": "no match",
+          "fmt": "00000000"
+        },
+        {
+          "text": "concat",
+          "fmt": "000000"
+        }
+      ]
+    },
+    {
+      "name": "case-upper",
+      "find": "word",
+      "replace": "DOG",
+      "matchCase": false,
+      "wholeWord": false,
+      "wildcards": false,
+      "count": 5,
+      "paragraphs": [
+        {
+          "text": "The Cat sat on the cat mat. CAT cat.",
+          "fmt": "000001100000000002222000000000000000"
+        },
+        {
+          "text": "concatenate category cat-like scatter concat.",
+          "fmt": "000000000000000000000000000000000000000000000"
+        },
+        {
+          "text": "Hello World hello world HELLO",
+          "fmt": "00019999800000000000000000000"
+        },
+        {
+          "text": "alpha1 beta22 gamma333 delta",
+          "fmt": "0000000000000000000000000000"
+        },
+        {
+          "text": "foo_bar foo-bar foo bar foobar",
+          "fmt": "000111000000000000000000000000"
+        },
+        {
+          "text": "tab\tseparated and line\nbreak",
+          "fmt": "0000000000000000000000000000"
+        },
+        {
+          "text": "a*b a?b axxb a b",
+          "fmt": "0000000000000000"
+        },
+        {
+          "text": "[bracket] (paren) caret^ back\\slash",
+          "fmt": "00000000000000000000000000000000000"
+        },
+        {
+          "text": "\u00dcn\u00ef c\u00f6de \u00dcN\u00cf \u00fcn\u00ef",
+          "fmt": "0000000000000000"
+        },
+        {
+          "text": "foobar and foobar",
+          "fmt": "00011104440000111"
+        },
+        {
+          "text": "x1 x12 x123 x1234",
+          "fmt": "00004000000000000"
+        },
+        {
+          "text": "  leading and trailing  ",
+          "fmt": "000000000000000000000000"
+        },
+        {
+          "text": "DOG DOG DOG DOG DOG a A Ab AB",
+          "fmt": "00000000000000000000000000000"
+        },
+        {
+          "text": "cat in table",
+          "fmt": "000000000000"
+        },
+        {
+          "text": "Cat Cat",
+          "fmt": "0000000"
+        },
+        {
+          "text": "no match",
+          "fmt": "00000000"
+        },
+        {
+          "text": "concat",
+          "fmt": "000000"
+        }
+      ]
+    },
+    {
+      "name": "case-single",
+      "find": "word",
+      "replace": "d",
+      "matchCase": false,
+      "wholeWord": false,
+      "wildcards": false,
+      "count": 5,
+      "paragraphs": [
+        {
+          "text": "The Cat sat on the cat mat. CAT cat.",
+          "fmt": "000001100000000002222000000000000000"
+        },
+        {
+          "text": "concatenate category cat-like scatter concat.",
+          "fmt": "000000000000000000000000000000000000000000000"
+        },
+        {
+          "text": "Hello World hello world HELLO",
+          "fmt": "00019999800000000000000000000"
+        },
+        {
+          "text": "alpha1 beta22 gamma333 delta",
+          "fmt": "0000000000000000000000000000"
+        },
+        {
+          "text": "foo_bar foo-bar foo bar foobar",
+          "fmt": "000111000000000000000000000000"
+        },
+        {
+          "text": "tab\tseparated and line\nbreak",
+          "fmt": "0000000000000000000000000000"
+        },
+        {
+          "text": "a*b a?b axxb a b",
+          "fmt": "0000000000000000"
+        },
+        {
+          "text": "[bracket] (paren) caret^ back\\slash",
+          "fmt": "00000000000000000000000000000000000"
+        },
+        {
+          "text": "\u00dcn\u00ef c\u00f6de \u00dcN\u00cf \u00fcn\u00ef",
+          "fmt": "0000000000000000"
+        },
+        {
+          "text": "foobar and foobar",
+          "fmt": "00011104440000111"
+        },
+        {
+          "text": "x1 x12 x123 x1234",
+          "fmt": "00004000000000000"
+        },
+        {
+          "text": "  leading and trailing  ",
+          "fmt": "000000000000000000000000"
+        },
+        {
+          "text": "d D D d D a A Ab AB",
+          "fmt": "0000000000000000000"
+        },
+        {
+          "text": "cat in table",
+          "fmt": "000000000000"
+        },
+        {
+          "text": "Cat Cat",
+          "fmt": "0000000"
+        },
+        {
+          "text": "no match",
+          "fmt": "00000000"
+        },
+        {
+          "text": "concat",
+          "fmt": "000000"
+        }
+      ]
+    },
+    {
+      "name": "case-multiword",
+      "find": "word",
+      "replace": "dog cat",
+      "matchCase": false,
+      "wholeWord": false,
+      "wildcards": false,
+      "count": 5,
+      "paragraphs": [
+        {
+          "text": "The Cat sat on the cat mat. CAT cat.",
+          "fmt": "000001100000000002222000000000000000"
+        },
+        {
+          "text": "concatenate category cat-like scatter concat.",
+          "fmt": "000000000000000000000000000000000000000000000"
+        },
+        {
+          "text": "Hello World hello world HELLO",
+          "fmt": "00019999800000000000000000000"
+        },
+        {
+          "text": "alpha1 beta22 gamma333 delta",
+          "fmt": "0000000000000000000000000000"
+        },
+        {
+          "text": "foo_bar foo-bar foo bar foobar",
+          "fmt": "000111000000000000000000000000"
+        },
+        {
+          "text": "tab\tseparated and line\nbreak",
+          "fmt": "0000000000000000000000000000"
+        },
+        {
+          "text": "a*b a?b axxb a b",
+          "fmt": "0000000000000000"
+        },
+        {
+          "text": "[bracket] (paren) caret^ back\\slash",
+          "fmt": "00000000000000000000000000000000000"
+        },
+        {
+          "text": "\u00dcn\u00ef c\u00f6de \u00dcN\u00cf \u00fcn\u00ef",
+          "fmt": "0000000000000000"
+        },
+        {
+          "text": "foobar and foobar",
+          "fmt": "00011104440000111"
+        },
+        {
+          "text": "x1 x12 x123 x1234",
+          "fmt": "00004000000000000"
+        },
+        {
+          "text": "  leading and trailing  ",
+          "fmt": "000000000000000000000000"
+        },
+        {
+          "text": "dog cat Dog cat DOG CAT dog cat Dog cat a A Ab AB",
+          "fmt": "0000000000000000000000000000000000000000000000000"
+        },
+        {
+          "text": "cat in table",
+          "fmt": "000000000000"
+        },
+        {
+          "text": "Cat Cat",
+          "fmt": "0000000"
+        },
+        {
+          "text": "no match",
+          "fmt": "00000000"
+        },
+        {
+          "text": "concat",
+          "fmt": "000000"
+        }
+      ]
+    },
+    {
+      "name": "case-digit-lead",
+      "find": "word",
+      "replace": "1dog",
+      "matchCase": false,
+      "wholeWord": false,
+      "wildcards": false,
+      "count": 5,
+      "paragraphs": [
+        {
+          "text": "The Cat sat on the cat mat. CAT cat.",
+          "fmt": "000001100000000002222000000000000000"
+        },
+        {
+          "text": "concatenate category cat-like scatter concat.",
+          "fmt": "000000000000000000000000000000000000000000000"
+        },
+        {
+          "text": "Hello World hello world HELLO",
+          "fmt": "00019999800000000000000000000"
+        },
+        {
+          "text": "alpha1 beta22 gamma333 delta",
+          "fmt": "0000000000000000000000000000"
+        },
+        {
+          "text": "foo_bar foo-bar foo bar foobar",
+          "fmt": "000111000000000000000000000000"
+        },
+        {
+          "text": "tab\tseparated and line\nbreak",
+          "fmt": "0000000000000000000000000000"
+        },
+        {
+          "text": "a*b a?b axxb a b",
+          "fmt": "0000000000000000"
+        },
+        {
+          "text": "[bracket] (paren) caret^ back\\slash",
+          "fmt": "00000000000000000000000000000000000"
+        },
+        {
+          "text": "\u00dcn\u00ef c\u00f6de \u00dcN\u00cf \u00fcn\u00ef",
+          "fmt": "0000000000000000"
+        },
+        {
+          "text": "foobar and foobar",
+          "fmt": "00011104440000111"
+        },
+        {
+          "text": "x1 x12 x123 x1234",
+          "fmt": "00004000000000000"
+        },
+        {
+          "text": "  leading and trailing  ",
+          "fmt": "000000000000000000000000"
+        },
+        {
+          "text": "1dog 1dog 1DOG 1dog 1dog a A Ab AB",
+          "fmt": "0000000000000000000000000000000000"
+        },
+        {
+          "text": "cat in table",
+          "fmt": "000000000000"
+        },
+        {
+          "text": "Cat Cat",
+          "fmt": "0000000"
+        },
+        {
+          "text": "no match",
+          "fmt": "00000000"
+        },
+        {
+          "text": "concat",
+          "fmt": "000000"
+        }
+      ]
+    },
+    {
+      "name": "case-two-letters",
+      "find": "ab",
+      "replace": "xy",
+      "matchCase": false,
+      "wholeWord": false,
+      "wildcards": false,
+      "count": 4,
+      "paragraphs": [
+        {
+          "text": "The Cat sat on the cat mat. CAT cat.",
+          "fmt": "000001100000000002222000000000000000"
+        },
+        {
+          "text": "concatenate category cat-like scatter concat.",
+          "fmt": "000000000000000000000000000000000000000000000"
+        },
+        {
+          "text": "Hello World hello world HELLO",
+          "fmt": "00019999800000000000000000000"
+        },
+        {
+          "text": "alpha1 beta22 gamma333 delta",
+          "fmt": "0000000000000000000000000000"
+        },
+        {
+          "text": "foo_bar foo-bar foo bar foobar",
+          "fmt": "000111000000000000000000000000"
+        },
+        {
+          "text": "txy\tseparated and line\nbreak",
+          "fmt": "0000000000000000000000000000"
+        },
+        {
+          "text": "a*b a?b axxb a b",
+          "fmt": "0000000000000000"
+        },
+        {
+          "text": "[bracket] (paren) caret^ back\\slash",
+          "fmt": "00000000000000000000000000000000000"
+        },
+        {
+          "text": "\u00dcn\u00ef c\u00f6de \u00dcN\u00cf \u00fcn\u00ef",
+          "fmt": "0000000000000000"
+        },
+        {
+          "text": "foobar and foobar",
+          "fmt": "00011104440000111"
+        },
+        {
+          "text": "x1 x12 x123 x1234",
+          "fmt": "00004000000000000"
+        },
+        {
+          "text": "  leading and trailing  ",
+          "fmt": "000000000000000000000000"
+        },
+        {
+          "text": "word Word WORD wOrd WOrD a A Xy XY",
+          "fmt": "0000000000000000000000000000000000"
+        },
+        {
+          "text": "cat in txyle",
+          "fmt": "000000000000"
+        },
+        {
+          "text": "Cat Cat",
+          "fmt": "0000000"
+        },
+        {
+          "text": "no match",
+          "fmt": "00000000"
+        },
+        {
+          "text": "concat",
+          "fmt": "000000"
+        }
+      ]
+    },
+    {
+      "name": "case-single-letter",
+      "find": "a",
+      "replace": "x",
+      "matchCase": false,
+      "wholeWord": true,
+      "wildcards": false,
+      "count": 5,
+      "paragraphs": [
+        {
+          "text": "The Cat sat on the cat mat. CAT cat.",
+          "fmt": "000001100000000002222000000000000000"
+        },
+        {
+          "text": "concatenate category cat-like scatter concat.",
+          "fmt": "000000000000000000000000000000000000000000000"
+        },
+        {
+          "text": "Hello World hello world HELLO",
+          "fmt": "00019999800000000000000000000"
+        },
+        {
+          "text": "alpha1 beta22 gamma333 delta",
+          "fmt": "0000000000000000000000000000"
+        },
+        {
+          "text": "foo_bar foo-bar foo bar foobar",
+          "fmt": "000111000000000000000000000000"
+        },
+        {
+          "text": "tab\tseparated and line\nbreak",
+          "fmt": "0000000000000000000000000000"
+        },
+        {
+          "text": "x*b x?b axxb x b",
+          "fmt": "0000000000000000"
+        },
+        {
+          "text": "[bracket] (paren) caret^ back\\slash",
+          "fmt": "00000000000000000000000000000000000"
+        },
+        {
+          "text": "\u00dcn\u00ef c\u00f6de \u00dcN\u00cf \u00fcn\u00ef",
+          "fmt": "0000000000000000"
+        },
+        {
+          "text": "foobar and foobar",
+          "fmt": "00011104440000111"
+        },
+        {
+          "text": "x1 x12 x123 x1234",
+          "fmt": "00004000000000000"
+        },
+        {
+          "text": "  leading and trailing  ",
+          "fmt": "000000000000000000000000"
+        },
+        {
+          "text": "word Word WORD wOrd WOrD x X Ab AB",
+          "fmt": "0000000000000000000000000000000000"
+        },
+        {
+          "text": "cat in table",
+          "fmt": "000000000000"
+        },
+        {
+          "text": "Cat Cat",
+          "fmt": "0000000"
+        },
+        {
+          "text": "no match",
+          "fmt": "00000000"
+        },
+        {
+          "text": "concat",
+          "fmt": "000000"
+        }
+      ]
+    },
+    {
+      "name": "case-match-case",
+      "find": "Word",
+      "replace": "dog",
+      "matchCase": true,
+      "wholeWord": false,
+      "wildcards": false,
+      "count": 1,
+      "paragraphs": [
+        {
+          "text": "The Cat sat on the cat mat. CAT cat.",
+          "fmt": "000001100000000002222000000000000000"
+        },
+        {
+          "text": "concatenate category cat-like scatter concat.",
+          "fmt": "000000000000000000000000000000000000000000000"
+        },
+        {
+          "text": "Hello World hello world HELLO",
+          "fmt": "00019999800000000000000000000"
+        },
+        {
+          "text": "alpha1 beta22 gamma333 delta",
+          "fmt": "0000000000000000000000000000"
+        },
+        {
+          "text": "foo_bar foo-bar foo bar foobar",
+          "fmt": "000111000000000000000000000000"
+        },
+        {
+          "text": "tab\tseparated and line\nbreak",
+          "fmt": "0000000000000000000000000000"
+        },
+        {
+          "text": "a*b a?b axxb a b",
+          "fmt": "0000000000000000"
+        },
+        {
+          "text": "[bracket] (paren) caret^ back\\slash",
+          "fmt": "00000000000000000000000000000000000"
+        },
+        {
+          "text": "\u00dcn\u00ef c\u00f6de \u00dcN\u00cf \u00fcn\u00ef",
+          "fmt": "0000000000000000"
+        },
+        {
+          "text": "foobar and foobar",
+          "fmt": "00011104440000111"
+        },
+        {
+          "text": "x1 x12 x123 x1234",
+          "fmt": "00004000000000000"
+        },
+        {
+          "text": "  leading and trailing  ",
+          "fmt": "000000000000000000000000"
+        },
+        {
+          "text": "word dog WORD wOrd WOrD a A Ab AB",
+          "fmt": "000000000000000000000000000000000"
+        },
+        {
+          "text": "cat in table",
+          "fmt": "000000000000"
+        },
+        {
+          "text": "Cat Cat",
+          "fmt": "0000000"
+        },
+        {
+          "text": "no match",
+          "fmt": "00000000"
+        },
+        {
+          "text": "concat",
+          "fmt": "000000"
+        }
+      ]
+    },
+    {
+      "name": "case-wildcards",
+      "find": "wor?",
+      "replace": "dog",
+      "matchCase": false,
+      "wholeWord": false,
+      "wildcards": true,
+      "count": 2,
+      "paragraphs": [
+        {
+          "text": "The Cat sat on the cat mat. CAT cat.",
+          "fmt": "000001100000000002222000000000000000"
+        },
+        {
+          "text": "concatenate category cat-like scatter concat.",
+          "fmt": "000000000000000000000000000000000000000000000"
+        },
+        {
+          "text": "Hello World hello dogd HELLO",
+          "fmt": "0001999980000000000000000000"
+        },
+        {
+          "text": "alpha1 beta22 gamma333 delta",
+          "fmt": "0000000000000000000000000000"
+        },
+        {
+          "text": "foo_bar foo-bar foo bar foobar",
+          "fmt": "000111000000000000000000000000"
+        },
+        {
+          "text": "tab\tseparated and line\nbreak",
+          "fmt": "0000000000000000000000000000"
+        },
+        {
+          "text": "a*b a?b axxb a b",
+          "fmt": "0000000000000000"
+        },
+        {
+          "text": "[bracket] (paren) caret^ back\\slash",
+          "fmt": "00000000000000000000000000000000000"
+        },
+        {
+          "text": "\u00dcn\u00ef c\u00f6de \u00dcN\u00cf \u00fcn\u00ef",
+          "fmt": "0000000000000000"
+        },
+        {
+          "text": "foobar and foobar",
+          "fmt": "00011104440000111"
+        },
+        {
+          "text": "x1 x12 x123 x1234",
+          "fmt": "00004000000000000"
+        },
+        {
+          "text": "  leading and trailing  ",
+          "fmt": "000000000000000000000000"
+        },
+        {
+          "text": "dog Word WORD wOrd WOrD a A Ab AB",
+          "fmt": "000000000000000000000000000000000"
+        },
+        {
+          "text": "cat in table",
+          "fmt": "000000000000"
+        },
+        {
+          "text": "Cat Cat",
+          "fmt": "0000000"
+        },
+        {
+          "text": "no match",
+          "fmt": "00000000"
+        },
+        {
+          "text": "concat",
+          "fmt": "000000"
+        }
+      ]
+    },
+    {
+      "name": "case-tail-mixed",
+      "find": "ord",
+      "replace": "dog",
+      "matchCase": false,
+      "wholeWord": false,
+      "wildcards": false,
+      "count": 5,
+      "paragraphs": [
+        {
+          "text": "The Cat sat on the cat mat. CAT cat.",
+          "fmt": "000001100000000002222000000000000000"
+        },
+        {
+          "text": "concatenate category cat-like scatter concat.",
+          "fmt": "000000000000000000000000000000000000000000000"
+        },
+        {
+          "text": "Hello World hello world HELLO",
+          "fmt": "00019999800000000000000000000"
+        },
+        {
+          "text": "alpha1 beta22 gamma333 delta",
+          "fmt": "0000000000000000000000000000"
+        },
+        {
+          "text": "foo_bar foo-bar foo bar foobar",
+          "fmt": "000111000000000000000000000000"
+        },
+        {
+          "text": "tab\tseparated and line\nbreak",
+          "fmt": "0000000000000000000000000000"
+        },
+        {
+          "text": "a*b a?b axxb a b",
+          "fmt": "0000000000000000"
+        },
+        {
+          "text": "[bracket] (paren) caret^ back\\slash",
+          "fmt": "00000000000000000000000000000000000"
+        },
+        {
+          "text": "\u00dcn\u00ef c\u00f6de \u00dcN\u00cf \u00fcn\u00ef",
+          "fmt": "0000000000000000"
+        },
+        {
+          "text": "foobar and foobar",
+          "fmt": "00011104440000111"
+        },
+        {
+          "text": "x1 x12 x123 x1234",
+          "fmt": "00004000000000000"
+        },
+        {
+          "text": "  leading and trailing  ",
+          "fmt": "000000000000000000000000"
+        },
+        {
+          "text": "wdog Wdog WDOG wDog WDog a A Ab AB",
+          "fmt": "0000000000000000000000000000000000"
+        },
+        {
+          "text": "cat in table",
+          "fmt": "000000000000"
+        },
+        {
+          "text": "Cat Cat",
+          "fmt": "0000000"
+        },
+        {
+          "text": "no match",
+          "fmt": "00000000"
+        },
+        {
+          "text": "concat",
+          "fmt": "000000"
+        }
+      ]
+    },
+    {
+      "name": "wc-qmark-run",
+      "find": "f?o",
+      "replace": "Z",
+      "matchCase": false,
+      "wholeWord": false,
+      "wildcards": true,
+      "count": 6,
+      "paragraphs": [
+        {
+          "text": "The Cat sat on the cat mat. CAT cat.",
+          "fmt": "000001100000000002222000000000000000"
+        },
+        {
+          "text": "concatenate category cat-like scatter concat.",
+          "fmt": "000000000000000000000000000000000000000000000"
+        },
+        {
+          "text": "Hello World hello world HELLO",
+          "fmt": "00019999800000000000000000000"
+        },
+        {
+          "text": "alpha1 beta22 gamma333 delta",
+          "fmt": "0000000000000000000000000000"
+        },
+        {
+          "text": "Z_bar Z-bar Z bar Zbar",
+          "fmt": "0111000000000000000000"
+        },
+        {
+          "text": "tab\tseparated and line\nbreak",
+          "fmt": "0000000000000000000000000000"
+        },
+        {
+          "text": "a*b a?b axxb a b",
+          "fmt": "0000000000000000"
+        },
+        {
+          "text": "[bracket] (paren) caret^ back\\slash",
+          "fmt": "00000000000000000000000000000000000"
+        },
+        {
+          "text": "\u00dcn\u00ef c\u00f6de \u00dcN\u00cf \u00fcn\u00ef",
+          "fmt": "0000000000000000"
+        },
+        {
+          "text": "Zbar and Zbar",
+          "fmt": "0111044400111"
+        },
+        {
+          "text": "x1 x12 x123 x1234",
+          "fmt": "00004000000000000"
+        },
+        {
+          "text": "  leading and trailing  ",
+          "fmt": "000000000000000000000000"
+        },
+        {
+          "text": "word Word WORD wOrd WOrD a A Ab AB",
+          "fmt": "0000000000000000000000000000000000"
+        },
+        {
+          "text": "cat in table",
+          "fmt": "000000000000"
+        },
+        {
+          "text": "Cat Cat",
+          "fmt": "0000000"
+        },
+        {
+          "text": "no match",
+          "fmt": "00000000"
+        },
+        {
+          "text": "concat",
+          "fmt": "000000"
+        }
+      ]
+    },
+    {
+      "name": "wc-star-end",
+      "find": "foo*bar",
+      "replace": "Z",
+      "matchCase": false,
+      "wholeWord": false,
+      "wildcards": true,
+      "count": 6,
+      "paragraphs": [
+        {
+          "text": "The Cat sat on the cat mat. CAT cat.",
+          "fmt": "000001100000000002222000000000000000"
+        },
+        {
+          "text": "concatenate category cat-like scatter concat.",
+          "fmt": "000000000000000000000000000000000000000000000"
+        },
+        {
+          "text": "Hello World hello world HELLO",
+          "fmt": "00019999800000000000000000000"
+        },
+        {
+          "text": "alpha1 beta22 gamma333 delta",
+          "fmt": "0000000000000000000000000000"
+        },
+        {
+          "text": "Z Z Z Z",
+          "fmt": "0000000"
+        },
+        {
+          "text": "tab\tseparated and line\nbreak",
+          "fmt": "0000000000000000000000000000"
+        },
+        {
+          "text": "a*b a?b axxb a b",
+          "fmt": "0000000000000000"
+        },
+        {
+          "text": "[bracket] (paren) caret^ back\\slash",
+          "fmt": "00000000000000000000000000000000000"
+        },
+        {
+          "text": "\u00dcn\u00ef c\u00f6de \u00dcN\u00cf \u00fcn\u00ef",
+          "fmt": "0000000000000000"
+        },
+        {
+          "text": "Z and Z",
+          "fmt": "0044400"
+        },
+        {
+          "text": "x1 x12 x123 x1234",
+          "fmt": "00004000000000000"
+        },
+        {
+          "text": "  leading and trailing  ",
+          "fmt": "000000000000000000000000"
+        },
+        {
+          "text": "word Word WORD wOrd WOrD a A Ab AB",
+          "fmt": "0000000000000000000000000000000000"
+        },
+        {
+          "text": "cat in table",
+          "fmt": "000000000000"
+        },
+        {
+          "text": "Cat Cat",
+          "fmt": "0000000"
+        },
+        {
+          "text": "no match",
+          "fmt": "00000000"
+        },
+        {
+          "text": "concat",
+          "fmt": "000000"
+        }
+      ]
+    }
+  ]
+}

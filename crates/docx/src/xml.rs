@@ -85,6 +85,14 @@ impl ElementHead {
         local_part(&self.name)
     }
 
+    /// An element with this head and no children.
+    pub fn into_empty(self) -> XmlElement {
+        XmlElement {
+            head: self,
+            children: Vec::new(),
+        }
+    }
+
     /// True when this is the WordprocessingML element `local`.
     pub fn is_w(&self, local: &str) -> bool {
         is_w_ns(self.ns.as_deref()) && self.local_name() == local

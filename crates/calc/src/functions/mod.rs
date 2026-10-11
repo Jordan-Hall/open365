@@ -19,9 +19,17 @@ mod mathx;
 mod refs;
 mod stats;
 mod text;
+mod textasian;
+mod textbaht;
 mod textbyte;
 mod textchar;
 mod textfmt;
+mod textpcre;
+mod textpcreprops;
+#[cfg(test)]
+mod textpcretests;
+mod textpcrevm;
+mod textregex;
 mod textsplit;
 
 use std::collections::HashMap;
@@ -251,6 +259,14 @@ static TABLE: &[(&str, Func)] = &[
     ("N", Func::Res(textchar::n)),
     ("REPLACE", Func::Res(textbyte::replace)),
     ("REPLACEB", Func::Res(textbyte::replaceb)),
+    ("ASC", Func::Res(textasian::asc)),
+    ("DBCS", Func::Res(textasian::asc)),
+    ("PHONETIC", Func::Res(textasian::phonetic)),
+    ("ENCODEURL", Func::Res(textasian::encodeurl)),
+    ("BAHTTEXT", Func::Res(textbaht::bahttext)),
+    ("REGEXTEST", Func::Res(textregex::regextest)),
+    ("REGEXEXTRACT", Func::Res(textregex::regexextract)),
+    ("REGEXREPLACE", Func::Res(textregex::regexreplace)),
     ("LENB", Func::Res(textbyte::lenb)),
     ("LEFTB", Func::Res(text::left)),
     ("RIGHTB", Func::Res(text::right)),
@@ -616,6 +632,12 @@ static LIFTING: &[(&str, Lifting)] = &[
     ("CLEAN", ALWAYS),
     ("REPLACE", ALWAYS),
     ("REPLACEB", ALWAYS),
+    ("ASC", ALWAYS),
+    ("DBCS", ALWAYS),
+    ("ENCODEURL", ALWAYS),
+    ("BAHTTEXT", ALWAYS),
+    ("REGEXTEST", ALWAYS),
+    ("REGEXREPLACE", ALWAYS),
     ("LENB", ALWAYS),
     ("LEFTB", ALWAYS),
     ("RIGHTB", ALWAYS),

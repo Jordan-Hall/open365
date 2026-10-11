@@ -102,6 +102,33 @@ pub enum Command {
         end: DocPos,
         text: String,
     },
+    /// Word's Replace All: every match of `find` becomes `replacement` (`^&` is the found text,
+    /// `^t` a tab, `^l` a line break). Matches span runs; the replacement takes the formatting
+    /// of the first matched run. One undo step.
+    DocxReplaceAll {
+        find: String,
+        replacement: String,
+        #[serde(default)]
+        match_case: bool,
+        #[serde(default)]
+        whole_word: bool,
+        #[serde(default)]
+        wildcards: bool,
+    },
+    /// Excel's Replace All over the formula text (see [`crate::XlsxFind`]; `look_in` is
+    /// ignored, replace always works on formulas). One undo step.
+    XlsxReplaceAll {
+        find: crate::XlsxFind,
+        replacement: String,
+    },
+    /// Pastes a block of cell entries (typed text, `=` for formulas, empty to clear) with its
+    /// top-left cell at `row`, `col`. One undo step.
+    XlsxPaste {
+        sheet: usize,
+        row: u32,
+        col: u32,
+        rows: Vec<Vec<String>>,
+    },
     XlsxSetCellValue {
         sheet: usize,
         row: u32,
@@ -116,7 +143,8 @@ pub enum Command {
         formula: String,
     },
     /// Sets the stored width of columns `first..=last` (1-based, inclusive) in characters of
-    /// the default font, cell padding included: 0..=255, as Excel allows.
+    /// the default font, cell padding included: 0 up to 255 characters plus the padding (about 255.78), as
+    /// Excel allows: its cap counts the padding (2302 px for 9 px digits).
     SetColumnWidth {
         sheet: usize,
         first: u32,
@@ -129,6 +157,36 @@ pub enum Command {
         first: u32,
         last: u32,
         points: f64,
+    },
+    /// Inserts `count` blank rows before row `at` (1-based) of a worksheet, as Excel's Insert does:
+    /// cells at and below move down, formulas anywhere in the workbook that point at the sheet are
+    /// rewritten, ranges that span the insertion point grow.
+    InsertRows {
+        sheet: usize,
+        at: u32,
+        #[serde(default = "one")]
+        count: u32,
+    },
+    /// Deletes rows `at..at+count`. References to deleted cells become `#REF!`; ranges shrink.
+    DeleteRows {
+        sheet: usize,
+        at: u32,
+        #[serde(default = "one")]
+        count: u32,
+    },
+    /// Inserts `count` blank columns before column `at` (1-based).
+    InsertColumns {
+        sheet: usize,
+        at: u32,
+        #[serde(default = "one")]
+        count: u32,
+    },
+    /// Deletes columns `at..at+count`.
+    DeleteColumns {
+        sheet: usize,
+        at: u32,
+        #[serde(default = "one")]
+        count: u32,
     },
     /// Hides columns `first..=last`; their stored widths are kept (Excel's `Hidden = True`).
     HideColumns {
@@ -204,10 +262,17 @@ impl Command {
             Self::DocxSetParagraphStyle { .. } => "docx_set_paragraph_style",
             Self::DocxSetAlignment { .. } => "docx_set_alignment",
             Self::DocxReplaceRange { .. } => "docx_replace_range",
+            Self::DocxReplaceAll { .. } => "docx_replace_all",
+            Self::XlsxReplaceAll { .. } => "xlsx_replace_all",
+            Self::XlsxPaste { .. } => "xlsx_paste",
             Self::XlsxSetCellValue { .. } => "xlsx_set_cell_value",
             Self::XlsxSetCellFormula { .. } => "xlsx_set_cell_formula",
             Self::SetColumnWidth { .. } => "set_column_width",
             Self::SetRowHeight { .. } => "set_row_height",
+            Self::InsertRows { .. } => "insert_rows",
+            Self::DeleteRows { .. } => "delete_rows",
+            Self::InsertColumns { .. } => "insert_columns",
+            Self::DeleteColumns { .. } => "delete_columns",
             Self::HideColumns { .. } => "hide_columns",
             Self::UnhideColumns { .. } => "unhide_columns",
             Self::HideRows { .. } => "hide_rows",
@@ -218,7 +283,7 @@ impl Command {
     }
 
     /// The effect class. Formatting and insertion are `Edit`; deleting or replacing a
-    /// non-empty range is `Destructive`. `Save` is `Export` when it writes a path other
+    /// non-empty range, and deleting rows or columns, is `Destructive`. `Save` is `Export` when it writes a path other
     /// than `current_path` (the file the document was opened from or last saved to, or
     /// none for an unsaved document), and `Edit` when it overwrites that file.
     pub fn effect(&self, current_path: Option<&Path>) -> EffectClass {
@@ -230,9 +295,15 @@ impl Command {
             {
                 EffectClass::Destructive
             }
+            Self::DocxReplaceAll { .. } | Self::XlsxReplaceAll { .. } => EffectClass::Destructive,
+            Self::DeleteRows { .. } | Self::DeleteColumns { .. } => EffectClass::Destructive,
             _ => EffectClass::Edit,
         }
     }
+}
+
+fn one() -> u32 {
+    1
 }
 
 /// A spreadsheet cell address.
@@ -258,6 +329,9 @@ pub struct Outcome {
     /// Content the edit removed besides plain text (drawings, fields, section breaks).
     #[serde(default)]
     pub notes: Vec<String>,
+    /// Set by the replace-all commands: how many replacements were made.
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub replaced: usize,
 }
 
 fn is_zero(n: &usize) -> bool {

@@ -1,0 +1,12 @@
+{
+  "source": "fixtures/xlsx/chart-pie.xlsx",
+  "oracle": "Microsoft Excel via COM, points, origin at the chart area top left",
+  "excel_build": "20430",
+  "object": {"width":384,"height":259.20001220703125},
+  "chart_area": {"width":379,"height":254.2},
+  "plot_inside": {"left":73.97425196850394,"top":52.23905511811024,"width":177.69692913385828,"height":177.69692913385828},
+  "plot_outer": {"left":73.97425196850394,"top":52.23905511811024,"width":177.69692913385828,"height":177.69692913385828},
+  "legend": {"left":329.64535433070864,"top":95.88023622047244,"width":44.35464566929134,"height":90.41456692913385},
+  "title": {"left":163.8424409448819,"top":2,"width":48.31503937007874,"height":24.97503937007874},
+  "value_axis": null
+}

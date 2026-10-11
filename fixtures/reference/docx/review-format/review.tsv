@@ -1,0 +1,29 @@
+rev	0	SectionProperty	Reviewer A	Plain bold now\rCentred now\rCell one\r\u0007Cell two\r\u0007\r\u0007After table
+rev	1	Property	Reviewer A	bold now
+rev	2	ParagraphProperty	Reviewer B	Centred now
+markup	0	Plain bold now
+markup	1	Centred now
+markup	2	Cell one
+markup	3	Cell two
+markup	4	After table
+final	0	Plain bold now
+final	1	Centred now
+final	2	Cell one
+final	3	Cell two
+final	4	After table
+accept	0	Plain bold now	0
+accept	1	Centred now	1
+accept	2	Cell one	0
+accept	3	Cell two	0
+accept	4	After table	0
+reject	0	Plain bold now	0
+reject	1	Centred now	0
+reject	2	Cell one	0
+reject	3	Cell two	0
+reject	4	After table	0
+accept1	0	Plain bold now\u241eCentred now\u241eCell one\u241eCell two\u241eAfter table
+reject1	0	Plain bold now\u241eCentred now\u241eCell one\u241eCell two\u241eAfter table
+accept1	1	Plain bold now\u241eCentred now\u241eCell one\u241eCell two\u241eAfter table
+reject1	1	Plain bold now\u241eCentred now\u241eCell one\u241eCell two\u241eAfter table
+accept1	2	Plain bold now\u241eCentred now\u241eCell one\u241eCell two\u241eAfter table
+reject1	2	Plain bold now\u241eCentred now\u241eCell one\u241eCell two\u241eAfter table
