@@ -1,9 +1,13 @@
 //! Worksheet function registry and shared argument helpers.
 
 mod arith;
+mod complex;
 mod criteria;
+mod database;
 mod datecalc;
 mod datetime;
+mod dynarray;
+mod engineering;
 mod finance;
 mod info;
 mod letters;
@@ -254,6 +258,74 @@ static TABLE: &[(&str, Func)] = &[
     ("MATCH", Func::Res(lookup::match_)),
     ("XLOOKUP", Func::Res(lookup::xlookup)),
     ("CHOOSE", Func::Arg(lookup::choose)),
+    // engineering
+    ("BIN2DEC", Func::Res(engineering::bin2dec)),
+    ("BIN2OCT", Func::Res(engineering::bin2oct)),
+    ("BIN2HEX", Func::Res(engineering::bin2hex)),
+    ("OCT2BIN", Func::Res(engineering::oct2bin)),
+    ("OCT2DEC", Func::Res(engineering::oct2dec)),
+    ("OCT2HEX", Func::Res(engineering::oct2hex)),
+    ("HEX2BIN", Func::Res(engineering::hex2bin)),
+    ("HEX2DEC", Func::Res(engineering::hex2dec)),
+    ("HEX2OCT", Func::Res(engineering::hex2oct)),
+    ("DEC2BIN", Func::Res(engineering::dec2bin)),
+    ("DEC2OCT", Func::Res(engineering::dec2oct)),
+    ("DEC2HEX", Func::Res(engineering::dec2hex)),
+    ("BITAND", Func::Res(engineering::bitand)),
+    ("BITOR", Func::Res(engineering::bitor)),
+    ("BITXOR", Func::Res(engineering::bitxor)),
+    ("BITLSHIFT", Func::Res(engineering::bitlshift)),
+    ("BITRSHIFT", Func::Res(engineering::bitrshift)),
+    ("DELTA", Func::Res(engineering::delta)),
+    ("GESTEP", Func::Res(engineering::gestep)),
+    ("COMPLEX", Func::Res(complex::complex)),
+    ("IMREAL", Func::Res(complex::imreal)),
+    ("IMAGINARY", Func::Res(complex::imaginary)),
+    ("IMARGUMENT", Func::Res(complex::imargument)),
+    ("IMCONJUGATE", Func::Res(complex::imconjugate)),
+    ("IMEXP", Func::Res(complex::imexp)),
+    ("IMLN", Func::Res(complex::imln)),
+    ("IMLOG10", Func::Res(complex::imlog10)),
+    ("IMLOG2", Func::Res(complex::imlog2)),
+    ("IMSIN", Func::Res(complex::imsin)),
+    ("IMCOS", Func::Res(complex::imcos)),
+    ("IMSINH", Func::Res(complex::imsinh)),
+    ("IMCOSH", Func::Res(complex::imcosh)),
+    ("IMSUB", Func::Res(complex::imsub)),
+    ("IMDIV", Func::Res(complex::imdiv)),
+    ("IMSUM", Func::Res(complex::imsum)),
+    ("IMPRODUCT", Func::Res(complex::improduct)),
+    ("SEQUENCE", Func::Res(dynarray::sequence)),
+    ("TRANSPOSE", Func::Res(dynarray::transpose)),
+    ("SORT", Func::Res(dynarray::sort)),
+    ("SORTBY", Func::Res(dynarray::sortby)),
+    ("UNIQUE", Func::Res(dynarray::unique)),
+    ("FILTER", Func::Res(dynarray::filter)),
+    ("TAKE", Func::Res(dynarray::take)),
+    ("DROP", Func::Res(dynarray::drop)),
+    ("CHOOSECOLS", Func::Res(dynarray::choosecols)),
+    ("CHOOSEROWS", Func::Res(dynarray::chooserows)),
+    ("EXPAND", Func::Res(dynarray::expand)),
+    ("HSTACK", Func::Res(dynarray::hstack)),
+    ("VSTACK", Func::Res(dynarray::vstack)),
+    ("TOCOL", Func::Res(dynarray::tocol)),
+    ("TOROW", Func::Res(dynarray::torow)),
+    ("WRAPCOLS", Func::Res(dynarray::wrapcols)),
+    ("WRAPROWS", Func::Res(dynarray::wraprows)),
+    ("AREAS", Func::Res(dynarray::areas)),
+    ("HYPERLINK", Func::Res(dynarray::hyperlink)),
+    ("DSUM", Func::Res(database::dsum)),
+    ("DAVERAGE", Func::Res(database::daverage)),
+    ("DCOUNT", Func::Res(database::dcount)),
+    ("DCOUNTA", Func::Res(database::dcounta)),
+    ("DGET", Func::Res(database::dget)),
+    ("DMAX", Func::Res(database::dmax)),
+    ("DMIN", Func::Res(database::dmin)),
+    ("DPRODUCT", Func::Res(database::dproduct)),
+    ("DSTDEV", Func::Res(database::dstdev)),
+    ("DSTDEVP", Func::Res(database::dstdevp)),
+    ("DVAR", Func::Res(database::dvar)),
+    ("DVARP", Func::Res(database::dvarp)),
     // date and time
     ("DATE", Func::Res(datetime::date)),
     ("YEAR", Func::Res(datetime::year)),
@@ -307,15 +379,54 @@ pub(crate) fn is_array_param(name: &str, index: usize) -> bool {
     } else if name.eq_ignore_ascii_case("ROWS") || name.eq_ignore_ascii_case("COLUMNS") {
         true
     } else {
-        name.eq_ignore_ascii_case("SUMPRODUCT")
+        [
+            "SUMPRODUCT",
+            "SORT",
+            "SORTBY",
+            "UNIQUE",
+            "FILTER",
+            "TAKE",
+            "DROP",
+            "CHOOSECOLS",
+            "CHOOSEROWS",
+            "EXPAND",
+            "HSTACK",
+            "VSTACK",
+            "TOCOL",
+            "TOROW",
+            "WRAPCOLS",
+            "WRAPROWS",
+            "DSUM",
+            "DAVERAGE",
+            "DCOUNT",
+            "DCOUNTA",
+            "DGET",
+            "DMAX",
+            "DMIN",
+            "DPRODUCT",
+            "DSTDEV",
+            "DSTDEVP",
+            "DVAR",
+            "DVARP",
+        ]
+        .iter()
+        .any(|f| name.eq_ignore_ascii_case(f))
     }
 }
 
 /// Functions that take a reference: a literal reference to a missing sheet is still a reference for them.
 pub(crate) fn takes_reference(name: &str) -> bool {
-    ["ROW", "COLUMN", "ROWS", "COLUMNS", "ISREF", "ISFORMULA"]
-        .iter()
-        .any(|n| n.eq_ignore_ascii_case(name))
+    [
+        "ROW",
+        "COLUMN",
+        "ROWS",
+        "COLUMNS",
+        "ISREF",
+        "ISFORMULA",
+        "AREAS",
+    ]
+    .iter()
+    .any(|n| n.eq_ignore_ascii_case(name))
 }
 
 /// Functions that return a whole array for a multi-cell reference only where Excel evaluates arrays.
@@ -614,6 +725,40 @@ static LIFTING: &[(&str, Lifting)] = &[
     ("TEXTAFTER", lift(only_first)),
     ("VALUETOTEXT", ALWAYS),
     ("ADDRESS", ALWAYS),
+    ("COMPLEX", ALWAYS),
+    ("IMREAL", ALWAYS),
+    ("IMAGINARY", ALWAYS),
+    ("IMARGUMENT", ALWAYS),
+    ("IMCONJUGATE", ALWAYS),
+    ("IMEXP", ALWAYS),
+    ("IMLN", ALWAYS),
+    ("IMLOG10", ALWAYS),
+    ("IMLOG2", ALWAYS),
+    ("IMSIN", ALWAYS),
+    ("IMCOS", ALWAYS),
+    ("IMSINH", ALWAYS),
+    ("IMCOSH", ALWAYS),
+    ("IMSUB", ALWAYS),
+    ("IMDIV", ALWAYS),
+    ("BIN2DEC", ALWAYS),
+    ("BIN2OCT", ALWAYS),
+    ("BIN2HEX", ALWAYS),
+    ("OCT2BIN", ALWAYS),
+    ("OCT2DEC", ALWAYS),
+    ("OCT2HEX", ALWAYS),
+    ("HEX2BIN", ALWAYS),
+    ("HEX2DEC", ALWAYS),
+    ("HEX2OCT", ALWAYS),
+    ("DEC2BIN", ALWAYS),
+    ("DEC2OCT", ALWAYS),
+    ("DEC2HEX", ALWAYS),
+    ("BITAND", ALWAYS),
+    ("BITOR", ALWAYS),
+    ("BITXOR", ALWAYS),
+    ("BITLSHIFT", ALWAYS),
+    ("BITRSHIFT", ALWAYS),
+    ("DELTA", ALWAYS),
+    ("GESTEP", ALWAYS),
 ];
 
 fn lifting_table() -> &'static HashMap<String, Lifting> {

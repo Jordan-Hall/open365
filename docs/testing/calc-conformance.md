@@ -5,7 +5,7 @@ never needs Excel.
 
 | File | Role |
 |---|---|
-| `fixtures/calc/conformance.json` | The corpus: 33,165 cases. Edited by hand or by script; one case per line. |
+| `fixtures/calc/conformance.json` | The corpus: 50,620 cases. Edited by hand or by script; one case per line. |
 | `tools/office/calc-oracle.ps1` | Local-only tool. Runs every case in Excel over COM and writes the results. |
 | `fixtures/reference/calc/conformance-results.json` | Excel's answers, committed. Includes Excel version, build and decimal separator. |
 | `fixtures/calc/known-differences.toml` | Cases where Open365 intentionally or temporarily differs, each with a reason. |
@@ -66,7 +66,7 @@ forms; the corpus has no case for them.
 
 ## Current state
 
-33,165 cases, 33,007 pass, 158 known differences listed in `known-differences.toml` (44 older ones, 44 from the `mathfit_` probes and 70 from the second math batch).
+50,620 cases, 50,414 pass, 206 known differences listed in `known-differences.toml` (158 older ones and 48 from the third batch).
 Older entries: the `**` parse quirk, XLOOKUP array results (no spill), a
 few undocumented Excel quirks, large COMBIN, variance accumulation order, accounting fill, `DB` last period and two `IFERROR`
 over arrays of references. New entries: SINH/TANH below |x| = 1 (last digits) and one `x^-5000` case. The test also fails for a
@@ -290,3 +290,20 @@ cells hold full-precision doubles, generator `gen_mathfit.py` kept outside the r
   reference per element when evaluated in array mode (inside `SUMPRODUCT`, `N`, or two function calls deep). Per-function
   behaviour is in `functions::refs_mode`.
 * `CONCAT`/`TEXTJOIN` past 32,767 characters give `#CALC!`.
+
+Third batch (engineering, database, dynamic arrays; groups `bin2dec` ... `gestep`, `complex`, `im*`, `d*`, `sequence`, `sort`, ...):
+dynamic-array results are compared through `ARRAYTOTEXT(f,1)` because the oracle uses `Range.Formula` (no spill).
+
+* Base conversions: 10 digit two's complement (BIN 10 bits, OCT 30, HEX 40); a number argument is read as its text; `places` is coerced before the digits
+  are checked; for `DEC2x` the places range (1 to 10) is checked before the number is even coerced (`DEC2BIN("abc",0)` is `#NUM!`). Negative results ignore places.
+* Bit functions accept booleans and omitted arguments (as 0), coerce both arguments before range checks, limit 2^48. `BITLSHIFT(x,52)` and `(x,53)` are 0, a zero operand is 0
+  for any shift, `|shift| > 53` is `#NUM!`.
+* Complex text: the whole text may be a plain number (`1,000`, `3%`, `(3)`); otherwise it ends in lower case `i`/`j`, spaces are allowed around the parts, the imaginary
+  part may carry two signs (`3--4i` is `3+4i`), a bare `+`/`-` before the suffix is a coefficient of 1. Suffixes must agree (`#VALUE!`, `#NUM!` for IMSUB/IMDIV); components print with 15
+  digits, positional up to 21 characters. The trigonometric core uses the same 64-bit pi reduction as `SIN`/`COS`. Booleans are `#VALUE!`; an omitted argument is `#N/A`.
+* Database functions: plain text criteria match the start of the cell, numbers and `=`/operator text are exact; a text criteria header that names no field matches nothing
+  (a numeric header is ignored); a header-only criteria range or one-row database is `#VALUE!`; field `TRUE` means column 1; errors in matching field cells propagate;
+  DGET ignores records whose field is blank; DSTDEV/DVAR use `(sum x^2 - (sum x)^2/n)/(n-1)`, the population forms `(n sum x^2 - (sum x)^2)/n^2`. Formula criteria (re-evaluated per record by Excel) are not supported.
+* Array functions: `TRANSPOSE` takes the implicit intersection of a reference; `SEQUENCE` rows or columns below 0 or above the sheet are `#VALUE!`, 0 is `#CALC!`; `SORTBY` with four
+  or six arguments is refused; index arguments of CHOOSECOLS/ROWS are scalar parameters (a 2-D array or a multi-cell reference is `#VALUE!`); HSTACK/VSTACK with an omitted argument is `#VALUE!`;
+  `HYPERLINK` without a friendly name returns the link as text, with an omitted one 0.

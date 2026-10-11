@@ -212,7 +212,7 @@ fn variance(ctx: &EvalContext<'_>, args: &[Arg], sample: bool, root: bool) -> Re
     variance_of(&collect(ctx, args)?, sample, root)
 }
 
-fn variance_of(nums: &[f64], sample: bool, root: bool) -> Res<Value> {
+pub(super) fn variance_of(nums: &[f64], sample: bool, root: bool) -> Res<Value> {
     let n = nums.len() as f64;
     if nums.len() < usize::from(sample) + 1 {
         return Err(ErrorKind::DivZero);

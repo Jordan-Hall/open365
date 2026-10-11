@@ -636,3 +636,195 @@ reason = "SECH: one case differs in the last digit (1/COSH, x = 8.4); cause unkn
 [[difference]]
 id = "fn_seriessum.t068"
 reason = "SERIESSUM: the last digit of a six-term sum differs; Excel evaluates the powers or the summation in another order."
+
+[[difference]]
+id = "imexp.c0017"
+reason = "Complex transcendental result differs from Excel in the 15th significant digit (Excel's internal sequence of exp/ln/sin/cos roundings is not identified)."
+
+[[difference]]
+id = "imexp.c0039"
+reason = "Complex transcendental result differs from Excel in the 15th significant digit (Excel's internal sequence of exp/ln/sin/cos roundings is not identified)."
+
+[[difference]]
+id = "imexp.c0065"
+reason = "Complex transcendental result differs from Excel in the 15th significant digit (Excel's internal sequence of exp/ln/sin/cos roundings is not identified)."
+
+[[difference]]
+id = "imln.c0038"
+reason = "Complex transcendental result differs from Excel in the 15th significant digit (Excel's internal sequence of exp/ln/sin/cos roundings is not identified)."
+
+[[difference]]
+id = "imlog10.c0038"
+reason = "Complex transcendental result differs from Excel in the 15th significant digit (Excel's internal sequence of exp/ln/sin/cos roundings is not identified)."
+
+[[difference]]
+id = "imlog10.c0074"
+reason = "Complex transcendental result differs from Excel in the 15th significant digit (Excel's internal sequence of exp/ln/sin/cos roundings is not identified)."
+
+[[difference]]
+id = "imlog10.c0102"
+reason = "Complex transcendental result differs from Excel in the 15th significant digit (Excel's internal sequence of exp/ln/sin/cos roundings is not identified)."
+
+[[difference]]
+id = "imlog2.c0038"
+reason = "Complex transcendental result differs from Excel in the 15th significant digit (Excel's internal sequence of exp/ln/sin/cos roundings is not identified)."
+
+[[difference]]
+id = "imlog2.c0062"
+reason = "Complex transcendental result differs from Excel in the 15th significant digit (Excel's internal sequence of exp/ln/sin/cos roundings is not identified)."
+
+[[difference]]
+id = "imlog2.c0063"
+reason = "Complex transcendental result differs from Excel in the 15th significant digit (Excel's internal sequence of exp/ln/sin/cos roundings is not identified)."
+
+[[difference]]
+id = "imlog2.c0081"
+reason = "Complex transcendental result differs from Excel in the 15th significant digit (Excel's internal sequence of exp/ln/sin/cos roundings is not identified)."
+
+[[difference]]
+id = "imlog2.c0088"
+reason = "Complex transcendental result differs from Excel in the 15th significant digit (Excel's internal sequence of exp/ln/sin/cos roundings is not identified)."
+
+[[difference]]
+id = "imlog2.c0093"
+reason = "Complex transcendental result differs from Excel in the 15th significant digit (Excel's internal sequence of exp/ln/sin/cos roundings is not identified)."
+
+[[difference]]
+id = "imlog2.c0104"
+reason = "Complex transcendental result differs from Excel in the 15th significant digit (Excel's internal sequence of exp/ln/sin/cos roundings is not identified)."
+
+[[difference]]
+id = "imlog2.c0118"
+reason = "Complex transcendental result differs from Excel in the 15th significant digit (Excel's internal sequence of exp/ln/sin/cos roundings is not identified)."
+
+[[difference]]
+id = "imsin.c0011"
+reason = "Complex transcendental result differs from Excel in the 15th significant digit (Excel's internal sequence of exp/ln/sin/cos roundings is not identified)."
+
+[[difference]]
+id = "imsin.c0017"
+reason = "Complex transcendental result differs from Excel in the 15th significant digit (Excel's internal sequence of exp/ln/sin/cos roundings is not identified)."
+
+[[difference]]
+id = "imsin.c0038"
+reason = "Complex transcendental result differs from Excel in the 15th significant digit (Excel's internal sequence of exp/ln/sin/cos roundings is not identified)."
+
+[[difference]]
+id = "imsin.c0039"
+reason = "Complex transcendental result differs from Excel in the 15th significant digit (Excel's internal sequence of exp/ln/sin/cos roundings is not identified)."
+
+[[difference]]
+id = "imsin.c0065"
+reason = "Complex transcendental result differs from Excel in the 15th significant digit (Excel's internal sequence of exp/ln/sin/cos roundings is not identified)."
+
+[[difference]]
+id = "imsin.c0071"
+reason = "Complex transcendental result differs from Excel in the 15th significant digit (Excel's internal sequence of exp/ln/sin/cos roundings is not identified)."
+
+[[difference]]
+id = "imsin.c0073"
+reason = "Complex transcendental result differs from Excel in the 15th significant digit (Excel's internal sequence of exp/ln/sin/cos roundings is not identified)."
+
+[[difference]]
+id = "imsin.c0118"
+reason = "Complex transcendental result differs from Excel in the 15th significant digit (Excel's internal sequence of exp/ln/sin/cos roundings is not identified)."
+
+[[difference]]
+id = "imcos.c0039"
+reason = "Complex transcendental result differs from Excel in the 15th significant digit (Excel's internal sequence of exp/ln/sin/cos roundings is not identified)."
+
+[[difference]]
+id = "imcos.c0065"
+reason = "Complex transcendental result differs from Excel in the 15th significant digit (Excel's internal sequence of exp/ln/sin/cos roundings is not identified)."
+
+[[difference]]
+id = "imcos.c0071"
+reason = "Complex transcendental result differs from Excel in the 15th significant digit (Excel's internal sequence of exp/ln/sin/cos roundings is not identified)."
+
+[[difference]]
+id = "imcos.c0073"
+reason = "Complex transcendental result differs from Excel in the 15th significant digit (Excel's internal sequence of exp/ln/sin/cos roundings is not identified)."
+
+[[difference]]
+id = "imcos.c0083"
+reason = "Complex transcendental result differs from Excel in the 15th significant digit (Excel's internal sequence of exp/ln/sin/cos roundings is not identified)."
+
+[[difference]]
+id = "imcos.c0089"
+reason = "Complex transcendental result differs from Excel in the 15th significant digit (Excel's internal sequence of exp/ln/sin/cos roundings is not identified)."
+
+[[difference]]
+id = "imcos.c0118"
+reason = "Complex transcendental result differs from Excel in the 15th significant digit (Excel's internal sequence of exp/ln/sin/cos roundings is not identified)."
+
+[[difference]]
+id = "imsinh.c0084"
+reason = "Complex transcendental result differs from Excel in the 15th significant digit (Excel's internal sequence of exp/ln/sin/cos roundings is not identified)."
+
+[[difference]]
+id = "imcosh.c0096"
+reason = "Complex transcendental result differs from Excel in the 15th significant digit (Excel's internal sequence of exp/ln/sin/cos roundings is not identified)."
+
+[[difference]]
+id = "imdiv.c0365"
+reason = "IMDIV: Excel's division formula rounds differently in the 15th digit for some operands; the exact scaling is not identified."
+
+[[difference]]
+id = "imdiv.c0372"
+reason = "IMDIV: Excel's division formula rounds differently in the 15th digit for some operands; the exact scaling is not identified."
+
+[[difference]]
+id = "imdiv.c0380"
+reason = "IMDIV: Excel's division formula rounds differently in the 15th digit for some operands; the exact scaling is not identified."
+
+[[difference]]
+id = "imdiv.c0385"
+reason = "IMDIV: Excel's division formula rounds differently in the 15th digit for some operands; the exact scaling is not identified."
+
+[[difference]]
+id = "imsum.c0425"
+reason = "Excel skips a boolean cell inside an IMSUM/IMPRODUCT range and continues; Open365 returns #NUM! for the range."
+
+[[difference]]
+id = "improduct.c0425"
+reason = "Excel skips a boolean cell inside an IMSUM/IMPRODUCT range and continues; Open365 returns #NUM! for the range."
+
+[[difference]]
+id = "dstdev.c0130"
+reason = "Database variance/standard deviation with heavy cancellation: Excel's accumulation order is not identified (sum-of-squares form matches 20 of 26 variance groups; two-pass matches others); result differs in the last 5 to 12 digits."
+
+[[difference]]
+id = "dstdev.c0272"
+reason = "Database variance/standard deviation with heavy cancellation: Excel's accumulation order is not identified (sum-of-squares form matches 20 of 26 variance groups; two-pass matches others); result differs in the last 5 to 12 digits."
+
+[[difference]]
+id = "dstdev.c0366"
+reason = "Database variance/standard deviation with heavy cancellation: Excel's accumulation order is not identified (sum-of-squares form matches 20 of 26 variance groups; two-pass matches others); result differs in the last 5 to 12 digits."
+
+[[difference]]
+id = "dstdevp.c0366"
+reason = "Database variance/standard deviation with heavy cancellation: Excel's accumulation order is not identified (sum-of-squares form matches 20 of 26 variance groups; two-pass matches others); result differs in the last 5 to 12 digits."
+
+[[difference]]
+id = "dvar.c0130"
+reason = "Database variance/standard deviation with heavy cancellation: Excel's accumulation order is not identified (sum-of-squares form matches 20 of 26 variance groups; two-pass matches others); result differs in the last 5 to 12 digits."
+
+[[difference]]
+id = "dvar.c0272"
+reason = "Database variance/standard deviation with heavy cancellation: Excel's accumulation order is not identified (sum-of-squares form matches 20 of 26 variance groups; two-pass matches others); result differs in the last 5 to 12 digits."
+
+[[difference]]
+id = "dvar.c0366"
+reason = "Database variance/standard deviation with heavy cancellation: Excel's accumulation order is not identified (sum-of-squares form matches 20 of 26 variance groups; two-pass matches others); result differs in the last 5 to 12 digits."
+
+[[difference]]
+id = "dvarp.c0366"
+reason = "Database variance/standard deviation with heavy cancellation: Excel's accumulation order is not identified (sum-of-squares form matches 20 of 26 variance groups; two-pass matches others); result differs in the last 5 to 12 digits."
+
+[[difference]]
+id = "unique.c0287"
+reason = "ARRAYTOTEXT of a one-element array holding an error: Excel prints {#VALUE!}, Open365 returns the error itself."
+
+[[difference]]
+id = "areas.c0024"
+reason = "AREAS of a lookup result: Excel's XLOOKUP returns a reference (area count 1); Open365 returns a value."
