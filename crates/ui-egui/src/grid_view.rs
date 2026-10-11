@@ -36,16 +36,17 @@ use egui::{
 };
 use open365_calc::Value;
 use open365_calc::numfmt::{builtin_format_code, format_value};
-use open365_commands::{CellEntry, Command, Target};
+use open365_commands::{CellEntry, CfEffect, Command, ConditionalFormats, Target};
 use open365_xlsx::{
-    Border, BorderEdge, BorderStyle, Cell, CellFormat, CellValue, Color, ColorSource, Fill,
-    FillPattern, FrozenPanes, GridMetrics, HorizontalAlignment, MAX_COL, MAX_ROW, SheetGeometry,
-    SheetKind, SheetState, Styles, Underline, VerticalAlignment, Workbook, Worksheet, col_letters,
-    format_number,
+    Border, BorderEdge, BorderStyle, Cell, CellFormat, CellValue, Color, ColorSource, DxfFont,
+    Fill, FillPattern, FrozenPanes, GridMetrics, HorizontalAlignment, MAX_COL, MAX_ROW,
+    SheetGeometry, SheetKind, SheetState, Styles, Underline, VerticalAlignment, Workbook,
+    Worksheet, col_letters, format_number,
 };
 
 use crate::a11y;
 use crate::fonts::{Face, FontBook};
+use crate::grid_cf::{ICON_SLOT_PX, paint_data_bar, paint_icon};
 use crate::grid_text::{
     HintCache, HintedFace, NumberText, TEXT_INSET_PX, color32, effective_horizontal, fill_text,
     fit_number, is_numeric, line_px, overflow_room,
@@ -302,6 +303,26 @@ pub enum Resize {
     },
 }
 
+/// The context menu of a column or row header (or the corner), open at `pos`.
+#[derive(Debug, Clone, Copy)]
+struct HeaderMenu {
+    header: Header,
+    pos: Pos2,
+    /// Frame the menu opened in: the press that opened it must not close it.
+    opened: u64,
+}
+
+/// The Column Width or Row Height dialog.
+#[derive(Debug, Clone)]
+struct SizeDialog {
+    cols: bool,
+    first: u32,
+    last: u32,
+    text: String,
+    error: bool,
+    fresh: bool,
+}
+
 /// A header border being dragged.
 #[derive(Debug, Clone, Copy)]
 struct ResizeDrag {
@@ -433,6 +454,10 @@ impl View<'_> {
                 return Some(Header::Col(col));
             }
             if (pos.x - self.edge_x(col, shift)).abs() <= GRAB && col > 1 {
+                // Hidden columns before this one: the border is theirs (drag to show them).
+                if self.layout.geo.col_hidden(col - 1) {
+                    return Some(Header::Col(col - 1));
+                }
                 let prev = self.layout.next_visible(false, col, -1, MAX_COL);
                 if prev != col {
                     return Some(Header::Col(prev));
@@ -448,6 +473,9 @@ impl View<'_> {
                 return Some(Header::Row(row));
             }
             if (pos.y - self.edge_y(row, shift)).abs() <= GRAB && row > 1 {
+                if self.layout.geo.row_hidden(row - 1) {
+                    return Some(Header::Row(row - 1));
+                }
                 let prev = self.layout.next_visible(true, row, -1, MAX_ROW);
                 if prev != row {
                     return Some(Header::Row(prev));
@@ -531,6 +559,8 @@ pub struct GridView {
     return_col: Option<u32>,
     resize_drag: Option<ResizeDrag>,
     resizes: Vec<Resize>,
+    menu: Option<HeaderMenu>,
+    dialog: Option<SizeDialog>,
     want_focus: bool,
     grid_id: Id,
     formula_id: Id,
@@ -547,6 +577,11 @@ pub struct GridView {
     /// The application syncs a shared font book; a grid with its own syncs it itself.
     owns_fonts: bool,
     painted: RefCell<Vec<PaintedCell>>,
+    /// Conditional formats of the sheet being shown, rebuilt after any change to the cells.
+    cf: Option<(usize, Rc<ConditionalFormats>)>,
+    /// Date `TODAY()` and the time-period rules use as an Excel serial (tests); `None` is the
+    /// system clock.
+    cf_today: Option<f64>,
     /// Hinted glyph advances for the cell text decisions.
     hints: RefCell<HintCache>,
     /// Message for the status bar, taken by the application each frame.
@@ -574,7 +609,13 @@ fn format_code(wb: &Workbook, style: u32) -> &str {
 
 /// The text shown in a cell: its value through the cell's number format.
 fn display_text(wb: &Workbook, cell: &Cell) -> String {
-    let code = format_code(wb, cell.style.unwrap_or(0));
+    display_text_with(wb, cell, None)
+}
+
+/// [`display_text`] with a number format code that replaces the cell's own (a conditional
+/// format's `dxf` number format).
+fn display_text_with(wb: &Workbook, cell: &Cell, code: Option<&str>) -> String {
+    let code = code.unwrap_or_else(|| format_code(wb, cell.style.unwrap_or(0)));
     match &cell.value {
         CellValue::Empty => String::new(),
         CellValue::Number(n) => format_value(&Value::Number(*n), code, wb.date1904()),
@@ -631,6 +672,8 @@ impl GridView {
             return_col: None,
             resize_drag: None,
             resizes: Vec::new(),
+            menu: None,
+            dialog: None,
             want_focus: true,
             grid_id: Id::new("open365-grid-view"),
             formula_id: Id::new("open365-formula-bar"),
@@ -642,6 +685,8 @@ impl GridView {
             fonts: Rc::new(RefCell::new(FontBook::new())),
             owns_fonts: true,
             painted: RefCell::new(Vec::new()),
+            cf: None,
+            cf_today: None,
             hints: RefCell::new(HintCache::default()),
             status: None,
             last_frame_ms: 0.0,
@@ -698,6 +743,31 @@ impl GridView {
     /// heights (a resize command, undo, redo).
     pub fn invalidate_layout(&mut self) {
         self.layout = None;
+        self.cf = None;
+    }
+
+    /// Pins the date conditional formatting reads as today, as an Excel serial; `None` uses the
+    /// system clock.
+    pub fn set_cf_today(&mut self, serial: Option<f64>) {
+        self.cf_today = serial;
+        self.cf = None;
+    }
+
+    /// The conditional formats of the shown sheet, built on first use after a change. `None`
+    /// when the sheet has no rules.
+    fn cf_for(&mut self, wb: &Workbook) -> Option<Rc<ConditionalFormats>> {
+        if self
+            .cf
+            .as_ref()
+            .is_none_or(|(sheet, _)| *sheet != self.sheet)
+        {
+            let cf = ConditionalFormats::new(wb, self.sheet, self.cf_today);
+            self.cf = Some((self.sheet, Rc::new(cf)));
+        }
+        self.cf
+            .as_ref()
+            .map(|(_, cf)| Rc::clone(cf))
+            .filter(|cf| !cf.is_empty())
     }
 
     pub fn is_editing(&self) -> bool {
@@ -858,6 +928,7 @@ impl GridView {
             .xlsx()
             .is_some_and(|wb| Self::source_text(wb, self.sheet, row, col) == self.edit_text);
         if !unchanged {
+            self.cf = None;
             let command = Command::xlsx_enter(self.sheet, row, col, &self.edit_text);
             if let Err(e) = target.apply(command) {
                 self.status = Some(e.to_string());
@@ -1245,6 +1316,7 @@ impl GridView {
         let sheet = self.sheet;
         let Some(wb) = target.xlsx() else { return };
         let layout = self.layout_for(wb, ctx.pixels_per_point());
+        let cf = self.cf_for(wb);
         // The grid is the whole sheet, A1 to XFD1048576; only the visible part is built.
         let (rows_n, cols_n) = (MAX_ROW, MAX_COL);
         // Selecting any cell of a merge selects the merge, anchored at its top-left cell.
@@ -1320,6 +1392,7 @@ impl GridView {
         let mut resize_drag = self.resize_drag;
         let mut new_resizes: Vec<Resize> = Vec::new();
         let mut pressed = false;
+        let mut new_menu: Option<HeaderMenu> = None;
         let mut double_clicked = false;
         let mut visible = Visible::default();
 
@@ -1408,6 +1481,49 @@ impl GridView {
             };
             for event in events {
                 match event {
+                    Event::PointerButton {
+                        pos,
+                        button: PointerButton::Secondary,
+                        pressed: true,
+                        ..
+                    } if own_layer(pos) => {
+                        if let Some(header) = view.header_at(pos, limits) {
+                            pressed = true;
+                            press_on_header = true;
+                            let sel_cols = matches!(sel.reach, Reach::Cols | Reach::All)
+                                && (selection.1..=selection.3)
+                                    .contains(&header_index(header, true));
+                            let sel_rows = matches!(sel.reach, Reach::Rows | Reach::All)
+                                && (selection.0..=selection.2)
+                                    .contains(&header_index(header, false));
+                            // Like Excel: a header outside the selection selects first.
+                            match header {
+                                Header::Col(c) if !sel_cols => {
+                                    sel.active.1 = c;
+                                    sel.anchor = sel.active;
+                                    sel.extent = (sel.active.0, c);
+                                    sel.reach = Reach::Cols;
+                                }
+                                Header::Row(r) if !sel_rows => {
+                                    sel.active.0 = r;
+                                    sel.anchor = sel.active;
+                                    sel.extent = (r, sel.active.1);
+                                    sel.reach = Reach::Rows;
+                                }
+                                Header::Corner => {
+                                    sel.anchor = sel.active;
+                                    sel.extent = sel.active;
+                                    sel.reach = Reach::All;
+                                }
+                                _ => {}
+                            }
+                            new_menu = Some(HeaderMenu {
+                                header,
+                                pos,
+                                opened: ctx.cumulative_frame_nr(),
+                            });
+                        }
+                    }
                     Event::PointerButton {
                         pos,
                         button: PointerButton::Primary,
@@ -1622,6 +1738,7 @@ impl GridView {
                 log: &self.painted,
                 hints: &self.hints,
                 ppp,
+                cf: cf.as_deref(),
             };
             if let Some(border) = fit_border {
                 new_resizes.extend(autofit_request(
@@ -1672,6 +1789,9 @@ impl GridView {
         self.reach = sel.reach;
         self.resize_drag = resize_drag;
         self.press_on_header = press_on_header;
+        if new_menu.is_some() {
+            self.menu = new_menu;
+        }
         if pressed || moved {
             self.return_col = None;
             self.refocus_frame = Some(ctx.cumulative_frame_nr());
@@ -1696,6 +1816,8 @@ impl GridView {
             self.start_edit(&ctx, text);
         }
 
+        self.header_menu(&ctx, target);
+        self.size_dialog(&ctx, target, &layout);
         self.publish_accessibility(ui, target, &layout, (rows_n, cols_n));
         // After the cell widgets exist: a press elsewhere makes egui drop focus from them.
         if self
@@ -1707,7 +1829,247 @@ impl GridView {
         }
     }
 
+    /// The columns (`cols`) or rows a header command acts on: the selected ones when the header
+    /// is inside a whole-column or whole-row selection, the whole sheet for the corner, else
+    /// just that line.
+    fn header_range(&self, header: Header, cols: bool) -> (u32, u32) {
+        let s = self.selection();
+        let (lo, hi, max, reach_ok) = if cols {
+            (
+                s.1,
+                s.3,
+                MAX_COL,
+                matches!(self.reach, Reach::Cols | Reach::All),
+            )
+        } else {
+            (
+                s.0,
+                s.2,
+                MAX_ROW,
+                matches!(self.reach, Reach::Rows | Reach::All),
+            )
+        };
+        match header {
+            Header::Corner => (1, max),
+            h => {
+                let i = header_index(h, cols);
+                if reach_ok && (lo..=hi).contains(&i) {
+                    (lo, hi)
+                } else {
+                    (i, i)
+                }
+            }
+        }
+    }
+
+    /// Applies a header command through the command layer and reports the outcome.
+    fn apply_header_command(&mut self, target: &mut Target, command: Command, done: String) {
+        match target.apply(command) {
+            Ok(_) => {
+                self.layout = None;
+                self.cf = None;
+                self.status = Some(done);
+            }
+            Err(e) => self.status = Some(e.to_string()),
+        }
+    }
+
+    /// The right-click menu of a header: Hide, Unhide and the size dialog.
+    fn header_menu(&mut self, ctx: &Context, target: &mut Target) {
+        let Some(menu) = self.menu else { return };
+        let sheet = self.sheet;
+        let mut chosen: Option<&'static str> = None;
+        let items: &[&'static str] = match menu.header {
+            Header::Col(_) => &["Hide", "Unhide", "Column Width..."],
+            Header::Row(_) => &["Hide", "Unhide", "Row Height..."],
+            Header::Corner => &["Column Width...", "Row Height..."],
+        };
+        let area = egui::Area::new(Id::new("open365-header-menu"))
+            .order(egui::Order::Foreground)
+            .fixed_pos(menu.pos)
+            .show(ctx, |ui| {
+                egui::Frame::menu(ui.style()).show(ui, |ui| {
+                    ui.set_min_width(150.0);
+                    ui.with_layout(egui::Layout::top_down_justified(Align::LEFT), |ui| {
+                        for item in items {
+                            if ui.button(*item).clicked() {
+                                chosen = Some(item);
+                            }
+                        }
+                    });
+                });
+            });
+        let outside = ctx.input(|i| {
+            i.pointer.any_pressed()
+                && i.pointer
+                    .interact_pos()
+                    .is_some_and(|p| !area.response.rect.contains(p))
+        }) && ctx.cumulative_frame_nr() > menu.opened + 1;
+        let escape = ctx.input(|i| i.key_pressed(Key::Escape));
+        if chosen.is_some() || outside || escape {
+            self.menu = None;
+        }
+        let Some(item) = chosen else { return };
+        let header = menu.header;
+        match item {
+            "Hide" | "Unhide" => {
+                let cols = matches!(header, Header::Col(_));
+                let (first, last) = self.header_range(header, cols);
+                let what = if cols {
+                    columns_text(first, last)
+                } else {
+                    rows_text(first, last)
+                };
+                let (command, done) = match (item, cols) {
+                    ("Hide", true) => (
+                        Command::HideColumns { sheet, first, last },
+                        format!("Hid {what}"),
+                    ),
+                    ("Hide", false) => (
+                        Command::HideRows { sheet, first, last },
+                        format!("Hid {what}"),
+                    ),
+                    (_, true) => (
+                        Command::UnhideColumns {
+                            sheet,
+                            first,
+                            last,
+                            default_width: None,
+                        },
+                        format!("Unhid {what}"),
+                    ),
+                    (_, false) => (
+                        Command::UnhideRows { sheet, first, last },
+                        format!("Unhid {what}"),
+                    ),
+                };
+                self.apply_header_command(target, command, done);
+            }
+            _ => {
+                let cols = item == "Column Width...";
+                let (first, last) = self.header_range(header, cols);
+                self.dialog = Some(SizeDialog {
+                    cols,
+                    first,
+                    last,
+                    text: String::new(),
+                    error: false,
+                    fresh: true,
+                });
+            }
+        }
+    }
+
+    /// The Column Width and Row Height dialog: a number within Excel's limits, applied through
+    /// `SetColumnWidth` or `SetRowHeight`.
+    fn size_dialog(&mut self, ctx: &Context, target: &mut Target, layout: &SheetLayout) {
+        let Some(mut dialog) = self.dialog.take() else {
+            return;
+        };
+        let metrics = layout.geo.metrics();
+        let (title, label, max) = if dialog.cols {
+            ("Column Width", "Column width:", MAX_COL_WIDTH_CHARS)
+        } else {
+            ("Row Height", "Row height:", MAX_ROW_HEIGHT_PT)
+        };
+        if dialog.fresh && dialog.text.is_empty() {
+            // Show the size of the first line, as Excel does.
+            let current = if dialog.cols {
+                column_width_for_px(metrics, layout.geo.col_px(dialog.first))
+            } else {
+                row_points_for_px(metrics, layout.geo.row_px(dialog.first))
+            };
+            dialog.text = format_size(current);
+        }
+        let mut ok = false;
+        let mut cancel = false;
+        egui::Window::new(title)
+            .collapsible(false)
+            .resizable(false)
+            .anchor(egui::Align2::CENTER_CENTER, Vec2::ZERO)
+            .show(ctx, |ui| {
+                ui.horizontal(|ui| {
+                    ui.label(label);
+                    let edit = ui.add(
+                        TextEdit::singleline(&mut dialog.text)
+                            .id(Id::new("open365-size-dialog-input"))
+                            .desired_width(80.0),
+                    );
+                    if dialog.fresh {
+                        edit.request_focus();
+                        if let Some(mut state) = TextEditState::load(ctx, edit.id) {
+                            state
+                                .cursor
+                                .set_char_range(Some(egui::text::CCursorRange::two(
+                                    CCursor::new(0),
+                                    CCursor::new(dialog.text.chars().count()),
+                                )));
+                            state.store(ctx, edit.id);
+                        }
+                    }
+                    if edit.lost_focus() && ui.input(|i| i.key_pressed(Key::Enter)) {
+                        ok = true;
+                    }
+                });
+                if dialog.error {
+                    ui.colored_label(
+                        ui.visuals().error_fg_color,
+                        format!("Enter a number between 0 and {max}."),
+                    );
+                }
+                ui.horizontal(|ui| {
+                    ok |= ui.button("OK").clicked();
+                    cancel |= ui.button("Cancel").clicked();
+                });
+            });
+        dialog.fresh = false;
+        cancel |= ctx.input(|i| i.key_pressed(Key::Escape));
+        if cancel {
+            return;
+        }
+        if ok {
+            let value = dialog
+                .text
+                .trim()
+                .parse::<f64>()
+                .ok()
+                .filter(|v| v.is_finite() && (0.0..=max).contains(v));
+            let Some(value) = value else {
+                dialog.error = true;
+                self.dialog = Some(dialog);
+                return;
+            };
+            let sheet = self.sheet;
+            let (first, last) = (dialog.first, dialog.last);
+            let (command, done) = if dialog.cols {
+                (
+                    Command::SetColumnWidth {
+                        sheet,
+                        first,
+                        last,
+                        width: value,
+                    },
+                    format!("Width of {} set to {value}", columns_text(first, last)),
+                )
+            } else {
+                (
+                    Command::SetRowHeight {
+                        sheet,
+                        first,
+                        last,
+                        points: value,
+                    },
+                    format!("Height of {} set to {value} pt", rows_text(first, last)),
+                )
+            };
+            self.apply_header_command(target, command, done);
+            return;
+        }
+        self.dialog = Some(dialog);
+    }
+
     fn clear_selection(&mut self, target: &mut Target) {
+        self.cf = None;
         let (r1, c1, r2, c2) = self.selection();
         let mut cells: Vec<(u32, u32)> = target
             .xlsx()
@@ -2193,6 +2555,37 @@ fn resize_request(
     }
 }
 
+/// The column (`cols`) or row index a header stands for; the corner is 0.
+fn header_index(header: Header, cols: bool) -> u32 {
+    match (header, cols) {
+        (Header::Col(c), true) => c,
+        (Header::Row(r), false) => r,
+        _ => 0,
+    }
+}
+
+fn columns_text(first: u32, last: u32) -> String {
+    if first == last {
+        format!("column {}", col_letters(first))
+    } else {
+        format!("columns {}:{}", col_letters(first), col_letters(last))
+    }
+}
+
+fn rows_text(first: u32, last: u32) -> String {
+    if first == last {
+        format!("row {first}")
+    } else {
+        format!("rows {first}:{last}")
+    }
+}
+
+/// A size for the dialog: at most two decimals, none when whole.
+fn format_size(v: f64) -> String {
+    let t = format!("{v:.2}");
+    t.trim_end_matches('0').trim_end_matches('.').to_owned()
+}
+
 /// The stored column width (characters, cell padding included) that is `px` pixels wide.
 fn column_width_for_px(metrics: GridMetrics, px: u32) -> f64 {
     if px == 0 {
@@ -2593,6 +2986,18 @@ pub struct PaintedCell {
     /// The alignment after resolving General.
     pub horizontal: HorizontalAlignment,
     pub lines: usize,
+    /// The background after conditional formatting (`None` for the sheet background).
+    pub fill: Option<Color32>,
+    /// The text colour as drawn.
+    pub font_color: Color32,
+    pub bold: bool,
+    pub italic: bool,
+    pub strike: bool,
+    pub underline: bool,
+    /// Icon set name and icon index (0 = lowest band) drawn in the cell.
+    pub icon: Option<(String, usize)>,
+    /// Data bar length as a fraction `0.0..=1.0` of the value's position.
+    pub data_bar: Option<f64>,
 }
 
 /// Everything a painting pass needs besides the painter.
@@ -2605,6 +3010,8 @@ struct Paint<'a> {
     log: &'a RefCell<Vec<PaintedCell>>,
     hints: &'a RefCell<HintCache>,
     ppp: f32,
+    /// Conditional formats of the sheet, if it has any.
+    cf: Option<&'a ConditionalFormats>,
 }
 
 /// A cell to draw: its rectangle (the whole merge for a merged cell) and format.
@@ -2617,6 +3024,8 @@ struct Item<'a> {
     cell: &'a Cell,
     fmt: &'a CellFormat,
     merged: bool,
+    /// What conditional formatting does to the cell.
+    fx: Option<Arc<CfEffect>>,
 }
 
 /// Mixes the pattern colour into the background for a patterned fill.
@@ -2671,6 +3080,112 @@ fn text_color(styles: &Styles, c: &Color, pal: &Palette) -> Color32 {
         ColorSource::Auto => pal.text,
         ColorSource::Theme(1) if c.tint == 0.0 => pal.text,
         _ => color32(styles.resolve_color(c)),
+    }
+}
+
+/// The background of a cell: a colour scale or `dxf` fill from conditional formatting, else the
+/// cell's own fill.
+fn item_fill(styles: &Styles, item: &Item<'_>) -> Option<Color32> {
+    if let Some(fx) = item.fx.as_deref() {
+        if let Some(c) = fx.scale_fill {
+            return Some(color32(c));
+        }
+        if let Some(c) = fx.dxf.fill.as_ref().and_then(|f| f.solid_color()) {
+            return Some(color32(styles.resolve_color(&c)));
+        }
+    }
+    fill_color(styles, &item.fmt.fill)
+}
+
+/// The cell font with a conditional format's overrides applied.
+fn dxf_font(base: &open365_xlsx::Font, d: &DxfFont) -> open365_xlsx::Font {
+    let mut font = base.clone();
+    if let Some(b) = d.bold {
+        font.bold = b;
+    }
+    if let Some(i) = d.italic {
+        font.italic = i;
+    }
+    if let Some(s) = d.strike {
+        font.strike = s;
+    }
+    if let Some(u) = d.underline {
+        font.underline = u;
+    }
+    if let Some(c) = d.color {
+        font.color = c;
+    }
+    font
+}
+
+/// Draws the border edges a conditional format sets around a cell.
+fn paint_dxf_borders(painter: &Painter, paint: &Paint<'_>, r: Rect, fx: &CfEffect) {
+    let styles = paint.wb.styles();
+    let b = &fx.dxf.border;
+    let colour = |e: &BorderEdge| color32(styles.resolve_color(&e.color));
+    let edge = |e: &Option<BorderEdge>, horizontal: bool, at: f32, from: f32, to: f32| {
+        if let Some(e) = e.as_ref().filter(|e| e.style != BorderStyle::None) {
+            draw_edge(painter, horizontal, at, from, to, e, colour(e), paint.ppp);
+        }
+    };
+    edge(&b.top, true, r.top(), r.left(), r.right());
+    edge(&b.bottom, true, r.bottom(), r.left(), r.right());
+    edge(&b.left, false, r.left(), r.top(), r.bottom());
+    edge(&b.right, false, r.right(), r.top(), r.bottom());
+}
+
+/// Most blank cells in one region that conditional formatting is evaluated for.
+const MAX_BLANK_CF_CELLS: u32 = 60_000;
+
+/// Conditional fills and borders of cells that hold nothing (a rule on blanks, for example).
+fn paint_blank_cf(
+    painter: &Painter,
+    paint: &Paint<'_>,
+    cf: &ConditionalFormats,
+    region: &Region,
+    items: &[Item<'_>],
+) {
+    let (wb, view) = (paint.wb, paint.view);
+    let styles = wb.styles();
+    let geo = &view.layout.geo;
+    let stored: std::collections::HashSet<(u32, u32)> =
+        items.iter().map(|i| (i.row, i.col)).collect();
+    let mut budget = MAX_BLANK_CF_CELLS;
+    for (r1, c1, r2, c2) in cf.ranges() {
+        let (r1, r2) = (r1.max(region.rows.0), r2.min(region.rows.1));
+        let (c1, c2) = (c1.max(region.cols.0), c2.min(region.cols.1));
+        for row in r1..=r2 {
+            if geo.row_hidden(row) {
+                continue;
+            }
+            for col in c1..=c2 {
+                if geo.col_hidden(col)
+                    || stored.contains(&(row, col))
+                    || view.layout.merge_at(row, col).is_some()
+                {
+                    continue;
+                }
+                budget = budget.saturating_sub(1);
+                if budget == 0 {
+                    return;
+                }
+                let Some(fx) = cf.effect(wb, row, col) else {
+                    continue;
+                };
+                let rect = view.rect((row, col, row, col), region.shift);
+                let fill = fx.scale_fill.map(color32).or_else(|| {
+                    fx.dxf
+                        .fill
+                        .as_ref()
+                        .and_then(|f| f.solid_color())
+                        .map(|c| color32(styles.resolve_color(&c)))
+                });
+                if let Some(color) = fill {
+                    painter.rect_filled(rect, 0.0, color);
+                }
+                paint_dxf_borders(painter, paint, rect, &fx);
+            }
+        }
     }
 }
 
@@ -2730,6 +3245,7 @@ fn paint_region(
                     cell,
                     fmt: styles.cell_format(cell.style.unwrap_or(0)),
                     merged: false,
+                    fx: paint.cf.and_then(|cf| cf.effect(wb, row.r, cell.col)),
                 });
             }
         }
@@ -2743,6 +3259,7 @@ fn paint_region(
                     cell,
                     fmt: styles.cell_format(cell.style.unwrap_or(0)),
                     merged: true,
+                    fx: paint.cf.and_then(|cf| cf.effect(wb, m.0, m.1)),
                 });
             }
         }
@@ -2755,15 +3272,26 @@ fn paint_region(
         }
     }
     for item in &items {
-        if let Some(color) = fill_color(styles, &item.fmt.fill) {
+        if let Some(color) = item_fill(styles, item) {
             p.rect_filled(item.rect, 0.0, color);
+        }
+    }
+    if let Some(cf) = paint.cf {
+        paint_blank_cf(&p, paint, cf, region, &items);
+    }
+    for item in &items {
+        if let Some(bar) = item.fx.as_deref().and_then(|fx| fx.data_bar.as_ref()) {
+            paint_data_bar(&p, item.rect, bar, paint.ppp);
+        }
+        if let Some(icon) = item.fx.as_deref().and_then(|fx| fx.icon.as_ref()) {
+            paint_icon(&p, item.rect, &icon.set, icon.index, icon.count, paint.ppp);
         }
     }
     for m in &merges {
         let r = view.rect(*m, region.shift);
-        let has_fill = ws.and_then(|ws| ws.cell(m.0, m.1)).is_some_and(|c| {
-            fill_color(styles, &styles.cell_format(c.style.unwrap_or(0)).fill).is_some()
-        });
+        let has_fill = items
+            .iter()
+            .any(|i| i.merged && (i.row, i.col) == (m.0, m.1) && item_fill(styles, i).is_some());
         if r.is_positive() && !has_fill {
             p.rect_stroke(r, 0.0, line, egui::StrokeKind::Inside);
         }
@@ -2774,6 +3302,9 @@ fn paint_region(
     if let Some(ws) = ws {
         for item in &items {
             paint_cell_borders(&p, paint, ws, item);
+            if let Some(fx) = item.fx.as_deref() {
+                paint_dxf_borders(&p, paint, item.rect, fx);
+            }
         }
     }
 
@@ -2886,12 +3417,14 @@ fn shown_text(
     font: &FontId,
     hinted: Option<&HintedFace>,
     avail_px: f32,
+    code_override: Option<&str>,
 ) -> (String, bool) {
     let wb = paint.wb;
-    let full = display_text(wb, item.cell);
+    let full = display_text_with(wb, item.cell, code_override);
     match &item.cell.value {
         CellValue::Number(n) => {
-            let code = format_code(wb, item.cell.style.unwrap_or(0));
+            let code =
+                code_override.unwrap_or_else(|| format_code(wb, item.cell.style.unwrap_or(0)));
             let general = code == "General" || code.is_empty();
             // General counts the decimal point as wide as a digit when it decides what fits.
             let mut measure = |s: &str| {
@@ -2927,7 +3460,19 @@ fn paint_cell_text(painter: &Painter, paint: &Paint<'_>, item: &Item<'_>, region
     let layout = view.layout;
     let styles = wb.styles();
     let fmt = item.fmt;
-    let font = &fmt.font;
+    let fx = item.fx.as_deref();
+    let font_cf;
+    let font = if let Some(fx) = fx {
+        font_cf = dxf_font(&fmt.font, &fx.dxf.font);
+        &font_cf
+    } else {
+        &fmt.font
+    };
+    let code_override = fx.and_then(|f| f.dxf.num_fmt.as_deref());
+    let hide_value = fx.is_some_and(|f| {
+        f.data_bar.as_ref().is_some_and(|b| !b.show_value)
+            || f.icon.as_ref().is_some_and(|i| !i.show_value)
+    });
     let CellFont {
         face,
         id: mut font_id,
@@ -2939,8 +3484,16 @@ fn paint_cell_text(painter: &Painter, paint: &Paint<'_>, item: &Item<'_>, region
     let px = |v: f32| v / ppp;
     let hinted = hinted.as_deref();
     let avail_px = (r.width() * ppp).round() - number_inset_px(ppp);
-    let (text, hashes) = shown_text(painter, paint, item, &font_id, hinted, avail_px);
-    if text.is_empty() {
+    let (text, hashes) = shown_text(
+        painter,
+        paint,
+        item,
+        &font_id,
+        hinted,
+        avail_px,
+        code_override,
+    );
+    if text.is_empty() || hide_value {
         return;
     }
     let is_text = !is_numeric(&item.cell.value) && !matches!(item.cell.value, CellValue::Error(_));
@@ -2964,6 +3517,10 @@ fn paint_cell_text(painter: &Painter, paint: &Paint<'_>, item: &Item<'_>, region
         HorizontalAlignment::Left | HorizontalAlignment::Distributed => inner.min.x += indent,
         HorizontalAlignment::Right => inner.max.x -= indent,
         _ => {}
+    }
+    if fx.is_some_and(|f| f.icon.is_some()) && inner.width() > px(ICON_SLOT_PX) * 2.0 {
+        // The icon takes the left edge; the text keeps to what is left of the cell.
+        inner.min.x = inner.min.x.max(r.left() + px(ICON_SLOT_PX));
     }
     let mut text = text;
     if h == HorizontalAlignment::Fill && is_text {
@@ -3151,6 +3708,14 @@ fn paint_cell_text(painter: &Painter, paint: &Paint<'_>, item: &Item<'_>, region
         bounds,
         horizontal: h,
         lines: galley.rows.len().max(1),
+        fill: item_fill(styles, item),
+        font_color: color,
+        bold: font.bold,
+        italic: font.italic,
+        strike: font.strike,
+        underline: font.underline != Underline::None,
+        icon: fx.and_then(|f| f.icon.as_ref().map(|i| (i.set.clone(), i.index))),
+        data_bar: fx.and_then(|f| f.data_bar.as_ref().map(|b| b.fraction)),
     });
     let _ = region;
 }
@@ -3356,6 +3921,12 @@ fn paint_headers(
                 p.rect_filled(r, 0.0, pal.accent.gamma_multiply(0.2));
             }
             p.vline(r.left(), r.y_range(), stroke);
+            if c > 1 && layout.geo.col_hidden(c - 1) {
+                // Hidden columns before this one: Excel doubles the boundary line.
+                let hidden = Stroke::new(1.0, pal.text.gamma_multiply(0.7));
+                p.vline(r.left(), r.y_range(), hidden);
+                p.vline(r.left() - 3.0, r.y_range(), hidden);
+            }
             p.with_clip_rect(r.intersect(p.clip_rect())).text(
                 r.center(),
                 egui::Align2::CENTER_CENTER,
@@ -3402,6 +3973,11 @@ fn paint_headers(
                 p.rect_filled(rr, 0.0, pal.accent.gamma_multiply(0.2));
             }
             p.hline(rr.x_range(), rr.top(), stroke);
+            if r > 1 && layout.geo.row_hidden(r - 1) {
+                let hidden = Stroke::new(1.0, pal.text.gamma_multiply(0.7));
+                p.hline(rr.x_range(), rr.top(), hidden);
+                p.hline(rr.x_range(), rr.top() - 3.0, hidden);
+            }
             p.with_clip_rect(rr.intersect(p.clip_rect())).text(
                 rr.center(),
                 egui::Align2::CENTER_CENTER,

@@ -9,6 +9,7 @@ mod app;
 mod doc_view;
 mod docmodel;
 mod fonts;
+mod grid_cf;
 mod grid_text;
 mod grid_view;
 mod parts;
