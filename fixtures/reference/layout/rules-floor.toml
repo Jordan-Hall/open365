@@ -1,0 +1,20 @@
+# Ratchet for crates/layout/tests/rules_parity.rs: border rectangles that match Word.
+# Raise with UPDATE_PARITY_FLOOR=1; never lower.
+
+[layout-pbdr-ctx]
+matched = 32
+
+[layout-pbdr-edges]
+matched = 44
+
+[layout-pbdr-groups]
+matched = 46
+
+[layout-pbdr-pages]
+matched = 5
+
+[layout-pbdr-styles]
+matched = 64
+
+[layout-pbdr-widths]
+matched = 90

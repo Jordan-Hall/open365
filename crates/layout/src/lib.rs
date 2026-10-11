@@ -34,6 +34,7 @@ mod metrics;
 mod numbering;
 mod para;
 mod props;
+mod rules;
 mod table;
 
 use std::ops::Range;
@@ -45,6 +46,7 @@ use open365_text::{FaceId, FontLibrary, FontMatch};
 pub use incremental::{IncrementalLayout, UpdateStats};
 pub use metrics::LineMetricModel;
 pub use props::{SectionProps, TabKind, TabLeader, TabStop};
+pub use rules::LineBorder;
 
 /// Knobs for layout. The defaults are the measured Word behaviour.
 #[derive(Debug, Clone, Copy)]
@@ -190,6 +192,8 @@ pub struct Line {
     /// The list label text, on the first line of a numbered paragraph.
     pub label: Option<Arc<str>>,
     pub role: ParaRole,
+    /// The paragraph's border box, when it has borders; [`Page::rules`] is derived from it.
+    pub border: Option<LineBorder>,
 }
 
 impl Line {
@@ -355,6 +359,37 @@ pub struct Page {
     pub header_images: Vec<ImagePlacement>,
     pub footer_images: Vec<ImagePlacement>,
     pub note_images: Vec<ImagePlacement>,
+    /// Paragraph border rules of every story on the page (header, body, cells, notes, footer),
+    /// in drawing order.
+    pub rules: Vec<Rule>,
+}
+
+/// The edge of a paragraph's border box a [`Rule`] belongs to.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RuleSide {
+    Top,
+    Bottom,
+    Left,
+    Right,
+    /// The rule between two paragraphs of one box (`w:between`).
+    Between,
+}
+
+/// A filled rectangle of a paragraph border, in page coordinates (points, y down). A composite
+/// style (`double`, `triple`, thin-thick pairs) is several rules; a dotted or dashed style is
+/// one rule the renderer may dash. Edges lie on Word's 0.24 pt drawing grid.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Rule {
+    pub x: f64,
+    pub y: f64,
+    pub width: f64,
+    pub height: f64,
+    pub color: [u8; 3],
+    pub style: BorderStyle,
+    pub side: RuleSide,
+    pub story: StoryKind,
+    /// Document-order index of the first paragraph of the box.
+    pub paragraph: usize,
 }
 
 /// A font family the document asked for and how the library satisfied it.

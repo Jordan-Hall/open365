@@ -25,6 +25,7 @@ use crate::flow::{Base, build_line, line_images};
 use crate::numbering::ListLabel;
 use crate::para::{Context, FieldEnv, NoteOrder, ParaLayout};
 use crate::props::SectionProps;
+use crate::rules::rules_of;
 use crate::{ImagePlacement, ImageSource, Line, NoteSlot, Page, StoryKind};
 
 /// Where the body goes on a page.
@@ -96,8 +97,15 @@ fn place(
         story: 0,
         table: 0,
     };
-    for pl in paras {
+    for (k, pl) in paras.iter().enumerate() {
+        let joined_prev = k > 0 && paras[k - 1].joins(pl);
+        let joined_next = paras.get(k + 1).is_some_and(|q| pl.joins(q));
         y += after.max(f64::from(pl.props.space_before_pt));
+        y += if joined_prev {
+            pl.between_extent()
+        } else {
+            pl.border_top()
+        };
         // Floating pictures sit against the page; they do not displace the text of a furniture
         // story.
         if let Some(sp) = section {
@@ -111,12 +119,16 @@ fn place(
         for lb in &pl.lines {
             let mut line = build_line(pl, lb, origin_x, y, base);
             line.story = story;
+            line.border = pl.line_border(lb, origin_x, joined_prev, joined_next);
             for mut im in line_images(pl, lb, origin_x, y, base) {
                 im.source = source.clone();
                 images.push((lines.len(), im));
             }
             lines.push(line);
             y += lb.height;
+        }
+        if !joined_next {
+            y += pl.border_bottom();
         }
         after = f64::from(pl.props.space_after_pt);
     }
@@ -274,6 +286,15 @@ impl Furniture {
                 page.footer = placed.lines;
                 page.footer_images = placed.images.into_iter().map(|i| i.1).collect();
             }
+        }
+        for page in pages.iter_mut() {
+            page.rules.clear();
+            let mut rules = Vec::new();
+            rules_of(&page.header, &mut rules);
+            rules_of(&page.lines, &mut rules);
+            rules_of(&page.notes, &mut rules);
+            rules_of(&page.footer, &mut rules);
+            page.rules = rules;
         }
     }
 }

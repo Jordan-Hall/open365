@@ -44,7 +44,9 @@ Units are points. Baselines come from Word's 600 dpi PDF and sit on a 0.24 pt gr
 | A top or bottom border adds its extent plus `w:space` to the paragraph: above the first line (after the space before), below the last line (before the space after). Left and right borders hang outside the text and change neither position nor wrapping. | `layout-pbdr-edges` |
 | Extent of a rule: single, dotted and dashed styles the width; double 3x; triple 5x; thin-thick and thick-thin small gap width + 1.5 pt; thin-thick-thin small gap width + 3 pt; medium gap 2x; large gap width + 2.4 pt (thin-thick-thin 2x + 3 pt). Approximate for the large gaps (the layout-pbdr-styles drift is under 1.2 pt per paragraph). | `layout-pbdr-styles` |
 | Consecutive paragraphs with identical `pBdr` and identical left and right indents form one box: the top edge once, the bottom edge once, nothing between unless `w:between` is set, then `width + 2 x space` is added to the usual gap (the larger of space after and before). Alignment, width, distance or indent differences end the group. | `layout-pbdr-groups` |
-| Word draws a rule as a filled rectangle: its outer left edge lies `space + 1.42` pt left of the text and its right edge `space + 1.65` pt right of it; the space before and after sit outside the box. Not yet exposed on `Line` or a box type. | PDF rectangles of `layout-pbdr-*` |
+| Rule geometry (`rules.rs`, `Page::rules`, oracle `-Rules`, scored by `tests/rules_parity.rs`). Every edge lies on the 0.24 pt grid (nearest, halves up) in the PDF frame (x / 1.0004, y / 1.0003). A bar is `floor(width / 0.24)` units thick, at least one. The inner edge of a left rule is `text left - space - 1.44`, the inner edge of a right rule `text right + space + 1.44` (a missing side counts as space 0); top and bottom rules span from the outer left edge to the outer right edge. A side rule runs the whole box, top rule to bottom rule. Top rule starts at `first line top - space - extent`, bottom rule at `last line bottom + space`; a between rule sits `space + extent` above the next paragraph's first line. | PDF rectangles of `layout-pbdr-edges`, `-styles`, `-groups`, `-widths` |
+| Composite styles are bars (top to bottom, the same for top and bottom borders; units of 0.24 pt): double and triple: `w` bars with `w` gaps; small gap: thick `w`, thin and gap 0.75 pt; medium gap: thin and gap `w / 2`; large gap: thick `max(w, 1.5)`, gap `w`, thin 0.75 pt. `thinThick*` draws thick first, `thickThin*` thin first. Word raises `w:sz` of the small-gap styles to 2.25 pt in the file. | `layout-pbdr-styles` |
+| Paragraph borders also apply inside table cells (`layout_cell`), headers and footers (`furniture::place`) with the same grouping rule. | `layout-pbdr-ctx` (lines 33/33) |
 
 ## Multiple spacing at a page end
 
@@ -62,8 +64,12 @@ Inline and floating placements match `layout-img-inline`, `layout-img-none`, `la
   vertically by the padding (4 cells; they still differ by 0.10 pt in x), but in the template corpus the same
   inset breaks more cells than it fixes, so `CellBox::pad_top` and `pad_bottom` are reported and the parity test
   compares the full box.
-- Paragraph borders inside table cells, headers, footers and notes (only the main flow applies them), the box
-  geometry for drawing, `w:bar`, and borders across a page break.
+- Paragraph border rules: 6 of 50 rectangles of `layout-pbdr-edges` are 0.24 pt off (the grid rounding of the top rule
+  after a 4 pt space and of some bottom rules: Word rounds from the snapped baseline of the previous or last line, not from
+  the exact bottom), groups, cells, indents and page breaks (`layout-pbdr-groups`, `-ctx`, `-pages`) are only partly
+  matched (see `rules-floor.toml`); `w:bar`, hanging-indent left edges, the vertical order of thin and thick bars in
+  side rules and the box across a page break are unverified. Text boxes (`wps`, `wpg`, VML) and content controls
+  (`w:sdt`) are not started.
 - Auto-fit tables wider than the text area (`layout-table-width`, 4 lines and cells).
 - The zero-height line of the empty paragraph after a nested table (`layout-table-flow`, 1 line).
 - Contextual spacing (`layout-indents-spacing`, 7 lines) and the Caladea/Cambria vertical metric difference in bundled mode.

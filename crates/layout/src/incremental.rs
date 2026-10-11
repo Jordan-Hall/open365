@@ -359,6 +359,7 @@ impl IncrementalLayout {
                     header_images: Vec::new(),
                     footer_images: Vec::new(),
                     note_images: Vec::new(),
+                    rules: Vec::new(),
                     ..pg.clone()
                 });
                 let Some(current) = current else {

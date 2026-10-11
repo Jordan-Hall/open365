@@ -1096,6 +1096,79 @@ try {
     Marker
   }
 
+  # Probe: thickness of a single rule by width (w:sz 2..48), as top and bottom borders of one-line paragraphs.
+  L-Fixture 'layout-pbdr-widths' 'layout-pbdr-widths' 'top and bottom single borders of every width from 0.25 to 6 pt, 1 pt distance' {
+    Init-Doc 0
+    Marker
+    foreach ($w in 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 20, 22, 24, 28, 32, 36, 40, 44, 48) {
+      $lw = $w
+      L-Para "Border width $w" { param($f) PBorder $f -1 1 $lw 1; PBorder $f -3 1 $lw 1 }
+      Marker
+    }
+  }
+
+  # Probe: borders where Word lays out other content: header and footer, table cells, indents.
+  L-Fixture 'layout-pbdr-ctx' 'layout-pbdr-ctx' 'paragraph borders in a header, a footer, table cells, with hanging, first-line, left and right indents and in a list' {
+    Init-Doc 0
+    function Box($f, $w, $sp) { foreach ($sd in -1, -2, -3, -4) { PBorder $f $sd 1 $w $sp } }
+    $hdr = $doc.Sections.Item(1).Headers.Item(1).Range
+    $hdr.Text = 'Header probe'
+    $hf = $doc.Sections.Item(1).Headers.Item(1).Range.Paragraphs.Item(1).Format
+    Box $hf 8 3
+    $ftr = $doc.Sections.Item(1).Footers.Item(1).Range
+    $ftr.Text = 'Footer probe'
+    $ff = $doc.Sections.Item(1).Footers.Item(1).Range.Paragraphs.Item(1).Format
+    PBorder $ff -1 1 12 2; PBorder $ff -3 1 4 5
+    Marker
+    L-Para 'Body before the table'
+    $t = T-Add 2 2; T-Widths $t @(200, 200); T-Fill $t; $t.Borders.Enable = 0
+    Box $t.Cell(1, 1).Range.Paragraphs.Item(1).Format 8 2
+    PBorder $t.Cell(1, 2).Range.Paragraphs.Item(1).Format -1 1 12 3
+    PBorder $t.Cell(1, 2).Range.Paragraphs.Item(1).Format -3 1 12 3
+    PBorder $t.Cell(2, 1).Range.Paragraphs.Item(1).Format -3 1 8 4
+    $t.Cell(2, 2).Range.Text = "Cell para one`rCell para two"
+    Box $t.Cell(2, 2).Range.Paragraphs.Item(1).Format 8 2
+    Box $t.Cell(2, 2).Range.Paragraphs.Item(2).Format 8 2
+    L-Para 'Body after the table'
+    Marker
+    L-Para 'Hanging indent paragraph with a box around it so that its text wraps over several lines and the box follows the indent' { param($f) Box $f 8 2; $f.LeftIndent = 36; $f.FirstLineIndent = -18 }
+    Marker
+    L-Para 'First-line indent paragraph with a box around it so that its text wraps over several lines and the box follows the indent' { param($f) Box $f 8 2; $f.LeftIndent = 0; $f.FirstLineIndent = 24 }
+    Marker
+    L-Para 'Left and right indents with a box around the paragraph so that its text wraps over several lines inside the indents' { param($f) Box $f 8 2; $f.LeftIndent = 30; $f.RightIndent = 50 }
+    Marker
+    L-Para 'Negative left indent with a box around the paragraph so that its text wraps over several lines past the margin' { param($f) Box $f 8 2; $f.LeftIndent = -20 }
+    Marker
+    L-Para 'Centred paragraph with a box' { param($f) Box $f 8 2; $f.Alignment = 1 }
+    Marker
+    L-Para 'Right aligned paragraph with a box' { param($f) Box $f 8 2; $f.Alignment = 2 }
+    Marker
+    L-Para 'Shaded paragraph with a box' { param($f) Box $f 8 2; $f.Shading.BackgroundPatternColor = 14540253 }
+    Marker
+  }
+
+  # Probe: a border box across page breaks (single paragraph, group with and without between rules, top-only group).
+  L-Fixture 'layout-pbdr-pages' 'layout-pbdr-pages' 'bordered paragraph groups that break across pages' {
+    Init-Doc 0
+    function Box($f, $w, $sp) { foreach ($sd in -1, -2, -3, -4) { PBorder $f $sd 1 $w $sp } }
+    function Between($n, $w, $sp) {
+      $d = $script:doc; $c = $d.Paragraphs.Count
+      $r = $d.Range($d.Paragraphs.Item($c - $n).Range.Start, $d.Paragraphs.Item($c - 1).Range.End)
+      $b = $r.Borders.Item(-5); $b.LineStyle = 1; $b.LineWidth = $w; $b.Color = 0
+    }
+    1..4 | ForEach-Object { L-Para $A }
+    1..2 | ForEach-Object { L-Para ($A + ' ' + $B) { param($f) Box $f 8 3 } }
+    L-Para 'Plain filler paragraph'
+    1..4 | ForEach-Object { L-Para $B { param($f) Box $f 8 3 } }
+    Between 4 4 2
+    L-Para 'Plain filler paragraph'
+    1..3 | ForEach-Object { L-Para $A }
+    1..4 | ForEach-Object { L-Para $B { param($f) PBorder $f -1 1 12 4; PBorder $f -3 1 12 4; $f.SpaceAfter = 6 } }
+    1..3 | ForEach-Object { L-Para $A }
+    L-Para ($A + ' ' + $B + ' ' + $A) { param($f) Box $f 12 4; $f.SpaceBefore = 8; $f.SpaceAfter = 8 }
+    L-Para 'Closing paragraph'
+  }
+
 } finally {
   if ($word) {
     try { $word.UserName = $oldUser; $word.UserInitials = $oldInit; $word.Options.UseLocalUserInfo = $oldLocal } catch {}

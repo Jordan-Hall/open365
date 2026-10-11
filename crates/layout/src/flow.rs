@@ -248,6 +248,7 @@ impl PageBuild {
             header_images: Vec::new(),
             footer_images: Vec::new(),
             note_images,
+            rules: Vec::new(),
         }
     }
 }
@@ -642,6 +643,7 @@ pub(crate) fn build_line(
         text: para.text.clone(),
         label: label_text,
         role: para.role,
+        border: None,
     }
 }
 
@@ -802,7 +804,8 @@ impl Paginator<'_> {
         let Some((unit, base)) = self.cur else { return };
         let para = &unit.arena[ln.para];
         let lb = &para.lines[ln.line];
-        let line = build_line(para, lb, origin + ln.dx, top, base);
+        let mut line = build_line(para, lb, origin + ln.dx, top, base);
+        line.border = para.line_border(lb, origin + ln.dx, ln.join_prev, ln.join_next);
         self.page.lines.push(line);
         let images = line_images(para, lb, origin + ln.dx, top, base);
         self.page.images.extend(images);
@@ -1439,6 +1442,7 @@ pub(crate) fn paginate<'a>(
                 y += lb.lead;
                 let mut line = build_line(para, lb, origin, y, base);
                 line.story = item.story;
+                line.border = para.line_border(lb, origin, joined_prev, joined_next);
                 let images = line_images(para, lb, origin, y, base);
                 y += lb.height;
                 pg.page.lines.push(line);

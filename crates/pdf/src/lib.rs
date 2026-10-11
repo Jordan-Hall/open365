@@ -395,6 +395,7 @@ impl Export<'_> {
             self.draw_image(&mut buf, img, true);
         }
         self.draw_borders(&mut buf, page);
+        self.draw_rules(&mut buf, page);
         for line in page
             .header
             .iter()
@@ -652,6 +653,36 @@ impl Export<'_> {
         if open {
             buf.content.push_str("EMC\n");
         }
+    }
+
+    /// Paragraph border rules (`Page::rules`), as artifacts.
+    fn draw_rules(&mut self, buf: &mut PageBuf, page: &Page) {
+        if page.rules.is_empty() {
+            return;
+        }
+        buf.content.push_str(
+            "/Artifact BMC
+",
+        );
+        for r in &page.rules {
+            let line = BorderLine {
+                width: r.width.min(r.height),
+                color: r.color,
+                style: r.style,
+            };
+            let rect = (r.x, r.y, r.width, r.height);
+            draw_border_strip(
+                &mut buf.content,
+                buf.height,
+                &line,
+                r.width >= r.height,
+                rect,
+            );
+        }
+        buf.content.push_str(
+            "EMC
+",
+        );
     }
 
     /// Draws a picture; `tagged` pictures of the main story become Figure elements.

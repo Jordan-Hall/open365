@@ -87,7 +87,7 @@ fn capital(c: char) -> Option<char> {
 /// a multiple of `w:sz` plus fixed gaps. Fitted to layout-pbdr-styles (single rules and the
 /// dotted and dashed ones take the width; double 3x, triple 5x; the thin and thick pairs and
 /// triples a width plus 1.5, 3 or 2.4 pt, the medium-gap pair twice the width).
-fn border_extent(b: &open365_docx::Border) -> f64 {
+pub(crate) fn border_extent(b: &open365_docx::Border) -> f64 {
     if !b.is_visible() {
         return 0.0;
     }
@@ -131,6 +131,28 @@ impl ParaLayout {
             .between
             .as_ref()
             .map_or(0.0, |b| border_extent(b) + 2.0 * b.space)
+    }
+
+    /// The border box information a line of this paragraph carries. `origin_x` is the left of the
+    /// area the paragraph was laid out in; `join_prev` and `join_next` say whether the
+    /// neighbouring paragraphs continue the box.
+    pub(crate) fn line_border(
+        &self,
+        lb: &LineBox,
+        origin_x: f64,
+        join_prev: bool,
+        join_next: bool,
+    ) -> Option<crate::rules::LineBorder> {
+        let spec = self.border.clone()?;
+        Some(crate::rules::LineBorder {
+            spec,
+            left: origin_x + f64::from(self.props.indent_left_pt),
+            right: origin_x + self.fill.text_width - f64::from(self.props.indent_right_pt),
+            first: lb.atoms.start == 0,
+            last: lb.atoms.end >= self.atoms.len(),
+            join_prev,
+            join_next,
+        })
     }
 
     /// Whether `next` continues this paragraph's border group: borders present and identical,
@@ -364,6 +386,8 @@ pub(crate) struct ParaLayout {
     /// The collected text of the paragraph (hidden field codes left out, mark included).
     pub text: Arc<str>,
     pub role: ParaRole,
+    /// The paragraph's borders, `None` without any.
+    pub border: Option<Arc<crate::rules::BorderSpec>>,
 }
 
 /// Length of the footnote and endnote separator rule in points (measured: the paragraph mark
@@ -1044,6 +1068,7 @@ pub(crate) fn layout_paragraph(
         heading_level(ctx.styles, para.style_id()).map_or(ParaRole::Plain, ParaRole::Heading)
     };
 
+    let border = crate::rules::BorderSpec::from_docx(&flow.borders);
     ParaLayout {
         index,
         props,
@@ -1061,6 +1086,7 @@ pub(crate) fn layout_paragraph(
         separator,
         text: Arc::from(text.as_str()),
         role,
+        border,
     }
 }
 

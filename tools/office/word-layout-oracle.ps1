@@ -45,7 +45,8 @@ param(
   [string[]]$Path,
   [string]$InputDir,  # optional: scan this directory (in addition to -Path)
   [string]$OutDir,    # optional: write <OutDir>/<name>/layout.json instead of fixtures/reference/layout/<name>.json
-  [switch]$NoPdf   # skip the PDF baseline pass (then baseline/inkLeft are null)
+  [switch]$NoPdf,  # skip the PDF baseline pass (then baseline/inkLeft are null)
+  [switch]$Rules   # also write "rules": every filled rectangle of the PDF (paragraph borders, rules, shading), page-top origin
 )
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
@@ -149,7 +150,8 @@ function Read-PdfPages([string]$pdf) {
   }
   $pagesObj = $objs.Keys | Where-Object { $objs[$_] -match '/Type\s*/Pages' } | Select-Object -First 1
   $kids = @([regex]::Matches([regex]::Match($objs[$pagesObj], '/Kids\s*\[(.*?)\]', 'Singleline').Groups[1].Value, '(\d+) 0 R') | ForEach-Object { [int]$_.Groups[1].Value })
-  $rx = '(?<rx>[\d.\-]+) (?<ry>[\d.\-]+) (?<rw>[\d.\-]+) (?<rh>[\d.\-]+) re\r?\nW\* n|/(?<fn>F\d+) (?<fs>[\d.]+) Tf|1 0 0 1 (?<tx>[\d.\-]+) (?<ty>[\d.\-]+) Tm|\[(?<tj>[^\]]*)\] TJ|(?<iw>[\d.\-]+) 0 0 (?<ih>[\d.\-]+) (?<ix>[\d.\-]+) (?<iy>[\d.\-]+) cm?
+  $rx = '(?<rx>[\d.\-]+) (?<ry>[\d.\-]+) (?<rw>[\d.\-]+) (?<rh>[\d.\-]+) re\r?\nW\* n|(?<fx>[\d.\-]+) (?<fy>[\d.\-]+) (?<fw>[\d.\-]+) (?<fh>[\d.\-]+) re\r?\nf\*?|(?<cr>[\d.]+) (?<cg>[\d.]+) (?<cb>[\d.]+) rg|(?<gy>[\d.]+) g\r?\n|/(?<fn>F\d+) (?<fs>[\d.]+) Tf|1 0 0 1 (?<tx>[\d.\-]+) (?<ty>[\d.\-]+) Tm|\[(?<tj>[^\]]*)\] TJ|(?<iw>[\d.\-]+) 0 0 (?<ih>[\d.\-]+) (?<ix>[\d.\-]+) (?<iy>[\d.\-]+) cm
+?
 /(?<im>\w+) Do'
   $pages = New-Object System.Collections.Generic.List[object]
   foreach ($po in $kids) {
@@ -162,10 +164,11 @@ function Read-PdfPages([string]$pdf) {
     $cm = [regex]::Match($pd, '/Contents\s*(?:\[([^\]]*)\]|(\d+) 0 R)')
     if ($cm.Groups[2].Success) { $content = $streams[[int]$cm.Groups[2].Value] }
     else { foreach ($r in [regex]::Matches($cm.Groups[1].Value, '(\d+) 0 R')) { $content += $streams[[int]$r.Groups[1].Value] } }
+    if ($env:O365_ORACLE_DUMP_DIR) { [IO.File]::WriteAllText((Join-Path $env:O365_ORACLE_DUMP_DIR ("page{0}.txt" -f ($pages.Count + 1))), $content) }
     $cells = New-Object System.Collections.Generic.List[object]
     $rows = New-Object System.Collections.Generic.List[object]
     $images = New-Object System.Collections.Generic.List[object]
-    $clip = -1; $font = $null; $fsize = ''; $tx = 0.0; $ty = 0.0
+    $clip = -1; $font = $null; $fsize = ''; $tx = 0.0; $ty = 0.0; $fill = '000000'; $fills = New-Object System.Collections.Generic.List[object]
     $byKey = @{}
     foreach ($m in [regex]::Matches($content, $rx)) {
       if ($m.Groups['rx'].Success) {
@@ -177,6 +180,13 @@ function Read-PdfPages([string]$pdf) {
           for ($i = 0; $i -lt $cells.Count; $i++) { $c = $cells[$i]; if ([math]::Abs($c.x - $x) -lt 0.0005 -and [math]::Abs($c.w - $w) -lt 0.0005 -and [math]::Abs($c.top - $top) -lt 0.0005 -and [math]::Abs($c.h - $h) -lt 0.0005) { $clip = $i; break } }
           if ($clip -lt 0) { $cells.Add(@{ x = $x; top = $top; w = $w; h = $h }); $clip = $cells.Count - 1 }
         }
+      } elseif ($m.Groups['fx'].Success) {
+        $fh = [double]::Parse($m.Groups['fh'].Value, $inv); $fy = [double]::Parse($m.Groups['fy'].Value, $inv)
+        $fills.Add(@{ x = [double]::Parse($m.Groups['fx'].Value, $inv); y = $ph - $fy - $fh; w = [double]::Parse($m.Groups['fw'].Value, $inv); h = $fh; color = $fill; clip = $clip })
+      } elseif ($m.Groups['cr'].Success) {
+        $fill = (@('cr', 'cg', 'cb') | ForEach-Object { '{0:x2}' -f [int][math]::Round(255 * [double]::Parse($m.Groups[$_].Value, $inv)) }) -join ''
+      } elseif ($m.Groups['gy'].Success) {
+        $fill = ('{0:x2}' -f [int][math]::Round(255 * [double]::Parse($m.Groups['gy'].Value, $inv))) * 3
       } elseif ($m.Groups['iw'].Success) {
         # A picture: `w 0 0 h x y cm /ImageN Do` (PDF user space, y up). x/y/w/h in points from the page top-left.
         $iw = [double]::Parse($m.Groups['iw'].Value, $inv); $ih = [double]::Parse($m.Groups['ih'].Value, $inv)
@@ -200,7 +210,7 @@ function Read-PdfPages([string]$pdf) {
       }
     }
     foreach ($r in $rows) { $r['text'] = (($r.parts | Sort-Object { $_.x } | ForEach-Object { $_.text }) -join '').Trim() }
-    $pages.Add(@{ pw = $pw; ph = $ph; rows = $rows; cells = $cells; images = $images })
+    $pages.Add(@{ pw = $pw; ph = $ph; rows = $rows; cells = $cells; images = $images; fills = $fills })
   }
   , $pages
 }
@@ -295,12 +305,14 @@ function Ref-Layout($f) {
     $warn = @()
     $cellRects = New-Object System.Collections.Generic.List[object]
     $imageRects = New-Object System.Collections.Generic.List[object]
+    $ruleRects = New-Object System.Collections.Generic.List[object]
     if ($pdfPages) {
       if ($pdfPages.Count -ne $pcount) { $warn += "PDF has $($pdfPages.Count) text pages, Word layout has $pcount" }
       for ($pi = 1; $pi -le [math]::Min($pcount, $pdfPages.Count); $pi++) {
         $pg = $pdfPages[$pi - 1]
         # A clip around a picture (within its border) is the picture, not a cell.
         # A clip that reaches the page edge is the page clipping a cell that runs off the page: not a cell box.
+        if ($Rules) { foreach ($fl in $pg.fills) { $ruleRects.Add([ordered]@{ page = $pi; x = $fl.x; y = $fl.y; w = $fl.w; h = $fl.h; color = $fl.color; cell = ($fl.clip -ge 0) }) } }
         foreach ($im in $pg.images) { $imageRects.Add([ordered]@{ page = $pi; x = $im.x; y = $im.y; w = $im.w; h = $im.h }) }
         foreach ($c in $pg.cells) { if ($c.x + $c.w -ge $pg.pw - 0.01) { continue }; if (@($pg.images | Where-Object { $c.x -ge $_.x - 8 -and $c.x + $c.w -le $_.x + $_.w + 8 -and $c.top -ge $_.y - 8 -and $c.top + $c.h -le $_.y + $_.h + 8 }).Count -gt 0) { continue }; $cellRects.Add([ordered]@{ page = $pi; x = $c.x; y = $c.top; w = $c.w; h = $c.h }) }
         if (-not $byPage.ContainsKey($pi)) { continue }
@@ -400,6 +412,16 @@ function Ref-Layout($f) {
         $c = $imageRects[$i]
         $row = '    {"page": ' + $c.page + ', "x": ' + (Num $c.x) + ', "y": ' + (Num $c.y) + ', "w": ' + (Num $c.w) + ', "h": ' + (Num $c.h) + '}'
         if ($i -lt $imageRects.Count - 1) { $row += ',' }
+        [void]$sb.Append($row + "`n")
+      }
+      [void]$sb.Append("  ],`n")
+    }
+    if ($Rules -and $ruleRects.Count -gt 0) {
+      [void]$sb.Append('  "rules": [' + "`n")
+      for ($i = 0; $i -lt $ruleRects.Count; $i++) {
+        $c = $ruleRects[$i]
+        $row = '    {"page": ' + $c.page + ', "x": ' + (Num $c.x) + ', "y": ' + (Num $c.y) + ', "w": ' + (Num $c.w) + ', "h": ' + (Num $c.h) + ', "color": "' + $c.color + '"' + $(if ($c.cell) { ', "cell": true' } else { '' }) + '}'
+        if ($i -lt $ruleRects.Count - 1) { $row += ',' }
         [void]$sb.Append($row + "`n")
       }
       [void]$sb.Append("  ],`n")

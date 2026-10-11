@@ -89,6 +89,9 @@ pub(crate) struct FlowLine {
     /// Top of the line relative to the content box.
     pub dy: f64,
     pub height: f64,
+    /// The paragraph continues the border box of the one before it, or the one after it does.
+    pub join_prev: bool,
+    pub join_next: bool,
 }
 
 /// A nested cell's rectangle inside the content box.
@@ -187,10 +190,14 @@ fn layout_cell(
     content_w: f64,
     fmt: &open365_docx::TableCellFormat,
 ) -> (Vec<FlowLine>, Vec<FlowBox>, f64) {
-    let mut lines = Vec::new();
+    let mut lines: Vec<FlowLine> = Vec::new();
     let mut boxes = Vec::new();
     let mut y = 0.0;
     let mut prev: Option<Prev> = None;
+    // The previous paragraph of the run being stacked (arena index) and the bottom border it
+    // has not added yet: a following paragraph with the same borders takes it into its box.
+    let mut run_prev: Option<usize> = None;
+    let mut pending_bottom = 0.0;
     let count = cell.blocks.len();
     for (bi, block) in cell.blocks.iter().enumerate() {
         match block {
@@ -206,6 +213,10 @@ fn layout_cell(
                 {
                     continue;
                 }
+                let joined = run_prev.is_some_and(|q| b.arena[q].joins(pl));
+                if !joined {
+                    y += std::mem::take(&mut pending_bottom);
+                }
                 let mut before = f64::from(pl.props.space_before_pt);
                 let mut after_prev = prev.as_ref().map_or(0.0, |p| p.after);
                 if let Some(pv) = &prev
@@ -219,6 +230,11 @@ fn layout_cell(
                     }
                 }
                 y += after_prev.max(before);
+                y += if joined {
+                    pl.between_extent()
+                } else {
+                    pl.border_top()
+                };
                 for (i, lb) in pl.lines.iter().enumerate() {
                     lines.push(FlowLine {
                         para: idx,
@@ -226,9 +242,18 @@ fn layout_cell(
                         dx: 0.0,
                         dy: y,
                         height: lb.height,
+                        join_prev: joined,
+                        join_next: false,
                     });
                     y += lb.height;
                 }
+                if joined && let Some(q) = run_prev {
+                    for l in lines.iter_mut().filter(|l| l.para == q) {
+                        l.join_next = true;
+                    }
+                }
+                pending_bottom = pl.border_bottom();
+                run_prev = Some(idx);
                 prev = Some(Prev {
                     after: f64::from(pl.props.space_after_pt),
                     contextual: pl.flow.contextual_spacing,
@@ -236,6 +261,8 @@ fn layout_cell(
                 });
             }
             Block::Table(t) => {
+                y += std::mem::take(&mut pending_bottom);
+                run_prev = None;
                 y += prev.take().map_or(0.0, |p| p.after);
                 let nested = layout_table(b, t, content_w);
                 let (l, bx, h) = nested.flatten(0.0, y);
@@ -246,6 +273,7 @@ fn layout_cell(
             Block::Raw(_) => {}
         }
     }
+    y += pending_bottom;
     y += prev.map_or(0.0, |p| p.after);
     (lines, boxes, y)
 }

@@ -1787,6 +1787,12 @@ impl DocView {
         let rect_of = |x: f64, y: f64, w: f64, h: f64| {
             Rect::from_min_size(at(x, y), vec2(w as f32, h as f32) * s)
         };
+        for r in &self.engine.layout().pages[page].rules {
+            let rect = rect_of(r.x, r.y, r.width, r.height);
+            if rect.expand(8.0 * s).intersects(clip) {
+                painter.rect_filled(rect, 0.0, color(r.color));
+            }
+        }
         let cells = &self.engine.layout().pages[page].cells;
         for cell in cells {
             let bounds = rect_of(cell.x, cell.y, cell.width, cell.height).expand(8.0 * s);

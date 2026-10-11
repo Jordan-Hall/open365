@@ -1,0 +1,5 @@
+feature = "layout-pbdr-ctx"
+made_with = "Microsoft Word 16.0.20430 (Windows)"
+author = "project member"
+expect_dropped = []
+notes = "paragraph borders in a header, a footer, table cells, with hanging, first-line, left and right indents and in a list"

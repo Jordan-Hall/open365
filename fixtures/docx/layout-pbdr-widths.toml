@@ -1,0 +1,5 @@
+feature = "layout-pbdr-widths"
+made_with = "Microsoft Word 16.0.20430 (Windows)"
+author = "project member"
+expect_dropped = []
+notes = "top and bottom single borders of every width from 0.25 to 6 pt, 1 pt distance"
