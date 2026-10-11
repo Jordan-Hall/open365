@@ -238,3 +238,49 @@ pub fn xlsx_cells(
         "truncated": truncated,
     }))
 }
+
+/// Which cells a formula may see: with `include_hidden` all of them, otherwise only those on
+/// visible sheets outside hidden rows and columns. `keep(sheet, 0, 0)` asks about the sheet.
+pub fn visibility_filter(wb: &Workbook, include_hidden: bool) -> impl Fn(usize, u32, u32) -> bool {
+    struct Hidden {
+        visible: bool,
+        rows: std::collections::HashSet<u32>,
+        cols: Vec<(u32, u32)>,
+    }
+    let sheets: Vec<Hidden> = (0..wb.sheets().len())
+        .map(|i| {
+            let ws = wb.sheet(i);
+            Hidden {
+                visible: sheet_visible(wb, i, include_hidden),
+                rows: ws
+                    .map(|w| {
+                        w.rows()
+                            .iter()
+                            .filter(|r| r.hidden())
+                            .map(|r| r.r)
+                            .collect()
+                    })
+                    .unwrap_or_default(),
+                cols: ws
+                    .map(|w| {
+                        w.columns()
+                            .iter()
+                            .filter(|c| c.hidden)
+                            .map(|c| (c.min, c.max))
+                            .collect()
+                    })
+                    .unwrap_or_default(),
+            }
+        })
+        .collect();
+    move |sheet, row, col| {
+        let Some(h) = sheets.get(sheet) else {
+            return false;
+        };
+        if !h.visible {
+            return false;
+        }
+        include_hidden
+            || !(h.rows.contains(&row) || h.cols.iter().any(|&(lo, hi)| lo <= col && col <= hi))
+    }
+}

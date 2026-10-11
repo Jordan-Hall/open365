@@ -1,9 +1,12 @@
 //! `open365` CLI: `docx|xlsx inspect`, `apply`, `roundtrip --check`, `mcp` and `inspect`.
 
 mod apply_cmd;
+mod eval_cmd;
 mod export_pdf_cmd;
 mod inspect_cmd;
+mod layout_cmd;
 mod mcp_cmd;
+mod template_cmd;
 
 use std::fmt;
 use std::path::{Path, PathBuf};
@@ -36,9 +39,15 @@ struct InspectArgs {
 }
 
 #[derive(Debug, Subcommand)]
-enum FormatCommand {
+enum XlsxCommand {
     /// Print parts, relationships and content types.
     Inspect(InspectArgs),
+    /// Evaluate a formula against the workbook and print the result as JSON. Read-only:
+    /// nothing is saved.
+    Eval(eval_cmd::Args),
+    /// Make a new .xlsx or .xlsm from a .xltx or .xltm template. A VBA project is kept and
+    /// never run. Refuses to replace a file unless --overwrite is given.
+    NewFromTemplate(template_cmd::Args),
 }
 
 #[derive(Debug, Subcommand)]
@@ -50,6 +59,11 @@ enum DocxCommand {
     /// Fonts are the bundled ones (Calibri -> Carlito, Cambria -> Caladea) unless
     /// --system-fonts is given. No author or date is written unless asked for.
     ExportPdf(export_pdf_cmd::Args),
+    /// Print pages, lines and table cell boxes from the layout engine (read-only).
+    Layout(layout_cmd::Args),
+    /// Make a new .docx or .docm from a .dotx or .dotm template. A VBA project is kept and
+    /// never run. Refuses to replace a file unless --overwrite is given.
+    NewFromTemplate(template_cmd::Args),
 }
 
 #[derive(Debug, Subcommand)]
@@ -64,7 +78,7 @@ enum Command {
     /// XLSX commands.
     Xlsx {
         #[command(subcommand)]
-        command: FormatCommand,
+        command: XlsxCommand,
     },
     /// Apply a JSON command file through the command layer and save the result.
     ///
@@ -201,9 +215,12 @@ fn finish(result: Result<(), CliError>) -> ExitCode {
     }
 }
 
-fn format_inspect(kind: Kind, command: &FormatCommand) -> ExitCode {
-    let FormatCommand::Inspect(a) = command;
-    finish(inspect_cmd::run(kind, &a.file, a.hidden, a.json))
+fn xlsx_command(command: &XlsxCommand) -> ExitCode {
+    match command {
+        XlsxCommand::Inspect(a) => finish(inspect_cmd::run(Kind::Xlsx, &a.file, a.hidden, a.json)),
+        XlsxCommand::Eval(a) => finish(eval_cmd::run(a)),
+        XlsxCommand::NewFromTemplate(a) => finish(template_cmd::run(a, false)),
+    }
 }
 
 fn main() -> ExitCode {
@@ -214,8 +231,10 @@ fn main() -> ExitCode {
                 finish(inspect_cmd::run(Kind::Docx, &a.file, a.hidden, a.json))
             }
             DocxCommand::ExportPdf(args) => finish(export_pdf_cmd::run(&args)),
+            DocxCommand::Layout(args) => finish(layout_cmd::run(&args)),
+            DocxCommand::NewFromTemplate(args) => finish(template_cmd::run(&args, true)),
         },
-        Command::Xlsx { command } => format_inspect(Kind::Xlsx, &command),
+        Command::Xlsx { command } => xlsx_command(&command),
         Command::Apply {
             commands,
             input,

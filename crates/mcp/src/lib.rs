@@ -10,6 +10,7 @@ mod audit;
 mod fence;
 mod server;
 mod tools;
+mod tools_ext;
 mod views;
 
 pub use fence::{Denied, Fence};

@@ -2732,6 +2732,7 @@ dependencies = [
  "open365-pdf",
  "open365-testkit",
  "open365-text",
+ "open365-xlsx",
  "serde_json",
  "zip",
 ]
@@ -2802,7 +2803,10 @@ version = "0.1.0"
 dependencies = [
  "open365-commands",
  "open365-docx",
+ "open365-layout",
+ "open365-pdf",
  "open365-testkit",
+ "open365-text",
  "open365-xlsx",
  "serde_json",
  "zip",

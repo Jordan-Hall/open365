@@ -150,35 +150,7 @@ impl XlsxState {
         if self.engine.is_some() {
             return;
         }
-        let wb = &self.workbook;
-        let mut engine = Engine::new();
-        engine.set_date1904(wb.date1904());
-        for (i, info) in wb.sheets().iter().enumerate() {
-            if info.kind != SheetKind::Worksheet {
-                continue;
-            }
-            engine.add_sheet(&info.name);
-            let Some(ws) = wb.sheet(i) else { continue };
-            for (row, col, cell) in ws.iter_cells() {
-                if cell.formula.is_some() {
-                    // Seed the cached value so the engine starts from the file's results.
-                    engine.set_value(&info.name, row, col, to_calc_value(&cell.value));
-                    if let Some(text) = ws.formula_text(row, col) {
-                        // An unparseable formula keeps its cached value as a constant.
-                        let _ = engine.set_formula(&info.name, row, col, &text);
-                    }
-                } else if !matches!(cell.value, CellValue::Empty) {
-                    engine.set_value(&info.name, row, col, to_calc_value(&cell.value));
-                }
-            }
-        }
-        for name in wb.defined_names() {
-            if name.local_sheet_id.is_none() {
-                let _ = engine.define_name(&name.name, &name.formula);
-            }
-        }
-        engine.recalc_dirty();
-        self.engine = Some(engine);
+        self.engine = Some(build_engine(&self.workbook, &|_, _, _| true));
     }
 
     /// Recalculates dirty formulas and writes changed results into the workbook as cached
@@ -228,6 +200,43 @@ impl XlsxState {
         }
         Ok(())
     }
+}
+
+/// Builds a calculation engine from the workbook. Cached values stay as the file has them:
+/// the initial recalculation only primes the engine. `keep(sheet, row, col)` leaves cells
+/// out (a hidden row, say); a sheet is left out when `keep(sheet, 0, 0)` is false.
+pub(crate) fn build_engine(wb: &Workbook, keep: &dyn Fn(usize, u32, u32) -> bool) -> Engine {
+    let mut engine = Engine::new();
+    engine.set_date1904(wb.date1904());
+    for (i, info) in wb.sheets().iter().enumerate() {
+        if info.kind != SheetKind::Worksheet || !keep(i, 0, 0) {
+            continue;
+        }
+        engine.add_sheet(&info.name);
+        let Some(ws) = wb.sheet(i) else { continue };
+        for (row, col, cell) in ws.iter_cells() {
+            if !keep(i, row, col) {
+                continue;
+            }
+            if cell.formula.is_some() {
+                // Seed the cached value so the engine starts from the file's results.
+                engine.set_value(&info.name, row, col, to_calc_value(&cell.value));
+                if let Some(text) = ws.formula_text(row, col) {
+                    // An unparseable formula keeps its cached value as a constant.
+                    let _ = engine.set_formula(&info.name, row, col, &text);
+                }
+            } else if !matches!(cell.value, CellValue::Empty) {
+                engine.set_value(&info.name, row, col, to_calc_value(&cell.value));
+            }
+        }
+    }
+    for name in wb.defined_names() {
+        if name.local_sheet_id.is_none() {
+            let _ = engine.define_name(&name.name, &name.formula);
+        }
+    }
+    engine.recalc_dirty();
+    engine
 }
 
 fn to_calc_value(v: &CellValue) -> Value {

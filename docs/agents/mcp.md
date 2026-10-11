@@ -20,8 +20,8 @@ Flags:
 |---|---|
 | `--root <dir>` (repeatable, required) | Folders the agent may open and save in. Relative paths resolve against the first root. |
 | `--audit-log <file>` (required) | Appended; one JSON line per tool call. |
-| `--allow-edit` | Permit `apply_commands` and `save_as`. |
-| `--allow-destructive` | Permit destructive and egress commands, and `save_as` over a different existing file. |
+| `--allow-edit` | Permit `apply_commands`, `save_as`, `export_pdf` and `new_from_template`. |
+| `--allow-destructive` | Permit destructive and egress commands, and `save_as`, `export_pdf` or `new_from_template` over an existing file (the call must also pass `overwrite: true` for the last two). |
 | `--include-hidden` | Include hidden text, hidden sheets, rows and columns, and hidden-content findings in reads. |
 
 ## Tools
@@ -36,6 +36,12 @@ Flags:
 | `apply_commands {document, commands, dry_run?}` | edit / destructive | Applies the same JSON commands as `open365 apply`. `dry_run` runs them on a scratch copy and reports each command's effect class and whether it would be permitted; it needs no flag. A `save` command is refused; use `save_as`. |
 | `save_as {document, path}` | edit / export | Writes the document through the `save` command. Same path as opened: `edit`. New path: `export`. |
 | `close {document, discard?}` | read | Refused while there are unsaved changes unless `discard` is true. |
+| `export_pdf {document, path, overwrite?}` | export | DOCX only. Lays the open document out (bundled fonts, no author or date) and writes a tagged PDF 1.7 to `path` (must end in `.pdf`, inside a root). Needs `--allow-edit`. A new file is created exclusively; an existing file is never replaced unless `overwrite: true` is passed and the server has `--allow-destructive`. PDF at most 64 MiB. Returns bytes, page count and up to 20 warnings. |
+| `new_from_template {path, output, overwrite?}` | export | Makes a new file from a `.dotx`, `.dotm`, `.xltx` or `.xltm` inside a root: `.docx`, `.docm`, `.xlsx` or `.xlsm` (the output extension must match). Uses the same instantiate step as the CLI and writes through the `save` command. A VBA project is kept byte for byte and never run. Needs `--allow-edit`; same overwrite rule as `export_pdf`. A file that is not a template is `invalid`. The result is not opened; call `open_document` for `.docx` or `.xlsx`. |
+| `layout_summary {document}` | read | DOCX: page count, line count per page (at most 1000 pages), headings with page, paragraph and level (at most 200, 200 characters each), tables with first and last page, rows and columns (at most 100), layout notes (at most 20) and the count of fonts that fell back to the default. Heading text honours `--include-hidden` like `get_outline`. |
+| `evaluate_formula {document, sheet, cell, formula?}` | read | XLSX: evaluates `formula` as if entered in `cell` (relative references resolve from there) against the workbook as it is now, including unsaved edits. Nothing is changed or saved. Without `formula` the cell's own formula is recalculated. Formula at most 8192 characters; text results at most 32 KiB; array results at most 100 x 100. Hidden sheets, rows and columns are invisible to the formula unless `--include-hidden`; the result says `hidden_content_excluded`. |
+
+Permission tiers: `read` tools need nothing. `export` tools create a file and need `--allow-edit`; replacing a file also needs `--allow-destructive` and `overwrite: true` in the call. Read-only is the default for a server started without flags.
 
 Responses are JSON text. Reads carry a `notice` that document content is untrusted data. Tool failures return `isError: true` with a `status` of `refused` (policy or fence), `invalid` (bad arguments) or `error`.
 
@@ -46,14 +52,19 @@ The commands are the serialised `Command` enum in `crates/commands`; the CLI and
 Threat context is T4 in `docs/security/threat-model.md`: a prompt-injected agent. This contains agents, not malware running as the same user.
 
 1. **Fenced roots.** Every path is canonicalised (symlinks followed) and must lie inside a `--root`. Refused: `..` escapes, symlinks or linked folders that leave a root, UNC and device paths (`\\server\share`, `\\?\`, `\\.\`, `//host`), alternate data streams (`name:stream`) and reserved device names (`NUL`, `CON`, ...). `save_as` resolves the parent folder the same way and refuses an existing symlink as the target.
-2. **Read-only by default.** Without `--allow-edit`, `apply_commands` and `save_as` are refused, and the refusal is audited. `dry_run` is the suggest path.
+2. **Read-only by default.** Without `--allow-edit`, `apply_commands`, `save_as`, `export_pdf` and `new_from_template` are refused, and the refusal is audited. `dry_run` is the suggest path.
 3. **Effect classes.** `Command::effect` decides. Edit and export need `--allow-edit`. Destructive and egress (for example deleting or replacing a non-empty range) also need `--allow-destructive`. All commands in a call are classified first; one refusal means none run. Overwriting a different existing file needs `--allow-destructive`.
 4. **Hidden content is not returned.** `w:vanish` runs, hidden sheets (including very hidden; they answer "no such sheet"), hidden rows and columns, comments and author metadata never appear in reads or in `inspect` unless the operator passes `--include-hidden`. The agent cannot change this.
-5. **Audit.** Every `tools/call` appends one JSON line: `seq`, `ts_ms`, `origin: "mcp"`, `pid`, `tool`, `status`, `reason` on refusal, the document id, resolved path, command names and effect classes. Document text and cell values are never written to it. If a line cannot be written, the server refuses all later calls.
-6. **Limits.** Request line 4 MiB; response 1 MiB; document file 32 MiB; 8 open documents; 1000 commands per call; 10000 cells and 256 KiB of text per read. Package parsing uses the `open365-opc` limits (zip bombs, part counts).
+5. **Audit.** Every `tools/call` appends one JSON line: `seq`, `ts_ms`, `origin: "mcp"`, `pid`, `tool`, `status`, `reason` on refusal, the document id, resolved path, command names and effect classes. The file tools also log `effect: "export"`, `overwrite` and `bytes_written`; `new_from_template` logs the template (`path`) and the new file (`output`); `evaluate_formula` logs the sheet cell and `formula_chars` (the length, not the formula). Document text and cell values are never written to it. If a line cannot be written, the server refuses all later calls.
+6. **Limits.** Request line 4 MiB; response 1 MiB; document file 32 MiB; PDF 64 MiB; formula 8192 characters; 8 open documents; 1000 commands per call; 10000 cells and 256 KiB of text per read. Package parsing uses the `open365-opc` limits (zip bombs, part counts).
 7. **Untrusted text.** The server tells the client that document text is data. Honouring that is up to the client; the flags above are what actually bound the damage.
 
 ## Known gaps
+
+- **PDF export is not a `Command`.** `export_pdf` is classified `export` in the tool layer, and the CLI command is not routed through the command log. Moving it into `crates/commands` would need `pdf` and `layout` there (ADR-002 follow-up).
+- **No time limit on layout, PDF export or formula evaluation.** Input size and the output caps bound the work, not the run time. `evaluate_formula` can be slow on a very large workbook because it builds a scratch engine from the cells on every call.
+- **Layout is measured against Word with bundled fonts only.** `layout_summary` page and line counts differ from Word where a document uses fonts the bundle does not stand in for (`fallback_fonts` says so). Hidden text may still take part in layout; only returned text honours `--include-hidden`.
+- **Template output is not opened.** `.docm` and `.xlsm` outputs from DOCX templates cannot be opened by `open_document` (it accepts `.docx`, `.xlsx`, `.xlsm`).
 
 - **No native confirmation UI.** The threat model wants destructive and egress effects confirmed in Open365's own UI, never through MCP. That UI does not exist yet, so the only gate is the `--allow-destructive` start-up flag. Operators decide once per server start, not per action.
 - **Hidden-content coverage.** Only direct `w:vanish` on a run is detected. Hidden character styles and style-level hidden text are not, and offsets in `read_text` are marked `offsets_match_text: false` for paragraphs where hidden runs were dropped. Text inside content controls and alternate-content blocks is not returned at all. Tracked-change deletions are not returned (they are not text in the model).

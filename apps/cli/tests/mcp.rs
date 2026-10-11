@@ -129,7 +129,10 @@ fn stdio_round_trip_is_read_only_by_default() {
     let mut m = Session::start(&scratch.root(), &audit, &[]);
 
     let tools = m.rpc("tools/list", json!({}));
-    assert_eq!(tools["result"]["tools"].as_array().expect("tools").len(), 8);
+    assert_eq!(
+        tools["result"]["tools"].as_array().expect("tools").len(),
+        12
+    );
 
     let (open, err) = m.call("open_document", json!({"path": "f.xlsx"}));
     assert!(!err, "{open}");

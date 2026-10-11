@@ -212,7 +212,11 @@ fn json_rpc_session_covers_the_protocol() {
             "inspect",
             "apply_commands",
             "save_as",
-            "close"
+            "close",
+            "export_pdf",
+            "new_from_template",
+            "layout_summary",
+            "evaluate_formula"
         ]
     );
     assert!(tools.iter().all(|t| t["inputSchema"].is_object()));
@@ -743,4 +747,392 @@ fn an_unwritable_audit_log_stops_the_server() {
     assert!(first.to_string().contains("audit log"));
     let second = call(&mut server, json!({"path": s(&docx)}));
     assert_eq!(second["result"]["isError"], true);
+}
+
+// ---- PDF export, templates, layout summary, formula evaluation ----
+
+fn zip_has(path: &Path, name: &str) -> bool {
+    let file = std::fs::File::open(path).expect("open zip");
+    zip::ZipArchive::new(file)
+        .expect("zip")
+        .file_names()
+        .any(|n| n.is_ok_and(|n| n == name))
+}
+
+fn put_as(scratch: &Scratch, rel: &str, name: &str) -> PathBuf {
+    let dest = scratch.root().join(name);
+    std::fs::copy(fixture(rel), &dest).expect("copy fixture");
+    dest
+}
+
+#[test]
+fn export_pdf_needs_edit_and_never_overwrites_without_the_flags() {
+    let scratch = Scratch::new("pdf");
+    let docx = scratch.put("docx/styles-headings.docx");
+    let out = scratch.root().join("out.pdf");
+
+    let mut ro = rig(&scratch, false, false, false);
+    let id = ro.open(&docx);
+    let why = ro.refused("export_pdf", json!({"document": id, "path": s(&out)}));
+    assert!(why.contains("--allow-edit"), "{why}");
+    assert!(!out.exists());
+
+    let mut r = rig(&scratch, true, false, false);
+    let id = r.open(&docx);
+    let (v, err) = r.call("export_pdf", json!({"document": id, "path": s(&out)}));
+    assert!(!err, "{v}");
+    assert_eq!(v["effect"], "export");
+    let pdf = std::fs::read(&out).expect("pdf");
+    assert!(pdf.starts_with(b"%PDF-1.7"));
+    assert!(!String::from_utf8_lossy(&pdf).contains("/Author"));
+
+    // A second export is refused with and without the argument unless the operator allows it.
+    let why = r.refused("export_pdf", json!({"document": id, "path": s(&out)}));
+    assert!(why.contains("overwrite"), "{why}");
+    let why = r.refused(
+        "export_pdf",
+        json!({"document": id, "path": s(&out), "overwrite": true}),
+    );
+    assert!(why.contains("--allow-destructive"), "{why}");
+    assert_eq!(std::fs::read(&out).expect("pdf"), pdf);
+
+    let mut d = rig(&scratch, true, true, false);
+    let id = d.open(&docx);
+    // The operator flag alone is not enough either: the call must ask.
+    d.refused("export_pdf", json!({"document": id, "path": s(&out)}));
+    let (v, err) = d.call(
+        "export_pdf",
+        json!({"document": id, "path": s(&out), "overwrite": true}),
+    );
+    assert!(!err, "{v}");
+    assert!(!scratch.root().join("out.pdf.open365-tmp").exists());
+
+    // Audited: one line per call with the effect, the resolved path and the outcome.
+    let lines = r.audit.lines();
+    assert_eq!(lines[1]["tool"], "export_pdf");
+    assert_eq!(lines[1]["status"], "ok");
+    assert_eq!(lines[1]["effect"], "export");
+    assert_eq!(lines[2]["status"], "refused");
+    assert!(
+        lines[1]["path"]
+            .as_str()
+            .is_some_and(|p| p.ends_with("out.pdf"))
+    );
+    assert_eq!(ro.audit.lines()[1]["status"], "refused");
+}
+
+#[test]
+fn export_pdf_is_fenced_and_checks_the_extension_and_document() {
+    let scratch = Scratch::new("pdf-fence");
+    let docx = scratch.put("docx/plain-paragraphs.docx");
+    let xlsx = scratch.put("xlsx/formulas-basic.xlsx");
+    let mut r = rig(&scratch, true, true, true);
+    let id = r.open(&docx);
+    let outside = scratch.outside().join("x.pdf");
+    r.refused("export_pdf", json!({"document": id, "path": s(&outside)}));
+    r.refused(
+        "export_pdf",
+        json!({"document": id, "path": "../outside/x.pdf"}),
+    );
+    r.refused(
+        "export_pdf",
+        json!({"document": id, "path": r"\\server\share\x.pdf"}),
+    );
+    r.refused(
+        "export_pdf",
+        json!({"document": id, "path": "x.pdf:stream"}),
+    );
+    r.refused("export_pdf", json!({"document": id, "path": "NUL.pdf"}));
+    assert!(!outside.exists());
+    let (v, err) = r.call("export_pdf", json!({"document": id, "path": "x.docx"}));
+    assert!(err && v["status"] == "invalid", "{v}");
+    let x = r.open(&xlsx);
+    let (v, err) = r.call("export_pdf", json!({"document": x, "path": "x.pdf"}));
+    assert!(err && v["status"] == "invalid", "{v}");
+    assert!(!scratch.root().join("x.pdf").exists());
+}
+
+#[test]
+fn export_pdf_refuses_a_symlink_target() {
+    let scratch = Scratch::new("pdf-link");
+    let docx = scratch.put("docx/plain-paragraphs.docx");
+    let victim = scratch.outside().join("victim.pdf");
+    std::fs::write(&victim, b"keep").expect("write");
+    let link = scratch.root().join("link.pdf");
+    if !symlink(&victim, &link) {
+        return; // symlinks need privileges on some Windows set-ups
+    }
+    let mut r = rig(&scratch, true, true, false);
+    let id = r.open(&docx);
+    r.refused(
+        "export_pdf",
+        json!({"document": id, "path": "link.pdf", "overwrite": true}),
+    );
+    assert_eq!(std::fs::read(&victim).expect("read"), b"keep");
+}
+
+#[test]
+fn new_from_template_makes_documents_and_keeps_macros_unrun() {
+    let scratch = Scratch::new("template");
+    put_as(&scratch, "docx/template-basic.dotx", "t.dotx");
+    put_as(&scratch, "docx/template-macro.dotm", "m.dotm");
+    put_as(&scratch, "xlsx/template-basic.xltx", "t.xltx");
+    put_as(&scratch, "xlsx/template-macro.xltm", "m.xltm");
+    let mut ro = rig(&scratch, false, false, false);
+    let why = ro.refused(
+        "new_from_template",
+        json!({"path": "t.dotx", "output": "n.docx"}),
+    );
+    assert!(why.contains("--allow-edit"), "{why}");
+    assert!(!scratch.root().join("n.docx").exists());
+
+    let mut r = rig(&scratch, true, false, false);
+    for (t, o, vba) in [
+        ("t.dotx", "n.docx", false),
+        ("m.dotm", "n.docm", true),
+        ("t.xltx", "n.xlsx", false),
+        ("m.xltm", "n.xlsm", true),
+    ] {
+        let (v, err) = r.call("new_from_template", json!({"path": t, "output": o}));
+        assert!(!err, "{v}");
+        assert_eq!(v["vba_project"], vba, "{v}");
+        let made = scratch.root().join(o);
+        let part = if o.contains("doc") {
+            "word/vbaProject.bin"
+        } else {
+            "xl/vbaProject.bin"
+        };
+        assert_eq!(zip_has(&made, part), vba, "{o}");
+    }
+    // The new plain documents open as documents.
+    let id = r.open(&scratch.root().join("n.docx"));
+    let (v, err) = r.call("get_outline", json!({"document": id}));
+    assert!(!err, "{v}");
+    r.open(&scratch.root().join("n.xlsx"));
+
+    let lines = r.audit.lines();
+    assert_eq!(lines[0]["tool"], "new_from_template");
+    assert_eq!(lines[0]["effect"], "export");
+    assert_eq!(lines[0]["status"], "ok");
+}
+
+#[test]
+fn new_from_template_is_fenced_and_never_overwrites() {
+    let scratch = Scratch::new("template-fence");
+    put_as(&scratch, "docx/template-basic.dotx", "t.dotx");
+    let plain = scratch.put("docx/plain-paragraphs.docx");
+    std::fs::write(scratch.outside().join("t.dotx"), b"x").expect("write");
+    let mut r = rig(&scratch, true, false, false);
+    let outside = scratch.outside().join("t.dotx");
+    r.refused(
+        "new_from_template",
+        json!({"path": s(&outside), "output": "n.docx"}),
+    );
+    r.refused(
+        "new_from_template",
+        json!({"path": "t.dotx", "output": "../outside/n.docx"}),
+    );
+    r.refused(
+        "new_from_template",
+        json!({"path": "t.dotx", "output": r"\\server\share\n.docx"}),
+    );
+    // A document that is not a template, or the wrong output extension, is invalid.
+    let (v, err) = r.call(
+        "new_from_template",
+        json!({"path": "plain-paragraphs.docx", "output": "n.docx"}),
+    );
+    assert!(err && v["status"] == "invalid", "{v}");
+    let (v, err) = r.call(
+        "new_from_template",
+        json!({"path": "t.dotx", "output": "n.docm"}),
+    );
+    assert!(err && v["status"] == "invalid", "{v}");
+    let renamed = scratch.root().join("fake.dotx");
+    std::fs::copy(&plain, &renamed).expect("copy");
+    let (v, err) = r.call(
+        "new_from_template",
+        json!({"path": "fake.dotx", "output": "n.docx"}),
+    );
+    assert!(err && v["status"] == "invalid", "{v}");
+    assert!(!scratch.root().join("n.docx").exists());
+    assert!(!scratch.root().join("n.docm").exists());
+
+    let (_, err) = r.call(
+        "new_from_template",
+        json!({"path": "t.dotx", "output": "n.docx"}),
+    );
+    assert!(!err);
+    let first = std::fs::read(scratch.root().join("n.docx")).expect("read");
+    let why = r.refused(
+        "new_from_template",
+        json!({"path": "t.dotx", "output": "n.docx"}),
+    );
+    assert!(why.contains("overwrite"), "{why}");
+    let why = r.refused(
+        "new_from_template",
+        json!({"path": "t.dotx", "output": "n.docx", "overwrite": true}),
+    );
+    assert!(why.contains("--allow-destructive"), "{why}");
+    assert_eq!(
+        std::fs::read(scratch.root().join("n.docx")).expect("read"),
+        first
+    );
+}
+
+#[test]
+fn layout_summary_reports_pages_headings_and_tables_read_only() {
+    let scratch = Scratch::new("layout");
+    let heads = scratch.put("docx/styles-headings.docx");
+    let table = scratch.put("docx/layout-table-pages.docx");
+    let xlsx = scratch.put("xlsx/formulas-basic.xlsx");
+    let mut r = rig(&scratch, false, false, false);
+    let h = r.open(&heads);
+    let (v, err) = r.call("layout_summary", json!({"document": h}));
+    assert!(!err, "{v}");
+    assert_eq!(v["page_count"], 1);
+    assert_eq!(v["page_lines"].as_array().expect("lines").len(), 1);
+    assert!(v["page_lines"][0].as_u64().expect("n") > 0);
+    let heads_found = v["headings"].as_array().expect("headings");
+    assert!(heads_found.len() >= 2, "{v}");
+    assert_eq!(heads_found[0]["level"], 1);
+    assert_eq!(heads_found[0]["page"], 1);
+    assert!(v["notice"].as_str().is_some());
+
+    let t = r.open(&table);
+    let (v, err) = r.call("layout_summary", json!({"document": t}));
+    assert!(!err, "{v}");
+    assert!(v["page_count"].as_u64().expect("pages") >= 2, "{v}");
+    let tables = v["tables"].as_array().expect("tables");
+    assert!(!tables.is_empty(), "{v}");
+    assert!(tables[0]["rows"].as_u64().expect("rows") > 0);
+    assert!(tables[0]["columns"].as_u64().expect("cols") > 0);
+    assert!(v.to_string().len() < 64 * 1024);
+
+    let x = r.open(&xlsx);
+    let (v, err) = r.call("layout_summary", json!({"document": x}));
+    assert!(err && v["status"] == "invalid", "{v}");
+    let (v, err) = r.call("layout_summary", json!({"document": "doc99"}));
+    assert!(err && v["status"] == "invalid", "{v}");
+
+    let lines = r.audit.lines();
+    assert_eq!(lines[1]["tool"], "layout_summary");
+    assert_eq!(lines[1]["effect"], "read");
+    assert_eq!(lines[1]["status"], "ok");
+}
+
+#[test]
+fn evaluate_formula_is_read_only_and_leaves_the_file_alone() {
+    let scratch = Scratch::new("eval");
+    let xlsx = scratch.put("xlsx/formulas-basic.xlsx");
+    let before = std::fs::read(&xlsx).expect("read");
+    let mut r = rig(&scratch, false, false, false);
+    let id = r.open(&xlsx);
+    let (v, err) = r.call(
+        "evaluate_formula",
+        json!({"document": id, "sheet": 0, "cell": "Z1", "formula": "=1+2"}),
+    );
+    assert!(!err, "{v}");
+    assert_eq!(v["result"], json!({"type": "number", "value": 3.0}));
+    assert_eq!(v["saved"], false);
+    let (v, _) = r.call(
+        "evaluate_formula",
+        json!({"document": id, "sheet": 0, "cell": "Z1", "formula": "1/0"}),
+    );
+    assert_eq!(v["result"]["type"], "error");
+    // Errors: bad cell, bad formula, no such sheet, empty cell without formula, wrong type.
+    for args in [
+        json!({"document": id, "sheet": 0, "cell": "ZZZZ", "formula": "1"}),
+        json!({"document": id, "sheet": 0, "cell": "A1", "formula": "1+"}),
+        json!({"document": id, "sheet": 9, "cell": "A1", "formula": "1"}),
+        json!({"document": id, "sheet": 0, "cell": "Z9"}),
+        json!({"document": id, "sheet": 0, "cell": "A1", "formula": 5}),
+    ] {
+        let (v, err) = r.call("evaluate_formula", args);
+        assert!(err && v["status"] == "invalid", "{v}");
+    }
+    // Size cap: formulas over 8192 characters are refused.
+    let long = format!("1{}", "+1".repeat(5000));
+    let (v, err) = r.call(
+        "evaluate_formula",
+        json!({"document": id, "sheet": 0, "cell": "Z1", "formula": long}),
+    );
+    assert!(err, "{v}");
+    assert!(
+        v["error"].as_str().is_some_and(|e| e.contains("8192")),
+        "{v}"
+    );
+    // The open document is untouched and clean; closing needs no discard.
+    let (_, err) = r.call("close", json!({"document": id}));
+    assert!(!err);
+    assert_eq!(std::fs::read(&xlsx).expect("read"), before);
+    let lines = r.audit.lines();
+    let eval_lines: Vec<&Value> = lines
+        .iter()
+        .filter(|l| l["tool"] == "evaluate_formula")
+        .collect();
+    assert_eq!(eval_lines[0]["effect"], "read");
+    assert_eq!(eval_lines[0]["cell"], "Z1");
+    // The formula text is not logged, only its size.
+    assert!(!lines.iter().any(|l| l.to_string().contains("1+2")));
+    assert_eq!(eval_lines[0]["formula_chars"], 4);
+}
+
+#[test]
+fn evaluate_formula_cannot_see_hidden_content_unless_included() {
+    let scratch = Scratch::new("eval-hidden");
+    let path = scratch.root().join("h.xlsx");
+    std::fs::write(&path, hidden_rows_xlsx()).expect("write");
+    let args = |f: &str| json!({"document": "doc1", "sheet": 0, "cell": "E5", "formula": f});
+    let mut plain = rig(&scratch, false, false, false);
+    plain.open(&path);
+    for f in ["A2", "B2", "C1", "CONCAT(A1,A2,B2,C1,C3)"] {
+        let (v, err) = plain.call("evaluate_formula", args(f));
+        assert!(!err, "{v}");
+        assert!(!v.to_string().contains("SECRET"), "{f}: {v}");
+        assert_eq!(v["hidden_content_excluded"], true);
+    }
+    let (v, _) = plain.call("evaluate_formula", args("CONCAT(A1,A3)"));
+    assert_eq!(v["result"]["value"], "a1a3");
+    // A cell in a hidden row cannot be read back through its own formula either.
+    let (v, err) = plain.call(
+        "evaluate_formula",
+        json!({"document": "doc1", "sheet": 0, "cell": "A2"}),
+    );
+    assert!(err, "{v}");
+
+    let mut with = rig(&scratch, false, false, true);
+    with.open(&path);
+    let (v, _) = with.call("evaluate_formula", args("A2"));
+    assert_eq!(v["result"]["value"], "SECRET-A2");
+}
+
+#[test]
+fn evaluate_formula_cannot_reach_hidden_sheets() {
+    let scratch = Scratch::new("eval-hidden-sheet");
+    let path = scratch.put("xlsx/hidden-sheet.xlsx");
+    let mut all = rig(&scratch, false, false, true);
+    let aid = all.open(&path);
+    let (o, _) = all.call("get_outline", json!({"document": aid}));
+    let names: Vec<String> = o["sheets"]
+        .as_array()
+        .expect("sheets")
+        .iter()
+        .filter(|s| s["state"].as_str().is_some_and(|st| st != "visible"))
+        .map(|s| s["name"].as_str().expect("name").to_owned())
+        .collect();
+    assert!(!names.is_empty(), "{o}");
+    let mut r = rig(&scratch, false, false, false);
+    let id = r.open(&path);
+    for name in names {
+        let f = format!("'{name}'!A1");
+        let (v, err) = r.call(
+            "evaluate_formula",
+            json!({"document": id, "sheet": 0, "cell": "H9", "formula": f}),
+        );
+        assert!(!err, "{v}");
+        assert_ne!(
+            v["result"]["type"], "text",
+            "hidden sheet {name} leaked: {v}"
+        );
+    }
 }

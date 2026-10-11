@@ -398,3 +398,224 @@ fn docx_export_pdf_rejects_a_non_docx() {
     assert!(!o.status.success());
     assert!(!out.exists());
 }
+
+fn zip_has(path: &Path, name: &str) -> bool {
+    let file = std::fs::File::open(path).expect("open zip");
+    zip::ZipArchive::new(file)
+        .expect("zip")
+        .file_names()
+        .any(|n| n.is_ok_and(|n| n == name))
+}
+
+#[test]
+fn docx_layout_json_has_pages_lines_roles_and_cell_boxes() {
+    let o = run(&[
+        s("docx"),
+        s("layout"),
+        s("--json"),
+        &fixture("docx/styles-headings.docx"),
+    ]);
+    assert!(o.status.success(), "{}", stderr(&o));
+    let v: Value = serde_json::from_slice(&o.stdout).expect("json");
+    assert_eq!(v["page_count"], 1);
+    assert_eq!(v["truncated"], false);
+    let lines = v["pages"][0]["lines"].as_array().expect("lines");
+    assert_eq!(lines[0]["role"], "heading");
+    assert_eq!(lines[0]["level"], 1);
+    assert!(lines.iter().any(|l| l["role"] == "plain"));
+    assert!(v["pages"][0]["width"].as_f64().is_some());
+
+    let o = run(&[
+        s("docx"),
+        s("layout"),
+        s("--json"),
+        &fixture("docx/layout-table-basic.docx"),
+    ]);
+    let v: Value = serde_json::from_slice(&o.stdout).expect("json");
+    let cell = &v["pages"][0]["cells"][0];
+    for key in ["table", "row", "col", "x", "y", "width", "height"] {
+        assert!(cell[key].is_number(), "{key}: {cell}");
+    }
+}
+
+#[test]
+fn docx_layout_caps_pages_and_has_a_text_form() {
+    let f = fixture("docx/layout-table-basic.docx");
+    let o = run(&[
+        s("docx"),
+        s("layout"),
+        s("--json"),
+        s("--max-pages"),
+        s("1"),
+        &f,
+    ]);
+    let v: Value = serde_json::from_slice(&o.stdout).expect("json");
+    assert_eq!(v["pages"].as_array().expect("pages").len(), 1);
+    assert_eq!(v["truncated"], true);
+    assert!(v["page_count"].as_u64().expect("count") > 1);
+    let o = run(&[s("docx"), s("layout"), &f]);
+    assert!(stdout(&o).starts_with("2 pages"), "{}", stdout(&o));
+}
+
+#[test]
+fn docx_layout_rejects_a_bad_file() {
+    let scratch = Scratch::new("layout-bad");
+    let bad = scratch.write("bad.docx", "not a zip");
+    let o = run(&[s("docx"), s("layout"), s("--json"), &bad]);
+    assert!(!o.status.success());
+    assert!(o.stdout.is_empty());
+}
+
+#[test]
+fn xlsx_eval_evaluates_without_saving() {
+    let f = fixture("xlsx/formulas-basic.xlsx");
+    let before = std::fs::read(&f).expect("read");
+    let o = run(&[
+        s("xlsx"),
+        s("eval"),
+        &f,
+        s("--sheet"),
+        s("0"),
+        s("--cell"),
+        s("Z1"),
+        s("--formula"),
+        s("=SUM(A1:A3)"),
+    ]);
+    assert!(o.status.success(), "{}", stderr(&o));
+    let v: Value = serde_json::from_slice(&o.stdout).expect("json");
+    assert_eq!(v["result"]["type"], "number");
+    assert_eq!(v["saved"], false);
+    assert_eq!(std::fs::read(&f).expect("read"), before);
+    // An error value is a result, not a failure; a parse error is a failure.
+    let o = run(&[
+        s("xlsx"),
+        s("eval"),
+        &f,
+        s("--sheet"),
+        s("0"),
+        s("--cell"),
+        s("Z1"),
+        s("--formula"),
+        s("1/0"),
+    ]);
+    let v: Value = serde_json::from_slice(&o.stdout).expect("json");
+    assert_eq!(v["result"]["value"], "#DIV/0!");
+    for (sheet, cell, formula) in [("0", "Z1", "1+"), ("nope", "A1", "1"), ("0", "??", "1")] {
+        let o = run(&[
+            s("xlsx"),
+            s("eval"),
+            &f,
+            s("--sheet"),
+            s(sheet),
+            s("--cell"),
+            s(cell),
+            s("--formula"),
+            s(formula),
+        ]);
+        assert!(!o.status.success(), "{sheet} {cell} {formula}");
+        assert!(o.stdout.is_empty());
+    }
+}
+
+#[test]
+fn xlsx_eval_rejects_a_docx() {
+    let f = fixture("docx/plain-paragraphs.docx");
+    let o = run(&[
+        s("xlsx"),
+        s("eval"),
+        &f,
+        s("--sheet"),
+        s("0"),
+        s("--cell"),
+        s("A1"),
+        s("--formula"),
+        s("1"),
+    ]);
+    assert!(!o.status.success());
+}
+
+#[test]
+fn new_from_template_writes_documents_and_refuses_to_overwrite() {
+    let scratch = Scratch::new("template");
+    let docx = scratch.path("n.docx");
+    let o = run(&[
+        s("docx"),
+        s("new-from-template"),
+        &fixture("docx/template-basic.dotx"),
+        s("-o"),
+        &docx,
+    ]);
+    assert!(o.status.success(), "{}", stderr(&o));
+    assert!(zip_has(&docx, "word/document.xml"));
+    let first = std::fs::read(&docx).expect("read");
+    let again = run(&[
+        s("docx"),
+        s("new-from-template"),
+        &fixture("docx/template-basic.dotx"),
+        s("-o"),
+        &docx,
+    ]);
+    assert!(!again.status.success());
+    assert!(stderr(&again).contains("--overwrite"), "{}", stderr(&again));
+    assert_eq!(std::fs::read(&docx).expect("read"), first);
+    let over = run(&[
+        s("docx"),
+        s("new-from-template"),
+        &fixture("docx/template-basic.dotx"),
+        s("-o"),
+        &docx,
+        s("--overwrite"),
+    ]);
+    assert!(over.status.success(), "{}", stderr(&over));
+
+    let macro_out = scratch.path("m.xlsm");
+    let o = run(&[
+        s("xlsx"),
+        s("new-from-template"),
+        &fixture("xlsx/template-macro.xltm"),
+        s("-o"),
+        &macro_out,
+    ]);
+    assert!(o.status.success(), "{}", stderr(&o));
+    assert!(zip_has(&macro_out, "xl/vbaProject.bin"), "macros are kept");
+
+    let word_macro = scratch.path("m.docm");
+    let o = run(&[
+        s("docx"),
+        s("new-from-template"),
+        &fixture("docx/template-macro.dotm"),
+        s("-o"),
+        &word_macro,
+    ]);
+    assert!(o.status.success(), "{}", stderr(&o));
+    assert!(zip_has(&word_macro, "word/vbaProject.bin"));
+}
+
+#[test]
+fn new_from_template_checks_kinds_and_extensions() {
+    let scratch = Scratch::new("template-bad");
+    let plain = fixture("docx/plain-paragraphs.docx");
+    let out = scratch.path("n.docx");
+    // Not a template.
+    let o = run(&[s("docx"), s("new-from-template"), &plain, s("-o"), &out]);
+    assert!(!o.status.success());
+    // Wrong subcommand for the template, and wrong output extension.
+    let t = fixture("docx/template-basic.dotx");
+    let o = run(&[
+        s("xlsx"),
+        s("new-from-template"),
+        &t,
+        s("-o"),
+        &scratch.path("n.xlsx"),
+    ]);
+    assert!(!o.status.success());
+    let o = run(&[
+        s("docx"),
+        s("new-from-template"),
+        &t,
+        s("-o"),
+        &scratch.path("n.docm"),
+    ]);
+    assert!(!o.status.success());
+    assert!(!out.exists() && !scratch.path("n.docm").exists());
+}
