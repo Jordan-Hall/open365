@@ -283,6 +283,16 @@ pub fn export_pdf(
     Ok(PdfOutput { bytes, warnings })
 }
 
+/// True when `text` is one character that `shown` only draws in another case: a character set in
+/// capitals or small capitals, which Word's PDF copies as the capital.
+fn differs_by_case(text: &str, shown: char) -> bool {
+    let mut it = text.chars();
+    match (it.next(), it.next()) {
+        (Some(c), None) => c != shown && c.to_uppercase().eq(shown.to_uppercase()),
+        _ => false,
+    }
+}
+
 /// The text each glyph stands for, from the layout's clusters. A glyph whose cluster is several
 /// characters (a ligature) or that the font's cmap does not describe gets an entry of its own
 /// for the ToUnicode CMap; the second map is what the CMap will say for every glyph, to find the
@@ -312,7 +322,10 @@ fn cluster_text(
             }
             let face = g.face.index();
             let described = rev.get(&face).and_then(|m| m.get(&g.glyph_id));
-            if described.is_none() || text.chars().nth(1).is_some() {
+            // Capitals and small capitals: the glyph shown is the capital, and Word's PDF copies
+            // the capital (no ActualText), so the reverse cmap stands.
+            let shown_case = described.is_some_and(|c| differs_by_case(text, *c));
+            if !shown_case && (described.is_none() || text.chars().nth(1).is_some()) {
                 extra
                     .entry(face)
                     .or_default()
@@ -494,12 +507,19 @@ impl Export<'_> {
             if t.is_empty() {
                 continue;
             }
-            text.push_str(t);
-            if !t.chars().any(private)
-                && self
-                    .to_unicode
-                    .get(&(g.face.index(), g.glyph_id))
-                    .is_none_or(|u| u != t)
+            let mapped = self.to_unicode.get(&(g.face.index(), g.glyph_id));
+            let shown_case = mapped.is_some_and(|u| {
+                let mut it = u.chars();
+                matches!((it.next(), it.next()), (Some(c), None) if differs_by_case(t, c))
+            });
+            text.push_str(if shown_case {
+                mapped.map_or(t, String::as_str)
+            } else {
+                t
+            });
+            if !shown_case
+                && !t.chars().any(private)
+                && mapped.is_none_or(|u| u != t)
                 && !t.chars().all(|c| c.is_control())
             {
                 differs = true;

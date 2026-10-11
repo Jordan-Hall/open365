@@ -72,6 +72,11 @@ caller's library, not from the document.
   not displace text; no EMF/WMF/SVG pictures (warning), no tiling
   patterns for stripe shading (fill colour only), no text rendering modes for outline/shadow.
 - Colour is DeviceRGB, no output intent, no encryption.
+- Caps and small caps copy as the displayed capitals. Evidence (Word 16.0.20430, `ExportAsFixedFormat`
+  of `fixtures/docx/layout-caps-chars.docx`): the PDF has no `/ActualText` at all, and the font's
+  ToUnicode CMap maps the glyph of a small-cap "n" to U+004E. We match it: a cluster whose text
+  differs from the glyph's reverse-`cmap` character only by case gets no CMap override and no
+  `ActualText`. The round-trip test compares `layout-caps*` paragraphs case-insensitively.
 - `ActualText` is per line, not per glyph run, and compares against the CMap only; it is not
   validated with an external checker.
 

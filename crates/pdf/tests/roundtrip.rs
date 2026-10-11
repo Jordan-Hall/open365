@@ -109,7 +109,11 @@ fn glyph_positions_and_text_round_trip() {
             let got: String = got.chars().filter(|c| !c.is_whitespace()).collect();
             text_lines += 1;
             // Rows of exact height clip their text: the layout draws a prefix.
-            let ok = if name == "layout-table-rows" {
+            // Caps and small caps: Word's PDF copies the displayed capitals (no ActualText), so
+            // only the case may differ (docs/architecture/pdf-export.md).
+            let ok = if name.starts_with("layout-caps") {
+                got.to_lowercase() == want.to_lowercase()
+            } else if name == "layout-table-rows" {
                 want.starts_with(&got)
             } else if labels[*idx].is_some() {
                 got.ends_with(&want)
