@@ -41,6 +41,9 @@ pub enum Func {
     Res(fn(&EvalContext<'_>, &[Arg]) -> Result<Value, ErrorKind>),
     /// Returns an argument as-is, so references pass through (`IF`, `CHOOSE`).
     Arg(fn(&EvalContext<'_>, &[Arg]) -> Arg),
+    /// Implemented by the evaluator (`LET`, `LAMBDA`, `MAP`, ...): it needs the unevaluated arguments or calls
+    /// back into the evaluator. Registered so the function is known, not callable through the table.
+    Lazy,
 }
 
 static TABLE: &[(&str, Func)] = &[
@@ -198,6 +201,7 @@ static TABLE: &[(&str, Func)] = &[
     ("ISODD", Func::Res(info::isodd)),
     ("ISREF", Func::Res(info::isref)),
     ("ISFORMULA", Func::Res(info::isformula)),
+    ("FORMULATEXT", Func::Res(info::formulatext)),
     ("TYPE", Func::Res(info::type_)),
     ("ERROR.TYPE", Func::Res(info::error_type)),
     ("ROWS", Func::Res(refs::rows)),
@@ -257,7 +261,17 @@ static TABLE: &[(&str, Func)] = &[
     ("INDEX", Func::Arg(lookup::index)),
     ("MATCH", Func::Res(lookup::match_)),
     ("XLOOKUP", Func::Res(lookup::xlookup)),
+    ("XMATCH", Func::Res(lookup::xmatch)),
     ("CHOOSE", Func::Arg(lookup::choose)),
+    ("LET", Func::Lazy),
+    ("LAMBDA", Func::Lazy),
+    ("MAP", Func::Lazy),
+    ("REDUCE", Func::Lazy),
+    ("SCAN", Func::Lazy),
+    ("BYROW", Func::Lazy),
+    ("BYCOL", Func::Lazy),
+    ("MAKEARRAY", Func::Lazy),
+    ("ISOMITTED", Func::Lazy),
     // engineering
     ("BIN2DEC", Func::Res(engineering::bin2dec)),
     ("BIN2OCT", Func::Res(engineering::bin2oct)),
@@ -376,11 +390,14 @@ pub(crate) fn is_array_param(name: &str, index: usize) -> bool {
         index == 0
     } else if name.eq_ignore_ascii_case("XLOOKUP") || name.eq_ignore_ascii_case("LOOKUP") {
         index == 1 || index == 2
+    } else if name.eq_ignore_ascii_case("XMATCH") {
+        index == 1
     } else if name.eq_ignore_ascii_case("ROWS") || name.eq_ignore_ascii_case("COLUMNS") {
         true
     } else {
         [
             "SUMPRODUCT",
+            "ARRAYTOTEXT",
             "SORT",
             "SORTBY",
             "UNIQUE",
@@ -423,6 +440,7 @@ pub(crate) fn takes_reference(name: &str) -> bool {
         "COLUMNS",
         "ISREF",
         "ISFORMULA",
+        "FORMULATEXT",
         "AREAS",
     ]
     .iter()
@@ -670,6 +688,7 @@ static LIFTING: &[(&str, Lifting)] = &[
         },
     ),
     ("MATCH", lift(not_second)),
+    ("XMATCH", lift(only_first)),
     ("SUMIF", lift(only_second)),
     ("COUNTIF", lift(only_second)),
     ("AVERAGEIF", lift(only_second)),

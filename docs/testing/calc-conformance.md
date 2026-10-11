@@ -66,7 +66,7 @@ forms; the corpus has no case for them.
 
 ## Current state
 
-50,620 cases, 50,414 pass, 206 known differences listed in `known-differences.toml` (158 older ones and 48 from the third batch).
+52,555 cases, 52,336 pass, 219 known differences listed in `known-differences.toml` (158 older ones, 47 from the third batch, 14 from the fourth).
 Older entries: the `**` parse quirk, XLOOKUP array results (no spill), a
 few undocumented Excel quirks, large COMBIN, variance accumulation order, accounting fill, `DB` last period and two `IFERROR`
 over arrays of references. New entries: SINH/TANH below |x| = 1 (last digits) and one `x^-5000` case. The test also fails for a
@@ -307,3 +307,32 @@ dynamic-array results are compared through `ARRAYTOTEXT(f,1)` because the oracle
 * Array functions: `TRANSPOSE` takes the implicit intersection of a reference; `SEQUENCE` rows or columns below 0 or above the sheet are `#VALUE!`, 0 is `#CALC!`; `SORTBY` with four
   or six arguments is refused; index arguments of CHOOSECOLS/ROWS are scalar parameters (a 2-D array or a multi-cell reference is `#VALUE!`); HSTACK/VSTACK with an omitted argument is `#VALUE!`;
   `HYPERLINK` without a friendly name returns the link as text, with an omitted one 0.
+
+Fourth batch (`let`, `let2`, `lambda`, `map`, `reduce`, `scan`, `byrow`, `bycol`, `makearray`, `nest`, `xmatch`, `xmatch2`, `formulatext`; 1,935 cases;
+the oracle runs `Range.Formula`, so array results are compared through `ARRAYTOTEXT(f,1)`):
+
+* Mode: `LET` values and bodies and lambda bodies are not evaluated in array mode, even inside an array parameter. A name bound to an array
+  (`LET(x,{1,2,3},..)`, a lambda parameter) that an operator or a scalar-parameter function consumes there is its first element
+  (`x+1` is 2, `ABS(x)` is 1, `TYPE(x)` is 1, `TRANSPOSE(x)` is `{1}`); a name bound to a range still takes the implicit intersection; a computed array
+  (`SEQUENCE(3)+1`) still lifts. Where another argument is a computed array that lifts the call (`CHOOSE({1,2},x,x)`) the names lift too.
+  `ARRAYTOTEXT` evaluates its first argument in array mode (`ARRAYTOTEXT(A1:A3*2,1)` is `{2;4;6}`); `TYPE` of a multi-cell range there is 64.
+* Lambdas: parameters must match exactly (`#VALUE!`), optional ones are written `[y]`, an omitted argument (`f(1,)`) is allowed and `ISOMITTED` is TRUE for it,
+  `ISOMITTED` of anything that is not a parameter is FALSE. A lambda captures the names visible where it is written (a `LET` name defined later,
+  or the lambda itself, is `#NAME?`). `LET`/`LAMBDA` names may not contain a period and may not repeat; names that look like cells (`x1`, `Q9`) are fine
+  and hide the cell. A function name used as a value (`MAP(a,SUM)`, `LET(f,ABS,f(-1))`) is a lambda over that function. A lambda value is `#CALC!` in a cell,
+  `TYPE` 128, `ISNONTEXT` TRUE, the other `IS*` FALSE, `COUNTA` 1, `ARRAYTOTEXT` `λ`, other functions `#VALUE!`; `INDEX`, `TRANSPOSE`, `IFERROR` pass it through.
+* `MAP`: arrays of different size give `#N/A` outside the smaller one (no broadcasting of a row against a column); a scalar mixed with arrays, or two scalars, is `#VALUE!`;
+  one scalar is mapped as 1x1; an error value as the only argument (or all scalar) is the result. Range arguments hand the lambda cell references.
+  A lambda result that is an array is `#CALC!`. `REDUCE`/`SCAN` need all three arguments (row-major order, the accumulator may be an array for `REDUCE`);
+  `BYROW`/`BYCOL` with only the array are `#CALC!`, the lambda must have one parameter; a single-element part is passed as a plain value. `MAKEARRAY` dimensions must be
+  integers from 1 (`1.9` and `0` are `#VALUE!`, `"2"` is fine, an array takes its first element); sizes are not capped by the sheet (`COLUMNS` of 16,385 works).
+* `ARRAYTOTEXT`/`VALUETOTEXT` longer than 32,767 characters are `#CALC!`; `ARRAYTOTEXT({#N/A},1)` is `{#N/A}` (only a bare error is returned).
+  `INDEX(error,n)` is that error; `INDEX` of an array with one index returns the row.
+* `XMATCH` shares the search of `XLOOKUP`. The mode arguments are rounded down (`-1.5` is `-2` and invalid, `1.5` is 1).
+* `FORMULATEXT`: first cell of the reference; `#N/A` without a formula; a plus sign before a number literal is dropped.
+* Known residue (`known-differences.toml`): `match_mode` 3 (regular-expression match, no regex engine); `@` inserted by Excel where a range or array could
+  spill (6 cases); redundant parentheses and sheet-name case in `FORMULATEXT` (3 cases; Excel also keeps typed whitespace, not modelled and not tested);
+  a lambda returned from `REDUCE`/`SCAN`/`MAP` elements (Excel shows `λ` in arrays).
+* Excel quirks recorded but not tested: `LAMBDA(a,b,IFERROR(b,a))(1,2)` crashes Excel over COM (the oracle restarts it); `ROW(param)` inside
+  `MAP`/`BYROW` is `#VALUE!` but works in `REDUCE`; `COUNTBLANK(array parameter)` makes `BYROW`/`BYCOL` `#CALC!`; `TRANSPOSE(range)` inside
+  `BYROW` is `#VALUE!` for the whole call; `LET(A1,5,A2)` is `#NAME?`; `	` and `SUM (A2)` are refused as input formulas.

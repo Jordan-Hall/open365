@@ -133,6 +133,21 @@ fn is_word_char(c: char) -> bool {
     c.is_alphanumeric() || matches!(c, '_' | '\\' | '$' | '.')
 }
 
+/// Length in characters of an optional-parameter marker such as `[y]` starting at `chars[i]` (a name in
+/// square brackets, only meaningful inside `LAMBDA(..)`), if there is one.
+fn optional_param_len(chars: &[(usize, char)], i: usize) -> Option<usize> {
+    let plain = |c: char| is_word_char(c) && c != '$' && c != '\\';
+    let first = chars.get(i + 1)?.1;
+    if !is_word_start(first) || !plain(first) {
+        return None;
+    }
+    let mut j = i + 1;
+    while chars.get(j).is_some_and(|&(_, c)| plain(c)) {
+        j += 1;
+    }
+    (chars.get(j).map(|&(_, c)| c) == Some(']')).then_some(j + 1 - i)
+}
+
 fn tokenize(src: &str, base: usize) -> Result<Vec<Token>, ParseError> {
     let chars: Vec<(usize, char)> = src.char_indices().collect();
     let at = |i: usize| chars.get(i).map(|&(_, c)| c);
@@ -282,6 +297,18 @@ fn tokenize(src: &str, base: usize) -> Result<Vec<Token>, ParseError> {
                     (')', _) => (Tok::RParen, 1),
                     ('{', _) => (Tok::LBrace, 1),
                     ('}', _) => (Tok::RBrace, 1),
+                    ('[', _) if optional_param_len(&chars, i).is_some() => {
+                        let len = optional_param_len(&chars, i).unwrap_or(1);
+                        let word: String = chars[i..i + len].iter().map(|&(_, c)| c).collect();
+                        i += len;
+                        out.push(Token {
+                            tok: Tok::Word(word),
+                            pos,
+                            space_before: space,
+                        });
+                        space = false;
+                        continue;
+                    }
                     ('[', _) => {
                         return err(
                             ParseErrorKind::Unsupported("external workbook reference"),
@@ -496,7 +523,7 @@ impl Parser {
                 if close.tok != Tok::RParen {
                     return self.unexpected(&close);
                 }
-                Ok(inner)
+                self.invoke_chain(inner)
             }
             Tok::LBrace => self.array(),
             Tok::Func(name) => self.call(&name),
@@ -517,10 +544,16 @@ impl Parser {
             }
             _ => (raw_name.to_ascii_uppercase(), false),
         };
+        let args = self.call_args()?;
+        self.invoke_chain(Ast::Func { name, xlfn, args })
+    }
+
+    /// The arguments of a call, after the opening parenthesis, up to and including the closing one.
+    fn call_args(&mut self) -> Result<Vec<Ast>, ParseError> {
         let mut args = Vec::new();
         if self.peek().tok == Tok::RParen {
             self.advance();
-            return Ok(Ast::Func { name, xlfn, args });
+            return Ok(args);
         }
         loop {
             if matches!(self.peek().tok, Tok::Comma | Tok::RParen) {
@@ -535,7 +568,21 @@ impl Parser {
                 _ => return self.unexpected(&sep),
             }
         }
-        Ok(Ast::Func { name, xlfn, args })
+        Ok(args)
+    }
+
+    /// `LAMBDA(x,x+1)(2)`, `(f)(2)`: a parenthesis directly after a call or a parenthesised expression calls
+    /// the value it produced.
+    fn invoke_chain(&mut self, mut callee: Ast) -> Result<Ast, ParseError> {
+        while self.peek().tok == Tok::LParen && !self.peek().space_before {
+            self.advance();
+            let args = self.call_args()?;
+            callee = Ast::Invoke {
+                callee: Box::new(callee),
+                args,
+            };
+        }
+        Ok(callee)
     }
 
     fn array(&mut self) -> Result<Ast, ParseError> {

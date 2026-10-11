@@ -83,3 +83,26 @@ pub(super) fn error_type(ctx: &EvalContext<'_>, args: &[Arg]) -> Res<Value> {
         _ => Err(ErrorKind::NA),
     }
 }
+
+/// The first cell of a reference argument, for the functions that read the formula or position of a cell.
+fn first_cell(arg: &Arg) -> Res<&crate::eval::RangeRef> {
+    match arg {
+        Arg::Range(r) => Ok(r),
+        Arg::Union(rs) => rs.first().ok_or(ErrorKind::Value),
+        Arg::Value(Value::Error(e)) => Err(*e),
+        _ => Err(ErrorKind::Value),
+    }
+}
+
+/// `FORMULATEXT`: the formula of the first cell of the reference, `#N/A` when the cell holds no formula.
+pub(super) fn formulatext(ctx: &EvalContext<'_>, args: &[Arg]) -> Res<Value> {
+    arity(args, 1, 1)?;
+    let range = first_cell(&args[0])?;
+    if !ctx.source.sheet_exists(&range.sheet) {
+        return Err(ErrorKind::NA);
+    }
+    ctx.source
+        .formula_text(&range.sheet, range.row1, range.col1)
+        .map(Value::Text)
+        .ok_or(ErrorKind::NA)
+}

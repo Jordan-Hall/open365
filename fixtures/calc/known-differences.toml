@@ -822,9 +822,61 @@ id = "dvarp.c0366"
 reason = "Database variance/standard deviation with heavy cancellation: Excel's accumulation order is not identified (sum-of-squares form matches 20 of 26 variance groups; two-pass matches others); result differs in the last 5 to 12 digits."
 
 [[difference]]
-id = "unique.c0287"
-reason = "ARRAYTOTEXT of a one-element array holding an error: Excel prints {#VALUE!}, Open365 returns the error itself."
-
-[[difference]]
 id = "areas.c0024"
 reason = "AREAS of a lookup result: Excel's XLOOKUP returns a reference (area count 1); Open365 returns a value."
+
+[[difference]]
+id = "xmatch.misc_mm_bad"
+reason = "Excel accepts match_mode 3 for XMATCH (and XLOOKUP): it is a regular-expression match (XMATCH(\"a*\",{\"b\",\"a\"},3) is 1, so the pattern matches anywhere in the text; numbers are matched as their text). Open365 has no regular-expression engine and returns #VALUE!."
+
+[[difference]]
+id = "xmatch2.c0026"
+reason = "Same as xmatch.misc_mm_bad (match_mode 3 is a regular-expression match)."
+
+[[difference]]
+id = "formulatext.c0030"
+reason = "Excel rewrites the sheet name of a reference to the sheet's real spelling (`sheet2!A1` becomes `Sheet2!A1`); Open365 prints the name as typed."
+
+[[difference]]
+id = "formulatext.c0059"
+reason = "Excel stores a formula entered through Range.Formula with the implicit-intersection operator `@` wherever a range could spill (`=@A2:A3`); Open365 does not model where `@` is inserted."
+
+[[difference]]
+id = "formulatext.c0060"
+reason = "Same as formulatext.c0059 (`@` before an array constant)."
+
+[[difference]]
+id = "formulatext.c0061"
+reason = "Same as formulatext.c0059 (`@` before a column range)."
+
+[[difference]]
+id = "formulatext.c0062"
+reason = "Same as formulatext.c0059 (`@` before a row range)."
+
+[[difference]]
+id = "formulatext.c0063"
+reason = "Same as formulatext.c0059 (`@` before a function that returns an array)."
+
+[[difference]]
+id = "formulatext.c0064"
+reason = "Same as formulatext.c0059 (`@LAMBDA(x,@x+1)(2)`)."
+
+[[difference]]
+id = "formulatext.c0065"
+reason = "Same as formulatext.c0059 (`@MAP(..)`)."
+
+[[difference]]
+id = "formulatext.c0066"
+reason = "Excel keeps redundant parentheses in the stored formula text (`=(1)+2`); Open365's parser drops them, so FORMULATEXT prints `=1+2`."
+
+[[difference]]
+id = "formulatext.c0067"
+reason = "Same as formulatext.c0066 (`=((1))`)."
+
+[[difference]]
+id = "reduce.c0106"
+reason = "A REDUCE whose lambda returns a lambda yields a lambda value; ARRAYTOTEXT shows it as the text \"λ\" in Excel. Open365 has no lambda element in a result array and returns #CALC!."
+
+[[difference]]
+id = "scan.c0106"
+reason = "Same as reduce.c0106 (SCAN accumulating lambdas)."

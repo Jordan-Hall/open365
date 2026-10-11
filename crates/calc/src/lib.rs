@@ -589,6 +589,12 @@ impl CellSource for Engine {
             .is_some_and(|c| c.formula.is_some())
     }
 
+    fn formula_text(&self, sheet: &str, row: u32, col: u32) -> Option<String> {
+        self.cell_data(sheet, row, col)
+            .and_then(|c| c.formula.as_ref())
+            .map(|f| format!("={}", ast::to_stored_formula_string(&f.ast)))
+    }
+
     fn is_subtotal(&self, sheet: &str, row: u32, col: u32) -> bool {
         self.cell_data(sheet, row, col)
             .and_then(|c| c.formula.as_ref())

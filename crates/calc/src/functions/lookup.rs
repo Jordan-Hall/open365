@@ -292,6 +292,9 @@ fn index_inner(ctx: &EvalContext<'_>, args: &[Arg]) -> Res<Arg> {
     if args.len() == 4 && int_arg(ctx, &args[3])? != 1 {
         return Err(ErrorKind::Ref);
     }
+    if let Arg::Value(Value::Error(e)) = &args[0] {
+        return Err(*e);
+    }
     let grid = table_grid(ctx, &args[0])?;
     let (rows, cols) = (grid.rows(), grid.cols());
     let first = int_arg(ctx, &args[1])?;
@@ -301,6 +304,8 @@ fn index_inner(ctx: &EvalContext<'_>, args: &[Arg]) -> Res<Arg> {
         Some(c) => (first, c),
         None if rows == 1 => (1, first),
         None if cols == 1 => (first, 1),
+        // An array constant or computed array with one index gives the whole row.
+        None if !matches!(args[0], Arg::Range(_)) => (first, 0),
         None => return Err(ErrorKind::Ref),
     };
     if r < 0 || c < 0 {
@@ -344,19 +349,18 @@ fn index_inner(ctx: &EvalContext<'_>, args: &[Arg]) -> Res<Arg> {
     }))
 }
 
-pub(super) fn xlookup(ctx: &EvalContext<'_>, args: &[Arg]) -> Res<Value> {
-    arity(args, 3, 6)?;
-    // A blank lookup value matches blank cells (not zero).
-    let lookup = scalar(ctx, &args[0])?;
-    let keys = table_grid(ctx, &args[1])?;
-    let results = table_grid(ctx, &args[2])?;
-    let match_mode = match optional(args, 4) {
+/// The `match_mode` and `search_mode` arguments of `XLOOKUP` and `XMATCH` (arguments 4 and 5 of
+/// `XLOOKUP`, 3 and 4 of `XMATCH`), checked.
+fn lookup_modes(ctx: &EvalContext<'_>, args: &[Arg], first: usize) -> Res<(i64, i64)> {
+    // The mode arguments are rounded down (`-1.5` is `-2`, which is invalid), not truncated.
+    let mode = |a: &Arg| -> Res<i64> { Ok(num_arg(ctx, a)?.floor() as i64) };
+    let match_mode = match optional(args, first) {
         None => 0,
-        Some(a) => int_arg(ctx, a)?,
+        Some(a) => mode(a)?,
     };
-    let search_mode = match optional(args, 5) {
+    let search_mode = match optional(args, first + 1) {
         None => 1,
-        Some(a) => int_arg(ctx, a)?,
+        Some(a) => mode(a)?,
     };
     if !(-1..=2).contains(&match_mode) || !matches!(search_mode, -2 | -1 | 1 | 2) {
         return Err(ErrorKind::Value);
@@ -365,6 +369,50 @@ pub(super) fn xlookup(ctx: &EvalContext<'_>, args: &[Arg]) -> Res<Value> {
     if match_mode == 2 && search_mode.abs() == 2 {
         return Err(ErrorKind::Value);
     }
+    Ok((match_mode, search_mode))
+}
+
+/// The position (0-based) of `lookup` in the vector `keys`, if it is there.
+fn locate(
+    lookup: &Value,
+    keys: &Grid<'_>,
+    vertical: bool,
+    n: usize,
+    match_mode: i64,
+    search_mode: i64,
+) -> Option<usize> {
+    let get = |i: usize| {
+        if vertical {
+            keys.get(i, 0)
+        } else {
+            keys.get(0, i)
+        }
+    };
+    let reverse = search_mode < 0;
+    let mut found = if search_mode.abs() == 2 {
+        binary_search(lookup, n, &get, reverse, match_mode)
+    } else {
+        let mut f = find_exact(lookup, n, &get, reverse, match_mode == 2);
+        if f.is_none() && (match_mode == 1 || match_mode == -1) {
+            f = nearest(lookup, n, &get, reverse, match_mode == 1);
+        }
+        f
+    };
+    let full_len = if vertical { keys.rows() } else { keys.cols() };
+    if found.is_none() && *lookup == Value::Empty && n < full_len {
+        // The blank cells past the used area of a whole-column reference.
+        found = Some(n);
+    }
+    found
+}
+
+pub(super) fn xlookup(ctx: &EvalContext<'_>, args: &[Arg]) -> Res<Value> {
+    arity(args, 3, 6)?;
+    // A blank lookup value matches blank cells (not zero).
+    let lookup = scalar(ctx, &args[0])?;
+    let keys = table_grid(ctx, &args[1])?;
+    let results = table_grid(ctx, &args[2])?;
+    let (match_mode, search_mode) = lookup_modes(ctx, args, 4)?;
     let (vertical, n) = vector_shape(&keys).map_err(|_| ErrorKind::Value)?;
     let expected = if vertical { keys.rows() } else { keys.cols() };
     let actual = if vertical {
@@ -375,29 +423,7 @@ pub(super) fn xlookup(ctx: &EvalContext<'_>, args: &[Arg]) -> Res<Value> {
     if expected != actual {
         return Err(ErrorKind::Value);
     }
-    let get = |i: usize| {
-        if vertical {
-            keys.get(i, 0)
-        } else {
-            keys.get(0, i)
-        }
-    };
-    let reverse = search_mode < 0;
-    let mut found = if search_mode.abs() == 2 {
-        binary_search(&lookup, n, &get, reverse, match_mode)
-    } else {
-        let mut f = find_exact(&lookup, n, &get, reverse, match_mode == 2);
-        if f.is_none() && (match_mode == 1 || match_mode == -1) {
-            f = nearest(&lookup, n, &get, reverse, match_mode == 1);
-        }
-        f
-    };
-    let full_len = if vertical { keys.rows() } else { keys.cols() };
-    if found.is_none() && lookup == Value::Empty && n < full_len {
-        // The blank cells past the used area of a whole-column reference.
-        found = Some(n);
-    }
-    let Some(i) = found else {
+    let Some(i) = locate(&lookup, &keys, vertical, n, match_mode, search_mode) else {
         return match optional(args, 3) {
             Some(fallback) => Ok(ctx.scalar(fallback)),
             None => Err(ErrorKind::NA),
@@ -420,6 +446,19 @@ pub(super) fn xlookup(ctx: &EvalContext<'_>, args: &[Arg]) -> Res<Value> {
                 .collect(),
         )
     })
+}
+
+/// `XMATCH(lookup, array, [match_mode], [search_mode])`: the position of the match, counted from 1.
+pub(super) fn xmatch(ctx: &EvalContext<'_>, args: &[Arg]) -> Res<Value> {
+    arity(args, 2, 4)?;
+    let lookup = scalar(ctx, &args[0])?;
+    let keys = table_grid(ctx, &args[1])?;
+    let (match_mode, search_mode) = lookup_modes(ctx, args, 2)?;
+    let (vertical, n) = vector_shape(&keys).map_err(|_| ErrorKind::Value)?;
+    match locate(&lookup, &keys, vertical, n, match_mode, search_mode) {
+        Some(i) => Ok(Value::Number((i + 1) as f64)),
+        None => Err(ErrorKind::NA),
+    }
 }
 
 /// `XLOOKUP` with `search_mode` 2 (ascending data) or -2 (descending data): a plain binary search that

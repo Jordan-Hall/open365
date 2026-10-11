@@ -172,8 +172,9 @@ fn format_arg(ctx: &EvalContext<'_>, args: &[Arg]) -> Res<bool> {
 }
 
 fn limited(s: String) -> Res<Value> {
+    // Excel answers `#CALC!`, not `#VALUE!`, for a result longer than a cell can hold.
     if s.encode_utf16().count() > MAX_TEXT {
-        Err(ErrorKind::Value)
+        Err(ErrorKind::Calc)
     } else {
         Ok(Value::Text(s))
     }
@@ -191,7 +192,9 @@ pub(super) fn arraytotext(ctx: &EvalContext<'_>, args: &[Arg]) -> Res<Value> {
     arity(args, 1, 2)?;
     let strict = format_arg(ctx, args)?;
     let rows: Vec<Vec<Value>> = match &args[0] {
-        Arg::Missing | Arg::Union(_) | Arg::Refs(_) => return Err(ErrorKind::Value),
+        Arg::Missing | Arg::Union(_) | Arg::Refs(_) | Arg::Lambda(_) => {
+            return Err(ErrorKind::Value);
+        }
         Arg::Value(v) => vec![vec![v.clone()]],
         Arg::Array(rows) => rows.clone(),
         Arg::Range(_) => {
@@ -204,7 +207,8 @@ pub(super) fn arraytotext(ctx: &EvalContext<'_>, args: &[Arg]) -> Res<Value> {
     let single = rows.len() == 1 && rows[0].len() == 1;
     if single {
         match &rows[0][0] {
-            Value::Error(e) => return Err(*e),
+            // `ARRAYTOTEXT(#N/A)` is the error, `ARRAYTOTEXT({#N/A},1)` the text `{#N/A}`.
+            Value::Error(e) if !matches!(args[0], Arg::Array(_)) => return Err(*e),
             Value::Empty if matches!(args[0], Arg::Range(_)) => return Err(ErrorKind::Value),
             _ => {}
         }

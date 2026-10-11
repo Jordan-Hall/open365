@@ -31,7 +31,7 @@ fn rows_of(ctx: &EvalContext<'_>, arg: &Arg) -> Res<Rows> {
                 .collect())
         }
         Arg::Union(_) => Err(ErrorKind::Value),
-        Arg::Refs(_) => Err(ErrorKind::Value),
+        Arg::Refs(_) | Arg::Lambda(_) => Err(ErrorKind::Value),
     }
 }
 
@@ -99,7 +99,7 @@ pub(super) fn transpose(ctx: &EvalContext<'_>, args: &[Arg]) -> Res<Value> {
     arity(args, 1, 1)?;
     // A reference is a scalar parameter here: it takes the implicit intersection.
     let rows = match &args[0] {
-        Arg::Range(_) => vec![vec![ctx.scalar(&args[0])]],
+        Arg::Range(_) => vec![vec![scalar(ctx, &args[0])?]],
         a => rows_of(ctx, a)?,
     };
     let (nr, nc) = dims(&rows);

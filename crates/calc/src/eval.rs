@@ -5,7 +5,7 @@
 //! element-wise; scalar function parameters take the implicit intersection of a range with the
 //! formula's cell, or `#VALUE!` when there is none.
 
-use std::cell::Cell;
+use std::cell::{Cell, RefCell};
 use std::cmp::Ordering;
 use std::fmt;
 
@@ -15,6 +15,10 @@ use std::sync::{Arc, OnceLock};
 use crate::fmtlocale::{FormatLocale, Scope};
 use crate::functions::{self, Func, Lifting};
 use crate::value::{ErrorKind, Value, compare_values};
+
+mod lambda;
+
+pub use lambda::Lambda;
 
 const MAX_NAME_DEPTH: u32 = 16;
 /// Largest range that arithmetic will materialise as an array.
@@ -36,6 +40,11 @@ pub trait CellSource {
     /// Whether the cell holds a formula (for `ISFORMULA`).
     fn has_formula(&self, _sheet: &str, _row: u32, _col: u32) -> bool {
         false
+    }
+
+    /// The formula of a cell as text with its leading `=` (for `FORMULATEXT`); `None` for a cell without one.
+    fn formula_text(&self, _sheet: &str, _row: u32, _col: u32) -> Option<String> {
+        None
     }
 
     /// Whether the cell holds a formula that calls `SUBTOTAL` or `AGGREGATE` (such cells are skipped by those functions).
@@ -166,7 +175,7 @@ impl<'a> EvalContext<'a> {
                 .cloned()
                 .unwrap_or(Value::Error(ErrorKind::Value)),
             Arg::Range(r) => self.implicit_intersection(r),
-            Arg::Union(_) => Value::Error(ErrorKind::Value),
+            Arg::Union(_) | Arg::Lambda(_) => Value::Error(ErrorKind::Value),
             // Functions that do not know reference arrays see the first element.
             Arg::Refs(refs) => match refs.first().and_then(|row| row.first()) {
                 Some(Ok(r)) => self.implicit_intersection(r),
@@ -201,6 +210,7 @@ impl<'a> EvalContext<'a> {
             Arg::Range(r) => self.range_cells(r),
             Arg::Union(rs) => Box::new(rs.iter().flat_map(move |r| self.range_cells(r))),
             Arg::Refs(refs) => Box::new(refs.iter().flatten().map(move |e| self.ref_element(e))),
+            Arg::Lambda(_) => Box::new(std::iter::once(Value::Error(ErrorKind::Value))),
         }
     }
 
@@ -270,6 +280,7 @@ impl<'a> EvalContext<'a> {
                     })
                     .collect(),
             ),
+            Arg::Lambda(_) => GridData::Owned(vec![vec![Value::Error(ErrorKind::Value)]]),
             Arg::Missing | Arg::Union(_) => return None,
         };
         Some(Grid { ctx: self, data })
@@ -352,6 +363,8 @@ pub enum Arg {
     /// An array of references, rows of elements, what `OFFSET` and `INDIRECT` return when an argument is an
     /// array. An element is a reference or the error `OFFSET`/`INDIRECT` gave for that position.
     Refs(Vec<Vec<Result<RangeRef, ErrorKind>>>),
+    /// A function value: `LAMBDA(..)` or a bare function name such as `SUM` passed to `MAP`.
+    Lambda(Arc<Lambda>),
 }
 
 impl Arg {
@@ -461,6 +474,8 @@ pub fn evaluate_root(ast: &Ast, ctx: &EvalContext<'_>, snap_root: bool) -> Value
         name_depth: Cell::new(0),
         under_n: Cell::new(false),
         fn_depth: Cell::new(0),
+        locals: RefCell::new(Vec::new()),
+        lambda_depth: Cell::new(0),
     };
     let arg = match ast {
         Ast::Binary {
@@ -480,6 +495,7 @@ pub fn evaluate_root(ast: &Ast, ctx: &EvalContext<'_>, snap_root: bool) -> Value
             v => v,
         },
         Arg::Union(_) => Value::Error(ErrorKind::Value),
+        Arg::Lambda(_) => Value::Error(ErrorKind::Calc),
         // A cell shows the first element.
         refs @ Arg::Refs(_) => match ctx.scalar(&refs) {
             Value::Empty => Value::Number(0.0),
@@ -497,6 +513,10 @@ struct Evaluator<'c, 'a> {
     /// How many function calls enclose the expression being evaluated. A call nested in another call's
     /// arguments is evaluated in array mode, so `OFFSET`/`INDIRECT` given an array return references per element.
     fn_depth: Cell<u32>,
+    /// `LET` names and lambda parameters in scope, innermost last.
+    locals: RefCell<Vec<(String, Arg)>>,
+    /// How many lambda calls are in progress.
+    lambda_depth: Cell<u32>,
 }
 
 /// Operand of an arithmetic operator after reference resolution.
@@ -526,10 +546,17 @@ impl Evaluator<'_, '_> {
             Ast::Func { name, args, .. } => self.eval_call(name, args, array),
             Ast::Unary { op, operand } => {
                 let v = self.eval_in(operand, array);
+                let v = if array { v } else { self.scalarize(operand, v) };
                 self.unary(*op, v, array)
+            }
+            Ast::Invoke { callee, args } => {
+                let f = self.eval_value(callee);
+                let argv = self.call_args(args);
+                self.invoke(&f, argv)
             }
             Ast::Percent(inner) => {
                 let v = self.eval_in(inner, array);
+                let v = if array { v } else { self.scalarize(inner, v) };
                 let d = self.ctx.date1904;
                 lift_unary(self.operand(v, array), |x| match x.to_number_in(d) {
                     Ok(n) => Value::Number(n / 100.0),
@@ -558,6 +585,13 @@ impl Evaluator<'_, '_> {
     }
 
     fn eval_ref(&self, r: &CellRef) -> Arg {
+        // A `LET` name or lambda parameter such as `x1` hides the cell of that name.
+        if r.sheet.is_none() && !r.row_abs && !r.col_abs && !self.locals.borrow().is_empty() {
+            let spelled = crate::ast::to_formula_string(&Ast::Ref(r.clone()));
+            if let Some(local) = self.local(&spelled) {
+                return local;
+            }
+        }
         let sheet = self.sheet_of(r.sheet.as_ref());
         if !self.ctx.source.sheet_exists(sheet) {
             return Arg::error(ErrorKind::Ref);
@@ -599,6 +633,9 @@ impl Evaluator<'_, '_> {
     }
 
     fn eval_name(&self, name: &str) -> Arg {
+        if let Some(local) = self.local(name) {
+            return local;
+        }
         let Some(ast) = self.ctx.source.name(name) else {
             return Arg::error(ErrorKind::Name);
         };
@@ -613,6 +650,13 @@ impl Evaluator<'_, '_> {
     }
 
     fn eval_call(&self, name: &str, args: &[Ast], array: bool) -> Arg {
+        if let Some(special) = self.eval_special(name, args) {
+            return special;
+        }
+        if let Some(f @ Arg::Lambda(_)) = self.local(name) {
+            let argv = self.call_args(args);
+            return self.invoke(&f, argv);
+        }
         let Some(func) = functions::lookup(name) else {
             return Arg::error(ErrorKind::Name);
         };
@@ -656,7 +700,8 @@ impl Evaluator<'_, '_> {
                 let lifted = lifted
                     || array
                         && (feeds_array_of_refs || ref_fn.is_some_and(|l| (l.scalar_param)(i)));
-                let arg = self.eval_in(a, lifted || functions::is_array_param(name, i));
+                let array_param = lifted || functions::is_array_param(name, i);
+                let arg = self.eval_in(a, array_param);
                 // `IFERROR(A1,0)` is a value for `ROW`, `ISREF` and friends, though `ISBLANK` sees through it.
                 match (&arg, a) {
                     (Arg::Range(r), Ast::Func { name: inner, .. })
@@ -671,6 +716,7 @@ impl Evaluator<'_, '_> {
             })
             .collect();
         self.fn_depth.set(self.fn_depth.get() - 1);
+        let evaluated = self.scalarize_names(name, args, evaluated, lifting, array, expand);
         if let Some(l) = lifting {
             let triggers = evaluated.iter().enumerate().any(|(i, a)| {
                 l.trigger.unwrap_or(l.scalar_param)(i)
@@ -690,6 +736,19 @@ impl Evaluator<'_, '_> {
                 }
                 return self.lift_call(func, &evaluated, l);
             }
+        }
+        if evaluated.iter().any(|a| matches!(a, Arg::Lambda(_)))
+            && let Some(answer) = Self::lambda_answer(name, &evaluated)
+        {
+            return answer;
+        }
+        // `TYPE` of a multi-cell range is 64 where Excel evaluates arrays, 16 (the intersection fails) elsewhere.
+        if array
+            && name.eq_ignore_ascii_case("TYPE")
+            && let [Arg::Range(r)] = evaluated.as_slice()
+            && !r.is_single_cell()
+        {
+            return Arg::Value(Value::Number(64.0));
         }
         let result = if evaluated.iter().any(|a| matches!(a, Arg::Refs(_))) {
             self.refs_call(name, func, &evaluated, array)
@@ -979,7 +1038,7 @@ impl Evaluator<'_, '_> {
                     .collect();
                 Operand::Grid(grid)
             }
-            Arg::Union(_) => Operand::Scalar(Value::Error(ErrorKind::Value)),
+            Arg::Union(_) | Arg::Lambda(_) => Operand::Scalar(Value::Error(ErrorKind::Value)),
             // Arithmetic and comparison on an array of references are `#VALUE!` (measured).
             Arg::Refs(_) => Operand::Scalar(Value::Error(ErrorKind::Value)),
         }
@@ -1004,8 +1063,12 @@ impl Evaluator<'_, '_> {
     fn eval_binary(&self, op: BinOp, lhs: &Ast, rhs: &Ast, array: bool, snap: bool) -> Arg {
         // The operands of `:`, space and `,` are references, never evaluated element-wise.
         let operand_array = array && !matches!(op, BinOp::Range | BinOp::Intersect | BinOp::Union);
-        let left = self.eval_in(lhs, operand_array);
-        let right = self.eval_in(rhs, operand_array);
+        let mut left = self.eval_in(lhs, operand_array);
+        let mut right = self.eval_in(rhs, operand_array);
+        if !operand_array && !matches!(op, BinOp::Range | BinOp::Intersect | BinOp::Union) {
+            left = self.scalarize(lhs, left);
+            right = self.scalarize(rhs, right);
+        }
         match op {
             BinOp::Range => range_operator(left, right),
             BinOp::Intersect => intersect_operator(left, right),
@@ -1046,6 +1109,8 @@ fn call_function(ctx: &EvalContext<'_>, func: &Func, args: &[Arg]) -> Arg {
             Err(e) => Arg::error(e),
         },
         Func::Arg(f) => f(ctx, args),
+        // Handled by the evaluator before it gets here.
+        Func::Lazy => Arg::error(ErrorKind::Name),
     }
 }
 

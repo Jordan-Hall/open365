@@ -455,7 +455,8 @@ fn walk(ast: &Ast, sheet: &str, resolve: &dyn Fn(&str) -> Option<Ast>, out: &mut
                 .iter()
                 .any(|n| n.eq_ignore_ascii_case(name));
             let offset = name.eq_ignore_ascii_case("OFFSET");
-            let is_formula = name.eq_ignore_ascii_case("ISFORMULA");
+            let is_formula =
+                name.eq_ignore_ascii_case("ISFORMULA") || name.eq_ignore_ascii_case("FORMULATEXT");
             for (i, a) in args.iter().enumerate() {
                 let literal = matches!(a, Ast::Ref(_) | Ast::Area(_));
                 if literal && is_formula {
@@ -467,6 +468,12 @@ fn walk(ast: &Ast, sheet: &str, resolve: &dyn Fn(&str) -> Option<Ast>, out: &mut
                 if literal && (position_only || offset && i == 0) {
                     continue;
                 }
+                walk(a, sheet, resolve, out, depth);
+            }
+        }
+        Ast::Invoke { callee, args } => {
+            walk(callee, sheet, resolve, out, depth);
+            for a in args {
                 walk(a, sheet, resolve, out, depth);
             }
         }

@@ -8,27 +8,27 @@ That page has 514 table rows naming 521 distinct functions (seven rows pair a fu
 earlier, recalled list: `COPILOT` is not on the page (removed); `CALL`, `DETECTLANGUAGE`, `EUROCONVERT`, `JIS`, `REGISTER.ID` and
 `TRANSLATE` are on it (added under "Web, cube, other"). No registered function is missing from the page. In the table below a name that is
 also in another category counts in both (the legacy names repeat), so the category total is larger than 521. Distinct names: 521 on the page,
-301 registered, 220 missing. Before this change: 236 registered.
+312 registered, 209 missing. Before the previous change: 236 registered; before this one: 301.
 
 | Category | Excel | Registered | Missing |
 |---|---:|---:|---:|
-| Math and trigonometry | 82 | 68 | 14 |
+| Math and trigonometry | 82 | 69 | 13 |
 | Statistical | 111 | 30 | 81 |
 | Financial | 55 | 23 | 32 |
 | Date and time | 25 | 25 | 0 |
 | Text | 44 | 40 | 4 |
-| Lookup and reference | 36 | 32 | 4 |
-| Logical | 18 | 11 | 7 |
-| Information | 21 | 16 | 5 |
+| Lookup and reference | 36 | 34 | 2 |
+| Logical | 18 | 18 | 0 |
+| Information | 21 | 17 | 4 |
 | Engineering | 54 | 36 | 18 |
 | Database | 12 | 12 | 0 |
 | Compatibility (legacy names) | 41 | 10 | 31 |
 | Web, cube, other | 25 | 0 | 25 |
-| **Total** | 524 | 303 | 221 |
+| **Total** | 524 | 314 | 210 |
 
 ## Missing by category
 
-**Math and trigonometry** (14): CEILING.PRECISE, COMBINA, FLOOR.PRECISE, ISO.CEILING, LET, MDETERM, MINVERSE, MMULT, MULTINOMIAL, MUNIT, RANDARRAY, SUMX2MY2, SUMX2PY2, SUMXMY2
+**Math and trigonometry** (13): CEILING.PRECISE, COMBINA, FLOOR.PRECISE, ISO.CEILING, MDETERM, MINVERSE, MMULT, MULTINOMIAL, MUNIT, RANDARRAY, SUMX2MY2, SUMX2PY2, SUMXMY2
 
 **Statistical** (81): AVEDEV, BETA.DIST, BETA.INV, BINOM.DIST, BINOM.DIST.RANGE, BINOM.INV, CHISQ.DIST, CHISQ.DIST.RT, CHISQ.INV, CHISQ.INV.RT, CHISQ.TEST, CONFIDENCE.NORM, CONFIDENCE.T, CORREL, COVARIANCE.P, COVARIANCE.S, DEVSQ, EXPON.DIST, F.DIST, F.DIST.RT, F.INV, F.INV.RT, F.TEST, FISHER, FISHERINV, FORECAST, FORECAST.ETS, FORECAST.ETS.CONFINT, FORECAST.ETS.SEASONALITY, FORECAST.ETS.STAT, FORECAST.LINEAR, FREQUENCY, GAMMA, GAMMA.DIST, GAMMA.INV, GAMMALN, GAMMALN.PRECISE, GAUSS, GEOMEAN, GROWTH, HARMEAN, HYPGEOM.DIST, INTERCEPT, KURT, LINEST, LOGEST, LOGNORM.DIST, LOGNORM.INV, MODE.MULT, NEGBINOM.DIST, NORM.DIST, NORM.INV, NORM.S.DIST, NORM.S.INV, PEARSON, PERCENTRANK.EXC, PERCENTRANK.INC, PERMUTATIONA, PHI, POISSON.DIST, PROB, RSQ, SKEW, SKEW.P, SLOPE, STANDARDIZE, STDEVA, STDEVPA, STEYX, T.DIST, T.DIST.2T, T.DIST.RT, T.INV, T.INV.2T, T.TEST, TREND, TRIMMEAN, VARA, VARPA, WEIBULL.DIST, Z.TEST
 
@@ -38,11 +38,11 @@ also in another category counts in both (the legacy names repeat), so the catego
 
 **Text** (4): ASC, BAHTTEXT, DBCS, PHONETIC
 
-**Lookup and reference** (4): FORMULATEXT, GETPIVOTDATA, RTD, XMATCH
+**Lookup and reference** (2): GETPIVOTDATA, RTD
 
-**Logical** (7): BYCOL, BYROW, LAMBDA, MAKEARRAY, MAP, REDUCE, SCAN
+**Logical** (0): none
 
-**Information** (5): CELL, INFO, ISOMITTED, SHEET, SHEETS
+**Information** (4): CELL, INFO, SHEET, SHEETS
 
 **Engineering** (18): BESSELI, BESSELJ, BESSELK, BESSELY, CONVERT, ERF, ERF.PRECISE, ERFC, ERFC.PRECISE, IMABS, IMCOT, IMCSC, IMCSCH, IMPOWER, IMSEC, IMSECH, IMSQRT, IMTAN
 
@@ -52,7 +52,19 @@ also in another category counts in both (the legacy names repeat), so the catego
 
 **Web, cube, other** (25): ENCODEURL, FILTERXML, WEBSERVICE, CUBEKPIMEMBER, CUBEMEMBER, CUBEMEMBERPROPERTY, CUBERANKEDMEMBER, CUBESET, CUBESETCOUNT, CUBEVALUE, IMAGE, STOCKHISTORY, TRIMRANGE, GROUPBY, PIVOTBY, PERCENTOF, REGEXTEST, REGEXEXTRACT, REGEXREPLACE, CALL, DETECTLANGUAGE, EUROCONVERT, JIS, REGISTER.ID, TRANSLATE
 
-## Third batch (this change): engineering, database, arrays, small lookups
+## Fourth batch (this change): lambdas, LET, XMATCH, FORMULATEXT
+
+Added and verified against Excel (about 1,940 cases; residue in `fixtures/calc/known-differences.toml`): LET, LAMBDA, MAP, REDUCE, SCAN,
+BYROW, BYCOL, MAKEARRAY, ISOMITTED, XMATCH, FORMULATEXT. `LET` and the lambda family live in `eval/lambda.rs` (they need unevaluated
+arguments); `Arg::Lambda` is the closure value.
+
+Not done in this change (no code, no cases): CELL, INFO, SHEET, SHEETS (group 2) and ASC, DBCS, BAHTTEXT, PHONETIC, REGEXTEST,
+REGEXEXTRACT, REGEXREPLACE (group 3). Findings for whoever continues: this Excel build has REGEX functions and `XMATCH`/`XLOOKUP`
+`match_mode` 3 is a regular-expression match; `CELL("filename")` and `INFO("osversion")` must be tested for type and shape only
+(for example `ISTEXT(INFO("osversion"))`) because they depend on the machine; the oracle's columns are 60 wide, so `CELL("width")`
+cannot match an engine without column widths.
+
+## Third batch: engineering, database, arrays, small lookups
 
 Added and verified against Excel (bit for bit unless listed in `fixtures/calc/known-differences.toml`): BIN2DEC, BIN2OCT, BIN2HEX, OCT2BIN,
 OCT2DEC, OCT2HEX, HEX2BIN, HEX2DEC, HEX2OCT, DEC2BIN, DEC2OCT, DEC2HEX, BITAND, BITOR, BITXOR, BITLSHIFT, BITRSHIFT, DELTA, GESTEP,

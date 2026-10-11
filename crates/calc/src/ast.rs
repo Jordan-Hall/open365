@@ -187,6 +187,13 @@ pub enum Ast {
     },
     /// Array constant, stored as rows.
     Array(Vec<Vec<Ast>>),
+    /// A call of a computed value, as in `LAMBDA(x,x+1)(2)`.
+    Invoke {
+        /// The expression producing the function value.
+        callee: Box<Ast>,
+        /// Arguments; an omitted argument is [`Ast::Missing`].
+        args: Vec<Ast>,
+    },
 }
 
 impl Ast {
@@ -216,6 +223,10 @@ impl Ast {
             max = max.max(depth);
             match node {
                 Ast::Func { args, .. } => stack.extend(args.iter().map(|a| (a, depth + 1))),
+                Ast::Invoke { callee, args } => {
+                    stack.push((callee, depth + 1));
+                    stack.extend(args.iter().map(|a| (a, depth + 1)));
+                }
                 Ast::Unary { operand, .. } => stack.push((operand, depth + 1)),
                 Ast::Percent(inner) => stack.push((inner, depth + 1)),
                 Ast::Binary { lhs, rhs, .. } => {
@@ -309,6 +320,37 @@ pub fn to_formula_string(ast: &Ast) -> String {
     let mut out = String::new();
     write_ast(ast, &mut out);
     out
+}
+
+/// The formula as Excel stores and shows it (`FORMULATEXT`): like [`to_formula_string`], but a plus sign in
+/// front of a number literal is dropped (`=+5` is stored as `=5`).
+pub fn to_stored_formula_string(ast: &Ast) -> String {
+    fn strip(ast: &mut Ast) {
+        match ast {
+            Ast::Unary { op, operand } => {
+                strip(operand);
+                if *op == UnaryOp::Plus && matches!(**operand, Ast::Number(_)) {
+                    let inner = std::mem::replace(&mut **operand, Ast::Missing);
+                    *ast = inner;
+                }
+            }
+            Ast::Percent(inner) => strip(inner),
+            Ast::Binary { lhs, rhs, .. } => {
+                strip(lhs);
+                strip(rhs);
+            }
+            Ast::Func { args, .. } => args.iter_mut().for_each(strip),
+            Ast::Invoke { callee, args } => {
+                strip(callee);
+                args.iter_mut().for_each(strip);
+            }
+            Ast::Array(rows) => rows.iter_mut().flatten().for_each(strip),
+            _ => {}
+        }
+    }
+    let mut copy = ast.clone();
+    strip(&mut copy);
+    to_formula_string(&copy)
 }
 
 fn node_precedence(ast: &Ast) -> u8 {
@@ -436,6 +478,24 @@ fn write_ast(ast: &Ast, out: &mut String) {
                 }
             }
             out.push('}');
+        }
+        Ast::Invoke { callee, args } => {
+            // A callee that is not itself a call needs its parentheses to stay a callee.
+            if matches!(**callee, Ast::Func { .. } | Ast::Invoke { .. }) {
+                write_ast(callee, out);
+            } else {
+                out.push('(');
+                write_ast(callee, out);
+                out.push(')');
+            }
+            out.push('(');
+            for (i, arg) in args.iter().enumerate() {
+                if i > 0 {
+                    out.push(',');
+                }
+                write_ast(arg, out);
+            }
+            out.push(')');
         }
     }
 }
