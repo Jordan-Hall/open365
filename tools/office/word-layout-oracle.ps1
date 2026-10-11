@@ -240,13 +240,14 @@ function Story-Rank($l) {
   }
 }
 
-# Paragraphs inside tables (nested ones included), by story start, with their text without the end mark.
+# Paragraphs inside tables (nested ones included), by story start, with their text without the end mark. `cell` is the
+# start of the innermost cell holding the paragraph (a nested table is walked after its outer cell, and overrides it).
 function Walk-Table($t, $out, $seen, $tab) {
   foreach ($cell in $t.Range.Cells) {
+    $ck = [int]$cell.Range.Start
     foreach ($p in $cell.Range.Paragraphs) {
       $rg = $p.Range; $s = [int]$rg.Start
-      if ($seen.ContainsKey($s)) { continue }
-      $seen[$s] = 1
+      if ($seen.ContainsKey($s)) { $seen[$s].cell = $ck; continue }
       # Content controls: Word counts the start and the end of each as one story character, but Range.Text has neither,
       # so a text index maps to the story offset through the marker positions (sorted).
       $marks = New-Object System.Collections.Generic.List[int]
@@ -260,15 +261,91 @@ function Walk-Table($t, $out, $seen, $tab) {
         }
       } catch {}
       $marks.Sort()
-      $out.Add(@{ start = $s; text = (([string]$rg.Text) -replace '[\r\a]+$', ''); used = 0; lines = 0; tab = $tab; marks = $marks.ToArray() })
+      $ptext = (([string]$rg.Text) -replace '[\r\a]+$', '')
+      # A blank paragraph prints a row with no text, so the text cannot tell two of them apart. Its place is the cell and
+      # the order inside the cell (Pair-BlankRows); the position Word reports (page, x, y from Range.Information 3, 5, 6)
+      # only picks the cell of a drawn cell that has no text at all. It is wrong for the later paragraphs of a tall cell.
+      # Blank: nothing but white space, an inline object (U+0001) or, with a floating shape anchored in it, its '/' placeholder.
+      $blank = ($ptext -replace '[\s\x01]', '') -eq '' -or ($marks.Count -gt 0 -and ($ptext -replace '[\s\x01/]', '') -eq '')
+      $pos = $null
+      if ($blank) {
+        try {
+          $pc = $rg.Duplicate; $pc.Collapse(1)
+          $pgn = [int]$pc.Information(3); $px = [double]$pc.Information(5); $py = [double]$pc.Information(6)
+          if ($pgn -gt 0 -and $px -ge 0 -and $py -ge 0) { $pos = @{ page = $pgn; x = $px; y = $py } }
+        } catch {}
+      }
+      $e = @{ start = $s; text = $ptext; used = 0; lines = 0; tab = $tab; marks = $marks.ToArray(); cell = $ck; blank = $blank; pos = $pos; paired = $false }
+      $seen[$s] = $e; $out.Add($e)
     }
   }
   foreach ($n in $t.Tables) { Walk-Table $n $out $seen $tab }
 }
 
+# Pairs the blank rows of one page with blank paragraphs. Word draws the content of a cell inside one clip rectangle,
+# in paragraph order, so the rows of a clip are the lines of one cell in order. The cell is known from a text row of the
+# clip (matched by its text); a blank row takes the first blank paragraph of that cell that follows the paragraph of
+# the row before it and precedes the paragraph of the next text row. A clip with no text takes the cell of the blank
+# paragraph nearest to its first row (Word's page, x and y; the line top is about 0.93 em above the baseline), not
+# beyond 12 points. A blank row of a repeated header row pairs with the paragraph it repeats ($row.repeat).
+function Pair-BlankRows($pageRows, $tp, [int]$pageNo) {
+  $groups = [ordered]@{}
+  foreach ($row in $pageRows) { $gk = "c$($row.clip)"; if (-not $groups.Contains($gk)) { $groups[$gk] = New-Object System.Collections.Generic.List[object] }; $groups[$gk].Add($row) }
+  foreach ($g in $groups.Values) {
+    if (@($g | Where-Object { $_.text -eq '' }).Count -eq 0) { continue }
+    $cell = $null
+    foreach ($r in $g) { if ($r.text -ne '' -and $r.Contains('hit') -and $r.hit) { $cell = $r.hit.cell; break } }
+    $anchored = $null -ne $cell
+    $ptr = -1
+    for ($i = 0; $i -lt $g.Count; $i++) {
+      $r = $g[$i]
+      if ($r.text -ne '') {
+        if ($r.Contains('hit') -and $r.hit -and $r.hit.cell -eq $cell -and $r.hit.start -gt $ptr) { $ptr = $r.hit.start }
+        continue
+      }
+      $ub = [int]::MaxValue
+      for ($j = $i + 1; $j -lt $g.Count; $j++) { $n = $g[$j]; if ($n.text -ne '' -and $n.Contains('hit') -and $n.hit -and $n.hit.cell -eq $cell) { $ub = $n.hit.start; break } }
+      $cand = $null
+      if (-not $anchored) {
+        # First row of a clip without text: the cell of the nearest blank paragraph on this page.
+        $exp = 0.93 * [double]$r.size; $best = $null
+        foreach ($p in $tp) {
+          if (-not $p.blank -or $p.paired -or $null -eq $p.pos -or $p.pos.page -ne $pageNo) { continue }
+          $c = [math]::Abs($r.x - $p.pos.x) + [math]::Abs($r.y - $exp - $p.pos.y)
+          if ($null -eq $best -or $c -lt $best) { $best = $c; $cand = $p }
+        }
+        if ($null -eq $cand -or $best -gt 12) {
+          # A header row repeated from an earlier page: a blank paragraph already paired on an earlier page, at this place.
+          $rp = $null; $rbest = $null
+          foreach ($p in $tp) {
+            if (-not $p.blank -or -not $p.paired -or $null -eq $p.pos -or $p.pos.page -ge $pageNo) { continue }
+            $c = [math]::Abs($r.x - $p.pos.x) + [math]::Abs($r.y - $exp - $p.pos.y)
+            if ($c -le 6 -and ($null -eq $rbest -or $c -lt $rbest)) { $rbest = $c; $rp = $p }
+          }
+          if ($rp) { $r['pair'] = $rp; $r['isrepeat'] = $true; $cell = $rp.cell; $anchored = $true; $ptr = $rp.start; continue }
+        }
+        if ($null -eq $cand -or $best -gt 12) { $script:pairWarn.Add("page ${pageNo}: blank row y=$([math]::Round($r.y,2)) x=$([math]::Round($r.x,2)) has no blank paragraph within 12 points"); continue }
+        $cell = $cand.cell; $anchored = $true
+      } else {
+        foreach ($p in $tp) { if ($p.blank -and -not $p.paired -and $p.cell -eq $cell -and $p.start -gt $ptr -and $p.start -lt $ub -and ($null -eq $cand -or $p.start -lt $cand.start)) { $cand = $p } }
+      }
+      if ($cand) { $cand.paired = $true; $r['pair'] = $cand; $ptr = $cand.start; continue }
+      # Every blank paragraph in range is taken: a header row repeated on this page.
+      $rep = $null
+      foreach ($p in $tp) { if ($p.blank -and $p.paired -and $p.cell -eq $cell -and $p.start -gt $ptr -and $p.start -lt $ub -and ($null -eq $rep -or $p.start -lt $rep.start)) { $rep = $p } }
+      if ($env:O365_ORACLE_DEBUG -and -not $rep) {
+        Write-Output ("UNPAIRED p{0} y={1:N2} x={2:N2} clip={3} anchored cell={4} ptr={5} ub={6}" -f $pageNo, $r.y, $r.x, $r.clip, $cell, $ptr, $ub)
+        foreach ($q in $g) { Write-Output ("    ROW y={0:N2} x={1:N2} hit={2} cell={3} '{4}'" -f $q.y, $q.x, $(if ($q.Contains('hit') -and $q.hit) { $q.hit.start } else { '-' }), $(if ($q.Contains('hit') -and $q.hit) { $q.hit.cell } else { '-' }), $q.text.Substring(0, [math]::Min(20, $q.text.Length))) }
+        foreach ($p in $tp) { if ($p.cell -eq $cell) { Write-Output ("    para @{0} blank={1} paired={2} lines={3} text='{4}'" -f $p.start, $p.blank, $p.paired, $p.lines, $p.text.Substring(0, [math]::Min(30, $p.text.Length))) } }
+      }
+      if ($rep -and @($g | Where-Object { $_.Contains('hit') -and $_.hit -and $_.Contains('isrepeat') -and $_.isrepeat }).Count -gt 0) { $r['pair'] = $rep; $r['isrepeat'] = $true; $ptr = $rep.start }
+    }
+  }
+}
+
 function Ref-Layout($f) {
   $name = [IO.Path]::GetFileNameWithoutExtension($f)
-  $doc = $null; $pdf = $null
+  $doc = $null; $pdf = $null; $script:pairWarn = $null
   try {
     $doc = Open-Doc $f
     $w = Get-Word
@@ -447,8 +524,30 @@ function Ref-Layout($f) {
         $tp = New-Object System.Collections.Generic.List[object]; $seen = @{}
         $active = -1
         $tabId = 0; foreach ($t in $doc.Tables) { Walk-Table $t $tp $seen $tabId; $tabId++ }
+        $script:pairWarn = New-Object System.Collections.Generic.List[string]
+        $clipCells = @{}
         for ($pi = 1; $pi -le [math]::Min($pcount, $pdfPages.Count); $pi++) {
-          foreach ($row in @($pdfPages[$pi - 1].rows | Where-Object { $_.clip -ge 0 -and -not $_.frame })) {
+          $pageRows = @($pdfPages[$pi - 1].rows | Where-Object { $_.clip -ge 0 -and -not $_.frame })
+          $blankRows = New-Object System.Collections.Generic.List[object]
+          $provUsed = @{}
+          foreach ($row in $pageRows) {
+            if ($row.text -eq '') {
+              $blankRows.Add($row)
+              # A blank row can start the next table: let the nearest blank paragraph (Word's page, x, y) pick the table that is
+              # being drawn. Only the table is taken from it; the paragraph comes from Pair-BlankRows.
+              $exp = 0.93 * [double]$row.size; $bp = $null; $bc = $null
+              foreach ($p in $tp) {
+                if (-not $p.blank -or $p.paired -or $provUsed.ContainsKey($p.start) -or $null -eq $p.pos -or $p.pos.page -ne $pi) { continue }
+                $c = [math]::Abs($row.x - $p.pos.x) + [math]::Abs($row.y - $exp - $p.pos.y)
+                if ($null -eq $bc -or $c -lt $bc) { $bc = $c; $bp = $p }
+              }
+              if ($bp -and $bc -le 12) { $provUsed[$bp.start] = 1; $active = $bp.tab }
+              else {
+                # No paragraph near it: the next unconsumed blank paragraph in document order, as before.
+                foreach ($p in $tp) { if ($p.blank -and -not $p.paired -and -not $provUsed.ContainsKey($p.start)) { $provUsed[$p.start] = 1; $active = $p.tab; break } }
+              }
+              continue
+            }
             $t = $row.text; $hit = $null; $off = 0
             $repeat = $false
             # Cell texts are not unique across tables (every table has an R1C1w1), so a drawn row is matched
@@ -456,35 +555,49 @@ function Ref-Layout($f) {
             # unconsumed text) a repeated header row. Only then does the next table start.
             $activeLeft = $false
             if ($active -ge 0) { foreach ($p in $tp) { if ($p.tab -eq $active -and $p.text.Substring($p.used).Trim() -ne '') { $activeLeft = $true; break } } }
-            foreach ($pass in 1, 2) {
+            # Pass 0: a clip is one cell, so once a row of it is matched the next rows come from the same cell (the
+            # same sentence stands in several cells of a template).
+            $clipKey = "$pi|$($row.clip)"; $clipCell = $clipCells[$clipKey]
+            foreach ($pass in 0, 1, 2) {
               if ($hit) { break }
+              if ($pass -eq 0 -and $null -eq $clipCell) { continue }
               foreach ($p in $tp) {
+                if ($pass -eq 0 -and $p.cell -ne $clipCell) { continue }
                 if ($pass -eq 1 -and $activeLeft -and $p.tab -ne $active) { continue }
                 $rem = $p.text.Substring($p.used); $trim = $rem.TrimStart()
-                if ($t -eq '') { if ($trim -eq '' -and $p.lines -eq 0) { $hit = $p; $off = $p.used; break } }
-                elseif ($trim.StartsWith($t, [StringComparison]::Ordinal)) { $hit = $p; $off = $p.used + ($rem.Length - $trim.Length); break }
+                if ($trim.StartsWith($t, [StringComparison]::Ordinal)) { $hit = $p; $off = $p.used + ($rem.Length - $trim.Length); break }
               }
               if ($pass -eq 1 -and -not $hit -and $activeLeft) {
                 foreach ($p in $tp) {
-                  if ($p.tab -ne $active -or $p.lines -eq 0 -or $t -eq '') { continue }
+                  if ($p.tab -ne $active -or $p.lines -eq 0) { continue }
                   $ix = $p.text.IndexOf($t, [StringComparison]::Ordinal)
                   if ($ix -ge 0) { $hit = $p; $off = $ix; $repeat = $true; break }
                 }
               }
             }
             if (-not $hit) {
-              foreach ($p in $tp) { $ix = if ($t -eq '') { -1 } else { $p.text.IndexOf($t, [StringComparison]::Ordinal) }; if ($ix -ge 0) { $hit = $p; $off = $ix; $repeat = $true; break } }
+              foreach ($p in $tp) { $ix = $p.text.IndexOf($t, [StringComparison]::Ordinal); if ($ix -ge 0) { $hit = $p; $off = $ix; $repeat = $true; break } }
             }
-            if ($hit -and -not $repeat) { $active = $hit.tab }
+            if ($hit -and -not $repeat) { $active = $hit.tab; if ($null -eq $clipCells[$clipKey]) { $clipCells[$clipKey] = $hit.cell } }
             if (-not $hit) { $warn += "page ${pi}: table row '$t' matches no paragraph"; continue }
             if (-not $repeat) { $hit.used = $off + $t.Length; $hit.lines++ }
             $st = $hit.start + $off
             if ($off -gt 0) { foreach ($mk in $hit.marks) { if ($mk -le $st) { $st++ } else { break } } }
+            $row['hit'] = $hit; $row['isrepeat'] = $repeat
             $lines.Add([ordered]@{ page = $pi; start = $st; end = $st + $t.Length; top = $row.y; left = $row.x; lastX = $null; baseline = $row.y; inkLeft = $row.x; text = $t; cell = $true; repeat = $repeat })
+          }
+          Pair-BlankRows $pageRows $tp $pi
+          foreach ($row in $blankRows) {
+            $hit = $row.pair
+            if (-not $hit) { $warn += "page ${pi}: blank table row y=$([math]::Round($row.y,2)) x=$([math]::Round($row.x,2)) matches no paragraph"; continue }
+            $rp = [bool]($row.Contains('isrepeat') -and $row.isrepeat)
+            if (-not $rp) { $hit.lines++ }
+            $lines.Add([ordered]@{ page = $pi; start = $hit.start; end = $hit.start; top = $row.y; left = $row.x; lastX = $null; baseline = $row.y; inkLeft = $row.x; text = ''; cell = $true; repeat = $rp })
           }
         }
       }
     }
+    if ($hasTables -and $script:pairWarn) { $warn += @($script:pairWarn) }
     $lines = @($lines | Sort-Object @{ Expression = { $_.page } }, @{ Expression = { Story-Rank $_ } }, @{ Expression = { $_.start } }, @{ Expression = { $_.top } })
     $floatRows = New-Object System.Collections.Generic.List[object]
     if ($emitFloats) {

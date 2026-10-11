@@ -4,7 +4,8 @@
 
 use open365_commands::{
     AlignmentChange, BorderChange, CellFormatChange, ColorSpec, Command, FillChange, FontChange,
-    HAlign, LineSpec, NumberFormatSpec, RangeRef, RotationSpec, UnderlineKind, VAlign,
+    HAlign, LineSpec, MergeMode, NumberFormatSpec, RangeRef, RotationSpec, UnderlineKind, VAlign,
+    merge_discards,
 };
 use open365_ui_shell::{CommandState, MenuEntry};
 use open365_xlsx::{
@@ -45,6 +46,44 @@ pub enum ColourSlot {
 pub enum Action {
     None,
     Apply(Vec<Command>),
+    /// Ask first (Excel's "Merging cells only keeps the upper-left value" prompt); run the command on OK.
+    Confirm {
+        text: &'static str,
+        command: Command,
+    },
+}
+
+/// The prompt Excel shows when a merge would discard values.
+pub const MERGE_WARNING: &str =
+    "Merging cells only keeps the upper-left value and discards other values.";
+
+/// Whether a merged cell touches the selection.
+fn touches_merge(wb: &Workbook, sel: Sel) -> bool {
+    let (r1, c1, r2, c2) = sel.range;
+    wb.sheet(sel.sheet).is_some_and(|ws| {
+        ws.merged_cells()
+            .iter()
+            .any(|&(a, b, c, d)| a <= r2 && r1 <= c && b <= c2 && c1 <= d)
+    })
+}
+
+/// The command for a Merge & Centre menu item, behind the prompt when it would discard values.
+fn merge_action(wb: &Workbook, sel: Sel, mode: MergeMode) -> Action {
+    let command = Command::MergeCells {
+        sheet: sel.sheet,
+        range: sel.range_ref(),
+        mode,
+    };
+    let loses = mode != MergeMode::Unmerge
+        && merge_discards(wb, sel.sheet, sel.range_ref(), mode).is_ok_and(|d| !d.is_empty());
+    if loses {
+        Action::Confirm {
+            text: MERGE_WARNING,
+            command,
+        }
+    } else {
+        Action::Apply(vec![command])
+    }
 }
 
 /// Format Painter.
@@ -654,7 +693,15 @@ impl FormatUi {
                 }
             }
             "home.clipboard.format-painter" => CommandState::checked(self.painter != Painter::Off),
-            "home.alignment.merge-centre" => CommandState::DISABLED,
+            // The button is lit while the selection holds a merged cell.
+            "home.alignment.merge-centre" => CommandState::checked(touches_merge(wb, sel)),
+            "fmt.merge#unmerge" => {
+                if touches_merge(wb, sel) {
+                    CommandState::ENABLED
+                } else {
+                    CommandState::DISABLED
+                }
+            }
             _ => CommandState::ENABLED,
         }
     }
@@ -703,6 +750,12 @@ impl FormatUi {
     pub fn menu(&self, id: &str, wb: Option<&Workbook>, sel: Sel) -> Option<Vec<MenuEntry>> {
         let wb = wb?;
         match id {
+            "home.alignment.merge-centre" => Some(vec![
+                entry("fmt.merge#center".into(), "Merge & Centre"),
+                entry("fmt.merge#across".into(), "Merge Across"),
+                entry("fmt.merge#cells".into(), "Merge Cells"),
+                MenuEntry::new("fmt.merge#unmerge", "Unmerge Cells", touches_merge(wb, sel)),
+            ]),
             "home.font.font" => {
                 let current = &wb
                     .cell_format(sel.sheet, sel.active.0, sel.active.1)
@@ -907,6 +960,23 @@ impl FormatUi {
                     ..AlignmentChange::default()
                 }),
             )),
+            // The button toggles: a merged selection splits, anything else merges and centres.
+            "home.alignment.merge-centre" => merge_action(
+                wb,
+                sel,
+                if touches_merge(wb, sel) {
+                    MergeMode::Unmerge
+                } else {
+                    MergeMode::MergeCenter
+                },
+            ),
+            "fmt.merge" => match arg {
+                Some("center") => merge_action(wb, sel, MergeMode::MergeCenter),
+                Some("across") => merge_action(wb, sel, MergeMode::Across),
+                Some("cells") => merge_action(wb, sel, MergeMode::Cells),
+                Some("unmerge") => merge_action(wb, sel, MergeMode::Unmerge),
+                _ => Action::None,
+            },
             "home.alignment.wrap-text" => apply(format_cells(
                 sel,
                 align_change(AlignmentChange {
@@ -1081,7 +1151,7 @@ fn colour_menu(wb: &Workbook, slot: ColourSlot, current: &ColorSpec) -> Vec<Menu
         .collect();
     let mut none_entry = entry(format!("{prefix}#{none_id}"), none);
     none_entry.height = Some(34);
-    let mut out = Vec::new();
+    let mut out = vec![MenuEntry::filter("High-contrast only")];
     if slot == ColourSlot::Font {
         out.push(none_entry.clone());
         out.push(MenuEntry::separator());
@@ -1102,6 +1172,46 @@ fn colour_menu(wb: &Workbook, slot: ColourSlot, current: &ColorSpec) -> Vec<Menu
     out
 }
 
+/// Gives a gallery tile the look of a cell style: its real fill (white where the style has none, as
+/// the grid's cells are), font colour and size, and the four border edges.
+fn style_tile(wb: &Workbook, f: &open365_xlsx::CellFormat, tile: &mut open365_ui_shell::Tile) {
+    use open365_xlsx::{BorderStyle as B, ColorSource, FillPattern};
+    let rgb = |c: &open365_xlsx::Color| {
+        let v = wb.styles().resolve_color(c);
+        [v.r, v.g, v.b]
+    };
+    let solid = f.fill.pattern != FillPattern::None;
+    tile.fill = Some(if solid { rgb(&f.fill.fg) } else { [255; 3] });
+    tile.ink = Some(if f.font.color.source == ColorSource::Auto {
+        [0; 3]
+    } else {
+        rgb(&f.font.color)
+    });
+    let edge = |e: &open365_xlsx::BorderEdge| {
+        let w = match e.style {
+            B::None => return None,
+            B::Medium | B::Dashed => 2,
+            B::Thick | B::Double => 3,
+            _ => 1,
+        };
+        let c = if e.color.source == ColorSource::Auto {
+            [0; 3]
+        } else {
+            rgb(&e.color)
+        };
+        Some((c, w))
+    };
+    tile.borders = [
+        edge(&f.border.left),
+        edge(&f.border.right),
+        edge(&f.border.top),
+        edge(&f.border.bottom),
+    ];
+    tile.text_pct = (f.font.size / 11.0 * 100.0).round() as u32;
+    tile.bold = f.font.bold;
+    tile.italic = f.font.italic;
+}
+
 /// The Cell Styles gallery: one heading and a grid of 133 x 36 u tiles per group.
 fn cell_styles_menu(wb: &Workbook, sel: Sel) -> Vec<MenuEntry> {
     let names = wb.styles().cell_style_names();
@@ -1114,14 +1224,19 @@ fn cell_styles_menu(wb: &Workbook, sel: Sel) -> Vec<MenuEntry> {
             out.push(MenuEntry::separator());
         }
         out.push(MenuEntry::heading(title));
-        let tiles = styles
+        let previews = wb.styles().cell_style_previews(&styles);
+        let tiles = previews
             .into_iter()
-            .map(|n| open365_ui_shell::Tile {
-                id: format!("home.styles.cell-styles#{n}"),
-                checked: Some(&n) == current.as_ref(),
-                label: n,
-                fill: None,
-                ink: None,
+            .map(|(n, format)| {
+                let mut tile = open365_ui_shell::Tile::plain(
+                    &format!("home.styles.cell-styles#{n}"),
+                    &n,
+                    Some(&n) == current.as_ref(),
+                );
+                if let Some(f) = format {
+                    style_tile(wb, &f, &mut tile);
+                }
+                tile
             })
             .collect();
         out.push(MenuEntry::tiles(6, (133, 36), tiles));

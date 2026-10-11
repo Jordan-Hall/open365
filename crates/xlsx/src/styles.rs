@@ -3,10 +3,10 @@
 use std::collections::HashMap;
 
 use crate::XlsxError;
-use crate::builtin_numfmt::builtin_number_format_in;
 use crate::conditional::Dxf;
 use crate::format::{CellFormat, Color, FormatTables, Rgb, Theme};
 use crate::xml::{self, XmlElement};
+use open365_locale::builtin_number_format_in;
 
 /// Built-in number format codes for ids 0 to 49 (ECMA-376 Part 1, 18.8.30). Ids the
 /// specification leaves to the locale (23 to 36) return `None`.

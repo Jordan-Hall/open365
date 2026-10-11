@@ -171,10 +171,17 @@ fn every_formula_reads_as_excel_reports_it() {
                     }
                     _ => (row, col),
                 };
-                let text = wb
-                    .formula_text(i, qr, qc)
-                    .unwrap_or_else(|| panic!("{name}!{reference}: no formula"))
-                    .replace("_xlfn.", "");
+                let Some(text) = wb.formula_text(i, qr, qc) else {
+                    // Excel reports a calculated-item cell of a PivotTable as a formula
+                    // (`=Apple+Banana`) that the file does not store; the formula lives in
+                    // the pivot cache definition (`calculatedItems`).
+                    assert!(
+                        name.starts_with("pivot-") && excel.starts_with('='),
+                        "{name}!{reference}: no formula"
+                    );
+                    continue;
+                };
+                let text = text.replace("_xlfn.", "");
                 if text.starts_with("[1]") {
                     // External workbooks are stored as an index into externalLink parts;
                     // Excel reports the resolved path. Resolving is out of scope here.

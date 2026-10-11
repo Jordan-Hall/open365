@@ -30,6 +30,15 @@ const OBJECT_CHAR: &str = "\u{fffc}";
 /// match, but Word also weighs the alternative break, which is not modelled yet.
 const SPACE_SHRINK: f64 = 0.2;
 
+/// Word's justified lines end a little short of the margin, about this much per stretched space
+/// (points): in `layout-justify` the glyphs of a 16-space line sit up to 0.6 pt right of Word's
+/// at the line end, and the best constant over 110,000 glyphs is 0.02 pt (82.8 % of the glyphs
+/// within 0.5 pt, 87.2 % with it; 0.01 gives 86.5 %, 0.035 85.3 %). An empirical fit, not a
+/// mechanism: Word's advances and spaces are whole multiples of 0.24 pt, see the document.
+const JUSTIFY_SHORTFALL: f64 = 0.02;
+/// Lines with fewer stretched spaces (narrow columns) are not shortened: `layout-cols-line`.
+const JUSTIFY_SHORTFALL_MIN_SPACES: usize = 10;
+
 /// Resolved formatting of a run of text.
 #[derive(Debug, Clone)]
 pub(crate) struct RunStyle {
@@ -1417,8 +1426,17 @@ impl LineBuilder<'_> {
                 }
                 _ => {}
             }
-            if i < n && self.opportunity_at(self.atoms[i].byte_start).is_some() {
-                cand = Some(i);
+            // Word breaks before a tab, not after it: the tab goes to the next line together
+            // with the text it leads to (`layout-tabs`, "Twelve" + tab + "Thirteen").
+            if i < n {
+                let before_tab =
+                    self.atoms[i].class == AtomClass::Tab && a.class == AtomClass::Text;
+                let after_tab = a.class == AtomClass::Tab;
+                if before_tab
+                    || (!after_tab && self.opportunity_at(self.atoms[i].byte_start).is_some())
+                {
+                    cand = Some(i);
+                }
             }
         }
         if !forced && end == n && i >= n {
@@ -1482,7 +1500,11 @@ impl LineBuilder<'_> {
                         .filter(|k| self.atoms[a0 + k].class == AtomClass::Space)
                         .collect();
                     if !spaces.is_empty() && (avail - vis_w).abs() > EPS {
-                        let per = (avail - vis_w) / spaces.len() as f64;
+                        let slack = avail - vis_w;
+                        let mut per = slack / spaces.len() as f64;
+                        if slack > 0.0 && spaces.len() >= JUSTIFY_SHORTFALL_MIN_SPACES {
+                            per = (per - JUSTIFY_SHORTFALL).max(0.0);
+                        }
                         let mut added = 0.0;
                         for k in 0..xs.len() {
                             xs[k] += added;

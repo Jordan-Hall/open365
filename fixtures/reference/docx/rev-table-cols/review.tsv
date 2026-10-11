@@ -1,0 +1,312 @@
+para	markup	0	Before table.	0	Normal	0	B0I0U0S22x13
+para	markup	1	R1C1	0	Normal	0	B0I0U0S22x4
+para	markup	2	R1C3	0	Normal	0	B0I0U0S22x4
+para	markup	3		0	Normal	0	
+para	markup	4	R2C1	0	Normal	0	B0I0U0S22x4
+para	markup	5	R2C3	0	Normal	0	B0I0U0S22x4
+para	markup	6		0	Normal	0	
+para	markup	7	R3C1	0	Normal	0	B0I0U0S22x4
+para	markup	8	R3C3	0	Normal	0	B0I0U0S22x4
+para	markup	9		0	Normal	0	
+para	markup	10	After table.	0	Normal	0	B0I0U0S22x12
+tbl	markup	0	1,1,150.4,-16777216,R1C1\u241e1,2,150.4,-16777216,R1C3\u241e1,3,150.4,-16777216,\u241e2,1,150.4,-16777216,R2C1\u241e2,2,150.4,-16777216,R2C3\u241e2,3,150.4,-16777216,\u241e3,1,150.4,-16777216,R3C1\u241e3,2,150.4,-16777216,R3C3\u241e3,3,150.4,-16777216,
+para	final	0	Before table.	0	Normal	0	B0I0U0S22x13
+para	final	1	R1C1	0	Normal	0	B0I0U0S22x4
+para	final	2	R1C3	0	Normal	0	B0I0U0S22x4
+para	final	3		0	Normal	0	
+para	final	4	R2C1	0	Normal	0	B0I0U0S22x4
+para	final	5	R2C3	0	Normal	0	B0I0U0S22x4
+para	final	6		0	Normal	0	
+para	final	7	R3C1	0	Normal	0	B0I0U0S22x4
+para	final	8	R3C3	0	Normal	0	B0I0U0S22x4
+para	final	9		0	Normal	0	
+para	final	10	After table.	0	Normal	0	B0I0U0S22x12
+tbl	final	0	1,1,150.4,-16777216,R1C1\u241e1,2,150.4,-16777216,R1C3\u241e1,3,150.4,-16777216,\u241e2,1,150.4,-16777216,R2C1\u241e2,2,150.4,-16777216,R2C3\u241e2,3,150.4,-16777216,\u241e3,1,150.4,-16777216,R3C1\u241e3,2,150.4,-16777216,R3C3\u241e3,3,150.4,-16777216,
+para	accept	0	Before table.	0	Normal	0	B0I0U0S22x13
+para	accept	1	R1C1	0	Normal	0	B0I0U0S22x4
+para	accept	2	R1C3	0	Normal	0	B0I0U0S22x4
+para	accept	3		0	Normal	0	
+para	accept	4	R2C1	0	Normal	0	B0I0U0S22x4
+para	accept	5	R2C3	0	Normal	0	B0I0U0S22x4
+para	accept	6		0	Normal	0	
+para	accept	7	R3C1	0	Normal	0	B0I0U0S22x4
+para	accept	8	R3C3	0	Normal	0	B0I0U0S22x4
+para	accept	9		0	Normal	0	
+para	accept	10	After table.	0	Normal	0	B0I0U0S22x12
+tbl	accept	0	1,1,150.4,-16777216,R1C1\u241e1,2,150.4,-16777216,R1C3\u241e1,3,150.4,-16777216,\u241e2,1,150.4,-16777216,R2C1\u241e2,2,150.4,-16777216,R2C3\u241e2,3,150.4,-16777216,\u241e3,1,150.4,-16777216,R3C1\u241e3,2,150.4,-16777216,R3C3\u241e3,3,150.4,-16777216,
+para	reject	0	Before table.	0	Normal	0	B0I0U0S22x13
+para	reject	1	R1C1	0	Normal	0	B0I0U0S22x4
+para	reject	2	R1C3	0	Normal	0	B0I0U0S22x4
+para	reject	3		0	Normal	0	
+para	reject	4	R2C1	0	Normal	0	B0I0U0S22x4
+para	reject	5	R2C3	0	Normal	0	B0I0U0S22x4
+para	reject	6		0	Normal	0	
+para	reject	7	R3C1	0	Normal	0	B0I0U0S22x4
+para	reject	8	R3C3	0	Normal	0	B0I0U0S22x4
+para	reject	9		0	Normal	0	
+para	reject	10	After table.	0	Normal	0	B0I0U0S22x12
+tbl	reject	0	1,1,150.4,-16777216,R1C1\u241e1,2,150.4,-16777216,R1C3\u241e1,3,150.4,-16777216,\u241e2,1,150.4,-16777216,R2C1\u241e2,2,150.4,-16777216,R2C3\u241e2,3,150.4,-16777216,\u241e3,1,150.4,-16777216,R3C1\u241e3,2,150.4,-16777216,R3C3\u241e3,3,150.4,-16777216,
+para	acceptp:0	0	Before table.	0	Normal	0	B0I0U0S22x13
+para	acceptp:0	1	R1C1	0	Normal	0	B0I0U0S22x4
+para	acceptp:0	2	R1C3	0	Normal	0	B0I0U0S22x4
+para	acceptp:0	3		0	Normal	0	
+para	acceptp:0	4	R2C1	0	Normal	0	B0I0U0S22x4
+para	acceptp:0	5	R2C3	0	Normal	0	B0I0U0S22x4
+para	acceptp:0	6		0	Normal	0	
+para	acceptp:0	7	R3C1	0	Normal	0	B0I0U0S22x4
+para	acceptp:0	8	R3C3	0	Normal	0	B0I0U0S22x4
+para	acceptp:0	9		0	Normal	0	
+para	acceptp:0	10	After table.	0	Normal	0	B0I0U0S22x12
+tbl	acceptp:0	0	1,1,150.4,-16777216,R1C1\u241e1,2,150.4,-16777216,R1C3\u241e1,3,150.4,-16777216,\u241e2,1,150.4,-16777216,R2C1\u241e2,2,150.4,-16777216,R2C3\u241e2,3,150.4,-16777216,\u241e3,1,150.4,-16777216,R3C1\u241e3,2,150.4,-16777216,R3C3\u241e3,3,150.4,-16777216,
+para	rejectp:0	0	Before table.	0	Normal	0	B0I0U0S22x13
+para	rejectp:0	1	R1C1	0	Normal	0	B0I0U0S22x4
+para	rejectp:0	2	R1C3	0	Normal	0	B0I0U0S22x4
+para	rejectp:0	3		0	Normal	0	
+para	rejectp:0	4	R2C1	0	Normal	0	B0I0U0S22x4
+para	rejectp:0	5	R2C3	0	Normal	0	B0I0U0S22x4
+para	rejectp:0	6		0	Normal	0	
+para	rejectp:0	7	R3C1	0	Normal	0	B0I0U0S22x4
+para	rejectp:0	8	R3C3	0	Normal	0	B0I0U0S22x4
+para	rejectp:0	9		0	Normal	0	
+para	rejectp:0	10	After table.	0	Normal	0	B0I0U0S22x12
+tbl	rejectp:0	0	1,1,150.4,-16777216,R1C1\u241e1,2,150.4,-16777216,R1C3\u241e1,3,150.4,-16777216,\u241e2,1,150.4,-16777216,R2C1\u241e2,2,150.4,-16777216,R2C3\u241e2,3,150.4,-16777216,\u241e3,1,150.4,-16777216,R3C1\u241e3,2,150.4,-16777216,R3C3\u241e3,3,150.4,-16777216,
+para	acceptp:1	0	Before table.	0	Normal	0	B0I0U0S22x13
+para	acceptp:1	1	R1C1	0	Normal	0	B0I0U0S22x4
+para	acceptp:1	2	R1C3	0	Normal	0	B0I0U0S22x4
+para	acceptp:1	3		0	Normal	0	
+para	acceptp:1	4	R2C1	0	Normal	0	B0I0U0S22x4
+para	acceptp:1	5	R2C3	0	Normal	0	B0I0U0S22x4
+para	acceptp:1	6		0	Normal	0	
+para	acceptp:1	7	R3C1	0	Normal	0	B0I0U0S22x4
+para	acceptp:1	8	R3C3	0	Normal	0	B0I0U0S22x4
+para	acceptp:1	9		0	Normal	0	
+para	acceptp:1	10	After table.	0	Normal	0	B0I0U0S22x12
+tbl	acceptp:1	0	1,1,150.4,-16777216,R1C1\u241e1,2,150.4,-16777216,R1C3\u241e1,3,150.4,-16777216,\u241e2,1,150.4,-16777216,R2C1\u241e2,2,150.4,-16777216,R2C3\u241e2,3,150.4,-16777216,\u241e3,1,150.4,-16777216,R3C1\u241e3,2,150.4,-16777216,R3C3\u241e3,3,150.4,-16777216,
+para	rejectp:1	0	Before table.	0	Normal	0	B0I0U0S22x13
+para	rejectp:1	1	R1C1	0	Normal	0	B0I0U0S22x4
+para	rejectp:1	2	R1C3	0	Normal	0	B0I0U0S22x4
+para	rejectp:1	3		0	Normal	0	
+para	rejectp:1	4	R2C1	0	Normal	0	B0I0U0S22x4
+para	rejectp:1	5	R2C3	0	Normal	0	B0I0U0S22x4
+para	rejectp:1	6		0	Normal	0	
+para	rejectp:1	7	R3C1	0	Normal	0	B0I0U0S22x4
+para	rejectp:1	8	R3C3	0	Normal	0	B0I0U0S22x4
+para	rejectp:1	9		0	Normal	0	
+para	rejectp:1	10	After table.	0	Normal	0	B0I0U0S22x12
+tbl	rejectp:1	0	1,1,150.4,-16777216,R1C1\u241e1,2,150.4,-16777216,R1C3\u241e1,3,150.4,-16777216,\u241e2,1,150.4,-16777216,R2C1\u241e2,2,150.4,-16777216,R2C3\u241e2,3,150.4,-16777216,\u241e3,1,150.4,-16777216,R3C1\u241e3,2,150.4,-16777216,R3C3\u241e3,3,150.4,-16777216,
+para	acceptp:2	0	Before table.	0	Normal	0	B0I0U0S22x13
+para	acceptp:2	1	R1C1	0	Normal	0	B0I0U0S22x4
+para	acceptp:2	2	R1C3	0	Normal	0	B0I0U0S22x4
+para	acceptp:2	3		0	Normal	0	
+para	acceptp:2	4	R2C1	0	Normal	0	B0I0U0S22x4
+para	acceptp:2	5	R2C3	0	Normal	0	B0I0U0S22x4
+para	acceptp:2	6		0	Normal	0	
+para	acceptp:2	7	R3C1	0	Normal	0	B0I0U0S22x4
+para	acceptp:2	8	R3C3	0	Normal	0	B0I0U0S22x4
+para	acceptp:2	9		0	Normal	0	
+para	acceptp:2	10	After table.	0	Normal	0	B0I0U0S22x12
+tbl	acceptp:2	0	1,1,150.4,-16777216,R1C1\u241e1,2,150.4,-16777216,R1C3\u241e1,3,150.4,-16777216,\u241e2,1,150.4,-16777216,R2C1\u241e2,2,150.4,-16777216,R2C3\u241e2,3,150.4,-16777216,\u241e3,1,150.4,-16777216,R3C1\u241e3,2,150.4,-16777216,R3C3\u241e3,3,150.4,-16777216,
+para	rejectp:2	0	Before table.	0	Normal	0	B0I0U0S22x13
+para	rejectp:2	1	R1C1	0	Normal	0	B0I0U0S22x4
+para	rejectp:2	2	R1C3	0	Normal	0	B0I0U0S22x4
+para	rejectp:2	3		0	Normal	0	
+para	rejectp:2	4	R2C1	0	Normal	0	B0I0U0S22x4
+para	rejectp:2	5	R2C3	0	Normal	0	B0I0U0S22x4
+para	rejectp:2	6		0	Normal	0	
+para	rejectp:2	7	R3C1	0	Normal	0	B0I0U0S22x4
+para	rejectp:2	8	R3C3	0	Normal	0	B0I0U0S22x4
+para	rejectp:2	9		0	Normal	0	
+para	rejectp:2	10	After table.	0	Normal	0	B0I0U0S22x12
+tbl	rejectp:2	0	1,1,150.4,-16777216,R1C1\u241e1,2,150.4,-16777216,R1C3\u241e1,3,150.4,-16777216,\u241e2,1,150.4,-16777216,R2C1\u241e2,2,150.4,-16777216,R2C3\u241e2,3,150.4,-16777216,\u241e3,1,150.4,-16777216,R3C1\u241e3,2,150.4,-16777216,R3C3\u241e3,3,150.4,-16777216,
+para	acceptp:3	0	Before table.	0	Normal	0	B0I0U0S22x13
+para	acceptp:3	1	R1C1	0	Normal	0	B0I0U0S22x4
+para	acceptp:3	2	R1C3	0	Normal	0	B0I0U0S22x4
+para	acceptp:3	3		0	Normal	0	
+para	acceptp:3	4	R2C1	0	Normal	0	B0I0U0S22x4
+para	acceptp:3	5	R2C3	0	Normal	0	B0I0U0S22x4
+para	acceptp:3	6		0	Normal	0	
+para	acceptp:3	7	R3C1	0	Normal	0	B0I0U0S22x4
+para	acceptp:3	8	R3C3	0	Normal	0	B0I0U0S22x4
+para	acceptp:3	9		0	Normal	0	
+para	acceptp:3	10	After table.	0	Normal	0	B0I0U0S22x12
+tbl	acceptp:3	0	1,1,150.4,-16777216,R1C1\u241e1,2,150.4,-16777216,R1C3\u241e1,3,150.4,-16777216,\u241e2,1,150.4,-16777216,R2C1\u241e2,2,150.4,-16777216,R2C3\u241e2,3,150.4,-16777216,\u241e3,1,150.4,-16777216,R3C1\u241e3,2,150.4,-16777216,R3C3\u241e3,3,150.4,-16777216,
+para	rejectp:3	0	Before table.	0	Normal	0	B0I0U0S22x13
+para	rejectp:3	1	R1C1	0	Normal	0	B0I0U0S22x4
+para	rejectp:3	2	R1C3	0	Normal	0	B0I0U0S22x4
+para	rejectp:3	3		0	Normal	0	
+para	rejectp:3	4	R2C1	0	Normal	0	B0I0U0S22x4
+para	rejectp:3	5	R2C3	0	Normal	0	B0I0U0S22x4
+para	rejectp:3	6		0	Normal	0	
+para	rejectp:3	7	R3C1	0	Normal	0	B0I0U0S22x4
+para	rejectp:3	8	R3C3	0	Normal	0	B0I0U0S22x4
+para	rejectp:3	9		0	Normal	0	
+para	rejectp:3	10	After table.	0	Normal	0	B0I0U0S22x12
+tbl	rejectp:3	0	1,1,150.4,-16777216,R1C1\u241e1,2,150.4,-16777216,R1C3\u241e1,3,150.4,-16777216,\u241e2,1,150.4,-16777216,R2C1\u241e2,2,150.4,-16777216,R2C3\u241e2,3,150.4,-16777216,\u241e3,1,150.4,-16777216,R3C1\u241e3,2,150.4,-16777216,R3C3\u241e3,3,150.4,-16777216,
+para	acceptp:4	0	Before table.	0	Normal	0	B0I0U0S22x13
+para	acceptp:4	1	R1C1	0	Normal	0	B0I0U0S22x4
+para	acceptp:4	2	R1C3	0	Normal	0	B0I0U0S22x4
+para	acceptp:4	3		0	Normal	0	
+para	acceptp:4	4	R2C1	0	Normal	0	B0I0U0S22x4
+para	acceptp:4	5	R2C3	0	Normal	0	B0I0U0S22x4
+para	acceptp:4	6		0	Normal	0	
+para	acceptp:4	7	R3C1	0	Normal	0	B0I0U0S22x4
+para	acceptp:4	8	R3C3	0	Normal	0	B0I0U0S22x4
+para	acceptp:4	9		0	Normal	0	
+para	acceptp:4	10	After table.	0	Normal	0	B0I0U0S22x12
+tbl	acceptp:4	0	1,1,150.4,-16777216,R1C1\u241e1,2,150.4,-16777216,R1C3\u241e1,3,150.4,-16777216,\u241e2,1,150.4,-16777216,R2C1\u241e2,2,150.4,-16777216,R2C3\u241e2,3,150.4,-16777216,\u241e3,1,150.4,-16777216,R3C1\u241e3,2,150.4,-16777216,R3C3\u241e3,3,150.4,-16777216,
+para	rejectp:4	0	Before table.	0	Normal	0	B0I0U0S22x13
+para	rejectp:4	1	R1C1	0	Normal	0	B0I0U0S22x4
+para	rejectp:4	2	R1C3	0	Normal	0	B0I0U0S22x4
+para	rejectp:4	3		0	Normal	0	
+para	rejectp:4	4	R2C1	0	Normal	0	B0I0U0S22x4
+para	rejectp:4	5	R2C3	0	Normal	0	B0I0U0S22x4
+para	rejectp:4	6		0	Normal	0	
+para	rejectp:4	7	R3C1	0	Normal	0	B0I0U0S22x4
+para	rejectp:4	8	R3C3	0	Normal	0	B0I0U0S22x4
+para	rejectp:4	9		0	Normal	0	
+para	rejectp:4	10	After table.	0	Normal	0	B0I0U0S22x12
+tbl	rejectp:4	0	1,1,150.4,-16777216,R1C1\u241e1,2,150.4,-16777216,R1C3\u241e1,3,150.4,-16777216,\u241e2,1,150.4,-16777216,R2C1\u241e2,2,150.4,-16777216,R2C3\u241e2,3,150.4,-16777216,\u241e3,1,150.4,-16777216,R3C1\u241e3,2,150.4,-16777216,R3C3\u241e3,3,150.4,-16777216,
+para	acceptp:5	0	Before table.	0	Normal	0	B0I0U0S22x13
+para	acceptp:5	1	R1C1	0	Normal	0	B0I0U0S22x4
+para	acceptp:5	2	R1C3	0	Normal	0	B0I0U0S22x4
+para	acceptp:5	3		0	Normal	0	
+para	acceptp:5	4	R2C1	0	Normal	0	B0I0U0S22x4
+para	acceptp:5	5	R2C3	0	Normal	0	B0I0U0S22x4
+para	acceptp:5	6		0	Normal	0	
+para	acceptp:5	7	R3C1	0	Normal	0	B0I0U0S22x4
+para	acceptp:5	8	R3C3	0	Normal	0	B0I0U0S22x4
+para	acceptp:5	9		0	Normal	0	
+para	acceptp:5	10	After table.	0	Normal	0	B0I0U0S22x12
+tbl	acceptp:5	0	1,1,150.4,-16777216,R1C1\u241e1,2,150.4,-16777216,R1C3\u241e1,3,150.4,-16777216,\u241e2,1,150.4,-16777216,R2C1\u241e2,2,150.4,-16777216,R2C3\u241e2,3,150.4,-16777216,\u241e3,1,150.4,-16777216,R3C1\u241e3,2,150.4,-16777216,R3C3\u241e3,3,150.4,-16777216,
+para	rejectp:5	0	Before table.	0	Normal	0	B0I0U0S22x13
+para	rejectp:5	1	R1C1	0	Normal	0	B0I0U0S22x4
+para	rejectp:5	2	R1C3	0	Normal	0	B0I0U0S22x4
+para	rejectp:5	3		0	Normal	0	
+para	rejectp:5	4	R2C1	0	Normal	0	B0I0U0S22x4
+para	rejectp:5	5	R2C3	0	Normal	0	B0I0U0S22x4
+para	rejectp:5	6		0	Normal	0	
+para	rejectp:5	7	R3C1	0	Normal	0	B0I0U0S22x4
+para	rejectp:5	8	R3C3	0	Normal	0	B0I0U0S22x4
+para	rejectp:5	9		0	Normal	0	
+para	rejectp:5	10	After table.	0	Normal	0	B0I0U0S22x12
+tbl	rejectp:5	0	1,1,150.4,-16777216,R1C1\u241e1,2,150.4,-16777216,R1C3\u241e1,3,150.4,-16777216,\u241e2,1,150.4,-16777216,R2C1\u241e2,2,150.4,-16777216,R2C3\u241e2,3,150.4,-16777216,\u241e3,1,150.4,-16777216,R3C1\u241e3,2,150.4,-16777216,R3C3\u241e3,3,150.4,-16777216,
+para	acceptp:6	0	Before table.	0	Normal	0	B0I0U0S22x13
+para	acceptp:6	1	R1C1	0	Normal	0	B0I0U0S22x4
+para	acceptp:6	2	R1C3	0	Normal	0	B0I0U0S22x4
+para	acceptp:6	3		0	Normal	0	
+para	acceptp:6	4	R2C1	0	Normal	0	B0I0U0S22x4
+para	acceptp:6	5	R2C3	0	Normal	0	B0I0U0S22x4
+para	acceptp:6	6		0	Normal	0	
+para	acceptp:6	7	R3C1	0	Normal	0	B0I0U0S22x4
+para	acceptp:6	8	R3C3	0	Normal	0	B0I0U0S22x4
+para	acceptp:6	9		0	Normal	0	
+para	acceptp:6	10	After table.	0	Normal	0	B0I0U0S22x12
+tbl	acceptp:6	0	1,1,150.4,-16777216,R1C1\u241e1,2,150.4,-16777216,R1C3\u241e1,3,150.4,-16777216,\u241e2,1,150.4,-16777216,R2C1\u241e2,2,150.4,-16777216,R2C3\u241e2,3,150.4,-16777216,\u241e3,1,150.4,-16777216,R3C1\u241e3,2,150.4,-16777216,R3C3\u241e3,3,150.4,-16777216,
+para	rejectp:6	0	Before table.	0	Normal	0	B0I0U0S22x13
+para	rejectp:6	1	R1C1	0	Normal	0	B0I0U0S22x4
+para	rejectp:6	2	R1C3	0	Normal	0	B0I0U0S22x4
+para	rejectp:6	3		0	Normal	0	
+para	rejectp:6	4	R2C1	0	Normal	0	B0I0U0S22x4
+para	rejectp:6	5	R2C3	0	Normal	0	B0I0U0S22x4
+para	rejectp:6	6		0	Normal	0	
+para	rejectp:6	7	R3C1	0	Normal	0	B0I0U0S22x4
+para	rejectp:6	8	R3C3	0	Normal	0	B0I0U0S22x4
+para	rejectp:6	9		0	Normal	0	
+para	rejectp:6	10	After table.	0	Normal	0	B0I0U0S22x12
+tbl	rejectp:6	0	1,1,150.4,-16777216,R1C1\u241e1,2,150.4,-16777216,R1C3\u241e1,3,150.4,-16777216,\u241e2,1,150.4,-16777216,R2C1\u241e2,2,150.4,-16777216,R2C3\u241e2,3,150.4,-16777216,\u241e3,1,150.4,-16777216,R3C1\u241e3,2,150.4,-16777216,R3C3\u241e3,3,150.4,-16777216,
+para	acceptp:7	0	Before table.	0	Normal	0	B0I0U0S22x13
+para	acceptp:7	1	R1C1	0	Normal	0	B0I0U0S22x4
+para	acceptp:7	2	R1C3	0	Normal	0	B0I0U0S22x4
+para	acceptp:7	3		0	Normal	0	
+para	acceptp:7	4	R2C1	0	Normal	0	B0I0U0S22x4
+para	acceptp:7	5	R2C3	0	Normal	0	B0I0U0S22x4
+para	acceptp:7	6		0	Normal	0	
+para	acceptp:7	7	R3C1	0	Normal	0	B0I0U0S22x4
+para	acceptp:7	8	R3C3	0	Normal	0	B0I0U0S22x4
+para	acceptp:7	9		0	Normal	0	
+para	acceptp:7	10	After table.	0	Normal	0	B0I0U0S22x12
+tbl	acceptp:7	0	1,1,150.4,-16777216,R1C1\u241e1,2,150.4,-16777216,R1C3\u241e1,3,150.4,-16777216,\u241e2,1,150.4,-16777216,R2C1\u241e2,2,150.4,-16777216,R2C3\u241e2,3,150.4,-16777216,\u241e3,1,150.4,-16777216,R3C1\u241e3,2,150.4,-16777216,R3C3\u241e3,3,150.4,-16777216,
+para	rejectp:7	0	Before table.	0	Normal	0	B0I0U0S22x13
+para	rejectp:7	1	R1C1	0	Normal	0	B0I0U0S22x4
+para	rejectp:7	2	R1C3	0	Normal	0	B0I0U0S22x4
+para	rejectp:7	3		0	Normal	0	
+para	rejectp:7	4	R2C1	0	Normal	0	B0I0U0S22x4
+para	rejectp:7	5	R2C3	0	Normal	0	B0I0U0S22x4
+para	rejectp:7	6		0	Normal	0	
+para	rejectp:7	7	R3C1	0	Normal	0	B0I0U0S22x4
+para	rejectp:7	8	R3C3	0	Normal	0	B0I0U0S22x4
+para	rejectp:7	9		0	Normal	0	
+para	rejectp:7	10	After table.	0	Normal	0	B0I0U0S22x12
+tbl	rejectp:7	0	1,1,150.4,-16777216,R1C1\u241e1,2,150.4,-16777216,R1C3\u241e1,3,150.4,-16777216,\u241e2,1,150.4,-16777216,R2C1\u241e2,2,150.4,-16777216,R2C3\u241e2,3,150.4,-16777216,\u241e3,1,150.4,-16777216,R3C1\u241e3,2,150.4,-16777216,R3C3\u241e3,3,150.4,-16777216,
+para	acceptp:8	0	Before table.	0	Normal	0	B0I0U0S22x13
+para	acceptp:8	1	R1C1	0	Normal	0	B0I0U0S22x4
+para	acceptp:8	2	R1C3	0	Normal	0	B0I0U0S22x4
+para	acceptp:8	3		0	Normal	0	
+para	acceptp:8	4	R2C1	0	Normal	0	B0I0U0S22x4
+para	acceptp:8	5	R2C3	0	Normal	0	B0I0U0S22x4
+para	acceptp:8	6		0	Normal	0	
+para	acceptp:8	7	R3C1	0	Normal	0	B0I0U0S22x4
+para	acceptp:8	8	R3C3	0	Normal	0	B0I0U0S22x4
+para	acceptp:8	9		0	Normal	0	
+para	acceptp:8	10	After table.	0	Normal	0	B0I0U0S22x12
+tbl	acceptp:8	0	1,1,150.4,-16777216,R1C1\u241e1,2,150.4,-16777216,R1C3\u241e1,3,150.4,-16777216,\u241e2,1,150.4,-16777216,R2C1\u241e2,2,150.4,-16777216,R2C3\u241e2,3,150.4,-16777216,\u241e3,1,150.4,-16777216,R3C1\u241e3,2,150.4,-16777216,R3C3\u241e3,3,150.4,-16777216,
+para	rejectp:8	0	Before table.	0	Normal	0	B0I0U0S22x13
+para	rejectp:8	1	R1C1	0	Normal	0	B0I0U0S22x4
+para	rejectp:8	2	R1C3	0	Normal	0	B0I0U0S22x4
+para	rejectp:8	3		0	Normal	0	
+para	rejectp:8	4	R2C1	0	Normal	0	B0I0U0S22x4
+para	rejectp:8	5	R2C3	0	Normal	0	B0I0U0S22x4
+para	rejectp:8	6		0	Normal	0	
+para	rejectp:8	7	R3C1	0	Normal	0	B0I0U0S22x4
+para	rejectp:8	8	R3C3	0	Normal	0	B0I0U0S22x4
+para	rejectp:8	9		0	Normal	0	
+para	rejectp:8	10	After table.	0	Normal	0	B0I0U0S22x12
+tbl	rejectp:8	0	1,1,150.4,-16777216,R1C1\u241e1,2,150.4,-16777216,R1C3\u241e1,3,150.4,-16777216,\u241e2,1,150.4,-16777216,R2C1\u241e2,2,150.4,-16777216,R2C3\u241e2,3,150.4,-16777216,\u241e3,1,150.4,-16777216,R3C1\u241e3,2,150.4,-16777216,R3C3\u241e3,3,150.4,-16777216,
+para	acceptp:9	0	Before table.	0	Normal	0	B0I0U0S22x13
+para	acceptp:9	1	R1C1	0	Normal	0	B0I0U0S22x4
+para	acceptp:9	2	R1C3	0	Normal	0	B0I0U0S22x4
+para	acceptp:9	3		0	Normal	0	
+para	acceptp:9	4	R2C1	0	Normal	0	B0I0U0S22x4
+para	acceptp:9	5	R2C3	0	Normal	0	B0I0U0S22x4
+para	acceptp:9	6		0	Normal	0	
+para	acceptp:9	7	R3C1	0	Normal	0	B0I0U0S22x4
+para	acceptp:9	8	R3C3	0	Normal	0	B0I0U0S22x4
+para	acceptp:9	9		0	Normal	0	
+para	acceptp:9	10	After table.	0	Normal	0	B0I0U0S22x12
+tbl	acceptp:9	0	1,1,150.4,-16777216,R1C1\u241e1,2,150.4,-16777216,R1C3\u241e1,3,150.4,-16777216,\u241e2,1,150.4,-16777216,R2C1\u241e2,2,150.4,-16777216,R2C3\u241e2,3,150.4,-16777216,\u241e3,1,150.4,-16777216,R3C1\u241e3,2,150.4,-16777216,R3C3\u241e3,3,150.4,-16777216,
+para	rejectp:9	0	Before table.	0	Normal	0	B0I0U0S22x13
+para	rejectp:9	1	R1C1	0	Normal	0	B0I0U0S22x4
+para	rejectp:9	2	R1C3	0	Normal	0	B0I0U0S22x4
+para	rejectp:9	3		0	Normal	0	
+para	rejectp:9	4	R2C1	0	Normal	0	B0I0U0S22x4
+para	rejectp:9	5	R2C3	0	Normal	0	B0I0U0S22x4
+para	rejectp:9	6		0	Normal	0	
+para	rejectp:9	7	R3C1	0	Normal	0	B0I0U0S22x4
+para	rejectp:9	8	R3C3	0	Normal	0	B0I0U0S22x4
+para	rejectp:9	9		0	Normal	0	
+para	rejectp:9	10	After table.	0	Normal	0	B0I0U0S22x12
+tbl	rejectp:9	0	1,1,150.4,-16777216,R1C1\u241e1,2,150.4,-16777216,R1C3\u241e1,3,150.4,-16777216,\u241e2,1,150.4,-16777216,R2C1\u241e2,2,150.4,-16777216,R2C3\u241e2,3,150.4,-16777216,\u241e3,1,150.4,-16777216,R3C1\u241e3,2,150.4,-16777216,R3C3\u241e3,3,150.4,-16777216,
+para	acceptp:10	0	Before table.	0	Normal	0	B0I0U0S22x13
+para	acceptp:10	1	R1C1	0	Normal	0	B0I0U0S22x4
+para	acceptp:10	2	R1C3	0	Normal	0	B0I0U0S22x4
+para	acceptp:10	3		0	Normal	0	
+para	acceptp:10	4	R2C1	0	Normal	0	B0I0U0S22x4
+para	acceptp:10	5	R2C3	0	Normal	0	B0I0U0S22x4
+para	acceptp:10	6		0	Normal	0	
+para	acceptp:10	7	R3C1	0	Normal	0	B0I0U0S22x4
+para	acceptp:10	8	R3C3	0	Normal	0	B0I0U0S22x4
+para	acceptp:10	9		0	Normal	0	
+para	acceptp:10	10	After table.	0	Normal	0	B0I0U0S22x12
+tbl	acceptp:10	0	1,1,150.4,-16777216,R1C1\u241e1,2,150.4,-16777216,R1C3\u241e1,3,150.4,-16777216,\u241e2,1,150.4,-16777216,R2C1\u241e2,2,150.4,-16777216,R2C3\u241e2,3,150.4,-16777216,\u241e3,1,150.4,-16777216,R3C1\u241e3,2,150.4,-16777216,R3C3\u241e3,3,150.4,-16777216,
+para	rejectp:10	0	Before table.	0	Normal	0	B0I0U0S22x13
+para	rejectp:10	1	R1C1	0	Normal	0	B0I0U0S22x4
+para	rejectp:10	2	R1C3	0	Normal	0	B0I0U0S22x4
+para	rejectp:10	3		0	Normal	0	
+para	rejectp:10	4	R2C1	0	Normal	0	B0I0U0S22x4
+para	rejectp:10	5	R2C3	0	Normal	0	B0I0U0S22x4
+para	rejectp:10	6		0	Normal	0	
+para	rejectp:10	7	R3C1	0	Normal	0	B0I0U0S22x4
+para	rejectp:10	8	R3C3	0	Normal	0	B0I0U0S22x4
+para	rejectp:10	9		0	Normal	0	
+para	rejectp:10	10	After table.	0	Normal	0	B0I0U0S22x12
+tbl	rejectp:10	0	1,1,150.4,-16777216,R1C1\u241e1,2,150.4,-16777216,R1C3\u241e1,3,150.4,-16777216,\u241e2,1,150.4,-16777216,R2C1\u241e2,2,150.4,-16777216,R2C3\u241e2,3,150.4,-16777216,\u241e3,1,150.4,-16777216,R3C1\u241e3,2,150.4,-16777216,R3C3\u241e3,3,150.4,-16777216,

@@ -1,0 +1,37 @@
+rev	0	ParagraphProperty	Author A	2026-01-02T03:04:00Z	Level change
+para	markup	0	Numbered by tracked change	0	Normal	4	B0I0U0S22x26
+para	markup	1	Plain paragraph	0	Normal	0	B0I0U0S22x15
+para	markup	2	Level change	0	Normal	4	B0I0U0S22x12
+para	final	0	Numbered by tracked change	0	Normal	4	B0I0U0S22x26
+para	final	1	Plain paragraph	0	Normal	0	B0I0U0S22x15
+para	final	2	Level change	0	Normal	4	B0I0U0S22x12
+para	accept	0	Numbered by tracked change	0	Normal	4	B0I0U0S22x26
+para	accept	1	Plain paragraph	0	Normal	0	B0I0U0S22x15
+para	accept	2	Level change	0	Normal	4	B0I0U0S22x12
+para	reject	0	Numbered by tracked change	0	Normal	4	B0I0U0S22x26
+para	reject	1	Plain paragraph	0	Normal	0	B0I0U0S22x15
+para	reject	2	Level change	0	Normal	4	B0I0U0S22x12
+para	accept1:0	0	Numbered by tracked change	0	Normal	4	B0I0U0S22x26
+para	accept1:0	1	Plain paragraph	0	Normal	0	B0I0U0S22x15
+para	accept1:0	2	Level change	0	Normal	4	B0I0U0S22x12
+para	reject1:0	0	Numbered by tracked change	0	Normal	4	B0I0U0S22x26
+para	reject1:0	1	Plain paragraph	0	Normal	0	B0I0U0S22x15
+para	reject1:0	2	Level change	0	Normal	4	B0I0U0S22x12
+para	acceptp:0	0	Numbered by tracked change	0	Normal	4	B0I0U0S22x26
+para	acceptp:0	1	Plain paragraph	0	Normal	0	B0I0U0S22x15
+para	acceptp:0	2	Level change	0	Normal	4	B0I0U0S22x12
+para	rejectp:0	0	Numbered by tracked change	0	Normal	4	B0I0U0S22x26
+para	rejectp:0	1	Plain paragraph	0	Normal	0	B0I0U0S22x15
+para	rejectp:0	2	Level change	0	Normal	4	B0I0U0S22x12
+para	acceptp:1	0	Numbered by tracked change	0	Normal	4	B0I0U0S22x26
+para	acceptp:1	1	Plain paragraph	0	Normal	0	B0I0U0S22x15
+para	acceptp:1	2	Level change	0	Normal	4	B0I0U0S22x12
+para	rejectp:1	0	Numbered by tracked change	0	Normal	4	B0I0U0S22x26
+para	rejectp:1	1	Plain paragraph	0	Normal	0	B0I0U0S22x15
+para	rejectp:1	2	Level change	0	Normal	4	B0I0U0S22x12
+para	acceptp:2	0	Numbered by tracked change	0	Normal	4	B0I0U0S22x26
+para	acceptp:2	1	Plain paragraph	0	Normal	0	B0I0U0S22x15
+para	acceptp:2	2	Level change	0	Normal	4	B0I0U0S22x12
+para	rejectp:2	0	Numbered by tracked change	0	Normal	4	B0I0U0S22x26
+para	rejectp:2	1	Plain paragraph	0	Normal	0	B0I0U0S22x15
+para	rejectp:2	2	Level change	0	Normal	4	B0I0U0S22x12

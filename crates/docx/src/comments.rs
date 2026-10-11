@@ -21,6 +21,7 @@ use crate::edit::split_runs_at;
 use crate::model::{Inline, Paragraph, Run, RunContent};
 use crate::props::RunProps;
 use crate::ranges::DocPos;
+use crate::review::run_markup_text;
 use crate::xml::{self, Attr, ElementHead, ParsedXml, RawXml, W_NS, XmlElement};
 
 const REL_COMMENTS: &str =
@@ -32,6 +33,8 @@ const REL_EXTENSIBLE: &str =
     "http://schemas.microsoft.com/office/2018/08/relationships/commentsExtensible";
 const CT_COMMENTS: &str =
     "application/vnd.openxmlformats-officedocument.wordprocessingml.comments+xml";
+const REL_PEOPLE: &str = "http://schemas.microsoft.com/office/2011/relationships/people";
+const CT_PEOPLE: &str = "application/vnd.openxmlformats-officedocument.wordprocessingml.people+xml";
 const CT_EXTENDED: &str =
     "application/vnd.openxmlformats-officedocument.wordprocessingml.commentsExtended+xml";
 const W14: &str = "http://schemas.microsoft.com/office/word/2010/wordml";
@@ -46,6 +49,16 @@ const CONTENT_TYPES_PART: &str = "[Content_Types].xml";
 pub struct CommentAnchor {
     pub start: DocPos,
     pub end: DocPos,
+}
+
+/// A comment author listed in `word/people.xml`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Person {
+    pub author: String,
+    /// `w15:presenceInfo/@w15:providerId` (`None`, `AD`, `Windows Live`...).
+    pub provider_id: Option<String>,
+    /// `w15:presenceInfo/@w15:userId`.
+    pub user_id: Option<String>,
 }
 
 /// One comment.
@@ -64,7 +77,8 @@ pub struct Comment {
     pub resolved: bool,
     /// The range markers in the main story; `None` when the comment is not anchored there.
     pub anchor: Option<CommentAnchor>,
-    /// Final-view text of the anchor, paragraphs separated by `\n`.
+    /// Text of the anchor in the markup view, paragraphs separated by `\n`. Deleted text is
+    /// included, as in Word's `Comment.Scope.Text`.
     pub scope_text: String,
     /// `w14:paraId` of the body's last paragraph, the key of the extension parts.
     pub para_id: Option<String>,
@@ -117,6 +131,8 @@ pub(crate) struct CommentParts {
     extended: Option<PartXml>,
     ids: Option<PartXml>,
     extensible: Option<PartXml>,
+    /// `word/people.xml` (`w15:person`): the authors of comments.
+    people: Option<PartXml>,
     /// A comment part exists but cannot be parsed: comment edits are refused.
     broken: Option<String>,
 }
@@ -154,15 +170,22 @@ impl CommentParts {
         parts.extended = load(REL_EXTENDED, &mut broken);
         parts.ids = load(REL_IDS, &mut broken);
         parts.extensible = load(REL_EXTENSIBLE, &mut broken);
+        parts.people = load(REL_PEOPLE, &mut broken);
         parts.broken = broken;
         parts
     }
 
     pub(crate) fn is_dirty(&self) -> bool {
-        [&self.comments, &self.extended, &self.ids, &self.extensible]
-            .into_iter()
-            .flatten()
-            .any(|p| p.dirty)
+        [
+            &self.comments,
+            &self.extended,
+            &self.ids,
+            &self.extensible,
+            &self.people,
+        ]
+        .into_iter()
+        .flatten()
+        .any(|p| p.dirty)
     }
 
     /// Writes the changed parts into `package`, registering new ones.
@@ -176,6 +199,7 @@ impl CommentParts {
             (&mut self.extended, REL_EXTENDED, Some(CT_EXTENDED)),
             (&mut self.ids, REL_IDS, None),
             (&mut self.extensible, REL_EXTENSIBLE, None),
+            (&mut self.people, REL_PEOPLE, Some(CT_PEOPLE)),
         ] {
             let Some(part) = slot else { continue };
             if !part.dirty {
@@ -421,13 +445,6 @@ fn scan_inlines(content: &[Inline], para: usize, acc: &mut usize, out: &mut BTre
     }
 }
 
-fn char_slice(text: &str, from: usize, to: usize) -> String {
-    text.chars()
-        .skip(from)
-        .take(to.saturating_sub(from))
-        .collect()
-}
-
 impl Document {
     fn marks(&self) -> BTreeMap<u32, Marks> {
         let mut out = BTreeMap::new();
@@ -437,26 +454,91 @@ impl Document {
         out
     }
 
-    fn scope_text(&self, anchor: CommentAnchor) -> String {
-        let paragraphs = self.body().paragraphs();
+    /// Markup-view text between the range markers of comment `id` in the main story.
+    fn scope_text(&self, id: u32) -> String {
+        fn walk(
+            content: &[Inline],
+            id: u32,
+            inside: &mut bool,
+            ended: &mut bool,
+            touched: &mut bool,
+            out: &mut String,
+        ) {
+            for inline in content {
+                if *ended {
+                    return;
+                }
+                match inline {
+                    Inline::Run(r) if *inside => run_markup_text(r, out),
+                    Inline::Run(_) => {}
+                    Inline::Group(g) => walk(&g.content, id, inside, ended, touched, out),
+                    Inline::Raw(RawXml::Element(e)) if comment_id(e) == Some(id) => {
+                        if e.head.is_w("commentRangeStart") {
+                            *inside = true;
+                            *touched = true;
+                        } else if e.head.is_w("commentRangeEnd") && *inside {
+                            *inside = false;
+                            *ended = true;
+                        }
+                    }
+                    Inline::Raw(_) => {}
+                }
+            }
+        }
         let mut parts = Vec::new();
-        for q in anchor.start.para..=anchor.end.para {
-            let Some(p) = paragraphs.get(q) else { break };
-            let text = p.text();
-            let len = text.chars().count();
-            let from = if q == anchor.start.para {
-                anchor.start.offset
-            } else {
-                0
-            };
-            let to = if q == anchor.end.para {
-                anchor.end.offset
-            } else {
-                len
-            };
-            parts.push(char_slice(&text, from, to));
+        let (mut inside, mut ended) = (false, false);
+        for p in self.body().paragraphs() {
+            let mut touched = inside;
+            let mut seg = String::new();
+            walk(
+                &p.content,
+                id,
+                &mut inside,
+                &mut ended,
+                &mut touched,
+                &mut seg,
+            );
+            if touched {
+                parts.push(seg);
+            }
+            if ended {
+                break;
+            }
         }
         parts.join("\n")
+    }
+
+    /// The comment authors listed in `word/people.xml`.
+    pub fn people(&self) -> Vec<Person> {
+        let Some(part) = &self.comments.people else {
+            return Vec::new();
+        };
+        part.xml
+            .root
+            .children
+            .iter()
+            .filter_map(RawXml::as_element)
+            .filter(|e| is_el(e, W15, "person"))
+            .map(|e| {
+                let presence = e
+                    .children
+                    .iter()
+                    .filter_map(RawXml::as_element)
+                    .find(|c| is_el(c, W15, "presenceInfo"));
+                let get = |k: &str| {
+                    presence
+                        .and_then(|p| attr_ns(&p.head, W15, k))
+                        .map(str::to_owned)
+                };
+                Person {
+                    author: attr_ns(&e.head, W15, "author")
+                        .unwrap_or_default()
+                        .to_owned(),
+                    provider_id: get("providerId"),
+                    user_id: get("userId"),
+                }
+            })
+            .collect()
     }
 
     /// Every comment, in the order of `word/comments.xml`.
@@ -506,17 +588,8 @@ impl Document {
                     Some(CommentAnchor { start, end })
                 });
                 // Word reports a reply's scope as its parent's.
-                let scope_anchor = parent
-                    .and_then(|p| marks.get(&p))
-                    .and_then(|m| {
-                        let start = m.start.or(m.reference)?;
-                        Some(CommentAnchor {
-                            start,
-                            end: m.end.or(m.reference).unwrap_or(start),
-                        })
-                    })
-                    .or(anchor);
-                let scope_text = scope_anchor.map(|a| self.scope_text(a)).unwrap_or_default();
+                let scope_id = parent.filter(|p| marks.contains_key(p)).unwrap_or(id);
+                let scope_text = self.scope_text(scope_id);
                 let text = comment_paragraphs(c)
                     .into_iter()
                     .map(|p| {
@@ -1072,7 +1145,56 @@ impl Document {
             }));
             part.dirty = true;
         }
+        self.ensure_person(&comment.author)?;
         Ok(id)
+    }
+
+    /// Adds `author` to `word/people.xml` (created when missing) unless already listed.
+    fn ensure_person(&mut self, author: &str) -> Result<(), DocxError> {
+        if self.people().iter().any(|p| p.author == author) {
+            return Ok(());
+        }
+        if self.comments.people.is_none() {
+            let dir = self
+                .main_part()
+                .as_str()
+                .rsplit_once('/')
+                .map_or(String::new(), |(d, _)| format!("{d}/"));
+            self.comments.people = Some(PartXml {
+                name: PartName::new(&format!("{dir}people.xml"))?,
+                xml: xml::parse(NEW_PEOPLE.as_bytes())?,
+                dirty: true,
+                created: true,
+            });
+        }
+        let Some(part) = &mut self.comments.people else {
+            return Ok(());
+        };
+        let prefix = ensure_prefix(&mut part.xml.root, W15, "w15");
+        let name = |local: &str| format!("{prefix}:{local}");
+        let attr = |local: &str, value: &str| Attr {
+            name: name(local),
+            ns: Some(W15.into()),
+            value: value.to_owned(),
+        };
+        let presence = XmlElement {
+            head: ElementHead {
+                name: name("presenceInfo"),
+                ns: Some(W15.into()),
+                attrs: vec![attr("providerId", "None"), attr("userId", author)],
+            },
+            children: Vec::new(),
+        };
+        part.xml.root.children.push(RawXml::Element(XmlElement {
+            head: ElementHead {
+                name: name("person"),
+                ns: Some(W15.into()),
+                attrs: vec![attr("author", author)],
+            },
+            children: vec![RawXml::Element(presence)],
+        }));
+        part.dirty = true;
+        Ok(())
     }
 
     /// An empty marker element named like the paragraph's elements.
@@ -1252,6 +1374,14 @@ const NEW_COMMENTS: &str = concat!(
     "xmlns:w=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\" ",
     "xmlns:w14=\"http://schemas.microsoft.com/office/word/2010/wordml\" ",
     "mc:Ignorable=\"w14\"/>"
+);
+
+const NEW_PEOPLE: &str = concat!(
+    "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>
+",
+    "<w15:people xmlns:mc=\"http://schemas.openxmlformats.org/markup-compatibility/2006\" ",
+    "xmlns:w15=\"http://schemas.microsoft.com/office/word/2012/wordml\" ",
+    "mc:Ignorable=\"w15\"/>"
 );
 
 const NEW_EXTENDED: &str = concat!(

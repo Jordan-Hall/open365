@@ -15,8 +15,6 @@
 //! `t` attribute of a valueless cell is only kept when it is not the type its value
 //! implies.
 
-mod builtin_numfmt;
-mod builtin_numfmt_nls;
 mod conditional;
 mod drawing;
 mod error;
@@ -37,10 +35,6 @@ mod tables;
 mod workbook;
 mod xml;
 
-pub use builtin_numfmt::{
-    builtin_number_format_in, builtin_number_format_lcids, nls_pattern_to_excel,
-    resolve_number_format_lcid,
-};
 pub use conditional::{
     CellIsOp, CfBlock, CfKind, CfRule, Cfvo, CfvoKind, DataBarAxis, DataBarDirection, DataBarExt,
     Dxf, DxfBorder, DxfFill, DxfFont, TimePeriod,
@@ -54,6 +48,10 @@ pub use format::{
 pub use geometry::{
     Axis, BASE_DPI, ColumnSpec, FrozenPanes, GridMetrics, Pane, PaneState, SheetFormat,
     SheetGeometry, default_font,
+};
+pub use open365_locale::{
+    builtin_number_format_in, builtin_number_format_lcids, nls_pattern_to_excel,
+    resolve_number_format_lcid,
 };
 pub use parts::HygieneAction;
 pub use refs::{
@@ -80,8 +78,8 @@ pub use styles_edit::{
 };
 pub use tables::{Table, TableColumn, TableStyle};
 pub use workbook::{
-    BorderSpec, CellInput, DefinedName, DroppedItem, FormatSnapshot, SheetInfo, SheetKind,
-    SheetState, Workbook, WorkbookKind,
+    BorderSpec, CellInput, DefinedName, DroppedItem, FormatSnapshot, MergeKind, SheetInfo,
+    SheetKind, SheetState, Workbook, WorkbookKind, merge_areas,
 };
 pub use xml::{
     Attr, ElementHead, MAIN_NS, MAIN_NS_STRICT, MAX_XML_DEPTH, ParsedXml, RawXml, XmlElement,

@@ -54,7 +54,7 @@ table (see above). Per-locale expectations: `crates/xlsx/tests/numfmt_locale.rs`
 
 ## Open
 
-- Measure a second locale (en-US at least) in a separate profile or VM, per ADR-011; this settles the derivation choices above.
-- `Workbook` has no setter for the locale (`Workbook::styles()` is read-only); the application must call it through a new method.
+- Measure a second locale (en-US at least) in a separate profile or VM, per ADR-011; this settles the derivation choices above. Not done: the machine locale is en-GB and regional settings are never changed.
+- `Workbook::set_number_format_locale(Option<u32>)` sets the locale; the typed-code reverse lookup (`m/d/yyyy` to id 14) in `styles_edit.rs` follows it.
 - `open365-calc`'s `FormatLocale::builtin_format_code` derives only 14, 22 and the currency from CLDR and should use this module.
 - `open365-calc` does not parse the Thai codes (`t0`, Thai date letters, `bb`).

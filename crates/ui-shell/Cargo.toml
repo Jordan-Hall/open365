@@ -13,6 +13,9 @@ resvg = { version = "0.48", default-features = false }
 serde.workspace = true
 serde_json.workspace = true
 
+[target.'cfg(windows)'.dependencies]
+windows-registry.workspace = true
+
 [dev-dependencies]
 egui_kittest.workspace = true
 

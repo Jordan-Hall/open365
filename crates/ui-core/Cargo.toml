@@ -1,0 +1,20 @@
+[package]
+name = "open365-ui-core"
+description = "Retained widget tree for the Open365 UI: layout snapped per scale, hit testing, focus, pointer capture, theme tokens, Alt key tips, AccessKit tree, IME state and a headless test harness."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+accesskit.workspace = true
+open365-gfx.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+
+[target.'cfg(windows)'.dependencies]
+windows-registry.workspace = true
+
+[lints]
+workspace = true

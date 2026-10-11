@@ -1,6 +1,7 @@
 //! Worksheet function registry and shared argument helpers.
 
 mod arith;
+mod bessel;
 mod cellinfo;
 mod complex;
 mod convert;
@@ -27,6 +28,7 @@ mod math;
 mod mathmore;
 mod mathx;
 mod matrix;
+mod oddbond;
 mod refs;
 mod stats;
 mod statsx;
@@ -208,6 +210,10 @@ static TABLE: &[(&str, Func)] = &[
     ("NORMSINV", Func::Res(distrib::norm_s_inv)),
     ("PHI", Func::Res(distrib::phi)),
     ("GAUSS", Func::Res(distrib::gauss)),
+    ("BESSELI", Func::Res(bessel::besseli)),
+    ("BESSELJ", Func::Res(bessel::besselj)),
+    ("BESSELK", Func::Res(bessel::besselk)),
+    ("BESSELY", Func::Res(bessel::bessely)),
     ("ERF", Func::Res(distrib_erf::erf_fn)),
     ("ERF.PRECISE", Func::Res(distrib_erf::erf_precise)),
     ("ERFC", Func::Res(distrib_erf::erfc_fn)),
@@ -319,6 +325,10 @@ static TABLE: &[(&str, Func)] = &[
     ("COUPNCD", Func::Res(finbond::coupncd)),
     ("COUPNUM", Func::Res(finbond::coupnum)),
     ("COUPPCD", Func::Res(finbond::couppcd)),
+    ("ODDFPRICE", Func::Res(oddbond::oddfprice)),
+    ("ODDFYIELD", Func::Res(oddbond::oddfyield)),
+    ("ODDLPRICE", Func::Res(oddbond::oddlprice)),
+    ("ODDLYIELD", Func::Res(oddbond::oddlyield)),
     ("PRICE", Func::Res(finbond::price)),
     ("YIELD", Func::Res(finbond::yield_)),
     ("DURATION", Func::Res(finbond::duration)),
@@ -988,6 +998,14 @@ static LIFTING: &[(&str, Lifting)] = &[
     ("WEEKNUM", ALWAYS),
     ("ISOWEEKNUM", ALWAYS),
     ("COMBIN", ALWAYS),
+    ("ODDFPRICE", ALWAYS),
+    ("ODDFYIELD", ALWAYS),
+    ("ODDLPRICE", ALWAYS),
+    ("ODDLYIELD", ALWAYS),
+    ("BESSELI", ALWAYS),
+    ("BESSELJ", ALWAYS),
+    ("BESSELK", ALWAYS),
+    ("BESSELY", ALWAYS),
     ("PERMUT", ALWAYS),
     ("CEILING.MATH", ALWAYS),
     ("CEILING.PRECISE", ALWAYS),
@@ -1196,6 +1214,10 @@ pub fn is_volatile(name: &str) -> bool {
 // ---- shared argument helpers ---------------------------------------------------------
 
 pub(crate) type Res<T> = Result<T, ErrorKind>;
+
+/// Most cells a function will build for an array result or read as an array operand, mirroring the evaluator's
+/// operand cap (`eval.rs`, 2^20): a larger request is refused with `#VALUE!` instead of allocating gigabytes.
+pub(crate) const MAX_ARRAY_CELLS: usize = 1 << 20;
 
 /// Checks the argument count.
 pub(crate) fn arity(args: &[Arg], min: usize, max: usize) -> Res<()> {

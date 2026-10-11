@@ -7,8 +7,10 @@ use open365_locale::{CollationStrength, Locale};
 use open365_opc::{PartName, Relationships, rels_part_name, resolve_target};
 use open365_xlsx::{Workbook, parse_cell_ref, parse_range};
 
+use crate::calcitems::{CalcItems, Comb};
 use crate::error::PivotError;
 use crate::grouping::grouped_column;
+use crate::location::Location;
 use crate::model::{
     Axis, CacheDefinition, CacheRecords, CacheSource, Func, PivotTable, Record, VALUES_FIELD,
 };
@@ -179,6 +181,146 @@ pub struct PivotGrid {
     pub body: (u32, u32, u32, u32),
     /// Bounding box including the page-field area.
     pub range: (u32, u32, u32, u32),
+    /// The `location` element the refreshed table gets.
+    pub location: Location,
+    /// Header rows of the table body (column labels, data field captions).
+    pub header_rows: usize,
+    /// Label columns at the left of the body.
+    pub label_cols: usize,
+    /// Row lines below the header rows, in order (what the style engine needs).
+    pub row_lines: Vec<LineInfo>,
+    /// Column lines right of the label columns, in order.
+    pub col_lines: Vec<LineInfo>,
+    /// Identity of every value cell, for GETPIVOTDATA.
+    pub data_cells: Vec<DataCell>,
+    /// The lines of the row axis as `rowItems` lists them (item, subtotal, blank and grand lines).
+    pub row_items: Vec<AxisLine>,
+    /// The lines of the column axis as `colItems` lists them.
+    pub col_items: Vec<AxisLine>,
+    /// Row axis levels: the pivot field, `None` for the Values field.
+    pub row_levels: Vec<Option<usize>>,
+    /// Column axis levels: the pivot field, `None` for the Values field.
+    pub col_levels: Vec<Option<usize>>,
+    /// Item order per pivot field (axis fields only), the item positions the lines refer to.
+    pub item_order: Vec<Vec<Value>>,
+}
+
+/// One line of an axis with the identity `rowItems`/`colItems` store.
+#[derive(Debug, Clone, PartialEq)]
+pub struct AxisLine {
+    pub kind: LineKind,
+    /// Custom subtotal function of a subtotal line (`None` is the automatic subtotal).
+    pub func: Option<Func>,
+    /// Axis level the line belongs to.
+    pub level: usize,
+    /// Item position per level up to the line's own (the data field index at a Values level).
+    pub path: Vec<usize>,
+    /// Data field the line stands for.
+    pub data: Option<usize>,
+}
+
+fn axis_items(lines: &[Line]) -> Vec<AxisLine> {
+    lines
+        .iter()
+        .map(|l| AxisLine {
+            kind: match l.kind {
+                Kind::Item => LineKind::Item,
+                Kind::Subtotal => LineKind::Subtotal,
+                Kind::Grand => LineKind::Grand,
+                Kind::Blank => LineKind::Blank,
+                Kind::DataLeaf => LineKind::DataLeaf,
+            },
+            func: l.func,
+            level: l.level,
+            path: l.path.clone(),
+            data: l.data,
+        })
+        .collect()
+}
+
+fn level_fields(levels: &[Lvl]) -> Vec<Option<usize>> {
+    levels
+        .iter()
+        .map(|l| match l {
+            Lvl::Field(f) => Some(*f),
+            Lvl::Values => None,
+        })
+        .collect()
+}
+
+/// What a value cell of the table stands for: a data field at an intersection of items.
+#[derive(Debug, Clone, PartialEq)]
+pub struct DataCell {
+    pub row: u32,
+    pub col: u32,
+    /// Index into the table's data fields.
+    pub data: usize,
+    /// (pivot field index, item value) constraints; empty for the grand total.
+    pub items: Vec<(usize, Value)>,
+}
+
+/// What a row or column line of the body is.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LineKind {
+    /// An item label line (with its values when `values` is set).
+    Item,
+    Subtotal,
+    Grand,
+    /// The empty line after an item group.
+    Blank,
+    /// A data field line or column.
+    DataLeaf,
+}
+
+/// Structure of one row or column line of the body.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct LineInfo {
+    pub kind: LineKind,
+    /// Depth of the axis level the line belongs to (0 outermost).
+    pub level: usize,
+    /// The line is of the innermost level.
+    pub leaf: bool,
+    /// The line carries values.
+    pub values: bool,
+    /// Leading item constraints shared with the next line (how many enclosing groups go on).
+    pub shared_next: usize,
+}
+
+impl LineInfo {
+    fn of(l: &Line) -> Self {
+        Self {
+            kind: match l.kind {
+                Kind::Item => LineKind::Item,
+                Kind::Subtotal => LineKind::Subtotal,
+                Kind::Grand => LineKind::Grand,
+                Kind::Blank => LineKind::Blank,
+                Kind::DataLeaf => LineKind::DataLeaf,
+            },
+            level: l.level,
+            leaf: l.leaf,
+            values: l.values,
+            shared_next: 0,
+        }
+    }
+}
+
+/// Line infos of an axis, with the number of constraints each line shares with the next.
+fn line_infos(lines: &[Line]) -> Vec<LineInfo> {
+    lines
+        .iter()
+        .enumerate()
+        .map(|(i, l)| {
+            let mut info = LineInfo::of(l);
+            info.shared_next = lines.get(i + 1).map_or(0, |n| {
+                l.cons
+                    .iter()
+                    .zip(&n.cons)
+                    .take_while(|(a, b)| a == b)
+                    .count()
+            });
+            info
+        })
+        .collect()
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -199,11 +341,17 @@ enum Label {
 #[derive(Debug, Clone)]
 struct Line {
     kind: Kind,
+    /// Depth of the axis level the line belongs to.
+    level: usize,
+    /// An item line of the innermost level, or a data line.
+    leaf: bool,
     recs: Vec<u32>,
     func: Option<Func>,
     data: Option<usize>,
     /// Item constraints of the line (field, item position), outermost first.
     cons: Cons,
+    /// Position of every axis level up to the line's own (data index at a Values level).
+    path: Vec<usize>,
     /// Whether data cells of this line carry values.
     values: bool,
     /// (column for row lines, header row for column lines, label)
@@ -217,6 +365,8 @@ struct Ctx<'a> {
     order: Vec<Vec<Value>>,
     /// Position of every record's item per pivot field (only axis fields are filled).
     rpos: Vec<Vec<usize>>,
+    /// (pivot field, item position) of the calculated items.
+    calc: std::collections::HashSet<(usize, usize)>,
 }
 
 fn sub_funcs(ctx: &Ctx, field: usize) -> Vec<Option<Func>> {
@@ -378,10 +528,13 @@ fn build_axis(
                     walk.prev = path.clone();
                     out.push(Line {
                         kind: Kind::DataLeaf,
+                        level,
+                        leaf: true,
                         recs: recs.to_vec(),
                         func: None,
                         data: Some(j),
                         cons: cons_at(path),
+                        path: path.clone(),
                         values: true,
                         labels,
                     });
@@ -389,10 +542,13 @@ fn build_axis(
                     if stacked {
                         out.push(Line {
                             kind: Kind::Item,
+                            level,
+                            leaf: false,
                             recs: recs.to_vec(),
                             func: None,
                             data: Some(j),
                             cons: cons_at(path),
+                            path: path.clone(),
                             values: false,
                             labels: vec![(slot(level), level_label(ctx, Lvl::Values, j))],
                         });
@@ -453,11 +609,15 @@ fn build_axis(
         });
     }
     for pos in positions {
-        let sub: Vec<u32> = recs
-            .iter()
-            .copied()
-            .filter(|r| ctx.rpos[field][*r as usize] == pos)
-            .collect();
+        // A calculated item has no records of its own: its lines see all records of the parent.
+        let sub: Vec<u32> = if ctx.calc.contains(&(field, pos)) {
+            recs.to_vec()
+        } else {
+            recs.iter()
+                .copied()
+                .filter(|r| ctx.rpos[field][*r as usize] == pos)
+                .collect()
+        };
         if sub.is_empty() {
             continue;
         }
@@ -469,10 +629,13 @@ fn build_axis(
             walk.prev = path.clone();
             out.push(Line {
                 kind: Kind::Item,
+                level,
+                leaf: true,
                 recs: sub,
                 func: None,
                 data: cur,
                 cons: cons_at(path),
+                path: path.clone(),
                 values: true,
                 labels,
             });
@@ -485,10 +648,13 @@ fn build_axis(
             if stacked {
                 out.push(Line {
                     kind: Kind::Item,
+                    level,
+                    leaf: false,
                     recs: sub.clone(),
                     func: None,
                     data: cur,
                     cons: cons_at(path),
+                    path: path.clone(),
                     values: top_auto,
                     labels: vec![(slot(level), item_label)],
                 });
@@ -501,10 +667,13 @@ fn build_axis(
                         for (j, df) in ctx.pt.data_fields.iter().enumerate() {
                             out.push(Line {
                                 kind: Kind::Subtotal,
+                                level,
+                                leaf: false,
                                 recs: sub.clone(),
                                 func: None,
                                 data: Some(j),
                                 cons: cons_at(path),
+                                path: path.clone(),
                                 values: true,
                                 labels: sub_labels(path, format!("{name} {}", df.name)),
                             });
@@ -514,10 +683,13 @@ fn build_axis(
                     for f in &funcs {
                         out.push(Line {
                             kind: Kind::Subtotal,
+                            level,
+                            leaf: false,
                             recs: sub.clone(),
                             func: *f,
                             data: cur,
                             cons: cons_at(path),
+                            path: path.clone(),
                             values: true,
                             labels: sub_labels(path, total_label(ctx, &name, *f)),
                         });
@@ -527,16 +699,31 @@ fn build_axis(
             if is_row && pf.insert_blank_row {
                 out.push(Line {
                     kind: Kind::Blank,
+                    level,
+                    leaf: false,
                     recs: Vec::new(),
                     func: None,
                     data: None,
                     cons: cons_at(path),
+                    path: path.clone(),
                     values: false,
                     labels: Vec::new(),
                 });
             }
         }
         path.pop();
+    }
+}
+
+/// Sorts items the way a sorted pivot field orders them (ascending, or descending reversed).
+pub(crate) fn sort_items<T>(items: &mut [(Value, T)], descending: bool) {
+    let Ok(collator) = Locale::en_us().collator_with(CollationStrength::Secondary) else {
+        return;
+    };
+    let text_cmp = |a: &str, b: &str| collator.compare(a, b);
+    items.sort_by(|a, b| compare_values(&a.0, &b.0, &text_cmp));
+    if descending {
+        items.reverse();
     }
 }
 
@@ -549,8 +736,16 @@ pub fn compute(
     strings: &PivotStrings,
     mode: OrderMode,
 ) -> Result<PivotGrid, PivotError> {
-    if pt.calculated_items {
-        return Err(PivotError::Unsupported("calculated items"));
+    if !cache.calculated_items.is_empty()
+        && pt
+            .data_fields
+            .iter()
+            .any(|d| matches!(d.func, Func::Average | Func::StdDev | Func::Var))
+    {
+        // Excel refuses these functions while the table has calculated items.
+        return Err(PivotError::Unsupported(
+            "Average, StdDev and Var with calculated items",
+        ));
     }
     let collator = Locale::en_us()
         .collator_with(CollationStrength::Secondary)
@@ -613,19 +808,39 @@ pub fn compute(
         }
         let mut seen: HashMap<ItemKey, ()> = HashMap::new();
         let mut uniq: Vec<Value> = Vec::new();
-        for v in data.columns.get(fi).map_or(&[][..], Vec::as_slice) {
+        let calc_values = cache
+            .calculated_items
+            .iter()
+            .filter(|c| c.field == fi)
+            .filter_map(|c| cf.item_values().get(c.item as usize));
+        for v in data
+            .columns
+            .get(fi)
+            .map_or(&[][..], Vec::as_slice)
+            .iter()
+            .chain(calc_values)
+        {
             if seen.insert(ItemKey::of(v), ()).is_none() {
                 uniq.push(v.clone());
             }
         }
         if pf.sort_type == "manual" && !stored.is_empty() {
-            let mut list = stored;
-            let known: HashMap<ItemKey, ()> = list.iter().map(|v| (ItemKey::of(v), ())).collect();
-            let mut extra: Vec<Value> = uniq
+            // The refreshed cache spells an item as its first row does.
+            let spelling: HashMap<ItemKey, &Value> =
+                uniq.iter().map(|v| (ItemKey::of(v), v)).collect();
+            let mut list: Vec<Value> = stored
                 .into_iter()
-                .filter(|v| !known.contains_key(&ItemKey::of(v)))
+                .map(|v| {
+                    spelling
+                        .get(&ItemKey::of(&v))
+                        .map_or(v.clone(), |s| (*s).clone())
+                })
                 .collect();
-            extra.sort_by(|a, b| compare_values(a, b, &text_cmp));
+            let known: HashMap<ItemKey, ()> = list.iter().map(|v| (ItemKey::of(v), ())).collect();
+            // New items follow the stored ones in order of first appearance in the source.
+            let extra = uniq
+                .into_iter()
+                .filter(|v| !known.contains_key(&ItemKey::of(v)));
             list.extend(extra);
             order[fi] = list;
         } else {
@@ -705,13 +920,60 @@ pub fn compute(
         }
     }
     let alive_recs: Vec<u32> = (0..n as u32).filter(|r| alive[*r as usize]).collect();
+    // Calculated items: formula per (field, display position).
+    let mut calc_formulas: HashMap<(usize, usize), crate::calc::Expr> = HashMap::new();
+    for ci in &cache.calculated_items {
+        let Some(want) = cache
+            .fields
+            .get(ci.field)
+            .and_then(|f| f.item_values().get(ci.item as usize))
+            .map(ItemKey::of)
+        else {
+            continue;
+        };
+        let on_axis = pt
+            .fields
+            .get(ci.field)
+            .is_some_and(|p| matches!(p.axis, Some(Axis::Row | Axis::Col | Axis::Page)));
+        let Some(pos) = order
+            .get(ci.field)
+            .filter(|_| on_axis)
+            .and_then(|o| o.iter().position(|v| ItemKey::of(v) == want))
+        else {
+            continue;
+        };
+        if let Some(expr) = crate::calc::parse(&ci.formula) {
+            calc_formulas.insert((ci.field, pos), expr);
+        }
+    }
     let ctx = Ctx {
         data,
         pt,
         strings,
         order,
         rpos,
+        calc: calc_formulas.keys().copied().collect(),
     };
+    let item_calc = (!calc_formulas.is_empty()).then(|| {
+        let mut fields: Vec<usize> = calc_formulas.keys().map(|(f, _)| *f).collect();
+        fields.sort_unstable();
+        fields.dedup();
+        CalcItems {
+            rpos: &ctx.rpos,
+            names: cache.fields.iter().map(|f| f.name.to_lowercase()).collect(),
+            items: ctx
+                .order
+                .iter()
+                .map(|o| {
+                    o.iter()
+                        .map(|v| item_text(&ctx, v).to_lowercase())
+                        .collect()
+                })
+                .collect(),
+            formulas: calc_formulas,
+            fields,
+        }
+    });
 
     let to_levels = |list: &[u32]| -> Vec<Lvl> {
         list.iter()
@@ -756,10 +1018,13 @@ pub fn compute(
     let grand_lines = |slot: usize, with_values: bool| -> Vec<Line> {
         let mk = |data: Option<usize>, text: String| Line {
             kind: Kind::Grand,
+            level: 0,
+            leaf: false,
             recs: alive_recs.clone(),
             func: None,
             data,
             cons: Vec::new(),
+            path: Vec::new(),
             values: true,
             labels: vec![(slot, Label::Text(text))],
         };
@@ -784,10 +1049,13 @@ pub fn compute(
     if row_levels.is_empty() {
         rows.push(Line {
             kind: Kind::Grand,
+            level: 0,
+            leaf: false,
             recs: alive_recs.clone(),
             func: None,
             data: None,
             cons: Vec::new(),
+            path: Vec::new(),
             values: true,
             labels: if nlabel == 1 {
                 vec![(0, Label::Text(pt.data_fields[0].name.clone()))]
@@ -811,6 +1079,15 @@ pub fn compute(
             },
             None,
         );
+        // A group that ends together with its parent gets one blank row, not one per level.
+        let mut k = 0;
+        while k + 1 < rows.len() {
+            if rows[k].kind == Kind::Blank && rows[k + 1].kind == Kind::Blank {
+                rows.remove(k);
+            } else {
+                k += 1;
+            }
+        }
         if pt.row_grand_totals && row_levels.iter().any(|l| matches!(l, Lvl::Field(_))) {
             rows.extend(grand_lines(0, values_on_rows));
         }
@@ -822,10 +1099,13 @@ pub fn compute(
         if values_on_rows {
             cols.push(Line {
                 kind: Kind::DataLeaf,
+                level: 0,
+                leaf: true,
                 recs: alive_recs.clone(),
                 func: None,
                 data: None,
                 cons: Vec::new(),
+                path: Vec::new(),
                 values: true,
                 labels: Vec::new(),
             });
@@ -833,10 +1113,13 @@ pub fn compute(
             for (j, df) in pt.data_fields.iter().enumerate() {
                 cols.push(Line {
                     kind: Kind::DataLeaf,
+                    level: 0,
+                    leaf: true,
                     recs: alive_recs.clone(),
                     func: None,
                     data: Some(j),
                     cons: Vec::new(),
+                    path: if nd > 1 { vec![j] } else { Vec::new() },
                     values: true,
                     labels: vec![(0, Label::Text(df.name.clone()))],
                 });
@@ -973,7 +1256,28 @@ pub fn compute(
     } else {
         None
     };
+    let calc_exprs: Vec<Option<crate::calc::Expr>> = cache
+        .fields
+        .iter()
+        .map(|f| {
+            f.formula
+                .as_deref()
+                .filter(|_| !f.database_field)
+                .and_then(crate::calc::parse)
+        })
+        .collect();
+    let field_names: Vec<String> = cache.fields.iter().map(|f| f.name.to_lowercase()).collect();
+    let mut data_cells: Vec<DataCell> = Vec::new();
     let mut mark = vec![false; n];
+    // Row and column axis fields (the page fields are filters, not totals to split).
+    let axis_fields: Vec<usize> = row_levels
+        .iter()
+        .chain(col_levels.iter())
+        .filter_map(|l| match l {
+            Lvl::Field(f) => Some(*f),
+            Lvl::Values => None,
+        })
+        .collect();
     for (i, rl) in rows.iter().enumerate() {
         for (slot, lb) in &rl.labels {
             let (v, f) = label_cell(&ctx, lb);
@@ -991,22 +1295,85 @@ pub fn compute(
                 continue;
             };
             let func = rl.func.or(cl.func).unwrap_or(df.func);
+            let recs: Vec<u32> = cl
+                .recs
+                .iter()
+                .copied()
+                .filter(|r| mark[*r as usize])
+                .collect();
+            let cell_calcs = item_calc
+                .as_ref()
+                .map(|ic| ic.calcs_of(&[rl.cons.as_slice(), cl.cons.as_slice()].concat()));
+            let cell_free = item_calc
+                .as_ref()
+                .zip(cell_calcs.as_ref())
+                .map(|(ic, c)| ic.free(c, &[rl.cons.as_slice(), cl.cons.as_slice()]));
+            let cell_split: Vec<usize> = item_calc.as_ref().map_or_else(Vec::new, |ic| {
+                axis_fields
+                    .iter()
+                    .copied()
+                    .filter(|f| {
+                        !ic.fields.contains(f)
+                            && !rl.cons.iter().chain(cl.cons.iter()).any(|(cf, _)| cf == f)
+                    })
+                    .collect()
+            });
+            let item_ctx = match (item_calc.as_ref(), cell_calcs.as_ref(), cell_free.as_ref()) {
+                (Some(items), Some(calcs), Some(free)) => Some(ItemCtx {
+                    items,
+                    calcs,
+                    free,
+                    split: &cell_split,
+                }),
+                _ => None,
+            };
             let col = data
                 .columns
                 .get(df.fld as usize)
                 .map_or(&[][..], Vec::as_slice);
-            let vals: Vec<&Value> = cl
-                .recs
-                .iter()
-                .filter(|r| mark[**r as usize])
-                .filter_map(|r| col.get(*r as usize))
-                .collect();
-            let v = aggregate(func, &vals);
+            let v = if let Some(Some(expr)) = calc_exprs.get(df.fld as usize) {
+                FieldEval {
+                    exprs: &calc_exprs,
+                    names: &field_names,
+                    columns: &data.columns,
+                    items: item_ctx,
+                }
+                .cell(expr, &recs)
+            } else {
+                let plain = |rs: &[u32]| -> Option<GridValue> {
+                    let vals: Vec<&Value> =
+                        rs.iter().filter_map(|r| col.get(*r as usize)).collect();
+                    aggregate(func, &vals)
+                };
+                match item_ctx {
+                    Some(ic) => ic.items.value(
+                        &recs,
+                        ic.calcs,
+                        ic.free,
+                        ic.split,
+                        Comb::of(func),
+                        &plain,
+                        0,
+                    ),
+                    None => plain(&recs),
+                }
+            };
             let v = match &calc {
                 Some(c) => c.apply(di, &rl.cons, &cl.cons, v),
                 None => v,
             };
             if let Some(v) = v {
+                data_cells.push(DataCell {
+                    row: or + (hdr_rows + i) as u32,
+                    col: oc + (nlabel + j) as u32,
+                    data: di,
+                    items: rl
+                        .cons
+                        .iter()
+                        .chain(cl.cons.iter())
+                        .filter_map(|(f, p)| Some((*f, ctx.order[*f].get(*p)?.clone())))
+                        .collect(),
+                });
                 put(hdr_rows + i, nlabel + j, v, df.num_fmt_id);
             }
         }
@@ -1052,11 +1419,117 @@ pub fn compute(
     let last_row = or + (hdr_rows + rows.len()).saturating_sub(1) as u32;
     let last_col = oc + (nlabel + cols.len()).saturating_sub(1) as u32;
     let first_row = if np > 0 { or - 1 - np as u32 } else { or };
+    let first_header_row = if col_has_fields {
+        1
+    } else {
+        u32::from(nd <= 1 || values_on_rows)
+    };
+    let location = Location {
+        reference: Location::range_string((or, oc, last_row, last_col)),
+        first_header_row,
+        first_data_row: hdr_rows as u32,
+        first_data_col: nlabel as u32,
+        row_page_count: np as u32,
+        col_page_count: u32::from(np > 0),
+    };
     Ok(PivotGrid {
         cells,
         body: (or, oc, last_row, last_col),
         range: (first_row, oc, last_row, last_col),
+        location,
+        header_rows: hdr_rows,
+        label_cols: nlabel,
+        row_lines: line_infos(&rows),
+        col_lines: line_infos(&cols),
+        data_cells,
+        row_items: axis_items(&rows),
+        col_items: axis_items(&cols),
+        row_levels: level_fields(&row_levels),
+        col_levels: level_fields(&col_levels),
+        item_order: ctx.order.clone(),
     })
+}
+
+/// Calculated items in force for one output cell: the table's items, the ones the cell's lines
+/// stand on and the fields whose calculated items its total includes.
+#[derive(Clone, Copy)]
+struct ItemCtx<'a> {
+    items: &'a CalcItems<'a>,
+    calcs: &'a [(usize, usize)],
+    free: &'a [usize],
+    /// Axis fields the cell does not constrain.
+    split: &'a [usize],
+}
+
+/// Evaluates calculated fields over the records of one output cell.
+struct FieldEval<'a> {
+    exprs: &'a [Option<crate::calc::Expr>],
+    names: &'a [String],
+    columns: &'a [Vec<Value>],
+    items: Option<ItemCtx<'a>>,
+}
+
+impl FieldEval<'_> {
+    /// Sum of field `fi` over `recs`; a calculated field is its formula over such sums.
+    fn field_value(&self, fi: usize, recs: &[u32], depth: usize) -> crate::calc::Val {
+        use crate::calc::{Val, eval};
+        if let Some(Some(e)) = self.exprs.get(fi) {
+            if depth > 8 {
+                return Val::Err("#REF!");
+            }
+            return eval(e, &|n| self.lookup(n, recs, depth + 1));
+        }
+        let col = self.columns.get(fi).map_or(&[][..], Vec::as_slice);
+        let sum_leaf = |rs: &[u32]| -> Option<GridValue> {
+            let mut sum = 0.0;
+            for r in rs {
+                match col.get(*r as usize) {
+                    Some(Value::Number(x)) => sum += x,
+                    Some(Value::Error(e)) => return Some(GridValue::Error(e.clone())),
+                    _ => {}
+                }
+            }
+            Some(GridValue::Number(sum))
+        };
+        let v = match self.items {
+            Some(ic) => ic
+                .items
+                .value(recs, ic.calcs, ic.free, &[], Comb::Add, &sum_leaf, 0),
+            None => sum_leaf(recs),
+        };
+        match v {
+            Some(GridValue::Error(e)) => Val::Err(match e.as_str() {
+                "#DIV/0!" => "#DIV/0!",
+                "#N/A" => "#N/A",
+                "#NUM!" => "#NUM!",
+                _ => "#VALUE!",
+            }),
+            Some(GridValue::Number(n)) => Val::Num(n),
+            _ => Val::Num(0.0),
+        }
+    }
+
+    fn lookup(&self, name: &str, recs: &[u32], depth: usize) -> crate::calc::Val {
+        match self.names.iter().position(|n| *n == name.to_lowercase()) {
+            Some(fi) => self.field_value(fi, recs, depth),
+            None => crate::calc::Val::Err("#NAME?"),
+        }
+    }
+
+    /// Value of a calculated field's formula for one output cell. A cell without records stays
+    /// empty.
+    fn cell(&self, expr: &crate::calc::Expr, recs: &[u32]) -> Option<GridValue> {
+        use crate::calc::{Val, eval};
+        if recs.is_empty() {
+            return None;
+        }
+        Some(match eval(expr, &|n| self.lookup(n, recs, 1)) {
+            Val::Num(n) => GridValue::Number(n),
+            Val::Text(t) => GridValue::Text(t),
+            Val::Bool(b) => GridValue::Number(f64::from(u8::from(b))),
+            Val::Err(e) => GridValue::Error(e.to_owned()),
+        })
+    }
 }
 
 fn num_err(code: &str) -> GridValue {

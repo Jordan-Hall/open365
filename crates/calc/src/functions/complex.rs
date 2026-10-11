@@ -139,7 +139,8 @@ fn operand(ctx: &EvalContext<'_>, arg: &Arg) -> Res<Cx> {
     let text = match super::scalar(ctx, arg)? {
         Value::Bool(_) => return Err(ErrorKind::Value),
         Value::Number(n) => number_to_text(n),
-        Value::Empty => String::new(),
+        // A blank cell is the number 0.
+        Value::Empty => "0".to_owned(),
         v => v.to_text()?,
     };
     parse(&text)
@@ -211,6 +212,13 @@ fn unary(ctx: &EvalContext<'_>, args: &[Arg], f: fn(Cx) -> Res<Value>) -> Res<Va
 }
 
 pub(super) fn imreal(ctx: &EvalContext<'_>, args: &[Arg]) -> Res<Value> {
+    // A number argument comes back unchanged (full precision, not through the 15-digit text form).
+    if let [arg @ (Arg::Value(Value::Number(_)) | Arg::Range(_))] = args
+        && let Value::Number(n) = ctx.scalar(arg)
+        && !matches!(arg, Arg::Range(r) if !r.is_single_cell())
+    {
+        return Ok(Value::Number(n));
+    }
     unary(ctx, args, |z| Ok(Value::Number(z.re)))
 }
 pub(super) fn imaginary(ctx: &EvalContext<'_>, args: &[Arg]) -> Res<Value> {

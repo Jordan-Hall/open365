@@ -5,6 +5,7 @@ use std::path::Path;
 use open365_testkit::{HiddenFinding, Inspection, inspect, inspect_hidden};
 use serde_json::{Value, json};
 
+use crate::output::Report;
 use crate::{CliError, read};
 
 /// Which Office format the file is expected to be.
@@ -49,7 +50,7 @@ fn check_kind(info: &Inspection, kind: Kind, file: &Path) -> Result<(), CliError
     }
 }
 
-pub fn run(kind: Kind, file: &Path, hidden: bool, json: bool) -> Result<(), CliError> {
+pub fn run(kind: Kind, file: &Path, hidden: bool) -> Result<Report, CliError> {
     let bytes = read(file)?;
     let info = inspect(&bytes).map_err(|e| CliError::Opc(file.to_owned(), e))?;
     check_kind(&info, kind, file)?;
@@ -58,15 +59,11 @@ pub fn run(kind: Kind, file: &Path, hidden: bool, json: bool) -> Result<(), CliE
     } else {
         Vec::new()
     };
-    if json {
-        let doc = to_json(&info, hidden.then_some(findings.as_slice()));
-        let text =
-            serde_json::to_string_pretty(&doc).map_err(|e| CliError::Other(e.to_string()))?;
-        println!("{text}");
-    } else {
-        print_text(&info, hidden.then_some(findings.as_slice()));
-    }
-    Ok(())
+    let shown = hidden.then_some(findings.as_slice());
+    Ok(Report::new(
+        to_json(&info, shown),
+        render_text(&info, shown),
+    ))
 }
 
 pub fn to_json(info: &Inspection, hidden: Option<&[HiddenFinding]>) -> Value {
@@ -104,13 +101,17 @@ pub fn to_json(info: &Inspection, hidden: Option<&[HiddenFinding]>) -> Value {
     doc
 }
 
-fn print_text(info: &Inspection, hidden: Option<&[HiddenFinding]>) {
-    println!(
+pub fn render_text(info: &Inspection, hidden: Option<&[HiddenFinding]>) -> String {
+    use std::fmt::Write as _;
+    let mut out = String::new();
+    let _ = writeln!(
+        out,
         "{:>10}  {:<8}  {:<60}  PART",
         "SIZE", "METHOD", "CONTENT-TYPE"
     );
     for p in &info.parts {
-        println!(
+        let _ = writeln!(
+            out,
             "{:>10}  {:<8}  {:<60}  {}",
             p.size,
             format!("{:?}", p.compression),
@@ -118,9 +119,10 @@ fn print_text(info: &Inspection, hidden: Option<&[HiddenFinding]>) {
             p.name
         );
     }
-    println!("\nRELATIONSHIPS");
+    let _ = writeln!(out, "\nRELATIONSHIPS");
     for r in &info.relationships {
-        println!(
+        let _ = writeln!(
+            out,
             "  {} {} {} -> {}{}",
             r.rels_part,
             r.id,
@@ -129,26 +131,28 @@ fn print_text(info: &Inspection, hidden: Option<&[HiddenFinding]>) {
             if r.external { " (external)" } else { "" }
         );
     }
-    println!("\nCONTENT TYPES");
+    let _ = writeln!(out, "\nCONTENT TYPES");
     for (e, t) in &info.default_types {
-        println!("  default .{e} = {t}");
+        let _ = writeln!(out, "  default .{e} = {t}");
     }
     for (p, t) in &info.override_types {
-        println!("  override /{p} = {t}");
+        let _ = writeln!(out, "  override /{p} = {t}");
     }
-    println!(
+    let _ = writeln!(
+        out,
         "\n{} parts, {} relationships, {} integrity issues",
         info.parts.len(),
         info.relationship_count,
         info.integrity_issues.len()
     );
     for issue in &info.integrity_issues {
-        println!("  issue: {issue:?}");
+        let _ = writeln!(out, "  issue: {issue:?}");
     }
     if let Some(findings) = hidden {
-        println!("\nHIDDEN CONTENT ({} findings)", findings.len());
+        let _ = writeln!(out, "\nHIDDEN CONTENT ({} findings)", findings.len());
         for f in findings {
-            println!("  {:<16} {}: {}", f.category, f.part, f.detail);
+            let _ = writeln!(out, "  {:<16} {}: {}", f.category, f.part, f.detail);
         }
     }
+    out
 }

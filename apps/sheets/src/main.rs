@@ -28,6 +28,8 @@ struct State {
     untitled: u32,
     /// Row height (true) or column width (false) dialog and its value.
     size_dialog: Option<(bool, f64)>,
+    /// A question waiting for OK or Cancel (the merge warning) and the command OK runs.
+    prompt: Option<(&'static str, Command)>,
     /// Name Box text while it has focus.
     name_text: String,
     /// The OS UI font, handed to every new grid.
@@ -37,7 +39,27 @@ struct State {
     /// Memory of the Home tab's formatting controls (Format Painter, last colours, pop-ups).
     fmt: FormatUi,
     /// Clock for the Format Painter double click.
+    clock: Clock,
+}
+
+/// Seconds since start for double-click timing; a test can freeze it so timing never depends on the wall clock.
+struct Clock {
     started: std::time::Instant,
+    frozen: Option<f64>,
+}
+
+impl Clock {
+    fn new() -> Self {
+        Self {
+            started: std::time::Instant::now(),
+            frozen: None,
+        }
+    }
+
+    fn now(&self) -> f64 {
+        self.frozen
+            .unwrap_or_else(|| self.started.elapsed().as_secs_f64())
+    }
 }
 
 fn columns_label(first: u32, last: u32) -> String {
@@ -71,11 +93,12 @@ impl State {
             recent: Vec::new(),
             untitled: 0,
             size_dialog: None,
+            prompt: None,
             name_text: String::new(),
             ui_font: open365_ui_shell::fonts::system_ui_font(),
             formula_action: None,
             fmt: FormatUi::default(),
-            started: std::time::Instant::now(),
+            clock: Clock::new(),
         }
     }
 
@@ -95,13 +118,14 @@ impl State {
     /// Runs a formatting control or menu entry through the command layer.
     fn run_format(&mut self, id: &str) {
         let sel = self.sel();
-        let now = self.started.elapsed().as_secs_f64();
+        let now = self.clock.now();
         let action = self
             .fmt
             .run(id, self.target.as_ref().and_then(Target::xlsx), sel, now);
         match action {
             Action::None => {}
             Action::Apply(commands) => commands.into_iter().for_each(|c| self.apply(c)),
+            Action::Confirm { text, command } => self.prompt = Some((text, command)),
         }
     }
 
@@ -330,6 +354,7 @@ impl State {
 
     fn apply(&mut self, command: Command) {
         let Some(t) = &mut self.target else { return };
+        self.grid.autofit_after(&command);
         self.status = match t.apply(command) {
             Ok(_) => {
                 self.grid.invalidate_layout();
@@ -341,8 +366,22 @@ impl State {
 
     /// Applies the column widths and row heights the grid queued from dragging headers.
     fn apply_resizes(&mut self) {
+        // Measured fits of one frame are one undo step each (columns, rows).
+        let mut fit_cols: Vec<(u32, f64)> = Vec::new();
+        let mut fit_rows: Vec<(u32, f64)> = Vec::new();
+        let mut fit_sheet = self.grid.sheet();
         for resize in self.grid.take_resizes() {
             let command = match resize {
+                Resize::ColumnFit { sheet, col, width } => {
+                    fit_sheet = sheet;
+                    fit_cols.push((col, width));
+                    continue;
+                }
+                Resize::RowFit { sheet, row, points } => {
+                    fit_sheet = sheet;
+                    fit_rows.push((row, points));
+                    continue;
+                }
                 Resize::ColumnWidth {
                     sheet,
                     first,
@@ -367,6 +406,18 @@ impl State {
                 },
             };
             self.apply(command);
+        }
+        if !fit_cols.is_empty() {
+            self.apply(Command::AutoFitColumns {
+                sheet: fit_sheet,
+                columns: fit_cols,
+            });
+        }
+        if !fit_rows.is_empty() {
+            self.apply(Command::AutoFitRows {
+                sheet: fit_sheet,
+                rows: fit_rows,
+            });
         }
     }
 
@@ -553,6 +604,11 @@ impl ShellHost for Host<'_> {
         }
     }
 
+    /// A menu, list, group pop-up, combo editor or the Backstage view closed: the grid takes the keyboard back.
+    fn chrome_closed(&mut self) {
+        self.s.grid.focus();
+    }
+
     fn run(&mut self, id: &str, _value: Option<f64>) {
         let s = &mut *self.s;
         if let Some(i) = id
@@ -586,6 +642,8 @@ impl ShellHost for Host<'_> {
                 s.size_dialog = Some((true, h));
             }
             "cells.col-width" => s.size_dialog = Some((false, 8.43)),
+            "cells.autofit-rows" => s.grid.autofit_selection(false),
+            "cells.autofit-cols" => s.grid.autofit_selection(true),
             "sheet.select" => {
                 if let Some(v) = _value {
                     s.grid.select_sheet(v as usize);
@@ -632,7 +690,9 @@ impl ShellHost for Host<'_> {
             ]),
             "home.cells.format" => Some(vec![
                 e("cells.row-height", "Row Height..."),
+                e("cells.autofit-rows", "AutoFit Row Height"),
                 e("cells.col-width", "Column Width..."),
+                e("cells.autofit-cols", "AutoFit Column Width"),
                 e("cells.hide-rows", "Hide Rows"),
                 e("cells.hide-cols", "Hide Columns"),
                 e("cells.unhide-rows", "Unhide Rows"),
@@ -780,6 +840,37 @@ impl ShellHost for Host<'_> {
                 s.grid.cancel_edit(&ctx);
             }
         }
+        if let Some((text, command)) = s.prompt.take() {
+            // None: still open; Some(true): OK; Some(false): Cancel.
+            let mut answer = None;
+            egui::Window::new("Open365 Sheets")
+                .collapsible(false)
+                .resizable(false)
+                .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
+                .show(&ctx, |ui| {
+                    ui.label(text);
+                    ui.horizontal(|ui| {
+                        if ui.button("OK").clicked() {
+                            answer = Some(true);
+                        }
+                        if ui.button("Cancel").clicked() {
+                            answer = Some(false);
+                        }
+                    });
+                });
+            ctx.input(|i| {
+                if i.key_pressed(egui::Key::Enter) {
+                    answer = Some(true);
+                } else if i.key_pressed(egui::Key::Escape) {
+                    answer = Some(false);
+                }
+            });
+            match answer {
+                Some(true) => s.apply(command),
+                Some(false) => {}
+                None => s.prompt = Some((text, command)),
+            }
+        }
         if let Some((is_row, mut v)) = s.size_dialog {
             let mut open = true;
             let mut apply = false;
@@ -866,6 +957,49 @@ mod tests {
     fn theme_follows_the_system_mode() {
         let shell = Shell::new(AppKind::Sheets, Mode::system());
         assert_eq!(shell.theme.mode, Mode::system());
+    }
+
+    /// Sheets as `main` builds it: shell and state on a headless window.
+    fn app_harness() -> egui_kittest::Harness<'static, (Shell, State)> {
+        let mut state = State::new();
+        state.new_blank();
+        let mut shell = Shell::new(AppKind::Sheets, Mode::system());
+        shell.options.formula_bar = true;
+        shell.options.sheet_tabs = true;
+        egui_kittest::Harness::builder()
+            .with_size(egui::vec2(1600.0, 900.0))
+            .build_ui_state(
+                |ui, (shell, state): &mut (Shell, State)| {
+                    let mut host = Host {
+                        s: state,
+                        theme: shell.theme,
+                    };
+                    shell.show(ui, &mut host);
+                },
+                (shell, state),
+            )
+    }
+
+    /// Like Writer: when a menu, list or the Backstage view closes the grid gets the keyboard back.
+    #[test]
+    fn closing_chrome_returns_focus_to_the_grid() {
+        let mut h = app_harness();
+        h.run();
+        h.ctx.memory_mut(|m| {
+            if let Some(id) = m.focused() {
+                m.surrender_focus(id);
+            }
+        });
+        h.run();
+        assert!(!h.state().1.grid.is_focused(&h.ctx));
+        let theme = h.state().0.theme;
+        let mut host = Host {
+            s: &mut h.state_mut().1,
+            theme,
+        };
+        host.chrome_closed();
+        h.run();
+        assert!(h.state().1.grid.is_focused(&h.ctx));
     }
 
     #[test]

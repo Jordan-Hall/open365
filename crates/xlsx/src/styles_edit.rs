@@ -15,6 +15,7 @@ use crate::format::{
 };
 use crate::styles::{Styles, builtin_number_format};
 use crate::xml::{Attr, RawXml, XmlElement};
+use open365_locale::builtin_number_format_in;
 
 /// A change to a cell's font. `None` leaves the property as it is.
 #[derive(Debug, Clone, Default, PartialEq)]
@@ -732,10 +733,15 @@ pub(crate) fn set_apply(xf: &mut XmlElement, name: &str) {
 
 // ---- number formats --------------------------------------------------------------------------
 
-/// The built-in id whose code is `code`, as Excel resolves a typed format.
-fn builtin_id_for(code: &str) -> Option<u32> {
+/// The built-in id whose code is `code`, as Excel resolves a typed format. Under a locale
+/// (`Styles::set_number_format_locale`) the codes are that locale's, so en-GB `dd/mm/yyyy` is
+/// id 14 and `m/d/yyyy` stays a custom format; without one, the specification's codes.
+fn builtin_id_for(code: &str, locale: Option<u32>) -> Option<u32> {
     if code == "General" {
         return Some(0);
+    }
+    if let Some(lcid) = locale {
+        return (1..=49).find(|&id| builtin_number_format_in(id, lcid).as_deref() == Some(code));
     }
     if code == "m/d/yyyy" {
         return Some(14);
@@ -761,12 +767,12 @@ impl Styles {
     }
 
     /// The `numFmtId` for `fmt`, adding a custom format when needed.
-    fn number_format_id(root: &mut XmlElement, fmt: &NumberFormat) -> u32 {
+    fn number_format_id(root: &mut XmlElement, fmt: &NumberFormat, locale: Option<u32>) -> u32 {
         let code = match fmt {
             NumberFormat::Builtin(id) => return *id,
             NumberFormat::Code(code) => code,
         };
-        if let Some(id) = builtin_id_for(code) {
+        if let Some(id) = builtin_id_for(code, locale) {
             return id;
         }
         let normalised = crate::styles_numfmt::normalise_code(code);
@@ -801,6 +807,7 @@ impl Styles {
         let touches_border = !patch.border.is_empty();
         let touches_align = patch.alignment != AlignmentPatch::default();
         let touches_prot = patch.protection != ProtectionPatch::default();
+        let locale = self.num_fmt_locale;
         if !(touches_font
             || patch.fill.is_some()
             || touches_border
@@ -846,7 +853,7 @@ impl Styles {
             set_apply(&mut xf, "applyBorder");
         }
         if let Some(fmt) = &patch.number_format {
-            let id = Self::number_format_id(root, fmt);
+            let id = Self::number_format_id(root, fmt, locale);
             xf.head.set_attr("numFmtId", &id.to_string());
             set_apply(&mut xf, "applyNumberFormat");
         }

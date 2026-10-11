@@ -72,20 +72,7 @@ fn lines<'a>(r: &'a [Vec<String>], kind: &str) -> Vec<&'a Vec<String>> {
 }
 
 fn word_type(k: RevisionKind) -> &'static str {
-    match k {
-        RevisionKind::Insertion
-        | RevisionKind::ParagraphMarkInserted
-        | RevisionKind::RowInserted => "Insert",
-        RevisionKind::Deletion | RevisionKind::ParagraphMarkDeleted | RevisionKind::RowDeleted => {
-            "Delete"
-        }
-        RevisionKind::MovedFrom => "MovedFrom",
-        RevisionKind::MovedTo => "MovedTo",
-        RevisionKind::RunFormat => "Property",
-        RevisionKind::ParagraphFormat => "ParagraphProperty",
-        RevisionKind::TableFormat => "TableProperty",
-        RevisionKind::SectionFormat => "SectionProperty",
-    }
+    k.word_type_name()
 }
 
 /// Word 16 drops the `w:tblPrChange` of the probe, so it is not compared.

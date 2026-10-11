@@ -12,6 +12,8 @@ use open365_layout::{Layout, LayoutOptions, layout_document};
 use open365_opc::Limits;
 use open365_text::{FontLibrary, FontMatch};
 
+pub mod scan;
+
 pub fn root() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("../..")
 }
@@ -34,6 +36,40 @@ pub fn layout_fixture(name: &str, fonts: &FontLibrary) -> Option<(Document, Layo
         return None;
     }
     Some((doc, layout))
+}
+
+/// A fixture whose theme font "Calibri Light" is changed to "Calibri", so that the bundled fonts
+/// can lay it out. The layout is not Word's, which is fine for tests of the PDF structure.
+pub fn layout_with_bundled_theme(name: &str, fonts: &FontLibrary) -> (Document, Layout) {
+    use std::io::{Cursor, Write as _};
+    let bytes = std::fs::read(root().join(format!("fixtures/docx/{name}.docx"))).expect("docx");
+    let mut zin = zip::ZipArchive::new(Cursor::new(bytes)).expect("zip");
+    let mut out = zip::ZipWriter::new(Cursor::new(Vec::new()));
+    for i in 0..zin.len() {
+        let mut f = zin.by_index(i).expect("entry");
+        let entry = f.name().expect("name").into_owned();
+        let mut data = Vec::new();
+        f.read_to_end(&mut data).expect("read");
+        if entry.starts_with("word/theme/") {
+            data = String::from_utf8_lossy(&data)
+                .replace("typeface=\"Calibri Light\"", "typeface=\"Calibri\"")
+                .into_bytes();
+        }
+        out.start_file(&entry, zip::write::SimpleFileOptions::default())
+            .expect("start");
+        out.write_all(&data).expect("write");
+    }
+    let patched = out.finish().expect("finish").into_inner();
+    let doc = Document::open(&patched, &Limits::default()).expect("open docx");
+    let layout = layout_document(&doc, fonts, LayoutOptions::default());
+    assert!(
+        !layout
+            .fonts
+            .iter()
+            .any(|f| f.matched == FontMatch::Fallback),
+        "{name}: still needs a font the bundle lacks"
+    );
+    (doc, layout)
 }
 
 pub fn fixture_names() -> Vec<String> {
@@ -173,10 +209,20 @@ pub fn parse_obj(d: &[u8], pos: &mut usize) -> Obj {
                     *pos += 1;
                 }
                 *pos += 1;
-                let Some(Obj::Int(len)) = map.get("Length") else {
-                    panic!("stream length must be direct");
+                // An indirect /Length (other producers write them) is found by scanning.
+                let len = match map.get("Length") {
+                    Some(Obj::Int(len)) => *len as usize,
+                    _ => d[*pos..]
+                        .windows(9)
+                        .position(|w| w == b"endstream")
+                        .map_or(0, |p| {
+                            let mut end = p;
+                            while end > 0 && matches!(d[*pos + end - 1], b'\r' | b'\n') {
+                                end -= 1;
+                            }
+                            end
+                        }),
                 };
-                let len = *len as usize;
                 let bytes = d[*pos..*pos + len].to_vec();
                 *pos += len;
                 skip_ws(d, pos);
@@ -265,7 +311,7 @@ pub fn parse_obj(d: &[u8], pos: &mut usize) -> Obj {
 impl<'a> Reader<'a> {
     /// Reads the xref table and checks every offset points at its object header.
     pub fn new(data: &'a [u8]) -> Self {
-        assert!(data.starts_with(b"%PDF-1.7"));
+        assert!(data.starts_with(b"%PDF-1."));
         assert!(data.ends_with(b"%%EOF\n"));
         let tail = String::from_utf8_lossy(&data[data.len().saturating_sub(64)..]).into_owned();
         let sx = tail.rfind("startxref").expect("startxref");

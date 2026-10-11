@@ -13,5 +13,11 @@ encoding_rs = "0.8"
 # UAX #29 word boundaries for the paragraph tokenizer. MIT OR Apache-2.0.
 unicode-segmentation = "1.13"
 
+[features]
+default = ["bundled-en"]
+# Compile the SCOWL-derived en_US, en_GB, en_CA and en_AU dictionaries (about 2.2 MB) into the binary.
+# Licences: crates/spell/dictionaries/NOTICE.md.
+bundled-en = []
+
 [lints]
 workspace = true

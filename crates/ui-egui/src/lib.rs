@@ -6,6 +6,7 @@
 
 mod a11y;
 mod app;
+mod caret;
 mod clipboard;
 mod doc_view;
 mod docmodel;
@@ -15,12 +16,14 @@ mod grid_cf;
 mod grid_text;
 mod grid_view;
 mod parts;
+pub mod ruler;
 
 use std::path::PathBuf;
 
 pub use app::{App, print_command, write_private_temp};
+pub use caret::blink_phase;
 pub use clipboard::{ClipboardBackend, ClipboardContents, ClipboardState, MemoryClipboard};
-pub use doc_view::{DocPos, DocView, Toggle};
+pub use doc_view::{DocPos, DocView, RulerColors, Toggle};
 pub use find::{FindAction, FindDialog};
 pub use grid_view::{GridColors, GridView, PaintedCell, Resize};
 

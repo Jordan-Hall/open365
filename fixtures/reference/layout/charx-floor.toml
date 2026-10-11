@@ -1,0 +1,1032 @@
+# Ratchet for crates/layout/tests/char_x.rs: glyphs whose x is within 0.5 pt of Word's PDF.
+# [fixtures.*] is the default bundled-font mode, [system.*] the OPEN365_PARITY_SYSTEM_FONTS=1 mode.
+# Raise `agree` with UPDATE_CHARX_FLOOR=1 cargo test -p open365-layout --test char_x; never lower it.
+# `total` is the number of non-blank glyphs in Word's PDF.
+
+[fixtures.comments]
+agree = 42
+total = 42
+
+[fixtures.custom-xml-part]
+agree = 31
+total = 31
+
+[fixtures.footnotes-endnotes]
+agree = 66
+total = 70
+
+[fixtures.header-footer]
+agree = 72
+total = 72
+
+[fixtures.hidden-text]
+agree = 13
+total = 24
+
+[fixtures.hyperlink-external]
+agree = 16
+total = 16
+
+[fixtures.inline-image]
+agree = 16
+total = 16
+
+[fixtures.layout-align]
+agree = 1175
+total = 1446
+
+[fixtures.layout-anc-hyperlink]
+agree = 84
+total = 84
+
+[fixtures.layout-anc-hyperlink-hf]
+agree = 131
+total = 135
+
+[fixtures.layout-anc-hyperlink-hist0]
+agree = 84
+total = 84
+
+[fixtures.layout-anc-hyperlink-nohist]
+agree = 84
+total = 84
+
+[fixtures.layout-caps]
+agree = 1016
+total = 2136
+
+[fixtures.layout-caps-chars]
+agree = 74
+total = 74
+
+[fixtures.layout-caps-sizes]
+agree = 122
+total = 208
+
+[fixtures.layout-cols-balance]
+agree = 1228
+total = 1235
+
+[fixtures.layout-cols-balance-pages]
+agree = 3744
+total = 3757
+
+[fixtures.layout-cols-break]
+agree = 2727
+total = 2727
+
+[fixtures.layout-cols-continuous]
+agree = 2570
+total = 2580
+
+[fixtures.layout-cols-footnote]
+agree = 1446
+total = 2224
+
+[fixtures.layout-cols-four]
+agree = 5060
+total = 5060
+
+[fixtures.layout-cols-line]
+agree = 3742
+total = 3746
+
+[fixtures.layout-cols-mid]
+agree = 9318
+total = 9378
+
+[fixtures.layout-cols-newcol]
+agree = 999
+total = 999
+
+[fixtures.layout-cols-nextpage]
+agree = 2334
+total = 2353
+
+[fixtures.layout-cols-pagebefore]
+agree = 9342
+total = 9342
+
+[fixtures.layout-cols-pagebreak]
+agree = 2098
+total = 2098
+
+[fixtures.layout-cols-spacing]
+agree = 5638
+total = 5638
+
+[fixtures.layout-cols-table]
+agree = 1708
+total = 1708
+
+[fixtures.layout-cols-three]
+agree = 4925
+total = 4926
+
+[fixtures.layout-cols-two]
+agree = 4486
+total = 4486
+
+[fixtures.layout-cols-unequal]
+agree = 3826
+total = 3826
+
+[fixtures.layout-cols-unequal-two]
+agree = 7202
+total = 7202
+
+[fixtures.layout-float-align]
+agree = 2505
+total = 2535
+
+[fixtures.layout-float-anchor-bottom]
+agree = 2932
+total = 4808
+
+[fixtures.layout-float-anchor-nextpage]
+agree = 3088
+total = 4808
+
+[fixtures.layout-float-collide]
+agree = 3347
+total = 3380
+
+[fixtures.layout-float-collide-compat14]
+agree = 2500
+total = 2535
+
+[fixtures.layout-float-collide-tb]
+agree = 2495
+total = 2535
+
+[fixtures.layout-float-dist]
+agree = 3263
+total = 3380
+
+[fixtures.layout-float-dist-mixed]
+agree = 3338
+total = 3380
+
+[fixtures.layout-float-incell]
+agree = 943
+total = 943
+
+[fixtures.layout-float-incell-before]
+agree = 943
+total = 943
+
+[fixtures.layout-float-incell-compat14]
+agree = 942
+total = 943
+
+[fixtures.layout-float-pagebreak-anchor]
+agree = 1666
+total = 1690
+
+[fixtures.layout-float-poscol]
+agree = 8450
+total = 8450
+
+[fixtures.layout-float-posh]
+agree = 2505
+total = 2535
+
+[fixtures.layout-float-posv]
+agree = 3340
+total = 3380
+
+[fixtures.layout-float-posv-line]
+agree = 1516
+total = 1690
+
+[fixtures.layout-float-wrap-behind-front]
+agree = 1670
+total = 1690
+
+[fixtures.layout-float-wrap-sides]
+agree = 2504
+total = 2535
+
+[fixtures.layout-float-wrap-square]
+agree = 2499
+total = 2535
+
+[fixtures.layout-float-wrap-tight]
+agree = 3342
+total = 3380
+
+[fixtures.layout-float-wrap-topbottom]
+agree = 2505
+total = 2535
+
+[fixtures.layout-fn-basic]
+agree = 6450
+total = 6576
+
+[fixtures.layout-fn-endnotes]
+agree = 6166
+total = 6387
+
+[fixtures.layout-fn-long]
+agree = 9494
+total = 9633
+
+[fixtures.layout-fn-mixed]
+agree = 4889
+total = 5025
+
+[fixtures.layout-frame-basic]
+agree = 1500
+total = 1515
+
+[fixtures.layout-frame-bdr]
+agree = 1711
+total = 1731
+
+[fixtures.layout-frame-dropcap]
+agree = 626
+total = 648
+
+[fixtures.layout-frame-gap]
+agree = 1805
+total = 1867
+
+[fixtures.layout-frame-nobdr]
+agree = 1702
+total = 1735
+
+[fixtures.layout-frame-page]
+agree = 1494
+total = 1515
+
+[fixtures.layout-hdr-none]
+agree = 3012
+total = 3012
+
+[fixtures.layout-hdr-none-big]
+agree = 3012
+total = 3012
+
+[fixtures.layout-hdr-none-near]
+agree = 3012
+total = 3012
+
+[fixtures.layout-hdr-none-normal]
+agree = 1491
+total = 1491
+
+[fixtures.layout-hdr-none-style]
+agree = 3012
+total = 3012
+
+[fixtures.layout-hf-basic]
+agree = 7890
+total = 8010
+
+[fixtures.layout-hf-distance]
+agree = 5394
+total = 5474
+
+[fixtures.layout-hf-first-even]
+agree = 13142
+total = 13342
+
+[fixtures.layout-hf-sections]
+agree = 10620
+total = 10780
+
+[fixtures.layout-img-inline]
+agree = 501
+total = 539
+
+[fixtures.layout-img-line]
+agree = 63
+total = 63
+
+[fixtures.layout-img-none]
+agree = 532
+total = 603
+
+[fixtures.layout-img-spacing]
+agree = 148
+total = 148
+
+[fixtures.layout-img-square]
+agree = 4791
+total = 4884
+
+[fixtures.layout-img-tb]
+agree = 1484
+total = 1628
+
+[fixtures.layout-indents-spacing]
+agree = 6377
+total = 6790
+
+[fixtures.layout-justify]
+agree = 88618
+total = 109900
+
+[fixtures.layout-keep]
+agree = 14009
+total = 14009
+
+[fixtures.layout-lists-multilevel]
+agree = 413
+total = 413
+
+[fixtures.layout-lists-style]
+agree = 703
+total = 773
+
+[fixtures.layout-lists-suff]
+agree = 1956
+total = 2015
+
+[fixtures.layout-marks]
+agree = 133
+total = 133
+
+[fixtures.layout-mixed-sizes]
+agree = 521
+total = 581
+
+[fixtures.layout-pagination]
+agree = 7689
+total = 7796
+
+[fixtures.layout-pbdr-ctx]
+agree = 552
+total = 559
+
+[fixtures.layout-pbdr-edges]
+agree = 1496
+total = 1516
+
+[fixtures.layout-pbdr-groups]
+agree = 272
+total = 272
+
+[fixtures.layout-pbdr-pages]
+agree = 8246
+total = 8426
+
+[fixtures.layout-pbdr-styles]
+agree = 409
+total = 409
+
+[fixtures.layout-pbdr-widths]
+agree = 357
+total = 357
+
+[fixtures.layout-sdt]
+agree = 449
+total = 449
+
+[fixtures.layout-sect-empty]
+agree = 22
+total = 22
+
+[fixtures.layout-sect-space]
+agree = 14
+total = 20
+
+[fixtures.layout-sect-tail]
+agree = 1399
+total = 1399
+
+[fixtures.layout-sizes]
+agree = 1680
+total = 2222
+
+[fixtures.layout-table-basic]
+agree = 1055
+total = 1055
+
+[fixtures.layout-table-flow]
+agree = 923
+total = 923
+
+[fixtures.layout-table-pages]
+agree = 15484
+total = 15740
+
+[fixtures.layout-table-rows]
+agree = 1456
+total = 1651
+
+[fixtures.layout-table-width]
+agree = 1489
+total = 1510
+
+[fixtures.layout-tabs]
+agree = 561
+total = 892
+
+[fixtures.layout-tblp-allow]
+agree = 1532
+total = 1563
+
+[fixtures.layout-tblp-basic]
+agree = 1291
+total = 1320
+
+[fixtures.layout-tblp-bottom]
+agree = 2874
+total = 2942
+
+[fixtures.layout-tblp-margin]
+agree = 1503
+total = 1539
+
+[fixtures.layout-tblp-never]
+agree = 1532
+total = 1563
+
+[fixtures.layout-tblp-page]
+agree = 1737
+total = 1779
+
+[fixtures.layout-tblp-right]
+agree = 1285
+total = 1320
+
+[fixtures.layout-tblp-right2]
+agree = 1291
+total = 1320
+
+[fixtures.layout-tblp-yspec]
+agree = 3212
+total = 3303
+
+[fixtures.layout-trh-asym]
+agree = 173
+total = 173
+
+[fixtures.layout-trh-pad]
+agree = 260
+total = 262
+
+[fixtures.layout-trh-small]
+agree = 565
+total = 579
+
+[fixtures.layout-trh-tall]
+agree = 108
+total = 108
+
+[fixtures.layout-txbx-basic]
+agree = 345
+total = 355
+
+[fixtures.layout-txbx-wrap]
+agree = 3920
+total = 4041
+
+[fixtures.layout-wrap]
+agree = 653
+total = 2270
+
+[fixtures.plain-paragraphs]
+agree = 74
+total = 74
+
+[fixtures.sections-landscape]
+agree = 33
+total = 33
+
+[fixtures.table-merged-cells]
+agree = 64
+total = 64
+
+[fixtures.tracked-changes]
+agree = 39
+total = 39
+
+[system.comments]
+agree = 42
+total = 42
+
+[system.custom-xml-part]
+agree = 31
+total = 31
+
+[system.fields]
+agree = 76
+total = 353
+
+[system.footnotes-endnotes]
+agree = 66
+total = 70
+
+[system.header-footer]
+agree = 72
+total = 72
+
+[system.hidden-text]
+agree = 13
+total = 24
+
+[system.hyperlink-external]
+agree = 16
+total = 16
+
+[system.inline-image]
+agree = 16
+total = 16
+
+[system.layout-align]
+agree = 1398
+total = 1446
+
+[system.layout-anc-hyperlink]
+agree = 84
+total = 84
+
+[system.layout-anc-hyperlink-hf]
+agree = 131
+total = 135
+
+[system.layout-anc-hyperlink-hist0]
+agree = 84
+total = 84
+
+[system.layout-anc-hyperlink-nohist]
+agree = 84
+total = 84
+
+[system.layout-caps]
+agree = 2066
+total = 2136
+
+[system.layout-caps-chars]
+agree = 74
+total = 74
+
+[system.layout-caps-sizes]
+agree = 198
+total = 208
+
+[system.layout-cols-balance]
+agree = 1228
+total = 1235
+
+[system.layout-cols-balance-pages]
+agree = 3744
+total = 3757
+
+[system.layout-cols-break]
+agree = 2727
+total = 2727
+
+[system.layout-cols-continuous]
+agree = 2570
+total = 2580
+
+[system.layout-cols-footnote]
+agree = 1446
+total = 2224
+
+[system.layout-cols-four]
+agree = 5060
+total = 5060
+
+[system.layout-cols-line]
+agree = 3742
+total = 3746
+
+[system.layout-cols-mid]
+agree = 9318
+total = 9378
+
+[system.layout-cols-newcol]
+agree = 999
+total = 999
+
+[system.layout-cols-nextpage]
+agree = 2334
+total = 2353
+
+[system.layout-cols-pagebefore]
+agree = 9342
+total = 9342
+
+[system.layout-cols-pagebreak]
+agree = 2098
+total = 2098
+
+[system.layout-cols-spacing]
+agree = 5638
+total = 5638
+
+[system.layout-cols-table]
+agree = 1708
+total = 1708
+
+[system.layout-cols-three]
+agree = 4925
+total = 4926
+
+[system.layout-cols-two]
+agree = 4486
+total = 4486
+
+[system.layout-cols-unequal]
+agree = 3826
+total = 3826
+
+[system.layout-cols-unequal-two]
+agree = 7202
+total = 7202
+
+[system.layout-face-multiple]
+agree = 209
+total = 209
+
+[system.layout-face-typo]
+agree = 19
+total = 19
+
+[system.layout-float-align]
+agree = 2505
+total = 2535
+
+[system.layout-float-anchor-bottom]
+agree = 2932
+total = 4808
+
+[system.layout-float-anchor-nextpage]
+agree = 3088
+total = 4808
+
+[system.layout-float-collide]
+agree = 3347
+total = 3380
+
+[system.layout-float-collide-compat14]
+agree = 2500
+total = 2535
+
+[system.layout-float-collide-tb]
+agree = 2495
+total = 2535
+
+[system.layout-float-dist]
+agree = 3263
+total = 3380
+
+[system.layout-float-dist-mixed]
+agree = 3338
+total = 3380
+
+[system.layout-float-incell]
+agree = 943
+total = 943
+
+[system.layout-float-incell-before]
+agree = 943
+total = 943
+
+[system.layout-float-incell-compat14]
+agree = 942
+total = 943
+
+[system.layout-float-pagebreak-anchor]
+agree = 1666
+total = 1690
+
+[system.layout-float-poscol]
+agree = 8450
+total = 8450
+
+[system.layout-float-posh]
+agree = 2505
+total = 2535
+
+[system.layout-float-posv]
+agree = 3340
+total = 3380
+
+[system.layout-float-posv-line]
+agree = 1516
+total = 1690
+
+[system.layout-float-wrap-behind-front]
+agree = 1670
+total = 1690
+
+[system.layout-float-wrap-sides]
+agree = 2504
+total = 2535
+
+[system.layout-float-wrap-square]
+agree = 2499
+total = 2535
+
+[system.layout-float-wrap-tight]
+agree = 3342
+total = 3380
+
+[system.layout-float-wrap-topbottom]
+agree = 2505
+total = 2535
+
+[system.layout-fn-basic]
+agree = 6450
+total = 6576
+
+[system.layout-fn-endnotes]
+agree = 6166
+total = 6387
+
+[system.layout-fn-long]
+agree = 9494
+total = 9633
+
+[system.layout-fn-mixed]
+agree = 4889
+total = 5025
+
+[system.layout-frame-basic]
+agree = 1500
+total = 1515
+
+[system.layout-frame-bdr]
+agree = 1711
+total = 1731
+
+[system.layout-frame-dropcap]
+agree = 626
+total = 648
+
+[system.layout-frame-gap]
+agree = 1805
+total = 1867
+
+[system.layout-frame-nobdr]
+agree = 1702
+total = 1735
+
+[system.layout-frame-page]
+agree = 1494
+total = 1515
+
+[system.layout-hdr-none]
+agree = 3012
+total = 3012
+
+[system.layout-hdr-none-big]
+agree = 3012
+total = 3012
+
+[system.layout-hdr-none-near]
+agree = 3012
+total = 3012
+
+[system.layout-hdr-none-normal]
+agree = 1491
+total = 1491
+
+[system.layout-hdr-none-style]
+agree = 3012
+total = 3012
+
+[system.layout-hf-basic]
+agree = 7890
+total = 8010
+
+[system.layout-hf-distance]
+agree = 5394
+total = 5474
+
+[system.layout-hf-first-even]
+agree = 13142
+total = 13342
+
+[system.layout-hf-sections]
+agree = 10620
+total = 10780
+
+[system.layout-img-face]
+agree = 45
+total = 45
+
+[system.layout-img-inline]
+agree = 501
+total = 539
+
+[system.layout-img-line]
+agree = 63
+total = 63
+
+[system.layout-img-none]
+agree = 532
+total = 603
+
+[system.layout-img-spacing]
+agree = 148
+total = 148
+
+[system.layout-img-square]
+agree = 4791
+total = 4884
+
+[system.layout-img-tb]
+agree = 1484
+total = 1628
+
+[system.layout-indents-spacing]
+agree = 6641
+total = 6790
+
+[system.layout-justify]
+agree = 95819
+total = 109900
+
+[system.layout-keep]
+agree = 14009
+total = 14009
+
+[system.layout-lists-formats]
+agree = 3808
+total = 3862
+
+[system.layout-lists-multilevel]
+agree = 413
+total = 413
+
+[system.layout-lists-style]
+agree = 703
+total = 773
+
+[system.layout-lists-suff]
+agree = 1959
+total = 2015
+
+[system.layout-marks]
+agree = 133
+total = 133
+
+[system.layout-mixed-sizes]
+agree = 563
+total = 581
+
+[system.layout-pagination]
+agree = 7713
+total = 7796
+
+[system.layout-pbdr-ctx]
+agree = 552
+total = 559
+
+[system.layout-pbdr-edges]
+agree = 1496
+total = 1516
+
+[system.layout-pbdr-groups]
+agree = 272
+total = 272
+
+[system.layout-pbdr-pages]
+agree = 8246
+total = 8426
+
+[system.layout-pbdr-styles]
+agree = 409
+total = 409
+
+[system.layout-pbdr-widths]
+agree = 357
+total = 357
+
+[system.layout-sdt]
+agree = 449
+total = 449
+
+[system.layout-sect-empty]
+agree = 22
+total = 22
+
+[system.layout-sect-space]
+agree = 14
+total = 20
+
+[system.layout-sect-tail]
+agree = 1399
+total = 1399
+
+[system.layout-sizes]
+agree = 2222
+total = 2222
+
+[system.layout-table-basic]
+agree = 1055
+total = 1055
+
+[system.layout-table-flow]
+agree = 923
+total = 923
+
+[system.layout-table-pages]
+agree = 15484
+total = 15740
+
+[system.layout-table-rows]
+agree = 1456
+total = 1651
+
+[system.layout-table-width]
+agree = 1489
+total = 1510
+
+[system.layout-tabs]
+agree = 582
+total = 892
+
+[system.layout-tblp-allow]
+agree = 1532
+total = 1563
+
+[system.layout-tblp-basic]
+agree = 1291
+total = 1320
+
+[system.layout-tblp-bottom]
+agree = 2874
+total = 2942
+
+[system.layout-tblp-margin]
+agree = 1503
+total = 1539
+
+[system.layout-tblp-never]
+agree = 1532
+total = 1563
+
+[system.layout-tblp-page]
+agree = 1737
+total = 1779
+
+[system.layout-tblp-right]
+agree = 1285
+total = 1320
+
+[system.layout-tblp-right2]
+agree = 1291
+total = 1320
+
+[system.layout-tblp-yspec]
+agree = 3212
+total = 3303
+
+[system.layout-trh-asym]
+agree = 173
+total = 173
+
+[system.layout-trh-pad]
+agree = 260
+total = 262
+
+[system.layout-trh-small]
+agree = 565
+total = 579
+
+[system.layout-trh-tall]
+agree = 108
+total = 108
+
+[system.layout-txbx-basic]
+agree = 345
+total = 355
+
+[system.layout-txbx-wrap]
+agree = 3920
+total = 4041
+
+[system.layout-wrap]
+agree = 2042
+total = 2270
+
+[system.numbering]
+agree = 89
+total = 92
+
+[system.plain-paragraphs]
+agree = 74
+total = 74
+
+[system.sections-landscape]
+agree = 33
+total = 33
+
+[system.styles-headings]
+agree = 78
+total = 78
+
+[system.table-merged-cells]
+agree = 64
+total = 64
+
+[system.tracked-changes]
+agree = 39
+total = 39

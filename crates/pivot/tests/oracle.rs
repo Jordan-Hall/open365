@@ -167,3 +167,204 @@ fn untouched_parts_round_trip_byte_identical() {
         assert!(seen >= 3, "{name}: pivot parts found");
     }
 }
+
+/// `location` (ref, firstHeaderRow, firstDataRow, firstDataCol, page counts) of the computed
+/// grid against the values Excel stored in the pivot part.
+#[test]
+fn location_matches_what_excel_wrote() {
+    let (mut ok, mut total) = (0, 0);
+    for (name, _) in FLOORS {
+        let wb = open(name);
+        let refs = reference(&format!("pivot-{name}"));
+        for p in refs["pivots"].as_array().expect("pivots") {
+            let sheet = p["sheet"].as_str().expect("sheet");
+            let si = wb.sheet_index(sheet).expect("sheet exists");
+            let pivot = sheet_pivots(&wb, si).into_iter().next().expect("pivot");
+            let grid = pivot
+                .grid_from_cache(&PivotStrings::default())
+                .expect("grid");
+            let t = &pivot.table;
+            let stored = open365_pivot::Location {
+                reference: t.reference.clone(),
+                first_header_row: t.first_header_row,
+                first_data_row: t.first_data_row,
+                first_data_col: t.first_data_col,
+                row_page_count: t.row_page_count,
+                col_page_count: t.col_page_count,
+            };
+            total += 1;
+            // Writing the stored location back leaves the part byte-identical.
+            let mut again = t.clone();
+            again.set_location(&stored);
+            assert!(
+                again.to_bytes() == t.to_bytes(),
+                "{name}/{sheet}: set_location changed bytes"
+            );
+            if grid.location == stored {
+                ok += 1;
+            } else {
+                println!(
+                    "{name}/{sheet} {}: want {stored:?} got {:?}",
+                    p["case"], grid.location
+                );
+            }
+        }
+    }
+    println!("location: {ok}/{total}");
+    assert_eq!(ok, total);
+}
+
+/// Calculated fields (`calc` set) and GETPIVOTDATA (`getpivotdata` set) against Excel.
+#[test]
+fn calculated_fields_and_getpivotdata_match_excel() {
+    use open365_pivot::{PivotIndex, Value, get_pivot_data};
+    let (pok, ptotal, ..) = run("calc", OrderMode::Stored);
+    println!("calc stored: {pok}/{ptotal}");
+    assert!(pok >= CALC_FLOOR, "calc: {pok} pivots, floor {CALC_FLOOR}");
+    let (pok, ptotal, ..) = run("calc", OrderMode::Refresh);
+    println!("calc refreshed: {pok}/{ptotal}");
+    assert!(
+        pok >= CALC_FLOOR,
+        "calc refresh: {pok} pivots, floor {CALC_FLOOR}"
+    );
+    let wb = open("getpivotdata");
+    let refs = reference("pivot-getpivotdata");
+    let (mut ok, mut total) = (0, 0);
+    for p in refs["pivots"].as_array().expect("pivots") {
+        let si = wb
+            .sheet_index(p["sheet"].as_str().expect("sheet"))
+            .expect("sheet");
+        let pivot = sheet_pivots(&wb, si).into_iter().next().expect("pivot");
+        let index = PivotIndex::build(&pivot, &PivotStrings::default()).expect("index");
+        for q in p["gpd"].as_array().into_iter().flatten() {
+            let f = q["f"].as_str().expect("formula");
+            let Some((field, pairs)) = parse_gpd(f) else {
+                continue;
+            };
+            total += 1;
+            let got = get_pivot_data(&index, &field, &pairs);
+            let good = match (&q["v"], &got) {
+                (serde_json::Value::Object(o), Err(e)) => o["e"].as_str() == Some(*e),
+                (v, Ok(g)) => same(v, g),
+                _ => false,
+            };
+            if good {
+                ok += 1;
+            } else {
+                println!(
+                    "getpivotdata {}: {f}: want {} got {got:?}",
+                    p["case"], q["v"]
+                );
+            }
+            let _: &[(String, Value)] = &pairs;
+        }
+    }
+    println!("getpivotdata: {ok}/{total}");
+    assert!(
+        ok >= GPD_FLOOR,
+        "getpivotdata: {ok}/{total}, floor {GPD_FLOOR}"
+    );
+}
+
+/// The six calculated-field pivots and the nine calculated-item pivots.
+const CALC_FLOOR: usize = 15;
+const GPD_FLOOR: usize = 36;
+
+/// `=GETPIVOTDATA("Sum of Units",$B$4,"Region","East",...)` into (data field, pairs).
+fn parse_gpd(f: &str) -> Option<(String, Vec<(String, open365_pivot::Value)>)> {
+    let inner = f.strip_prefix("=GETPIVOTDATA(")?.strip_suffix(')')?;
+    let mut parts: Vec<String> = Vec::new();
+    let mut cur = String::new();
+    let mut quoted = false;
+    for c in inner.chars() {
+        match c {
+            '"' => {
+                quoted = !quoted;
+                cur.push(c);
+            }
+            ',' if !quoted => parts.push(std::mem::take(&mut cur)),
+            _ => cur.push(c),
+        }
+    }
+    parts.push(cur);
+    let text = |s: &str| s.trim_matches('"').to_owned();
+    if parts.len() < 2 || !parts.len().is_multiple_of(2) || !parts[0].starts_with('"') {
+        return None;
+    }
+    let pairs = parts[2..]
+        .chunks(2)
+        .map(|c| {
+            let item = if c[1].starts_with('"') {
+                open365_pivot::Value::Text(text(&c[1]))
+            } else {
+                open365_pivot::Value::Number(c[1].parse().unwrap_or(f64::NAN))
+            };
+            (text(&c[0]), item)
+        })
+        .collect();
+    Some((text(&parts[0]), pairs))
+}
+
+/// Excel refuses Average, StdDev and Var data fields while a table has calculated items, so the
+/// engine does too instead of inventing a value.
+#[test]
+fn calculated_items_refuse_average() {
+    let wb = open("calc");
+    let si = wb.sheet_index("P7").expect("sheet");
+    let mut pivot = sheet_pivots(&wb, si).into_iter().next().expect("pivot");
+    assert!(pivot.grid_from_cache(&PivotStrings::default()).is_ok());
+    pivot.table.data_fields[0].func = open365_pivot::Func::Average;
+    assert!(pivot.grid_from_cache(&PivotStrings::default()).is_err());
+}
+
+/// Hold-out for calculated items and fields: random formulas, layouts and data fields over a data
+/// seed no rule was fitted on (written once; failures are not inspected to tune). Pivots that
+/// match Excel cell for cell, from the stored cache and from the refreshed source.
+#[test]
+fn calculated_items_holdout_matches_excel() {
+    let path = root().join("fixtures/xlsx/pivot-holdout-calc.xlsx");
+    if !path.exists() {
+        println!("holdout-calc: fixture not generated yet, skipped");
+        return;
+    }
+    let (pok, ptotal, cok, ctotal) = run("holdout-calc", OrderMode::Stored);
+    println!("holdout-calc stored: pivots {pok}/{ptotal}, cells {cok}/{ctotal}");
+    assert!(
+        pok >= HOLDOUT_CALC_FLOOR,
+        "holdout-calc: {pok} pivots, floor {HOLDOUT_CALC_FLOOR}"
+    );
+    let (pok, ptotal, ..) = run("holdout-calc", OrderMode::Refresh);
+    println!("holdout-calc refreshed: {pok}/{ptotal}");
+    assert!(
+        pok >= HOLDOUT_CALC_FLOOR,
+        "holdout-calc refresh: {pok} pivots, floor {HOLDOUT_CALC_FLOOR}"
+    );
+}
+
+/// Measured on the first run of the hold-out; raise when the engine improves.
+const HOLDOUT_CALC_FLOOR: usize = 38;
+
+/// Second in-sample round of calculated items (`calc2`: division, Count/Max/Min data fields,
+/// items on inner levels, fields beside items), used to fit; pivots that match Excel cell for cell.
+#[test]
+fn calculated_items_second_round_matches_excel() {
+    let path = root().join("fixtures/xlsx/pivot-calc2.xlsx");
+    if !path.exists() {
+        println!("calc2: fixture not generated yet, skipped");
+        return;
+    }
+    let (pok, ptotal, cok, ctotal) = run("calc2", OrderMode::Stored);
+    println!("calc2 stored: pivots {pok}/{ptotal}, cells {cok}/{ctotal}");
+    assert!(
+        pok >= CALC2_FLOOR,
+        "calc2: {pok} pivots, floor {CALC2_FLOOR}"
+    );
+    let (pok, ptotal, ..) = run("calc2", OrderMode::Refresh);
+    println!("calc2 refreshed: {pok}/{ptotal}");
+    assert!(
+        pok >= CALC2_FLOOR,
+        "calc2 refresh: {pok} pivots, floor {CALC2_FLOOR}"
+    );
+}
+
+const CALC2_FLOOR: usize = 24;

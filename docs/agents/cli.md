@@ -10,7 +10,7 @@ Exit codes: 0 success, 1 error (message on stderr, nothing on stdout), 3 `apply`
 |---|---|---|
 | `open365 inspect <file>` | read | Parts, content types and integrity issues of any OPC package. |
 | `open365 docx inspect [--hidden] [--json] <file>` | read | Also `xlsx inspect`. `--hidden` lists what a user cannot see. |
-| `open365 apply <commands.json> <input> -o <out> [--dry-run] [--allow-destructive]` | edit / export / destructive | Applies the JSON command log and saves. Prints each command's effect class. |
+| `open365 apply <commands.json> <input> -o <out> [--dry-run] [--allow-destructive] [--root <dir>]` | edit / export / destructive | Applies the JSON command log and saves. Prints each command's effect class. Each command is classified against the document as the earlier ones leave it; overwriting a filled cell, pasting over data, merging that drops values, clearing existing formats and replacing an existing `-o` file are destructive and need `--allow-destructive`. `--root` fences `-o`. |
 | `open365 roundtrip --check <files...>` | read | Read, write, read; reports any loss. |
 | `open365 mcp --root <dir> --audit-log <file> [--allow-edit] [--allow-destructive] [--include-hidden]` | see `mcp.md` | Stdio MCP server. |
 
@@ -22,10 +22,10 @@ Lays the document out and writes a tagged PDF 1.7. Bundled fonts unless `--syste
 
 ## New document from a template
 
-`open365 docx new-from-template <template.dotx|.dotm> -o <out.docx|.docm> [--overwrite]`
-`open365 xlsx new-from-template <template.xltx|.xltm> -o <out.xlsx|.xlsm> [--overwrite]`
+`open365 docx new-from-template <template.dotx|.dotm> -o <out.docx|.docm> [--overwrite --allow-destructive --root <dir>]`
+`open365 xlsx new-from-template <template.xltx|.xltm> -o <out.xlsx|.xlsm> [--overwrite --allow-destructive --root <dir>]`
 
-The template content type becomes the plain document type (macro-enabled when a VBA project is present). The VBA project is kept byte for byte and never run. The output extension must match the template (`dotx`->`docx`, `dotm`->`docm`, `xltx`->`xlsx`, `xltm`->`xlsm`). A file that is not a template is an error. An existing output is never replaced without `--overwrite`. The save goes through the `save` command, so its effect is export.
+The template content type becomes the plain document type (macro-enabled when a VBA project is present). The VBA project is kept byte for byte and never run. The output extension must match the template (`dotx`->`docx`, `dotm`->`docm`, `xltx`->`xlsx`, `xltm`->`xlsm`). A file that is not a template is an error. An existing output is never replaced without both `--overwrite` and `--allow-destructive`. The save goes through the `save` command and the shared write gate: `--root` fences the output (it is written at the resolved path), and one audit line goes to stderr, including a refusal. The effect is export.
 
 ## Layout query
 

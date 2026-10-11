@@ -85,7 +85,16 @@ function Reset-Book([string]$name) {
 }
 
 function Start-Excel {
+  # Only an instance this script created may be driven (and later quit): snapshot the running Excel processes and, if the
+  # new COM object is one of them (it attached to someone else's Excel), release it untouched and abort.
+  $before = @(Get-Process -Name EXCEL -ErrorAction SilentlyContinue | ForEach-Object { $_.Id })
   $app = New-Object -ComObject Excel.Application
+  $attachedPid = [uint32]0
+  [void][Native.Win32]::GetWindowThreadProcessId([IntPtr]$app.Hwnd, [ref]$attachedPid)
+  if ($before -contains [int]$attachedPid) {
+    try { [void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($app) } catch {}
+    throw "calc-oracle: New-Object attached to the running Excel process $attachedPid; refusing to drive an instance this script did not start"
+  }
   $app.Visible = $false
   $app.DisplayAlerts = $false
   $app.ScreenUpdating = $false

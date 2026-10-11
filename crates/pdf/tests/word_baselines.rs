@@ -37,14 +37,25 @@ fn pdf_baselines_agree_with_word() {
         // (story, start) -> (page, layout baseline, baseline read back from the PDF).
         let mut engine: HashMap<(u8, usize), Vec<Seen>> = HashMap::new();
         for (pi, page) in layout.pages.iter().enumerate() {
+            // Height of the page as written (Word's grid), not the section's.
+            let media_h = reader.pages()[pi].1.dict()["MediaBox"].arr()[3].num();
             let with_glyphs = page
                 .header
                 .iter()
                 .chain(&page.lines)
+                .chain(page.frames.iter().flat_map(|f| f.lines.iter()))
                 .chain(&page.notes)
                 .chain(&page.footer)
                 .filter(|l| l.runs.iter().any(|r| !r.glyphs.is_empty()));
-            for (line, pdf_line) in with_glyphs.zip(&pages[pi]) {
+            // A line can be several marked-content sequences (list label, hyperlinks).
+            let mut next = 0;
+            for line in with_glyphs {
+                let want: usize = line.runs.iter().map(|r| r.glyphs.len()).sum();
+                let mut pdf_glyphs = Vec::new();
+                while pdf_glyphs.len() < want && next < pages[pi].len() {
+                    pdf_glyphs.extend(pages[pi][next].glyphs.iter().cloned());
+                    next += 1;
+                }
                 // The first glyph of a run that is not a note mark sits on the line baseline.
                 let skip: usize = line
                     .runs
@@ -52,10 +63,10 @@ fn pdf_baselines_agree_with_word() {
                     .take_while(|r| r.superscript)
                     .map(|r| r.glyphs.len())
                     .sum();
-                let Some(g) = pdf_line.glyphs.get(skip).or(pdf_line.glyphs.first()) else {
+                let Some(g) = pdf_glyphs.get(skip).or(pdf_glyphs.first()) else {
                     continue;
                 };
-                let pdf_baseline = page.section.page_height - g.y;
+                let pdf_baseline = media_h - g.y;
                 engine
                     .entry((line.story.word_code(), line.start))
                     .or_default()

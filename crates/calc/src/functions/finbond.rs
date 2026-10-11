@@ -30,12 +30,12 @@ fn dim(y: i64, m: i64) -> i64 {
     }
 }
 
-fn ymd(serial: i64, d1904: bool) -> Res<(i64, i64, i64)> {
+pub(super) fn ymd(serial: i64, d1904: bool) -> Res<(i64, i64, i64)> {
     serial_to_ymd(serial as f64, d1904).ok_or(ErrorKind::Num)
 }
 
 /// A date argument: truncated to a whole day, must be a valid non-negative serial.
-fn date_arg(ctx: &EvalContext<'_>, arg: &Arg) -> Res<i64> {
+pub(super) fn date_arg(ctx: &EvalContext<'_>, arg: &Arg) -> Res<i64> {
     let n = super::datecalc::atp_num(ctx, arg)?.trunc();
     if !(0.0..=2_958_465.0).contains(&n) {
         return Err(ErrorKind::Num);
@@ -43,11 +43,11 @@ fn date_arg(ctx: &EvalContext<'_>, arg: &Arg) -> Res<i64> {
     Ok(n as i64)
 }
 
-fn num(ctx: &EvalContext<'_>, arg: &Arg) -> Res<f64> {
+pub(super) fn num(ctx: &EvalContext<'_>, arg: &Arg) -> Res<f64> {
     super::datecalc::atp_num(ctx, arg)
 }
 
-fn opt_basis(ctx: &EvalContext<'_>, args: &[Arg], index: usize) -> Res<u8> {
+pub(super) fn opt_basis(ctx: &EvalContext<'_>, args: &[Arg], index: usize) -> Res<u8> {
     match optional(args, index) {
         None => Ok(0),
         Some(a) => {
@@ -60,7 +60,7 @@ fn opt_basis(ctx: &EvalContext<'_>, args: &[Arg], index: usize) -> Res<u8> {
     }
 }
 
-fn frequency(ctx: &EvalContext<'_>, arg: &Arg) -> Res<i64> {
+pub(super) fn frequency(ctx: &EvalContext<'_>, arg: &Arg) -> Res<i64> {
     let f = num(ctx, arg)?.trunc();
     if f == 1.0 || f == 2.0 || f == 4.0 {
         Ok(f as i64)
@@ -72,7 +72,7 @@ fn frequency(ctx: &EvalContext<'_>, arg: &Arg) -> Res<i64> {
 // ---- day counts ------------------------------------------------------------------------------
 
 /// Days from `a` to `b` (`a <= b`) under the basis' day count: 30/360 (US for basis 0, European for 4) or actual.
-fn days_between(basis: u8, a: i64, b: i64, d1904: bool) -> Res<f64> {
+pub(super) fn days_between(basis: u8, a: i64, b: i64, d1904: bool) -> Res<f64> {
     match basis {
         0 | 4 => {
             let (y1, m1, mut d1) = ymd(a, d1904)?;
@@ -136,7 +136,7 @@ fn year_length(basis: u8, a: i64, b: i64, d1904: bool) -> Res<f64> {
 // ---- coupon schedule -------------------------------------------------------------------------
 
 /// The coupon date `k` periods before `maturity` (the end-of-month rule applies when the maturity is one).
-fn coupon_date(maturity: i64, k: i64, step: i64, d1904: bool) -> Res<i64> {
+pub(super) fn coupon_date(maturity: i64, k: i64, step: i64, d1904: bool) -> Res<i64> {
     let (y, m, d) = ymd(maturity, d1904)?;
     let eom = d == dim(y, m);
     let total = y * 12 + (m - 1) - k * step;

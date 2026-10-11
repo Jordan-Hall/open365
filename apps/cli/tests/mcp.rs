@@ -131,7 +131,7 @@ fn stdio_round_trip_is_read_only_by_default() {
     let tools = m.rpc("tools/list", json!({}));
     assert_eq!(
         tools["result"]["tools"].as_array().expect("tools").len(),
-        12
+        17
     );
 
     let (open, err) = m.call("open_document", json!({"path": "f.xlsx"}));
@@ -156,6 +156,7 @@ fn stdio_round_trip_is_read_only_by_default() {
     let lines = audit_lines(&audit);
     let statuses: Vec<&str> = lines
         .iter()
+        .filter(|l| l["event"] == "tool_call")
         .map(|l| l["status"].as_str().expect("s"))
         .collect();
     assert_eq!(statuses, ["ok", "ok", "refused", "refused"]);
@@ -278,4 +279,68 @@ fn mcp_and_cli_apply_agree_on_an_xlsx() {
             {"command":"xlsx_set_cell_formula","sheet":0,"row":7,"col":1,"formula":"=A1+1"}
         ]),
     );
+}
+
+#[test]
+fn the_modern_transcript_replays_against_the_real_binary() {
+    let scratch = Scratch::new("transcript");
+    let audit = scratch.path("audit.jsonl");
+    let input =
+        std::fs::File::open(fixture("mcp/transcripts/modern-readonly.jsonl")).expect("open");
+    let out = Command::new(env!("CARGO_BIN_EXE_open365"))
+        .args([
+            "mcp",
+            "--root",
+            s(&scratch.root()),
+            "--audit-log",
+            s(&audit),
+        ])
+        .stdin(Stdio::from(input))
+        .output()
+        .expect("run");
+    assert!(out.status.success());
+    let replies: Vec<Value> = String::from_utf8_lossy(&out.stdout)
+        .lines()
+        .map(|l| serde_json::from_str(l).expect("json"))
+        .collect();
+    assert_eq!(replies.len(), 4);
+    assert_eq!(replies[0]["result"]["resultType"], "complete");
+    assert_eq!(replies[0]["result"]["supportedVersions"][0], "2026-07-28");
+    assert_eq!(
+        replies[1]["result"]["tools"].as_array().map(Vec::len),
+        Some(17)
+    );
+    assert!(replies[2]["result"]["contents"][0]["text"].is_string());
+    assert_eq!(replies[3]["result"]["isError"], true);
+    // The stateless session start, the resource read and the tool call (with the intent line
+    // written before it ran) are on the record.
+    let lines = audit_lines(&audit);
+    let events: Vec<&str> = lines.iter().filter_map(|l| l["event"].as_str()).collect();
+    assert_eq!(
+        events,
+        ["session_start", "resource_read", "tool_intent", "tool_call"]
+    );
+}
+
+#[test]
+fn grant_opens_exactly_the_named_scope() {
+    let scratch = Scratch::new("grant");
+    std::fs::copy(
+        fixture("docx/plain-paragraphs.docx"),
+        scratch.root().join("d.docx"),
+    )
+    .expect("copy");
+    let audit = scratch.path("audit.jsonl");
+    let mut m = Session::start(&scratch.root(), &audit, &["--grant", "edit"]);
+    let (open, _) = m.call("open_document", json!({"path": "d.docx"}));
+    let id = open["document"].as_str().expect("id").to_owned();
+    let edit = json!([{"command":"docx_insert_text","para":0,"offset":0,"text":"Z"}]);
+    let (ok, err) = m.call("apply_commands", json!({"document": id, "commands": edit}));
+    assert!(!err, "{ok}");
+    let (no, err) = m.call(
+        "save_as",
+        json!({"document": id, "path": s(&scratch.root().join("o.docx"))}),
+    );
+    assert!(err && no["status"] == "refused", "{no}");
+    m.finish();
 }

@@ -305,6 +305,13 @@ pub enum Resize {
         last: u32,
         points: f64,
     },
+    /// A measured auto-fit width of one column (header double-click, Home > Format > AutoFit Column
+    /// Width): stored with `bestFit`, applied through `AutoFitColumns`.
+    ColumnFit { sheet: usize, col: u32, width: f64 },
+    /// A measured auto-fit height of one row (header double-click, AutoFit Row Height, or the
+    /// implicit re-fit after wrapping or a font change): stored without `customHeight`, applied
+    /// through `AutoFitRows`.
+    RowFit { sheet: usize, row: u32, points: f64 },
 }
 
 /// The context menu of a column or row header (or the corner), open at `pos`.
@@ -587,6 +594,10 @@ pub struct GridView {
     return_col: Option<u32>,
     resize_drag: Option<ResizeDrag>,
     resizes: Vec<Resize>,
+    /// Rows to re-fit next frame (their wrap, font or value changed), see [`GridView::autofit_after`].
+    fit_rows: Vec<(u32, u32)>,
+    /// A Home > Format > AutoFit request for the selection: `true` for columns.
+    fit_selection: Option<bool>,
     menu: Option<HeaderMenu>,
     dialog: Option<SizeDialog>,
     want_focus: bool,
@@ -701,6 +712,8 @@ impl GridView {
             return_col: None,
             resize_drag: None,
             resizes: Vec::new(),
+            fit_rows: Vec::new(),
+            fit_selection: None,
             menu: None,
             dialog: None,
             want_focus: true,
@@ -773,6 +786,39 @@ impl GridView {
         self.layout
             .as_ref()
             .map_or(raw, |(_, _, layout)| layout.expand(raw))
+    }
+
+    /// Home > Format > AutoFit Column Width (`cols`) or AutoFit Row Height for the selection. The
+    /// result arrives as [`Resize::ColumnFit`] / [`Resize::RowFit`] after the next frame.
+    pub fn autofit_selection(&mut self, cols: bool) {
+        self.fit_selection = Some(cols);
+    }
+
+    /// Excel re-fits the height of a row that has no custom height whenever a cell in it changes
+    /// its wrapping, font or value. Call after a command was applied: the rows it touched are
+    /// measured on the next frame and come back as [`Resize::RowFit`] when their height changes.
+    pub fn autofit_after(&mut self, command: &Command) {
+        let rows = match command {
+            Command::FormatCells { sheet, range, .. }
+            | Command::ApplyCellStyle { sheet, range, .. }
+            | Command::ClearFormats { sheet, range }
+            | Command::CopyFormat {
+                sheet, to: range, ..
+            } if *sheet == self.sheet => (range.first_row, range.last_row),
+            Command::XlsxSetCellValue { sheet, row, .. }
+            | Command::XlsxSetCellFormula { sheet, row, .. }
+                if *sheet == self.sheet =>
+            {
+                (*row, *row)
+            }
+            Command::XlsxPaste {
+                sheet, row, rows, ..
+            } if *sheet == self.sheet => (*row, row.saturating_add(rows.len() as u32)),
+            _ => return,
+        };
+        if self.fit_rows.len() < MAX_PENDING_RESIZES {
+            self.fit_rows.push(rows);
+        }
     }
 
     /// The column widths and row heights the user asked for since the last call.
@@ -881,6 +927,12 @@ impl GridView {
         self.want_focus = true;
     }
 
+    /// The grid holds the keyboard focus.
+    #[must_use]
+    pub fn is_focused(&self, ctx: &Context) -> bool {
+        ctx.memory(|m| m.has_focus(self.focus_id))
+    }
+
     pub fn select_sheet(&mut self, sheet: usize) {
         if sheet != self.sheet {
             self.sheet = sheet;
@@ -977,6 +1029,7 @@ impl GridView {
         if !unchanged {
             self.cf = None;
             let command = Command::xlsx_enter(self.sheet, row, col, &self.edit_text);
+            self.autofit_after(&command);
             if let Err(e) = target.apply(command) {
                 self.status = Some(e.to_string());
                 return;
@@ -1563,6 +1616,8 @@ impl GridView {
         let mut press_on_header = self.press_on_header;
         let mut resize_drag = self.resize_drag;
         let mut new_resizes: Vec<Resize> = Vec::new();
+        let fit_rows = std::mem::take(&mut self.fit_rows);
+        let fit_selection = self.fit_selection.take();
         let mut pressed = false;
         let mut new_menu: Option<HeaderMenu> = None;
         let mut double_clicked = false;
@@ -1916,6 +1971,14 @@ impl GridView {
                 new_resizes.extend(autofit_request(
                     &painter, &paint, sheet, border, selection, sel.reach,
                 ));
+            }
+            if let Some(cols) = fit_selection {
+                new_resizes.extend(fit_selection_request(
+                    &painter, &paint, sheet, selection, sel.reach, cols,
+                ));
+            }
+            if !fit_rows.is_empty() {
+                new_resizes.extend(implicit_row_fits(&painter, &paint, sheet, &fit_rows));
             }
             for region in &regions {
                 paint_region(&painter, &paint, region, selection, active);
@@ -2849,12 +2912,16 @@ fn content_widths(
     paint: &Paint<'_>,
     first: u32,
     last: u32,
+    rows: Option<(u32, u32)>,
 ) -> std::collections::BTreeMap<u32, f32> {
     let mut widest = std::collections::BTreeMap::new();
     let Some(ws) = paint.ws else { return widest };
     let layout = paint.view.layout;
     let styles = paint.wb.styles();
     for row in ws.rows() {
+        if rows.is_some_and(|(a, b)| row.r < a || row.r > b) {
+            continue;
+        }
         let start = row.cells.partition_point(|c| c.col < first);
         for cell in row.cells[start..].iter().take_while(|c| c.col <= last) {
             if matches!(cell.value, CellValue::Empty) || layout.merge_at(row.r, cell.col).is_some()
@@ -2958,7 +3025,7 @@ fn autofit_request(
             } else {
                 (c, c)
             };
-            fit_columns(painter, paint, sheet, first, last, c)
+            fit_columns(painter, paint, sheet, (first, last), Some(c), None, false)
         }
         Header::Row(r) => {
             let whole = matches!(reach, Reach::Rows | Reach::All)
@@ -2968,59 +3035,90 @@ fn autofit_request(
             } else {
                 (r, r)
             };
-            fit_rows(painter, paint, sheet, first, last, r)
+            fit_rows(painter, paint, sheet, first, last, Some(r))
         }
         Header::Corner => Vec::new(),
     }
 }
 
 /// Auto-fit requests for columns `first..=last`: each column with content gets the width of
-/// its widest cell; `clicked`, if it has none, gets the sheet's default width, as in Excel.
+/// its widest cell (only the cells in `rows` when given: Home > Format > AutoFit Column Width
+/// on a cell selection); a column without content gets the sheet's default width, as in Excel
+/// (`clicked` only, unless `all_empty` asks for every column of the range).
 fn fit_columns(
     painter: &Painter,
     paint: &Paint<'_>,
     sheet: usize,
-    first: u32,
-    last: u32,
-    clicked: u32,
+    (first, last): (u32, u32),
+    clicked: Option<u32>,
+    rows: Option<(u32, u32)>,
+    all_empty: bool,
 ) -> Vec<Resize> {
     let layout = paint.view.layout;
     let metrics = layout.geo.metrics();
-    let mut widths: Vec<(u32, u32)> = content_widths(painter, paint, first, last)
-        .into_iter()
-        .map(|(col, w)| {
-            let px = excel_fit_px(w.ceil() as u32, metrics.mdw);
-            (col, px.min(max_col_px(metrics)))
-        })
-        .collect();
-    if !widths.iter().any(|(c, _)| *c == clicked) {
-        let format = paint.ws.map(Worksheet::sheet_format).unwrap_or_default();
-        widths.push((clicked, metrics.default_col_px(&format)));
+    let mut widths: std::collections::BTreeMap<u32, u32> =
+        content_widths(painter, paint, first, last, rows)
+            .into_iter()
+            .map(|(col, w)| {
+                let px = excel_fit_px(w.ceil() as u32, metrics.mdw);
+                (col, px.min(max_col_px(metrics)))
+            })
+            .collect();
+    let format = paint.ws.map(Worksheet::sheet_format).unwrap_or_default();
+    let default_px = metrics.default_col_px(&format);
+    if all_empty && last - first < 1024 {
+        for col in first..=last {
+            widths.entry(col).or_insert(default_px);
+        }
+    } else if let Some(col) = clicked {
+        widths.entry(col).or_insert(default_px);
     }
     widths
         .into_iter()
-        .map(|(col, px)| Resize::ColumnWidth {
+        .map(|(col, px)| Resize::ColumnFit {
             sheet,
-            first: col,
-            last: col,
+            col,
             width: column_width_for_px(metrics, px),
         })
         .collect()
 }
 
-/// Auto-fit requests for rows `first..=last`: the tallest line of any cell with content
-/// times its line count, never less than a row of the default font.
+/// The height a row of `row`'s cells asks for: the tallest line of any cell with content times
+/// its line count, never less than a row of the default font. Merged cells do not count.
+fn row_fit_px(
+    painter: &Painter,
+    paint: &Paint<'_>,
+    row: &open365_xlsx::Row,
+    default_px: u32,
+) -> u32 {
+    let layout = paint.view.layout;
+    let styles = paint.wb.styles();
+    let mut px = default_px;
+    for cell in &row.cells {
+        if matches!(cell.value, CellValue::Empty)
+            || layout
+                .merge_at(row.r, cell.col)
+                .is_some_and(|m| m.0 != m.2 || m.1 != m.3)
+        {
+            continue;
+        }
+        let fmt = styles.cell_format(cell.style.unwrap_or(0));
+        px = px.max(cell_height_px(painter, paint, layout, row.r, cell, fmt));
+    }
+    px
+}
+
+/// Auto-fit requests for rows `first..=last` (header double-click, AutoFit Row Height). The
+/// `clicked` row, if it has no cells, gets the default height.
 fn fit_rows(
     painter: &Painter,
     paint: &Paint<'_>,
     sheet: usize,
     first: u32,
     last: u32,
-    clicked: u32,
+    clicked: Option<u32>,
 ) -> Vec<Resize> {
-    let layout = paint.view.layout;
-    let metrics = layout.geo.metrics();
-    let styles = paint.wb.styles();
+    let metrics = paint.view.layout.geo.metrics();
     let default_px = default_row_px(paint);
     let mut out = Vec::new();
     let mut seen_clicked = false;
@@ -3028,33 +3126,80 @@ fn fit_rows(
         let rows = ws.rows();
         let start = rows.partition_point(|r| r.r < first);
         for row in rows[start..].iter().take_while(|r| r.r <= last) {
-            seen_clicked |= row.r == clicked;
-            let mut px = default_px;
-            for cell in &row.cells {
-                if matches!(cell.value, CellValue::Empty)
-                    || layout
-                        .merge_at(row.r, cell.col)
-                        .is_some_and(|m| m.0 != m.2 || m.1 != m.3)
-                {
-                    continue;
-                }
-                let fmt = styles.cell_format(cell.style.unwrap_or(0));
-                px = px.max(cell_height_px(painter, paint, layout, row.r, cell, fmt));
-            }
-            out.push((row.r, px));
+            seen_clicked |= Some(row.r) == clicked;
+            out.push((row.r, row_fit_px(painter, paint, row, default_px)));
         }
     }
-    if !seen_clicked {
-        out.push((clicked, default_px));
+    if let Some(row) = clicked.filter(|_| !seen_clicked) {
+        out.push((row, default_px));
     }
     out.into_iter()
-        .map(|(row, px)| Resize::RowHeight {
+        .map(|(row, px)| Resize::RowFit {
             sheet,
-            first: row,
-            last: row,
+            row,
             points: row_points_for_px(metrics, px),
         })
         .collect()
+}
+
+/// Home > Format > AutoFit Column Width / AutoFit Row Height for the selection.
+fn fit_selection_request(
+    painter: &Painter,
+    paint: &Paint<'_>,
+    sheet: usize,
+    selection: Span,
+    reach: Reach,
+    cols: bool,
+) -> Vec<Resize> {
+    let (r1, c1, r2, c2) = selection;
+    if cols {
+        let rows = matches!(reach, Reach::Cells).then_some((r1, r2));
+        fit_columns(painter, paint, sheet, (c1, c2), None, rows, true)
+    } else {
+        fit_rows(painter, paint, sheet, r1, r2, None)
+    }
+}
+
+/// The implicit re-fit of rows whose cells changed (`ranges` of rows): rows with a custom or
+/// hidden height stay as they are, others get their fitted height when it differs from the
+/// stored one by more than a hundredth of a point. A row left without any content returns to
+/// the default height, as in Excel.
+fn implicit_row_fits(
+    painter: &Painter,
+    paint: &Paint<'_>,
+    sheet: usize,
+    ranges: &[(u32, u32)],
+) -> Vec<Resize> {
+    let Some(ws) = paint.ws else {
+        return Vec::new();
+    };
+    let metrics = paint.view.layout.geo.metrics();
+    let default_px = default_row_px(paint);
+    let default_pt = ws.sheet_format().default_row_height;
+    let mut out = Vec::new();
+    for row in ws.rows() {
+        if !ranges.iter().any(|&(a, b)| (a..=b).contains(&row.r))
+            || row.custom_height()
+            || row.hidden()
+        {
+            continue;
+        }
+        let px = row_fit_px(painter, paint, row, default_px);
+        // A row that sits at the sheet default and fits within it stays as it is (no edit, no undo step).
+        if row.height().is_none() && px <= default_px {
+            continue;
+        }
+        let points = row_points_for_px(metrics, px);
+        let current = row.height().unwrap_or(default_pt);
+        if (points - current).abs() > 0.01 {
+            out.push(Resize::RowFit {
+                sheet,
+                row: row.r,
+                points,
+            });
+        }
+    }
+    out
 }
 
 /// Pixel height of a row of the workbook's default font.
@@ -3137,6 +3282,12 @@ fn resize_notice(r: &Resize) -> String {
             format!(
                 "Width of {cols} set to {width:.2}: applying it needs the SetColumnWidth command"
             )
+        }
+        Resize::ColumnFit { col, width, .. } => {
+            format!("Width of column {} fitted to {width:.2}", col_letters(col))
+        }
+        Resize::RowFit { row, points, .. } => {
+            format!("Height of row {row} fitted to {points:.2} pt")
         }
         Resize::RowHeight {
             first,

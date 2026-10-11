@@ -61,6 +61,30 @@ pub struct Tile {
     /// Text colour on a filled tile.
     pub ink: Option<[u8; 3]>,
     pub checked: bool,
+    /// Edges of the tile's sample cell, `[left, right, top, bottom]`: colour and width in `u`.
+    pub borders: [Option<([u8; 3], u8)>; 4],
+    /// The style's font size relative to the 11 pt Normal font, in percent (100 = same size).
+    pub text_pct: u32,
+    pub bold: bool,
+    pub italic: bool,
+}
+
+impl Tile {
+    /// A plain tile: field colour, no borders, label size.
+    #[must_use]
+    pub fn plain(id: &str, label: &str, checked: bool) -> Self {
+        Self {
+            id: id.to_owned(),
+            label: label.to_owned(),
+            fill: None,
+            ink: None,
+            checked,
+            borders: [None; 4],
+            text_pct: 100,
+            bold: false,
+            italic: false,
+        }
+    }
 }
 
 /// What a menu line is.
@@ -75,6 +99,10 @@ pub enum EntryKind {
     Heading,
     /// Rows of colour cells: the theme tint grid or the standard colours. `tight` rows touch (tints).
     Swatches { rows: Vec<Vec<Swatch>>, tight: bool },
+    /// Excel's "Gallery Filters" strip (52 u) above a colour picker, with its "High-contrast only"
+    /// switch (`label`). While the switch is on, colours with a contrast below 3:1 against the
+    /// menu background are left out.
+    Filter,
     /// Text tiles in `columns` columns.
     Tiles {
         columns: usize,
@@ -130,6 +158,16 @@ impl MenuEntry {
         Self {
             label: label.to_owned(),
             kind: EntryKind::Heading,
+            ..Self::default()
+        }
+    }
+
+    #[must_use]
+    pub fn filter(label: &str) -> Self {
+        Self {
+            label: label.to_owned(),
+            enabled: true,
+            kind: EntryKind::Filter,
             ..Self::default()
         }
     }
@@ -230,6 +268,8 @@ pub trait ShellHost {
     fn formula_ui(&mut self, _ui: &mut Ui) -> bool {
         false
     }
+    /// A menu, list, group pop-up, combo editor or the Backstage view just closed: hand the keyboard back to the document.
+    fn chrome_closed(&mut self) {}
     /// Draws the document area.
     fn central(&mut self, ui: &mut Ui);
 }

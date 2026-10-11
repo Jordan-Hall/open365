@@ -148,6 +148,15 @@ impl Dictionary {
     fn finish(&self, raw: Vec<String>, kind: CaseKind, original: &str, max: usize) -> Vec<String> {
         let mut seen = HashSet::new();
         let mut out = Vec::new();
+        // Word keeps proper nouns (`Ola`) behind ordinary words when the user typed lower case.
+        let raw = if kind == CaseKind::Lower {
+            let (plain, proper): (Vec<String>, Vec<String>) = raw
+                .into_iter()
+                .partition(|s| !s.chars().next().is_some_and(char::is_uppercase));
+            plain.into_iter().chain(proper).collect()
+        } else {
+            raw
+        };
         for suggestion in raw {
             let cased = match kind {
                 CaseKind::Upper => self.caser.upper(&suggestion),
@@ -234,6 +243,14 @@ impl Dictionary {
     fn edit_stage(&self, w: &[char], col: &mut Collector<'_>) {
         let n = w.len();
         let offer = |col: &mut Collector<'_>, c: &[char]| col.offer(&c.iter().collect::<String>());
+        // Lower-case words only gain upper-case letters through the case stage; skip them here.
+        let has_upper = w.iter().any(|c| c.is_uppercase());
+        let tries: Vec<char> = self
+            .try_chars()
+            .iter()
+            .copied()
+            .filter(|c| has_upper || !c.is_uppercase())
+            .collect();
 
         // Adjacent transpositions, and the double swaps of 4 and 5 letter words.
         for i in 0..n.saturating_sub(1) {
@@ -281,7 +298,7 @@ impl Dictionary {
         self.delete_stage(w, col);
         // Missing letter.
         for i in 0..=n {
-            for &t in self.try_chars() {
+            for &t in &tries {
                 let mut c = w.to_vec();
                 c.insert(i, t);
                 offer(col, &c);
@@ -304,7 +321,7 @@ impl Dictionary {
         }
         // Wrong letter.
         for i in 0..n {
-            for &t in self.try_chars() {
+            for &t in &tries {
                 if t != w[i] {
                     let mut c = w.to_vec();
                     c[i] = t;
@@ -364,31 +381,61 @@ impl Dictionary {
     fn ngram_stage(&self, w: &[char], col: &mut Collector<'_>) {
         let n = w.len();
         let max_dist = (n / 3).clamp(1, 3);
-        let aff = &self.aff;
+        let index = self.ngram_index.get_or_init(|| NgramIndex::build(self));
         let mut found: Vec<(usize, usize, &str)> = Vec::new();
-        for (stem, entries) in &self.words {
-            let usable = entries.iter().any(|e| {
-                !(e.has(aff.nosuggest)
-                    || e.has(aff.forbidden)
-                    || e.has(aff.only_in_compound)
-                    || e.has(aff.needaffix))
-            });
-            if !usable || stem.chars().count().abs_diff(n) > max_dist {
-                continue;
-            }
-            let lowered: Vec<char> = self.caser.lower(stem).chars().collect();
-            if let Some(distance) = bounded_distance(w, &lowered, max_dist) {
-                found.push((distance, 1000 - bigram_dice(w, &lowered), stem));
+        for len in n.saturating_sub(max_dist)..=(n + max_dist) {
+            for &at in index.by_len.get(len).map_or(&[][..], Vec::as_slice) {
+                let (stem, lowered) = &index.stems[at as usize];
+                if let Some(distance) = bounded_distance(w, lowered, max_dist) {
+                    found.push((distance, 1000 - bigram_dice(w, lowered), stem));
+                }
             }
         }
         found.sort_unstable();
-        let wanted = col.out.len() + aff.max_ngram_sugs;
+        let wanted = col.out.len() + self.aff.max_ngram_sugs;
         for (_, _, stem) in found {
             if col.out.len() >= wanted || col.full() {
                 break;
             }
             col.offer(stem);
         }
+    }
+}
+
+/// Suggestible stems, lower-cased once, grouped by length.
+#[derive(Debug)]
+pub(crate) struct NgramIndex {
+    stems: Vec<(Box<str>, Vec<char>)>,
+    by_len: Vec<Vec<u32>>,
+}
+
+impl NgramIndex {
+    fn build(dict: &Dictionary) -> Self {
+        let aff = &dict.aff;
+        let mut stems = Vec::new();
+        let mut by_len: Vec<Vec<u32>> = Vec::new();
+        for (stem, entries) in &dict.words {
+            let usable = entries.iter().any(|e| {
+                !(e.has(aff.nosuggest)
+                    || e.has(aff.forbidden)
+                    || e.has(aff.only_in_compound)
+                    || e.has(aff.needaffix))
+            });
+            if !usable {
+                continue;
+            }
+            let lowered: Vec<char> = dict.caser.lower(stem).chars().collect();
+            if by_len.len() <= lowered.len() {
+                by_len.resize(lowered.len() + 1, Vec::new());
+            }
+            by_len[lowered.len()].push(u32::try_from(stems.len()).unwrap_or(u32::MAX));
+            stems.push((stem.clone(), lowered));
+        }
+        // HashMap order is arbitrary; keep results deterministic.
+        for bucket in &mut by_len {
+            bucket.sort_unstable_by(|a, b| stems[*a as usize].0.cmp(&stems[*b as usize].0));
+        }
+        Self { stems, by_len }
     }
 }
 

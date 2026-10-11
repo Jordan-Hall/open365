@@ -1,0 +1,284 @@
+{
+  "oracle": "Microsoft Excel via COM (own hidden instance): Rows(r).Height after each step; the saved sheet XML rows/cols",
+  "excel_build": "20430",
+  "default_font": "Calibri 11",
+  "column_b_width_chars": 12,
+  "text": "The quick brown fox jumps over the lazy dog again and again",
+  "cases": [
+    {
+      "label": "wrap toggle",
+      "row": 1,
+      "step": "start",
+      "height_pt": 14.4
+    },
+    {
+      "label": "wrap toggle",
+      "row": 1,
+      "step": "wrap on",
+      "height_pt": 86.4
+    },
+    {
+      "label": "wrap toggle",
+      "row": 1,
+      "step": "wrap off",
+      "height_pt": 14.4
+    },
+    {
+      "label": "font change",
+      "row": 2,
+      "step": "wrapped",
+      "height_pt": 86.4
+    },
+    {
+      "label": "font change",
+      "row": 2,
+      "step": "size 20",
+      "height_pt": 309.6
+    },
+    {
+      "label": "font change",
+      "row": 2,
+      "step": "size 8",
+      "height_pt": 42.0
+    },
+    {
+      "label": "font change",
+      "row": 2,
+      "step": "cambria 14",
+      "height_pt": 121.8
+    },
+    {
+      "label": "size only",
+      "row": 3,
+      "step": "size 24",
+      "height_pt": 31.2
+    },
+    {
+      "label": "size only",
+      "row": 3,
+      "step": "clear formats",
+      "height_pt": 14.4
+    },
+    {
+      "label": "custom height",
+      "row": 4,
+      "step": "row height 40",
+      "height_pt": 39.6
+    },
+    {
+      "label": "custom height",
+      "row": 4,
+      "step": "wrap on",
+      "height_pt": 39.6
+    },
+    {
+      "label": "custom height",
+      "row": 4,
+      "step": "rows autofit",
+      "height_pt": 86.4
+    },
+    {
+      "label": "custom height",
+      "row": 4,
+      "step": "size 20 after autofit",
+      "height_pt": 309.6
+    },
+    {
+      "label": "merged wrap",
+      "row": 6,
+      "step": "merge then wrap",
+      "height_pt": 14.4
+    },
+    {
+      "label": "tallest cell",
+      "row": 7,
+      "step": "size 28 beside 11",
+      "height_pt": 36.6
+    },
+    {
+      "label": "newline",
+      "row": 8,
+      "step": "value with newlines, wrap off",
+      "height_pt": 43.2
+    },
+    {
+      "label": "newline",
+      "row": 8,
+      "step": "wrap on",
+      "height_pt": 43.2
+    },
+    {
+      "label": "bold wrap",
+      "row": 9,
+      "step": "bold",
+      "height_pt": 86.4
+    },
+    {
+      "label": "custom equal default",
+      "row": 10,
+      "step": "size 24",
+      "height_pt": 15.0
+    }
+  ],
+  "column_widths_chars": {
+    "autofit_text": 25.67,
+    "manual": 20.0,
+    "autofit_number": 5.22
+  },
+  "width_cases": [
+    {
+      "row": 13,
+      "col": 12,
+      "width_chars": 12
+    },
+    {
+      "row": 14,
+      "col": 14,
+      "width_chars": 24
+    },
+    {
+      "row": 15,
+      "col": 16,
+      "width_chars": 6
+    },
+    {
+      "row": 16,
+      "col": 18,
+      "width_chars": 40
+    }
+  ],
+  "saved_rows": [
+    {
+      "r": 1,
+      "ht": "",
+      "customHeight": ""
+    },
+    {
+      "r": 2,
+      "ht": "121.8",
+      "customHeight": ""
+    },
+    {
+      "r": 3,
+      "ht": "",
+      "customHeight": ""
+    },
+    {
+      "r": 4,
+      "ht": "309.60000000000002",
+      "customHeight": ""
+    },
+    {
+      "r": 6,
+      "ht": "",
+      "customHeight": ""
+    },
+    {
+      "r": 7,
+      "ht": "36.6",
+      "customHeight": ""
+    },
+    {
+      "r": 8,
+      "ht": "43.2",
+      "customHeight": ""
+    },
+    {
+      "r": 9,
+      "ht": "86.4",
+      "customHeight": ""
+    },
+    {
+      "r": 10,
+      "ht": "15",
+      "customHeight": "1"
+    },
+    {
+      "r": 12,
+      "ht": "",
+      "customHeight": ""
+    },
+    {
+      "r": 13,
+      "ht": "100.8",
+      "customHeight": ""
+    },
+    {
+      "r": 14,
+      "ht": "100.8",
+      "customHeight": ""
+    },
+    {
+      "r": 15,
+      "ht": "100.8",
+      "customHeight": ""
+    },
+    {
+      "r": 16,
+      "ht": "100.8",
+      "customHeight": ""
+    }
+  ],
+  "saved_cols": [
+    {
+      "min": 2,
+      "max": 2,
+      "width": "12.77734375",
+      "bestFit": "",
+      "customWidth": "1"
+    },
+    {
+      "min": 8,
+      "max": 8,
+      "width": "26.44140625",
+      "bestFit": "1",
+      "customWidth": "1"
+    },
+    {
+      "min": 9,
+      "max": 9,
+      "width": "20.77734375",
+      "bestFit": "",
+      "customWidth": "1"
+    },
+    {
+      "min": 10,
+      "max": 10,
+      "width": "6",
+      "bestFit": "1",
+      "customWidth": "1"
+    },
+    {
+      "min": 12,
+      "max": 12,
+      "width": "12.77734375",
+      "bestFit": "",
+      "customWidth": "1"
+    },
+    {
+      "min": 14,
+      "max": 14,
+      "width": "24.77734375",
+      "bestFit": "",
+      "customWidth": "1"
+    },
+    {
+      "min": 16,
+      "max": 16,
+      "width": "6.77734375",
+      "bestFit": "",
+      "customWidth": "1"
+    },
+    {
+      "min": 18,
+      "max": 18,
+      "width": "40.77734375",
+      "bestFit": "",
+      "customWidth": "1"
+    }
+  ],
+  "sheet_format": {
+    "defaultRowHeight": "14.4",
+    "customHeight": ""
+  }
+}

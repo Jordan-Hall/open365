@@ -66,30 +66,54 @@ fn resizes(h: &Harness<'_, App>) -> Vec<Resize> {
         .applied_log()
         .commands()
         .iter()
-        .filter_map(|c| match *c {
-            Command::SetColumnWidth {
-                sheet,
-                first,
-                last,
-                width,
-            } => Some(Resize::ColumnWidth {
-                sheet,
-                first,
-                last,
-                width,
-            }),
-            Command::SetRowHeight {
-                sheet,
-                first,
-                last,
-                points,
-            } => Some(Resize::RowHeight {
-                sheet,
-                first,
-                last,
-                points,
-            }),
-            _ => None,
+        .flat_map(|c| {
+            match c {
+                Command::AutoFitColumns { sheet, columns } => columns
+                    .iter()
+                    .map(|&(col, width)| Resize::ColumnWidth {
+                        sheet: *sheet,
+                        first: col,
+                        last: col,
+                        width,
+                    })
+                    .collect::<Vec<_>>(),
+                Command::AutoFitRows { sheet, rows } => rows
+                    .iter()
+                    .map(|&(row, points)| Resize::RowHeight {
+                        sheet: *sheet,
+                        first: row,
+                        last: row,
+                        points,
+                    })
+                    .collect::<Vec<_>>(),
+                _ => Vec::new(),
+            }
+            .into_iter()
+            .chain(match *c {
+                Command::SetColumnWidth {
+                    sheet,
+                    first,
+                    last,
+                    width,
+                } => Some(Resize::ColumnWidth {
+                    sheet,
+                    first,
+                    last,
+                    width,
+                }),
+                Command::SetRowHeight {
+                    sheet,
+                    first,
+                    last,
+                    points,
+                } => Some(Resize::RowHeight {
+                    sheet,
+                    first,
+                    last,
+                    points,
+                }),
+                _ => None,
+            })
         })
         .collect()
 }

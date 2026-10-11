@@ -259,3 +259,26 @@ fn only_the_edited_sheet_part_changes() {
         );
     }
 }
+
+#[test]
+fn auto_fit_writes_best_fit_widths_and_heights_without_the_custom_flags() {
+    let mut wb = workbook_with(
+        "",
+        "<sheetData><row r=\"2\" ht=\"40\" customHeight=\"1\"><c r=\"A2\"/></row><row r=\"3\"><c r=\"A3\"/></row></sheetData>",
+    );
+    wb.autofit_columns(0, &[(2, 12.5), (4, 7.0)]).expect("fits");
+    wb.autofit_rows(0, &[(2, 30.0), (3, 15.0), (5, 22.5)])
+        .expect("fits");
+    let text = sheet_text(&mut wb);
+    assert!(
+        text.contains("<col min=\"2\" max=\"2\" width=\"12.5\" customWidth=\"1\" bestFit=\"1\"/>")
+    );
+    assert!(
+        text.contains("<col min=\"4\" max=\"4\" width=\"7\" customWidth=\"1\" bestFit=\"1\"/>")
+    );
+    // Row 2 loses customHeight (Excel's AutoFit releases it), the default height writes no ht.
+    assert!(text.contains("<row r=\"2\" ht=\"30\">"));
+    assert!(!text.contains("<row r=\"3\" ht"));
+    assert!(text.contains("<row r=\"5\" ht=\"22.5\""));
+    assert!(wb.autofit_rows(0, &[(1, 500.0)]).is_err());
+}

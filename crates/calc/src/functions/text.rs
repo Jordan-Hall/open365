@@ -280,6 +280,14 @@ pub(super) fn substitute(ctx: &EvalContext<'_>, args: &[Arg]) -> Res<Value> {
         return Ok(Value::Text(s));
     }
     let Some(n) = instance else {
+        // Size the result before building it: 32767 occurrences of a 32767 character replacement is a gigabyte.
+        let hits = s.matches(old.as_str()).count() as u64;
+        let total = (s.chars().count() as u64)
+            .saturating_sub(hits.saturating_mul(old.chars().count() as u64))
+            .saturating_add(hits.saturating_mul(new.chars().count() as u64));
+        if total > MAX_TEXT as u64 {
+            return Err(ErrorKind::Value);
+        }
         return text(s.replace(&old, &new));
     };
     // Occurrences are counted with overlap: the 2nd "aa" in "aaaa" starts at the 2nd character.

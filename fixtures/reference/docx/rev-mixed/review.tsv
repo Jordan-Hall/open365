@@ -1,0 +1,117 @@
+rev	0	Insert	Author A	2026-10-11T15:20:00Z	 inserted
+rev	1	Property	Author A	2026-10-11T15:20:00Z	inserted
+rev	2	Delete	Author A	2026-10-11T15:20:00Z	gamma 
+rev	3	Property	Author A	2026-10-11T15:20:00Z	gamma
+rev	4	ParagraphProperty	Author A	2026-10-11T15:20:00Z	Second LINEline of text.
+rev	5	Insert	Author A	2026-10-11T15:20:00Z	LINE
+rev	6	Delete	Author A	2026-10-11T15:20:00Z	line
+rev	7	Insert	Author A	2026-10-11T15:20:00Z	\rInserted before third
+para	markup	0	Alpha beta inserted gamma delta.	0	Normal	0	B0I0U0S22x11;B1I0U0S22x8;B0I0U0S22x1;B0I1U0S22x5;B0I0U0S22x7
+para	markup	1	Second LINEline of text.	2	Normal	0	B0I0U0S22x24
+para	markup	2		0	Normal	0	
+para	markup	3	Inserted before thirdThird line of text.	0	Normal	0	B0I0U0S22x40
+para	final	0	Alpha beta inserted delta.	0	Normal	0	B0I0U0S22x11;B1I0U0S22x8;B0I0U0S22x1;B0I1U0S22x1;B0I0U0S22x5
+para	final	1	Second LINE of text.	2	Normal	0	B0I0U0S22x20
+para	final	2		0	Normal	0	
+para	final	3	Inserted before thirdThird line of text.	0	Normal	0	B0I0U0S22x40
+para	accept	0	Alpha beta inserted delta.	0	Normal	0	B0I0U0S22x11;B1I0U0S22x8;B0I0U0S22x7
+para	accept	1	Second LINE of text.	2	Normal	0	B0I0U0S22x20
+para	accept	2		0	Normal	0	
+para	accept	3	Inserted before thirdThird line of text.	0	Normal	0	B0I0U0S22x40
+para	reject	0	Alpha beta gamma delta.	0	Normal	0	B0I0U0S22x23
+para	reject	1	Second line of text.	0	Normal	0	B0I0U0S22x20
+para	reject	2	Third line of text.	0	Normal	0	B0I0U0S22x19
+para	accept1:0	0	Alpha beta inserted gamma delta.	0	Normal	0	B0I0U0S22x11;B1I0U0S22x8;B0I0U0S22x1;B0I1U0S22x5;B0I0U0S22x7
+para	accept1:0	1	Second LINEline of text.	2	Normal	0	B0I0U0S22x24
+para	accept1:0	2		0	Normal	0	
+para	accept1:0	3	Inserted before thirdThird line of text.	0	Normal	0	B0I0U0S22x40
+para	reject1:0	0	Alpha beta gamma delta.	0	Normal	0	B0I0U0S22x11;B0I1U0S22x5;B0I0U0S22x7
+para	reject1:0	1	Second LINEline of text.	2	Normal	0	B0I0U0S22x24
+para	reject1:0	2		0	Normal	0	
+para	reject1:0	3	Inserted before thirdThird line of text.	0	Normal	0	B0I0U0S22x40
+para	accept1:1	0	Alpha beta inserted gamma delta.	0	Normal	0	B0I0U0S22x11;B1I0U0S22x8;B0I0U0S22x1;B0I1U0S22x5;B0I0U0S22x7
+para	accept1:1	1	Second LINEline of text.	2	Normal	0	B0I0U0S22x24
+para	accept1:1	2		0	Normal	0	
+para	accept1:1	3	Inserted before thirdThird line of text.	0	Normal	0	B0I0U0S22x40
+para	reject1:1	0	Alpha beta inserted gamma delta.	0	Normal	0	B0I0U0S22x20;B0I1U0S22x5;B0I0U0S22x7
+para	reject1:1	1	Second LINEline of text.	2	Normal	0	B0I0U0S22x24
+para	reject1:1	2		0	Normal	0	
+para	reject1:1	3	Inserted before thirdThird line of text.	0	Normal	0	B0I0U0S22x40
+para	accept1:2	0	Alpha beta inserted delta.	0	Normal	0	B0I0U0S22x11;B1I0U0S22x8;B0I0U0S22x7
+para	accept1:2	1	Second LINEline of text.	2	Normal	0	B0I0U0S22x24
+para	accept1:2	2		0	Normal	0	
+para	accept1:2	3	Inserted before thirdThird line of text.	0	Normal	0	B0I0U0S22x40
+para	reject1:2	0	Alpha beta inserted gamma delta.	0	Normal	0	B0I0U0S22x11;B1I0U0S22x8;B0I0U0S22x1;B0I1U0S22x5;B0I0U0S22x7
+para	reject1:2	1	Second LINEline of text.	2	Normal	0	B0I0U0S22x24
+para	reject1:2	2		0	Normal	0	
+para	reject1:2	3	Inserted before thirdThird line of text.	0	Normal	0	B0I0U0S22x40
+para	accept1:3	0	Alpha beta inserted gamma delta.	0	Normal	0	B0I0U0S22x11;B1I0U0S22x8;B0I0U0S22x1;B0I1U0S22x5;B0I0U0S22x7
+para	accept1:3	1	Second LINEline of text.	2	Normal	0	B0I0U0S22x24
+para	accept1:3	2		0	Normal	0	
+para	accept1:3	3	Inserted before thirdThird line of text.	0	Normal	0	B0I0U0S22x40
+para	reject1:3	0	Alpha beta inserted gamma delta.	0	Normal	0	B0I0U0S22x11;B1I0U0S22x8;B0I0U0S22x13
+para	reject1:3	1	Second LINEline of text.	2	Normal	0	B0I0U0S22x24
+para	reject1:3	2		0	Normal	0	
+para	reject1:3	3	Inserted before thirdThird line of text.	0	Normal	0	B0I0U0S22x40
+para	accept1:4	0	Alpha beta inserted gamma delta.	0	Normal	0	B0I0U0S22x11;B1I0U0S22x8;B0I0U0S22x1;B0I1U0S22x5;B0I0U0S22x7
+para	accept1:4	1	Second LINEline of text.	2	Normal	0	B0I0U0S22x24
+para	accept1:4	2		0	Normal	0	
+para	accept1:4	3	Inserted before thirdThird line of text.	0	Normal	0	B0I0U0S22x40
+para	reject1:4	0	Alpha beta inserted gamma delta.	0	Normal	0	B0I0U0S22x11;B1I0U0S22x8;B0I0U0S22x1;B0I1U0S22x5;B0I0U0S22x7
+para	reject1:4	1	Second LINEline of text.	0	Normal	0	B0I0U0S22x24
+para	reject1:4	2		0	Normal	0	
+para	reject1:4	3	Inserted before thirdThird line of text.	0	Normal	0	B0I0U0S22x40
+para	accept1:5	0	Alpha beta inserted gamma delta.	0	Normal	0	B0I0U0S22x11;B1I0U0S22x8;B0I0U0S22x1;B0I1U0S22x5;B0I0U0S22x7
+para	accept1:5	1	Second LINEline of text.	2	Normal	0	B0I0U0S22x24
+para	accept1:5	2		0	Normal	0	
+para	accept1:5	3	Inserted before thirdThird line of text.	0	Normal	0	B0I0U0S22x40
+para	reject1:5	0	Alpha beta inserted gamma delta.	0	Normal	0	B0I0U0S22x11;B1I0U0S22x8;B0I0U0S22x1;B0I1U0S22x5;B0I0U0S22x7
+para	reject1:5	1	Second line of text.	2	Normal	0	B0I0U0S22x20
+para	reject1:5	2		0	Normal	0	
+para	reject1:5	3	Inserted before thirdThird line of text.	0	Normal	0	B0I0U0S22x40
+para	accept1:6	0	Alpha beta inserted gamma delta.	0	Normal	0	B0I0U0S22x11;B1I0U0S22x8;B0I0U0S22x1;B0I1U0S22x5;B0I0U0S22x7
+para	accept1:6	1	Second LINE of text.	2	Normal	0	B0I0U0S22x20
+para	accept1:6	2		0	Normal	0	
+para	accept1:6	3	Inserted before thirdThird line of text.	0	Normal	0	B0I0U0S22x40
+para	reject1:6	0	Alpha beta inserted gamma delta.	0	Normal	0	B0I0U0S22x11;B1I0U0S22x8;B0I0U0S22x1;B0I1U0S22x5;B0I0U0S22x7
+para	reject1:6	1	Second LINEline of text.	2	Normal	0	B0I0U0S22x24
+para	reject1:6	2		0	Normal	0	
+para	reject1:6	3	Inserted before thirdThird line of text.	0	Normal	0	B0I0U0S22x40
+para	accept1:7	0	Alpha beta inserted gamma delta.	0	Normal	0	B0I0U0S22x11;B1I0U0S22x8;B0I0U0S22x1;B0I1U0S22x5;B0I0U0S22x7
+para	accept1:7	1	Second LINEline of text.	2	Normal	0	B0I0U0S22x24
+para	accept1:7	2		0	Normal	0	
+para	accept1:7	3	Inserted before thirdThird line of text.	0	Normal	0	B0I0U0S22x40
+para	reject1:7	0	Alpha beta inserted gamma delta.	0	Normal	0	B0I0U0S22x11;B1I0U0S22x8;B0I0U0S22x1;B0I1U0S22x5;B0I0U0S22x7
+para	reject1:7	1	Second LINEline of text.	2	Normal	0	B0I0U0S22x24
+para	reject1:7	2	Third line of text.	0	Normal	0	B0I0U0S22x19
+para	acceptp:0	0	Alpha beta inserted delta.	0	Normal	0	B0I0U0S22x11;B1I0U0S22x8;B0I0U0S22x7
+para	acceptp:0	1	Second LINEline of text.	2	Normal	0	B0I0U0S22x24
+para	acceptp:0	2		0	Normal	0	
+para	acceptp:0	3	Inserted before thirdThird line of text.	0	Normal	0	B0I0U0S22x40
+para	rejectp:0	0	Alpha beta gamma delta.	0	Normal	0	B0I0U0S22x23
+para	rejectp:0	1	Second LINEline of text.	2	Normal	0	B0I0U0S22x24
+para	rejectp:0	2		0	Normal	0	
+para	rejectp:0	3	Inserted before thirdThird line of text.	0	Normal	0	B0I0U0S22x40
+para	acceptp:1	0	Alpha beta inserted gamma delta.	0	Normal	0	B0I0U0S22x11;B1I0U0S22x8;B0I0U0S22x1;B0I1U0S22x5;B0I0U0S22x7
+para	acceptp:1	1	Second LINE of text.	2	Normal	0	B0I0U0S22x20
+para	acceptp:1	2		0	Normal	0	
+para	acceptp:1	3	Inserted before thirdThird line of text.	0	Normal	0	B0I0U0S22x40
+para	rejectp:1	0	Alpha beta inserted gamma delta.	0	Normal	0	B0I0U0S22x11;B1I0U0S22x8;B0I0U0S22x1;B0I1U0S22x5;B0I0U0S22x7
+para	rejectp:1	1	Second line of text.	0	Normal	0	B0I0U0S22x20
+para	rejectp:1	2		0	Normal	0	
+para	rejectp:1	3	Inserted before thirdThird line of text.	0	Normal	0	B0I0U0S22x40
+para	acceptp:2	0	Alpha beta inserted gamma delta.	0	Normal	0	B0I0U0S22x11;B1I0U0S22x8;B0I0U0S22x1;B0I1U0S22x5;B0I0U0S22x7
+para	acceptp:2	1	Second LINEline of text.	2	Normal	0	B0I0U0S22x24
+para	acceptp:2	2		0	Normal	0	
+para	acceptp:2	3	Inserted before thirdThird line of text.	0	Normal	0	B0I0U0S22x40
+para	rejectp:2	0	Alpha beta inserted gamma delta.	0	Normal	0	B0I0U0S22x11;B1I0U0S22x8;B0I0U0S22x1;B0I1U0S22x5;B0I0U0S22x7
+para	rejectp:2	1	Second LINEline of text.	2	Normal	0	B0I0U0S22x24
+para	rejectp:2	2	Inserted before thirdThird line of text.	0	Normal	0	B0I0U0S22x40
+para	acceptp:3	0	Alpha beta inserted gamma delta.	0	Normal	0	B0I0U0S22x11;B1I0U0S22x8;B0I0U0S22x1;B0I1U0S22x5;B0I0U0S22x7
+para	acceptp:3	1	Second LINEline of text.	2	Normal	0	B0I0U0S22x24
+para	acceptp:3	2		0	Normal	0	
+para	acceptp:3	3	Inserted before thirdThird line of text.	0	Normal	0	B0I0U0S22x40
+para	rejectp:3	0	Alpha beta inserted gamma delta.	0	Normal	0	B0I0U0S22x11;B1I0U0S22x8;B0I0U0S22x1;B0I1U0S22x5;B0I0U0S22x7
+para	rejectp:3	1	Second LINEline of text.	2	Normal	0	B0I0U0S22x24
+para	rejectp:3	2		0	Normal	0	
+para	rejectp:3	3	Third line of text.	0	Normal	0	B0I0U0S22x19

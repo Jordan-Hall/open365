@@ -17,7 +17,13 @@ pub(super) fn render_date(
     out: &mut Out,
 ) -> bool {
     // A `[$-LCID]` prefix selects the names of that language.
-    let by_lcid = sec.lcid.and_then(FormatLocale::for_lcid);
+    // The Thai calendar (byte 7) and the untagged Thai letters use Thai names; the US Gregorian calendar (byte 2) English ones.
+    let names_lcid = match (sec.calendar, sec.thai) {
+        (7, _) | (_, true) => Some(0x041E),
+        (2, _) => Some(0x0409),
+        _ => sec.lcid,
+    };
+    let by_lcid = names_lcid.and_then(FormatLocale::for_lcid);
     let loc: &FormatLocale = by_lcid.as_deref().unwrap_or(default_locale);
     if !v.is_finite() || v < 0.0 {
         return false;
@@ -97,17 +103,22 @@ pub(super) fn render_date(
             Tok::Pad(c) => out.pad(*c),
             Tok::Fill(c) => out.fill(*c),
             Tok::Year(n) => {
-                if *n <= 2 {
-                    out.push(&format!("{:02}", ymd.0.rem_euclid(100)));
+                let y = if sec.calendar == 7 {
+                    ymd.0 + 543
                 } else {
-                    out.push(&format!("{:04}", ymd.0));
+                    ymd.0
+                };
+                if *n <= 2 {
+                    out.push(&format!("{:02}", y.rem_euclid(100)));
+                } else {
+                    out.push(&format!("{y:04}"));
                 }
             }
             Tok::Month(n) => {
                 let m = (ymd.1.clamp(1, 12) - 1) as usize;
                 match n {
                     1 => out.push_unpadded(ymd.1),
-                    2 => out.push(&format!("{:02}", ymd.1)),
+                    2 => out.push_padded(ymd.1),
                     3 => out.push_lit(&loc.month_abbr[m]),
                     5 => out.push_lit(&loc.month_full[m].chars().take(1).collect::<String>()),
                     _ => out.push_lit(&loc.month_full[m]),
@@ -115,7 +126,7 @@ pub(super) fn render_date(
             }
             Tok::Day(n) => match n {
                 1 => out.push_unpadded(ymd.2),
-                2 => out.push(&format!("{:02}", ymd.2)),
+                2 => out.push_padded(ymd.2),
                 3 => out.push_lit(&loc.day_abbr[weekday]),
                 _ => out.push_lit(&loc.day_full[weekday]),
             },
@@ -128,21 +139,21 @@ pub(super) fn render_date(
                     }
                 }
                 if *n >= 2 {
-                    out.push(&format!("{h:02}"));
+                    out.push_padded(h);
                 } else {
                     out.push_unpadded(h);
                 }
             }
             Tok::Minute(n) => {
                 if *n >= 2 {
-                    out.push(&format!("{:02}", minute as i64));
+                    out.push_padded(minute as i64);
                 } else {
                     out.push_unpadded(minute as i64);
                 }
             }
             Tok::Second(n) => {
                 if *n >= 2 {
-                    out.push(&format!("{:02}", second as i64));
+                    out.push_padded(second as i64);
                 } else {
                     out.push_unpadded(second as i64);
                 }
@@ -168,7 +179,7 @@ pub(super) fn render_date(
             }
             Tok::BuddhistYear(n) => {
                 // With a `[$-LCID]` prefix `b` is the Gregorian year (measured for every language tried).
-                let y = if sec.lcid.is_some() {
+                let y = if sec.lcid.is_some() && sec.calendar != 7 {
                     ymd.0
                 } else {
                     ymd.0 + 543

@@ -1,0 +1,5 @@
+feature = "pivot"
+made_with = "Microsoft Excel 20430 (Windows)"
+author = "project member"
+expect_dropped = []
+notes = "hold-out: fresh seed, random custom table styles over different source data"

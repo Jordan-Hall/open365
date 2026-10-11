@@ -18,6 +18,7 @@ use crate::xml::{
 
 pub(crate) mod cellformat;
 mod filter;
+mod merge;
 mod resize;
 mod sort;
 mod structure;

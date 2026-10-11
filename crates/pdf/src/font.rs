@@ -336,6 +336,7 @@ pub fn embed(
     extra: &BTreeMap<u32, String>,
     resource: String,
     warnings: &mut Vec<String>,
+    cid_set: bool,
 ) -> Result<(u32, FaceDraw), PdfError> {
     let name = face.family().to_owned();
     let font = FontRef::from_index(face.bytes(), face.index())
@@ -377,7 +378,16 @@ pub fn embed(
     let ps = ps_name(face, &tag);
 
     let is_cff = sfnt.get(b"CFF ").is_some() && sfnt.get(b"glyf").is_none();
-    let (file_id, descendant_subtype) = if is_cff {
+    let subset_cff = if is_cff && fs_type & 0x0100 == 0 {
+        sfnt.get(b"CFF ").and_then(|t| crate::cff::subset(t, &gids))
+    } else {
+        None
+    };
+    let (file_id, descendant_subtype) = if let Some(data) = subset_cff {
+        // A bare CFF, valid from PDF 1.3 on (an OpenType wrapper needs 1.6).
+        let id = pdf.add_stream("/Subtype /CIDFontType0C", &data, true);
+        (id, "CIDFontType0")
+    } else if is_cff {
         warnings.push(format!("{name}: CFF font embedded whole (no subsetting)"));
         let data = whole_font(&sfnt, true);
         let id = pdf.add_stream(
@@ -422,8 +432,20 @@ pub fn embed(
         f64::from(head.y_max()) * scale,
     ];
     let file_key = if is_cff { "FontFile3" } else { "FontFile2" };
+    // CIDSet (PDF/A-1 needs it, and only there is it exact): one bit per CID in the subset, CID 0
+    // the most significant bit of the first byte.
+    let cid_set_entry = if cid_set {
+        let max_gid = gids.iter().next_back().copied().unwrap_or(0) as usize;
+        let mut bits = vec![0u8; max_gid / 8 + 1];
+        for &g in &gids {
+            bits[g as usize / 8] |= 0x80 >> (g % 8);
+        }
+        format!(" /CIDSet {} 0 R", pdf.add_stream("", &bits, true))
+    } else {
+        String::new()
+    };
     let desc = pdf.add(format!(
-        "<< /Type /FontDescriptor /FontName /{ps} /Flags {flags} /FontBBox [{} {} {} {}] /ItalicAngle {} /Ascent {} /Descent {} /CapHeight {} /StemV {} /{file_key} {file_id} 0 R >>",
+        "<< /Type /FontDescriptor /FontName /{ps} /Flags {flags} /FontBBox [{} {} {} {}] /ItalicAngle {} /Ascent {} /Descent {} /CapHeight {} /StemV {} /{file_key} {file_id} 0 R{cid_set_entry} >>",
         num(bbox[0], 0),
         num(bbox[1], 0),
         num(bbox[2], 0),

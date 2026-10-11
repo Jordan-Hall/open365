@@ -8,9 +8,12 @@ use egui::{Key, KeyboardShortcut, Modifiers, Ui};
 use open365_commands::{Alignment, Command, RunPropsPatch, Target};
 use open365_pdf::PdfMetadata;
 use open365_ui_egui::{
-    ClipboardState, DocView, FindDialog, GridView, Toggle, print_command, write_private_temp,
+    ClipboardState, DocView, FindDialog, GridView, RulerColors, Toggle, print_command,
+    write_private_temp,
 };
-use open365_ui_shell::{AppKind, CommandState, MenuEntry, Mode, Shell, ShellHost, Theme, fonts};
+use open365_ui_shell::{
+    AppKind, CaretSettings, CommandState, MenuEntry, Mode, Shell, ShellHost, Theme, fonts,
+};
 
 const EXTENSIONS: [&str; 4] = ["docx", "dotx", "docm", "dotm"];
 
@@ -38,7 +41,7 @@ impl State {
     fn new() -> Self {
         Self {
             target: None,
-            doc: DocView::new(),
+            doc: Self::new_doc(),
             grid: GridView::new(),
             find: FindDialog::new(),
             clipboard: ClipboardState::default(),
@@ -50,9 +53,19 @@ impl State {
         }
     }
 
+    /// A document view with the system's caret width and blink time.
+    fn new_doc() -> DocView {
+        let caret = CaretSettings::system();
+        let mut doc = DocView::new();
+        doc.set_caret_style(caret.width, caret.blink_secs());
+        // Word shows the rulers by default (View > Show > Ruler).
+        doc.set_ruler(true);
+        doc
+    }
+
     fn set_target(&mut self, target: Target) {
         self.target = Some(target);
-        self.doc = DocView::new();
+        self.doc = Self::new_doc();
         self.doc.use_system_fonts();
         // Word opens at 100 %.
         self.doc.set_zoom(Some(1.0));
@@ -428,6 +441,96 @@ struct Host<'a> {
     theme: Theme,
 }
 
+impl Host<'_> {
+    fn run_command(&mut self, id: &str, value: Option<f64>) {
+        let s = &mut *self.s;
+        if let Some(rest) = id.strip_prefix("home.styles.quickstylesgallery#") {
+            if let Some(t) = &mut s.target {
+                s.doc.set_style(t, rest);
+                s.doc.focus();
+            }
+            return;
+        }
+        if let Some(name) = id.strip_prefix("home.font.font#") {
+            s.run_props(RunPropsPatch {
+                font: Some(name.to_owned()),
+                ..RunPropsPatch::default()
+            });
+            return;
+        }
+        if let Some(n) = id
+            .strip_prefix("home.font.font-size#")
+            .and_then(|n| n.parse::<u32>().ok())
+        {
+            s.run_props(RunPropsPatch {
+                size_half_points: Some(n * 2),
+                ..RunPropsPatch::default()
+            });
+            return;
+        }
+        if let Some(hex) = id.strip_prefix("home.font.font-colour#") {
+            if hex != "auto" {
+                s.font_color = hex.to_owned();
+            }
+            s.run_props(RunPropsPatch {
+                color: Some(hex.to_owned()),
+                ..RunPropsPatch::default()
+            });
+            return;
+        }
+        if let Some(i) = id
+            .strip_prefix("file.open-recent#")
+            .and_then(|i| i.parse::<usize>().ok())
+        {
+            if let Some(p) = s.recent.get(i).cloned() {
+                s.open_path(&p);
+            }
+            return;
+        }
+        match id {
+            "file.new" => s.new_blank(),
+            "file.open" => s.open_dialog(),
+            "qat.filesave" | "file.save" => s.save(),
+            "file.save-as" => s.save_as(),
+            "file.print" => s.print(),
+            "file.export" => s.export_pdf(),
+            "file.close" => s.target = None,
+            "qat.undo" => s.undo(),
+            "qat.redoorrepeat" | "qat.redo" => s.redo(),
+            "home.clipboard.paste" => s.paste(),
+            "home.clipboard.cut" => s.cut(),
+            "home.clipboard.copy" => s.copy(),
+            "home.font.bold" => s.toggle(Toggle::Bold),
+            "home.font.italic" => s.toggle(Toggle::Italic),
+            "home.font.underline" => s.toggle(Toggle::Underline),
+            "home.font.strikethrough" => s.toggle(Toggle::Strike),
+            "home.font.grow-font" => s.step_size(true),
+            "home.font.shrink-font" => s.step_size(false),
+            "home.font.font-colour" => {
+                let c = s.font_color.clone();
+                s.run_props(RunPropsPatch {
+                    color: Some(c),
+                    ..RunPropsPatch::default()
+                });
+            }
+            "home.paragraph.align-left" => s.align(Alignment::Left),
+            "home.paragraph.centre" => s.align(Alignment::Center),
+            "home.paragraph.align-right" => s.align(Alignment::Right),
+            "home.paragraph.justify" => s.align(Alignment::Justify),
+            "edit.find" => s.find.show_dialog(false),
+            "edit.replace" => s.find.show_dialog(true),
+            "view.show.ruler" => {
+                let on = s.doc.ruler();
+                s.doc.set_ruler(!on);
+            }
+            "view.zoom.100" => s.doc.set_zoom(Some(1.0)),
+            "view.zoom.page-width" => s.doc.set_zoom(None),
+            "view.zoom" => s.doc.set_zoom(value.map(|z| z as f32)),
+            _ => {}
+        }
+    }
+}
+
 impl ShellHost for Host<'_> {
     fn state(&self, id: &str) -> CommandState {
         let s = &*self.s;
@@ -516,93 +619,25 @@ impl ShellHost for Host<'_> {
                     CommandState::DISABLED
                 }
             }
+            "view.show.ruler" => CommandState {
+                enabled: has,
+                checked: s.doc.ruler(),
+            },
             "status.print-layout" => CommandState::checked(true),
             _ => CommandState::DISABLED,
         }
     }
 
     fn run(&mut self, id: &str, value: Option<f64>) {
-        let s = &mut *self.s;
-        if let Some(rest) = id.strip_prefix("home.styles.quickstylesgallery#") {
-            if let Some(t) = &mut s.target {
-                s.doc.set_style(t, rest);
-                s.doc.focus();
-            }
-            return;
+        self.run_command(id, value);
+        // Word hands the keyboard back to the document after a ribbon command (the Find dialog takes it itself).
+        if !matches!(id, "edit.find" | "edit.replace") {
+            self.s.doc.focus();
         }
-        if let Some(name) = id.strip_prefix("home.font.font#") {
-            s.run_props(RunPropsPatch {
-                font: Some(name.to_owned()),
-                ..RunPropsPatch::default()
-            });
-            return;
-        }
-        if let Some(n) = id
-            .strip_prefix("home.font.font-size#")
-            .and_then(|n| n.parse::<u32>().ok())
-        {
-            s.run_props(RunPropsPatch {
-                size_half_points: Some(n * 2),
-                ..RunPropsPatch::default()
-            });
-            return;
-        }
-        if let Some(hex) = id.strip_prefix("home.font.font-colour#") {
-            if hex != "auto" {
-                s.font_color = hex.to_owned();
-            }
-            s.run_props(RunPropsPatch {
-                color: Some(hex.to_owned()),
-                ..RunPropsPatch::default()
-            });
-            return;
-        }
-        if let Some(i) = id
-            .strip_prefix("file.open-recent#")
-            .and_then(|i| i.parse::<usize>().ok())
-        {
-            if let Some(p) = s.recent.get(i).cloned() {
-                s.open_path(&p);
-            }
-            return;
-        }
-        match id {
-            "file.new" => s.new_blank(),
-            "file.open" => s.open_dialog(),
-            "qat.filesave" | "file.save" => s.save(),
-            "file.save-as" => s.save_as(),
-            "file.print" => s.print(),
-            "file.export" => s.export_pdf(),
-            "file.close" => s.target = None,
-            "qat.undo" => s.undo(),
-            "qat.redoorrepeat" | "qat.redo" => s.redo(),
-            "home.clipboard.paste" => s.paste(),
-            "home.clipboard.cut" => s.cut(),
-            "home.clipboard.copy" => s.copy(),
-            "home.font.bold" => s.toggle(Toggle::Bold),
-            "home.font.italic" => s.toggle(Toggle::Italic),
-            "home.font.underline" => s.toggle(Toggle::Underline),
-            "home.font.strikethrough" => s.toggle(Toggle::Strike),
-            "home.font.grow-font" => s.step_size(true),
-            "home.font.shrink-font" => s.step_size(false),
-            "home.font.font-colour" => {
-                let c = s.font_color.clone();
-                s.run_props(RunPropsPatch {
-                    color: Some(c),
-                    ..RunPropsPatch::default()
-                });
-            }
-            "home.paragraph.align-left" => s.align(Alignment::Left),
-            "home.paragraph.centre" => s.align(Alignment::Center),
-            "home.paragraph.align-right" => s.align(Alignment::Right),
-            "home.paragraph.justify" => s.align(Alignment::Justify),
-            "edit.find" => s.find.show_dialog(false),
-            "edit.replace" => s.find.show_dialog(true),
-            "view.zoom.100" => s.doc.set_zoom(Some(1.0)),
-            "view.zoom.page-width" => s.doc.set_zoom(None),
-            "view.zoom" => s.doc.set_zoom(value.map(|z| z as f32)),
-            _ => {}
-        }
+    }
+
+    fn chrome_closed(&mut self) {
+        self.s.doc.focus();
     }
 
     fn title(&self) -> String {
@@ -767,6 +802,17 @@ impl ShellHost for Host<'_> {
             Some(t) => {
                 let th = &self.theme;
                 s.doc.set_page_colors(th.page, th.page_text, th.page_border);
+                s.doc.set_ruler_colors(RulerColors {
+                    band: th.canvas,
+                    track: th.ruler_track,
+                    line: th.ruler_line,
+                    marker: th.ruler_marker,
+                    marker_border: th.ruler_marker_border,
+                    glyph: match th.mode {
+                        Mode::Dark => th.ruler_marker,
+                        Mode::Light => th.ruler_marker_border,
+                    },
+                });
                 repaint = s.doc.show(ui, t);
             }
             None => {
@@ -872,6 +918,64 @@ mod tests {
         s.new_blank();
         let label = s.doc.caret_format().font_label();
         assert!(!label.contains("Carlito"), "{label}");
+    }
+
+    /// Writer as `main` builds it: shell and state on a headless window.
+    fn app_harness() -> egui_kittest::Harness<'static, (Shell, State)> {
+        let mut state = State::new();
+        state.new_blank();
+        let shell = Shell::new(AppKind::Writer, Mode::system());
+        egui_kittest::Harness::builder()
+            .with_size(egui::vec2(1600.0, 900.0))
+            .build_ui_state(
+                |ui, (shell, state): &mut (Shell, State)| {
+                    let mut host = Host {
+                        s: state,
+                        theme: shell.theme,
+                    };
+                    shell.show(ui, &mut host);
+                },
+                (shell, state),
+            )
+    }
+
+    /// Word opens with the caret in the document: no click needed.
+    #[test]
+    fn the_document_has_the_keyboard_at_launch() {
+        let mut h = app_harness();
+        h.run();
+        assert!(h.state().1.doc.is_focused());
+    }
+
+    /// A ribbon command hands the keyboard back to the document, and so does a closing menu.
+    #[test]
+    fn a_ribbon_command_or_closing_menu_returns_focus_to_the_document() {
+        let defocus = |h: &mut egui_kittest::Harness<'static, (Shell, State)>| {
+            h.ctx.memory_mut(|m| {
+                if let Some(id) = m.focused() {
+                    m.surrender_focus(id);
+                }
+            });
+            h.run();
+            assert!(!h.state().1.doc.is_focused());
+        };
+        let mut h = app_harness();
+        h.run();
+        for closing_menu in [false, true] {
+            defocus(&mut h);
+            let theme = h.state().0.theme;
+            let mut host = Host {
+                s: &mut h.state_mut().1,
+                theme,
+            };
+            if closing_menu {
+                host.chrome_closed();
+            } else {
+                host.run("home.font.bold", None);
+            }
+            h.run();
+            assert!(h.state().1.doc.is_focused(), "closing_menu {closing_menu}");
+        }
     }
 
     #[test]

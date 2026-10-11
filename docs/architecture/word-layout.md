@@ -156,7 +156,7 @@ Floating tables (`w:tblpPr`; `table.rs` `TablePos`, `flow.rs` `place_float_table
 | A floating table anchored in the next paragraph reaches back over the lines of the paragraph before it (negative `tblpY`, margin or page anchors): the lines are broken again around it with the same lookahead as pictures (`ahead_floats`). | `layout-tblp-never` |
 | The oracle reports one more clip rectangle per table: the outer box grown by the left and right text distances only (the top and bottom distances are not in it), `Page::table_wrap_zones`. Right aligned with `rightFromText` 0 it is 0.5 pt wider than that (`layout-tblp-right`, `layout-tblp-margin`: unexplained, 2 rectangles). | `layout-tblp-basic/-right2` |
 
-Open (floating tables): Word splits a floating table that does not fit the page and carries the rest to the top of the next page together with the anchor's text (`layout-tblp-bottom`, 62 of 97: rows 1 to 5 stay on page 1 at y 636 (5 rows, 70.10 pt), rows 6 to 10 start page 2 at the top margin (y 72.03), and the whole anchor paragraph L22 and L23 moves to page 2 beside them, starting at 82.58; the engine keeps all ten rows on page 1 below the bottom margin and the anchor paragraph beside them; not implemented: `place_float_table` has no split and the paragraph loop has no hook to carry the anchor); frames and tables that are not as wide as the anchor's column in a section with columns are untested.
+A floating table that runs past the bottom margin breaks between rows (`layout-tblp-bottom` 97/97, `place_float_table`, `emit_float_rows`): the rows that fit stay (rows 1 to 5, 70.10 pt), the rest start the next page at the top margin (the part again begins with the table's top border, so it is 70.10 pt as well), and the anchor paragraph moves to that page with them, where its text wraps beside the second part (L22 and L23 start at 82.58 and are 281.64 from the left; L24 is back at full width). Not measured: a table of which no row fits, a row that could split itself, header rows repeated in the second part, and a vertically merged cell across the break (the table then stays whole). Frames and tables that are not as wide as the anchor's column in a section with columns are untested.
 
 Frames (`w:framePr`, drop caps; `frame.rs`, `build.rs` `frame_paragraph`, `flow.rs` `place_frame_run`; probes `layout-frame-basic/-page/-dropcap/-nobdr/-bdr/-gap`, 38/38, 39/41, 17/17, 41/43, 40/42, 79/84). A frame paragraph, or consecutive paragraphs with equal `framePr` (a drop cap stands alone), is a float that leaves the flow like a floating table; frames with `yAlign="inline"` stay in the flow.
 
@@ -189,6 +189,34 @@ Not done: floats whose anchor is inside a nested table or a text box in a cell a
 | A section that names two or more footer parts and no header part (`0a90ca9d`: default and first footers; `d52c20af`: even and default) keeps an empty paragraph of the `Header` style as its header: the body starts at `header distance + height of that paragraph` when that is lower than the top margin (10.8 pt for the 8 pt Header style of `0a90ca9d`, so 21.6 + 10.8 = 32.4; `d52c20af` 14.4 + 12.6 = 27). The same holds for a footer story when only headers are named. `Word.Headers(1).Exists` is true for these. | corpus +141 lines (`0a90ca9d` 3 to 84, `d52c20af` 2 to 62), no template lost |
 
 Open: the rule is a fit, not a mechanism. `titlePg` alone is not the trigger (`65cf689e`, `0c8d491f`, `25409d45`, `b0e9c2cf`, `114ed224` lost all lines when it was). A section that inherits its stories and sets `titlePg` later (`4e493df5`, +59 lines when treated as implied) is not covered; a probe that writes a docx with exactly one footer part, two footer parts and `titlePg` is still to be made (COM writes both parts, so the file has to be patched).
+
+## In-line x positions (per-character parity; `crates/layout/tests/char_x.rs`)
+
+`char_x.rs` reads Word's own PDF (`fixtures/reference/pdf/<name>.pdf`, `tests/common/wordpdf.rs`: glyph origin = `Tm` origin + `/W` widths
++ `TJ` adjustments, characters through `ToUnicode`) and pairs every non-blank glyph of a page with the engine's by longest common subsequence in
+reading order (case-insensitive: `w:caps` glyphs are capitals in the PDF). A glyph agrees when x is within 0.5 pt and the baseline within 3 pt.
+Floors: `fixtures/reference/layout/charx-floor.toml` (bundled and `[system]`), `CHARX_DETAIL=<fixture>` lists bad rows, `CHARX_ROW=<page>:<y>` one row.
+Before / after (system fonts, 443,196 Word glyphs): 93.6 % -> 94.7 %; layout-justify 82.8 % -> 87.2 %, layout-align 95.4 % -> 96.7 %, layout-tabs 63.5 % -> 65.2 %.
+
+| Rule | Evidence |
+|---|---|
+| A justified line is stretched to `avail - 0.02 pt x spaces` (lines with at least 10 spaces): Word's lines end up to 0.6 pt short and the shortfall grows with the number of spaces. Empirical (0.01: 86.5 %, 0.02: 87.2 %, 0.035: 85.3 % on layout-justify); a rule `slack / (n + c)` fits worse. | `layout-justify`, `-align` |
+| A tab is a break opportunity before it, not after it: `Twelve` + tab + `Thirteen` at the margin puts the tab at the start of the next line, which then advances to the next stop (108 pt). | `layout-tabs` (16 -> 17 of 18 lines; corpus unchanged at 5385 of 7998) |
+
+Findings that did not become rules (so nobody retries the same thing):
+
+- Word's glyph advances and spaces are whole multiples of 0.24 pt (two 600 dpi pixels): in the PDF `l`/`i` advance 22 px (design 21.1), `t` 30 (30.7), `h`/`o`/`u` 48, `e` 46,
+  `g` 42 or 44, a natural space 20 px (design 20.7), and every justified space is 30/32/34/40 px with a few +-2 px outliers on a line. Rounding each advance to 0.24 pt in the
+  engine (nearest, ppem = size x 600/72) made things worse (layout-wrap 90 % -> 72 %, layout-justify 82.8 % -> 80.6 %): spaces lose 0.7 px each and the same glyph gets 42 or 44 px
+  depending on context, so the rounding is on positions or has a kerning/hinting part that is not understood. Distributing the justified slack in whole 0.24 pt units
+  (equal, floor + remainder first, evenly spread) was worse too (57 %, 53 %, 79 %).
+- Word's PDF writer drops `TJ` adjustments under about 3/1000 em, so a glyph's PDF position can differ from Word's layout by a fraction of a pixel; that noise bounds the metric.
+- Line breaks in justified text: Word accepts lines the engine breaks early (229 lines in layout-justify, space compression of 0.2-0.36 of the space width) and rejects some the
+  engine keeps (31 lines, e.g. `...fill with the sound` + `of`). 13,500 of the 18,900 failing glyphs of layout-justify are in the 194 rows whose break differs, so the break rule, not the spacing,
+  is now the largest in-line loss. `SPACE_SHRINK` = 0.2 is not a threshold on shrink per space (overflow at the end of the word did not separate the two sets).
+- Tab leaders are drawn by Word as glyph rows ('.' every 2.78 pt, '-' every 3.37 pt, starting a fraction of a point after the text) and are not drawn by the engine: 326 of 892 glyphs of
+  layout-tabs are leader glyphs with no engine counterpart.
+- Not looked at: list label offsets, mixed sizes, footnotes in columns (layout-cols-footnote 65 %), text boxes.
 
 ## Not matched yet
 
@@ -224,7 +252,38 @@ family match for "Aptos Display". Largest causes still open, by lines affected:
   (`layout-face-multiple`, Arial 10 pt, multiple 2.0, 5 lines); the engine moves it to the next page.
 - The `tblCellMar` padding and contextual spacing residue listed above is unchanged.
 
-Measured on 4982 of 8245 lines (12 of 74 templates): 581 of the 1686 failing lines are empty cell paragraphs, many of them
-paired by the oracle with the wrong PDF row (the first unconsumed empty paragraph of any table gets the next empty row; in
-`65cf689e` the engine's @100 position equals the reference of @142). A fix pairs empty rows with the paragraph whose Word position
-(`Range.Information(3, 5, 6)`) is nearest; not done. After the empty-story rule above the total is 5123 of 8245, 12 of 74.
+Oracle pairing of empty cell paragraphs (`word-layout-oracle.ps1`, `Pair-BlankRows`; done). A blank paragraph prints a row with no text, so
+the old rule (the next unconsumed blank paragraph of any table) mis-paired rows whenever a drawn row belonged to no main-story table
+paragraph (tables in text boxes, a picture paragraph) or the drawing order differed from the document order. Word draws the content
+of one cell inside one clip rectangle in paragraph order, so now: the cell of a clip comes from its text rows; a blank row takes the first
+unconsumed blank paragraph of that cell after the paragraph of the row before it and before the paragraph of the next text row; a clip with
+no text takes the cell of the nearest blank paragraph by `Range.Information` 3, 5, 6 (not beyond 12 pt, else the row is dropped with a
+warning instead of being paired with an unrelated paragraph). `Range.Information(6)` cannot be the key on its own: for the later
+paragraphs of a tall cell Word returns the same wrong y (`65cf689e`: four paragraphs 70 to 400 pt apart all report 357.6, and
+`Information(10)` stops at line 12). A paragraph whose only content is a floating shape's anchor (Range.Text `/`) or an inline object counts
+as blank (`65cf689e` @1109: its row is the paragraph mark right of a 160 pt picture). Text rows prefer the cell of their clip, and a blank row
+still tells which table is being drawn. `O365_ORACLE_DEBUG=1` prints the blank rows, their group and the cell's paragraphs for each unpaired row.
+
+Evidence for the regenerated references. The committed references predated several oracle features (cell rectangles without picture clips,
+`images`, baselines for some pages), so a control run was made: the HEAD oracle on the same Word build scores 5111 of 8121 lines, 14 templates
+at 100 %. The new pairing scores 5385 of 7998, 17 templates (new at 100 %: `67792a9e`, `741ee369`, `9f1fce92`, `a2a7720e`, `b0e9c2cf`); the
+pairing alone is +274 matched and -123 reference lines against the control. Reviewed by hand: `65cf689e` ref @100 moved from y 538.66 (a row of
+a table in a text box) to 274.61 (the engine's 274.56; Word's own position 262.8 plus the 11.8 pt from line top to baseline), 164/502 -> 231/498;
+`741ee369` 200/232 -> 232/232; `7fc3ccc4` 433/546 -> 534/554; `463abd5c` 94/130 -> 120/130. Reference lines that disappeared are rows no
+main-story paragraph accounts for. Floors that fell against the old floor file (`15d030a7`, `494a603b`, `4b9c352f`, `4c5d5d40`, `5ff67a28`,
+`8583a4ca`, `938d0510`, `aae2ed66`, `ae0aba0c`, `d52c20af`, `ee25c76b`, `ee8d0c24`) fall mostly to the older references' drift (picture and
+cell rectangles now in the reference, 20 of the 21 lines of `ae0aba0c`) or to removed mis-paired rows; the file is re-baselined to the new run.
+Probes: of the 25 probes with table rows, 22 regenerate identically; `layout-table-flow` moves one blank row from @278 to @288 (the paragraph
+after the nested table); `layout-table-width` differs only by 4 cells at the page edge (oracle drift, not taken); `layout-table-pages` timed
+out at 240 s and was not regenerated.
+
+Still open:
+
+- `ae0aba0c`: the reference pairs a page's PDF rows with the listed lines in sorted order, and one row (y 8.88, an empty header paragraph Word
+  prints but does not list) shifts every later pairing by one. The engine's 45.12, 664.32 and 750.48 are the plausible values. A monotone
+  alignment that checks `Range.Information(6)` against each row would fix it. `aae2ed66` is 82/84 now (the box line and the last body
+  paragraph, both `U+001F`, were swapped in the old reference).
+- `ad265748`: the page-1 sidebar sits 3.9 pt above Word's (a merged-cell row height, not pairing). `7fc3ccc4` is 534/554 with cell rectangles
+  0.02 to 0.3 pt off. `4ebce9eb`, `54d00e5f`: the remaining failures are cell and frame rectangles, not order.
+- Blank rows of tables inside text boxes are dropped (the oracle does not list those paragraphs); a repeated header row of blank cells is paired
+  by position only.

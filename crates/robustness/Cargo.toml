@@ -1,0 +1,18 @@
+[package]
+name = "open365-robustness"
+description = "Robustness regression suite: mutated fixtures and hostile inputs against the OPC, DOCX, XLSX and formula parsers."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+
+[dependencies]
+open365-calc.workspace = true
+open365-docx.workspace = true
+open365-opc.workspace = true
+open365-xlsx.workspace = true
+zip = { version = "9.0.1", default-features = false, features = ["deflate"] }
+
+[lints]
+workspace = true

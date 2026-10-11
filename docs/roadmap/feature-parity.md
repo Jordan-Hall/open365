@@ -76,7 +76,7 @@ Status: draft, 2026-10-11. Research and planning only; no product code changed. 
 | Printing | print preview, page ranges, duplex | partial: Print and Export PDF in File menu | print dialog, preview, ranges (shared) | in shared |
 | Complex text | RTL, bidi, East Asian, ligatures, OpenType | partial: shaping via `open365-text` (rustybuzz-style, **unverified**), IME works; bidi/vertical text not evidenced | bidi + vertical + font fallback | 5 |
 | Layout fidelity to Word | line, page breaks identical | partial: 89.5 % own-fixture lines, **39.3 % real templates** (3,238/8,245) | long tail: floats, tables in floats, kerning/justify, fields, fonts | 12 to reach ~85 %, 15 more to ~99 % |
-| Collaboration | co-authoring, share, version history, @mentions | missing (server not started; ADR roadmap P2) | sync service + CRDT | 12 (separate track) |
+| Collaboration | co-authoring, share, version history, @mentions | missing (server not started; sharing Stage 1, then Teams T0–T4, then co-editing; see `first-milestones.md`) | sync service + CRDT | 12 (separate track) |
 | Hidden content / privacy | inspect document, remove metadata | partial: `inspect --hidden`, hidden text excluded from MCP reads; sanitize command not yet built **(unverified)** | sanitize command | 1 |
 
 ## Excel: status table
@@ -117,7 +117,7 @@ Status: draft, 2026-10-11. Research and planning only; no product code changed. 
 | Accessibility | grid AccessKit | **done** grid tree + IME (51d0ca7); checker missing | checker | shared |
 | Values fidelity on real workbooks | match Excel recalculation | **94.1 %** values, 90 % formula cells on 62 templates | raise to 98 % | 3 |
 | Macros | VBA | **preserve** | none | 0 |
-| Collaboration | co-authoring | missing | server track | 12 (separate) |
+| Collaboration | co-authoring | missing | server track (after Teams T0–T4; ADR-014) | 12 (separate) |
 
 ## Shared substrate (counted once)
 

@@ -292,5 +292,10 @@ fn a_tiny_deadline_times_out_fast_and_the_engine_cache_survives() {
     // No partial or late PDF appears, and no temporary file is left behind.
     std::thread::sleep(Duration::from_millis(1500));
     assert!(!scratch.0.join("late.pdf").exists());
-    assert!(!scratch.0.join("late.pdf.open365-tmp").exists());
+    assert!(std::fs::read_dir(&scratch.0).expect("ls").all(|e| {
+        !e.expect("e")
+            .file_name()
+            .to_string_lossy()
+            .ends_with(".open365-tmp")
+    }));
 }

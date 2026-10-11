@@ -3,7 +3,7 @@
 use std::collections::{HashMap, HashSet};
 use std::fmt;
 use std::path::Path;
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 
 use encoding_rs::Encoding;
 
@@ -21,6 +21,8 @@ pub struct Dictionary {
     pub(crate) caser: Caser,
     pub(crate) default_try: Vec<char>,
     pub(crate) compound_rule_flags: HashSet<Flag>,
+    /// Lower-cased stems bucketed by length, built on the first edit-distance fallback.
+    pub(crate) ngram_index: OnceLock<crate::suggest::NgramIndex>,
 }
 
 impl fmt::Debug for Dictionary {
@@ -104,6 +106,7 @@ impl Dictionary {
             caser,
             default_try,
             compound_rule_flags,
+            ngram_index: OnceLock::new(),
         })
     }
 

@@ -1,0 +1,16 @@
+{
+  "name": "light",
+  "colors": {
+    "frame": "#f5f5f5", "card": "#ffffff", "card_border": "#e0e0e0",
+    "text": "#242424", "text_dim": "#616161", "text_disabled": "#a8a8a8",
+    "hover": "#ebebeb", "pressed": "#dcdcdc", "checked": "#dde8f6",
+    "separator": "#e0e0e0", "field": "#ffffff", "field_border": "#c8c8c8",
+    "accent": "#107c41", "on_accent": "#ffffff", "focus_ring": "#242424",
+    "selection": "#cfe3d8", "selection_text": "#242424", "caret": "#242424",
+    "menu_bg": "#ffffff", "menu_border": "#c6c6c6", "menu_hot": "#e6e6e6",
+    "scroll_track": "#f5f5f5", "scroll_thumb": "#c2c2c2",
+    "tab_text": "#242424", "tab_underline": "#107c41",
+    "tooltip_bg": "#ffffff", "tooltip_border": "#c6c6c6", "tooltip_text": "#242424",
+    "shadow": "#00000040", "keytip_bg": "#ffffff", "keytip_text": "#242424", "keytip_border": "#242424"
+  }
+}

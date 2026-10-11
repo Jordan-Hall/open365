@@ -21,6 +21,7 @@
 //! ```
 
 mod aff;
+mod bundled;
 mod casing;
 mod check;
 mod checker;
@@ -28,14 +29,21 @@ mod dictionary;
 mod error;
 mod flags;
 mod library;
+mod paragraph;
+mod proof;
+mod session;
 mod suggest;
 mod tokenize;
 mod user;
 
+pub use bundled::bundled_tags;
 pub use checker::Checker;
 pub use dictionary::Dictionary;
 pub use error::SpellError;
 pub use library::{DictionaryFiles, DictionaryLibrary, ResolvedDictionary};
+pub use paragraph::ProofOptions;
+pub use proof::{LangSpan, ParagraphReport, Proofing};
+pub use session::{ProofRequest, ProofResponse, ProofSession, ProofWorker};
 pub use suggest::SuggestOptions;
-pub use tokenize::{Misspelling, TokenizerOptions, Word, find_words};
+pub use tokenize::{IssueKind, Misspelling, TokenizerOptions, Word, find_words};
 pub use user::UserDictionary;

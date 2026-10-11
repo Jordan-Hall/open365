@@ -22,5 +22,8 @@ open365-ui-shell.workspace = true
 rfd.workspace = true
 zip = { version = "9.0.1", default-features = false, features = ["deflate"] }
 
+[dev-dependencies]
+egui_kittest.workspace = true
+
 [lints]
 workspace = true

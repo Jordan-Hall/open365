@@ -15,8 +15,10 @@ pub const MAX_BYTES: usize = 64 * 1024 * 1024;
 /// Allocation ceiling handed to the decoder.
 const MAX_ALLOC: u64 = 256 * 1024 * 1024;
 
-/// Writes the image as an XObject and returns its object number.
-pub fn embed(pdf: &mut Pdf, bytes: &[u8]) -> Result<u32, String> {
+/// Writes the image as an XObject and returns its object number. With `flatten` (PDF/A-1, which
+/// has no transparency) a picture with an alpha channel is composited onto white instead of
+/// getting a soft mask.
+pub fn embed(pdf: &mut Pdf, bytes: &[u8], flatten: bool) -> Result<u32, String> {
     if bytes.len() > MAX_BYTES {
         return Err(format!(
             "image part of {} bytes exceeds the limit",
@@ -26,7 +28,7 @@ pub fn embed(pdf: &mut Pdf, bytes: &[u8]) -> Result<u32, String> {
     if bytes.starts_with(&[0xFF, 0xD8]) {
         embed_jpeg(pdf, bytes)
     } else {
-        embed_decoded(pdf, bytes)
+        embed_decoded(pdf, bytes, flatten)
     }
 }
 
@@ -130,7 +132,7 @@ fn embed_jpeg(pdf: &mut Pdf, bytes: &[u8]) -> Result<u32, String> {
     ))
 }
 
-fn embed_decoded(pdf: &mut Pdf, bytes: &[u8]) -> Result<u32, String> {
+fn embed_decoded(pdf: &mut Pdf, bytes: &[u8], flatten: bool) -> Result<u32, String> {
     let reader = image::ImageReader::new(Cursor::new(bytes))
         .with_guessed_format()
         .map_err(|e| e.to_string())?;
@@ -152,8 +154,16 @@ fn embed_decoded(pdf: &mut Pdf, bytes: &[u8]) -> Result<u32, String> {
     let mut rgb = Vec::with_capacity(n * 3);
     let mut alpha = Vec::with_capacity(n);
     for px in rgba.pixels() {
-        rgb.extend_from_slice(&px.0[..3]);
-        alpha.push(px.0[3]);
+        let a = u32::from(px.0[3]);
+        if flatten && a != 255 {
+            for c in &px.0[..3] {
+                rgb.push(((u32::from(*c) * a + 255 * (255 - a)) / 255) as u8);
+            }
+            alpha.push(255);
+        } else {
+            rgb.extend_from_slice(&px.0[..3]);
+            alpha.push(px.0[3]);
+        }
     }
     let smask = if alpha.iter().any(|a| *a != 255) {
         let id = pdf.add_stream(
@@ -202,7 +212,7 @@ mod tests {
     #[test]
     fn png_alpha_becomes_a_soft_mask() {
         let mut pdf = Pdf::default();
-        embed(&mut pdf, &png(4, 3, true)).expect("embed");
+        embed(&mut pdf, &png(4, 3, true), false).expect("embed");
         let text = file(pdf);
         assert!(text.contains("/SMask"));
         assert!(text.contains("/FlateDecode"));
@@ -210,9 +220,16 @@ mod tests {
     }
 
     #[test]
+    fn flattened_png_has_no_soft_mask() {
+        let mut pdf = Pdf::default();
+        embed(&mut pdf, &png(4, 3, true), true).expect("embed");
+        assert!(!file(pdf).contains("/SMask"));
+    }
+
+    #[test]
     fn opaque_png_has_no_soft_mask() {
         let mut pdf = Pdf::default();
-        embed(&mut pdf, &png(4, 3, false)).expect("embed");
+        embed(&mut pdf, &png(4, 3, false), false).expect("embed");
         assert!(!file(pdf).contains("/SMask"));
     }
 
@@ -224,7 +241,7 @@ mod tests {
         jpeg.extend_from_slice(&[1, 0x22, 0, 2, 0x11, 1, 3, 0x11, 1]);
         jpeg.extend_from_slice(&[0xFF, 0xDA, 0x00, 0x02, 0xFF, 0xD9]);
         let mut pdf = Pdf::default();
-        embed(&mut pdf, &jpeg).expect("embed");
+        embed(&mut pdf, &jpeg, false).expect("embed");
         let text = file(pdf);
         assert!(text.contains("/DCTDecode"));
         assert!(text.contains("/Width 3 /Height 2"));
@@ -239,12 +256,12 @@ mod tests {
         ];
         jpeg.extend_from_slice(&[1, 0x22, 0, 2, 0x11, 1, 3, 0x11, 1]);
         jpeg.extend_from_slice(&[0xFF, 0xDA, 0x00, 0x02]);
-        assert!(embed(&mut pdf, &jpeg).is_err());
+        assert!(embed(&mut pdf, &jpeg, false).is_err());
         // Truncated and garbage input.
-        assert!(embed(&mut pdf, &jpeg[..10]).is_err());
-        assert!(embed(&mut pdf, &[0xFF, 0xD8]).is_err());
-        assert!(embed(&mut pdf, b"not an image at all").is_err());
-        assert!(embed(&mut pdf, &[]).is_err());
+        assert!(embed(&mut pdf, &jpeg[..10], false).is_err());
+        assert!(embed(&mut pdf, &[0xFF, 0xD8], false).is_err());
+        assert!(embed(&mut pdf, b"not an image at all", false).is_err());
+        assert!(embed(&mut pdf, &[], false).is_err());
         // A PNG whose header declares 100000 x 100000 pixels (CRC repaired).
         let mut bad = png(1, 1, false);
         bad[16..20].copy_from_slice(&100_000u32.to_be_bytes());
@@ -252,7 +269,7 @@ mod tests {
         let mut crc = flate2::Crc::new();
         crc.update(&bad[12..29]);
         bad[29..33].copy_from_slice(&crc.sum().to_be_bytes());
-        let err = embed(&mut pdf, &bad).expect_err("too large");
+        let err = embed(&mut pdf, &bad, false).expect_err("too large");
         assert!(
             err.contains("out of range") || err.contains("limit"),
             "{err}"

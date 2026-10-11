@@ -1,0 +1,173 @@
+rev	0	Delete	Author A	2026-10-11T16:34:00Z	beta 
+rev	1	Insert	Author B	2026-10-11T16:34:00Z	GAMMA
+rev	2	Delete	Author A	2026-10-11T16:34:00Z	gamma
+rev	3	Insert	Author B	2026-10-11T16:34:00Z	 zeta
+rev	4	Property	Author A	2026-10-11T16:34:00Z	line
+rev	5	Delete	Author B	2026-10-11T16:34:00Z	text 
+rev	6	Delete	Author B	2026-10-11T16:34:00Z	Third line goes.
+rev	7	Delete	Author A	2026-10-11T16:34:00Z	
+rev	8	Insert	Author A	2026-10-11T16:34:00Z	
+rev	9	Insert	Author B	2026-10-11T16:34:00Z	Inserted last
+para	markup	0	Alpha beta GAMMAgamma delta epsilon zeta.	0	Normal	0	B0I0U0S22x41
+para	markup	1	Second line of text here.	0	Normal	0	B0I0U0S22x7;B1I0U0S22x4;B0I0U0S22x14
+para	markup	2	Third line goes.	0	Normal	0	B0I0U0S22x16
+para	markup	3		0	Normal	0	
+para	markup	4	Inserted lastFourth line stays.	0	Normal	0	B0I0U0S22x31
+para	final	0	Alpha GAMMA delta epsilon zeta.	0	Normal	0	B0I0U0S22x31
+para	final	1	Second line of here.	0	Normal	0	B0I0U0S22x7;B1I0U0S22x4;B0I0U0S22x9
+para	final	2		0	Normal	0	
+para	final	3	Inserted lastFourth line stays.	0	Normal	0	B0I0U0S22x31
+para	accept	0	Alpha GAMMA delta epsilon zeta.	0	Normal	0	B0I0U0S22x31
+para	accept	1	Second line of here.	0	Normal	0	B0I0U0S22x7;B1I0U0S22x4;B0I0U0S22x9
+para	accept	2		0	Normal	0	
+para	accept	3	Inserted lastFourth line stays.	0	Normal	0	B0I0U0S22x31
+para	reject	0	Alpha beta gamma delta epsilon.	0	Normal	0	B0I0U0S22x31
+para	reject	1	Second line of text here.	0	Normal	0	B0I0U0S22x25
+para	reject	2	Third line goes.	0	Normal	0	B0I0U0S22x16
+para	reject	3	Fourth line stays.	0	Normal	0	B0I0U0S22x18
+para	accept1:0	0	Alpha GAMMAgamma delta epsilon zeta.	0	Normal	0	B0I0U0S22x36
+para	accept1:0	1	Second line of text here.	0	Normal	0	B0I0U0S22x7;B1I0U0S22x4;B0I0U0S22x14
+para	accept1:0	2	Third line goes.	0	Normal	0	B0I0U0S22x16
+para	accept1:0	3		0	Normal	0	
+para	accept1:0	4	Inserted lastFourth line stays.	0	Normal	0	B0I0U0S22x31
+para	reject1:0	0	Alpha beta GAMMAgamma delta epsilon zeta.	0	Normal	0	B0I0U0S22x41
+para	reject1:0	1	Second line of text here.	0	Normal	0	B0I0U0S22x7;B1I0U0S22x4;B0I0U0S22x14
+para	reject1:0	2	Third line goes.	0	Normal	0	B0I0U0S22x16
+para	reject1:0	3		0	Normal	0	
+para	reject1:0	4	Inserted lastFourth line stays.	0	Normal	0	B0I0U0S22x31
+para	accept1:1	0	Alpha beta GAMMAgamma delta epsilon zeta.	0	Normal	0	B0I0U0S22x41
+para	accept1:1	1	Second line of text here.	0	Normal	0	B0I0U0S22x7;B1I0U0S22x4;B0I0U0S22x14
+para	accept1:1	2	Third line goes.	0	Normal	0	B0I0U0S22x16
+para	accept1:1	3		0	Normal	0	
+para	accept1:1	4	Inserted lastFourth line stays.	0	Normal	0	B0I0U0S22x31
+para	reject1:1	0	Alpha beta gamma delta epsilon zeta.	0	Normal	0	B0I0U0S22x36
+para	reject1:1	1	Second line of text here.	0	Normal	0	B0I0U0S22x7;B1I0U0S22x4;B0I0U0S22x14
+para	reject1:1	2	Third line goes.	0	Normal	0	B0I0U0S22x16
+para	reject1:1	3		0	Normal	0	
+para	reject1:1	4	Inserted lastFourth line stays.	0	Normal	0	B0I0U0S22x31
+para	accept1:2	0	Alpha beta GAMMA delta epsilon zeta.	0	Normal	0	B0I0U0S22x36
+para	accept1:2	1	Second line of text here.	0	Normal	0	B0I0U0S22x7;B1I0U0S22x4;B0I0U0S22x14
+para	accept1:2	2	Third line goes.	0	Normal	0	B0I0U0S22x16
+para	accept1:2	3		0	Normal	0	
+para	accept1:2	4	Inserted lastFourth line stays.	0	Normal	0	B0I0U0S22x31
+para	reject1:2	0	Alpha beta GAMMAgamma delta epsilon zeta.	0	Normal	0	B0I0U0S22x41
+para	reject1:2	1	Second line of text here.	0	Normal	0	B0I0U0S22x7;B1I0U0S22x4;B0I0U0S22x14
+para	reject1:2	2	Third line goes.	0	Normal	0	B0I0U0S22x16
+para	reject1:2	3		0	Normal	0	
+para	reject1:2	4	Inserted lastFourth line stays.	0	Normal	0	B0I0U0S22x31
+para	accept1:3	0	Alpha beta GAMMAgamma delta epsilon zeta.	0	Normal	0	B0I0U0S22x41
+para	accept1:3	1	Second line of text here.	0	Normal	0	B0I0U0S22x7;B1I0U0S22x4;B0I0U0S22x14
+para	accept1:3	2	Third line goes.	0	Normal	0	B0I0U0S22x16
+para	accept1:3	3		0	Normal	0	
+para	accept1:3	4	Inserted lastFourth line stays.	0	Normal	0	B0I0U0S22x31
+para	reject1:3	0	Alpha beta GAMMAgamma delta epsilon.	0	Normal	0	B0I0U0S22x36
+para	reject1:3	1	Second line of text here.	0	Normal	0	B0I0U0S22x7;B1I0U0S22x4;B0I0U0S22x14
+para	reject1:3	2	Third line goes.	0	Normal	0	B0I0U0S22x16
+para	reject1:3	3		0	Normal	0	
+para	reject1:3	4	Inserted lastFourth line stays.	0	Normal	0	B0I0U0S22x31
+para	accept1:4	0	Alpha beta GAMMAgamma delta epsilon zeta.	0	Normal	0	B0I0U0S22x41
+para	accept1:4	1	Second line of text here.	0	Normal	0	B0I0U0S22x7;B1I0U0S22x4;B0I0U0S22x14
+para	accept1:4	2	Third line goes.	0	Normal	0	B0I0U0S22x16
+para	accept1:4	3		0	Normal	0	
+para	accept1:4	4	Inserted lastFourth line stays.	0	Normal	0	B0I0U0S22x31
+para	reject1:4	0	Alpha beta GAMMAgamma delta epsilon zeta.	0	Normal	0	B0I0U0S22x41
+para	reject1:4	1	Second line of text here.	0	Normal	0	B0I0U0S22x25
+para	reject1:4	2	Third line goes.	0	Normal	0	B0I0U0S22x16
+para	reject1:4	3		0	Normal	0	
+para	reject1:4	4	Inserted lastFourth line stays.	0	Normal	0	B0I0U0S22x31
+para	accept1:5	0	Alpha beta GAMMAgamma delta epsilon zeta.	0	Normal	0	B0I0U0S22x41
+para	accept1:5	1	Second line of here.	0	Normal	0	B0I0U0S22x7;B1I0U0S22x4;B0I0U0S22x9
+para	accept1:5	2	Third line goes.	0	Normal	0	B0I0U0S22x16
+para	accept1:5	3		0	Normal	0	
+para	accept1:5	4	Inserted lastFourth line stays.	0	Normal	0	B0I0U0S22x31
+para	reject1:5	0	Alpha beta GAMMAgamma delta epsilon zeta.	0	Normal	0	B0I0U0S22x41
+para	reject1:5	1	Second line of text here.	0	Normal	0	B0I0U0S22x7;B1I0U0S22x4;B0I0U0S22x14
+para	reject1:5	2	Third line goes.	0	Normal	0	B0I0U0S22x16
+para	reject1:5	3		0	Normal	0	
+para	reject1:5	4	Inserted lastFourth line stays.	0	Normal	0	B0I0U0S22x31
+para	accept1:6	0	Alpha beta GAMMAgamma delta epsilon zeta.	0	Normal	0	B0I0U0S22x41
+para	accept1:6	1	Second line of text here.	0	Normal	0	B0I0U0S22x7;B1I0U0S22x4;B0I0U0S22x14
+para	accept1:6	2		0	Normal	0	
+para	accept1:6	3		0	Normal	0	
+para	accept1:6	4	Inserted lastFourth line stays.	0	Normal	0	B0I0U0S22x31
+para	reject1:6	0	Alpha beta GAMMAgamma delta epsilon zeta.	0	Normal	0	B0I0U0S22x41
+para	reject1:6	1	Second line of text here.	0	Normal	0	B0I0U0S22x7;B1I0U0S22x4;B0I0U0S22x14
+para	reject1:6	2	Third line goes.	0	Normal	0	B0I0U0S22x16
+para	reject1:6	3		0	Normal	0	
+para	reject1:6	4	Inserted lastFourth line stays.	0	Normal	0	B0I0U0S22x31
+para	accept1:7	0	Alpha beta GAMMAgamma delta epsilon zeta.	0	Normal	0	B0I0U0S22x41
+para	accept1:7	1	Second line of text here.	0	Normal	0	B0I0U0S22x7;B1I0U0S22x4;B0I0U0S22x14
+para	accept1:7	2	Third line goes.	0	Normal	0	B0I0U0S22x16
+para	accept1:7	3	Inserted lastFourth line stays.	0	Normal	0	B0I0U0S22x31
+para	reject1:7	0	Alpha beta GAMMAgamma delta epsilon zeta.	0	Normal	0	B0I0U0S22x41
+para	reject1:7	1	Second line of text here.	0	Normal	0	B0I0U0S22x7;B1I0U0S22x4;B0I0U0S22x14
+para	reject1:7	2	Third line goes.	0	Normal	0	B0I0U0S22x16
+para	reject1:7	3		0	Normal	0	
+para	reject1:7	4	Inserted lastFourth line stays.	0	Normal	0	B0I0U0S22x31
+para	accept1:8	0	Alpha beta GAMMAgamma delta epsilon zeta.	0	Normal	0	B0I0U0S22x41
+para	accept1:8	1	Second line of text here.	0	Normal	0	B0I0U0S22x7;B1I0U0S22x4;B0I0U0S22x14
+para	accept1:8	2	Third line goes.	0	Normal	0	B0I0U0S22x16
+para	accept1:8	3		0	Normal	0	
+para	accept1:8	4	Inserted lastFourth line stays.	0	Normal	0	B0I0U0S22x31
+para	reject1:8	0	Alpha beta GAMMAgamma delta epsilon zeta.	0	Normal	0	B0I0U0S22x41
+para	reject1:8	1	Second line of text here.	0	Normal	0	B0I0U0S22x7;B1I0U0S22x4;B0I0U0S22x14
+para	reject1:8	2	Third line goes.	0	Normal	0	B0I0U0S22x16
+para	reject1:8	3	Inserted lastFourth line stays.	0	Normal	0	B0I0U0S22x31
+para	accept1:9	0	Alpha beta GAMMAgamma delta epsilon zeta.	0	Normal	0	B0I0U0S22x41
+para	accept1:9	1	Second line of text here.	0	Normal	0	B0I0U0S22x7;B1I0U0S22x4;B0I0U0S22x14
+para	accept1:9	2	Third line goes.	0	Normal	0	B0I0U0S22x16
+para	accept1:9	3		0	Normal	0	
+para	accept1:9	4	Inserted lastFourth line stays.	0	Normal	0	B0I0U0S22x31
+para	reject1:9	0	Alpha beta GAMMAgamma delta epsilon zeta.	0	Normal	0	B0I0U0S22x41
+para	reject1:9	1	Second line of text here.	0	Normal	0	B0I0U0S22x7;B1I0U0S22x4;B0I0U0S22x14
+para	reject1:9	2	Third line goes.	0	Normal	0	B0I0U0S22x16
+para	reject1:9	3		0	Normal	0	
+para	reject1:9	4	Fourth line stays.	0	Normal	0	B0I0U0S22x18
+para	acceptp:0	0	Alpha GAMMA delta epsilon zeta.	0	Normal	0	B0I0U0S22x31
+para	acceptp:0	1	Second line of text here.	0	Normal	0	B0I0U0S22x7;B1I0U0S22x4;B0I0U0S22x14
+para	acceptp:0	2	Third line goes.	0	Normal	0	B0I0U0S22x16
+para	acceptp:0	3		0	Normal	0	
+para	acceptp:0	4	Inserted lastFourth line stays.	0	Normal	0	B0I0U0S22x31
+para	rejectp:0	0	Alpha beta gamma delta epsilon.	0	Normal	0	B0I0U0S22x31
+para	rejectp:0	1	Second line of text here.	0	Normal	0	B0I0U0S22x7;B1I0U0S22x4;B0I0U0S22x14
+para	rejectp:0	2	Third line goes.	0	Normal	0	B0I0U0S22x16
+para	rejectp:0	3		0	Normal	0	
+para	rejectp:0	4	Inserted lastFourth line stays.	0	Normal	0	B0I0U0S22x31
+para	acceptp:1	0	Alpha beta GAMMAgamma delta epsilon zeta.	0	Normal	0	B0I0U0S22x41
+para	acceptp:1	1	Second line of here.	0	Normal	0	B0I0U0S22x7;B1I0U0S22x4;B0I0U0S22x9
+para	acceptp:1	2	Third line goes.	0	Normal	0	B0I0U0S22x16
+para	acceptp:1	3		0	Normal	0	
+para	acceptp:1	4	Inserted lastFourth line stays.	0	Normal	0	B0I0U0S22x31
+para	rejectp:1	0	Alpha beta GAMMAgamma delta epsilon zeta.	0	Normal	0	B0I0U0S22x41
+para	rejectp:1	1	Second line of text here.	0	Normal	0	B0I0U0S22x25
+para	rejectp:1	2	Third line goes.	0	Normal	0	B0I0U0S22x16
+para	rejectp:1	3		0	Normal	0	
+para	rejectp:1	4	Inserted lastFourth line stays.	0	Normal	0	B0I0U0S22x31
+para	acceptp:2	0	Alpha beta GAMMAgamma delta epsilon zeta.	0	Normal	0	B0I0U0S22x41
+para	acceptp:2	1	Second line of text here.	0	Normal	0	B0I0U0S22x7;B1I0U0S22x4;B0I0U0S22x14
+para	acceptp:2	2		0	Normal	0	
+para	acceptp:2	3	Inserted lastFourth line stays.	0	Normal	0	B0I0U0S22x31
+para	rejectp:2	0	Alpha beta GAMMAgamma delta epsilon zeta.	0	Normal	0	B0I0U0S22x41
+para	rejectp:2	1	Second line of text here.	0	Normal	0	B0I0U0S22x7;B1I0U0S22x4;B0I0U0S22x14
+para	rejectp:2	2	Third line goes.	0	Normal	0	B0I0U0S22x16
+para	rejectp:2	3		0	Normal	0	
+para	rejectp:2	4	Inserted lastFourth line stays.	0	Normal	0	B0I0U0S22x31
+para	acceptp:3	0	Alpha beta GAMMAgamma delta epsilon zeta.	0	Normal	0	B0I0U0S22x41
+para	acceptp:3	1	Second line of text here.	0	Normal	0	B0I0U0S22x7;B1I0U0S22x4;B0I0U0S22x14
+para	acceptp:3	2	Third line goes.	0	Normal	0	B0I0U0S22x16
+para	acceptp:3	3		0	Normal	0	
+para	acceptp:3	4	Inserted lastFourth line stays.	0	Normal	0	B0I0U0S22x31
+para	rejectp:3	0	Alpha beta GAMMAgamma delta epsilon zeta.	0	Normal	0	B0I0U0S22x41
+para	rejectp:3	1	Second line of text here.	0	Normal	0	B0I0U0S22x7;B1I0U0S22x4;B0I0U0S22x14
+para	rejectp:3	2	Third line goes.	0	Normal	0	B0I0U0S22x16
+para	rejectp:3	3	Inserted lastFourth line stays.	0	Normal	0	B0I0U0S22x31
+para	acceptp:4	0	Alpha beta GAMMAgamma delta epsilon zeta.	0	Normal	0	B0I0U0S22x41
+para	acceptp:4	1	Second line of text here.	0	Normal	0	B0I0U0S22x7;B1I0U0S22x4;B0I0U0S22x14
+para	acceptp:4	2	Third line goes.	0	Normal	0	B0I0U0S22x16
+para	acceptp:4	3		0	Normal	0	
+para	acceptp:4	4	Inserted lastFourth line stays.	0	Normal	0	B0I0U0S22x31
+para	rejectp:4	0	Alpha beta GAMMAgamma delta epsilon zeta.	0	Normal	0	B0I0U0S22x41
+para	rejectp:4	1	Second line of text here.	0	Normal	0	B0I0U0S22x7;B1I0U0S22x4;B0I0U0S22x14
+para	rejectp:4	2	Third line goes.	0	Normal	0	B0I0U0S22x16
+para	rejectp:4	3		0	Normal	0	
+para	rejectp:4	4	Fourth line stays.	0	Normal	0	B0I0U0S22x18

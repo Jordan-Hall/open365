@@ -7,6 +7,15 @@ use crate::test_support::{
     CLOCK_SECONDS, assert_close, b, engine_with, err, eval, eval_full, eval_in, eval_with, n, t,
 };
 
+/// Excel refuses a call with a wrong argument count when the formula is entered, so the parser rejects it.
+fn assert_rejected(formula: &str) {
+    let e = crate::parse_formula(formula).expect_err(formula);
+    assert!(
+        matches!(e.kind, crate::ParseErrorKind::ArgumentCount { .. }),
+        "{formula}: {e}"
+    );
+}
+
 /// A1:A6 = 1, 2, "x", TRUE, (blank), 4
 fn mixed() -> Vec<(&'static str, Value)> {
     vec![
@@ -435,7 +444,7 @@ fn modulo_abs_sqrt_power_pi() {
     assert_eq!(eval("POWER(0,0)"), err(Num));
     assert_eq!(eval("POWER(4,0.5)"), n(2.0));
     assert_close(&eval("PI()"), std::f64::consts::PI);
-    assert_eq!(eval("ABS(1,2)"), err(ValueErr), "wrong argument count");
+    assert_rejected("ABS(1,2)");
 }
 
 // ---- logical -------------------------------------------------------------------------
@@ -453,7 +462,7 @@ fn if_function() {
     assert_eq!(eval("IF(TRUE,,2)"), n(0.0));
     assert_eq!(eval("IF(FALSE,1,)"), n(0.0));
     assert_eq!(eval("IF(TRUE,1/0,2)"), err(DivZero));
-    assert_eq!(eval("IF(1)"), err(ValueErr));
+    assert_rejected("IF(1)");
     let d = [("A1", n(7.0))];
     assert_eq!(eval_with(&d, "IF(TRUE,A1)"), n(7.0));
     assert_eq!(eval_with(&d, "IF(A1>5,\"big\",\"small\")"), t("big"));
@@ -565,7 +574,7 @@ fn case_and_trim() {
 #[test]
 fn concatenation_functions() {
     assert_eq!(eval("CONCATENATE(\"a\",1,TRUE)"), t("a1TRUE"));
-    assert_eq!(eval("CONCATENATE()"), err(ValueErr));
+    assert_rejected("CONCATENATE()");
     let d = mixed();
     assert_eq!(eval_with(&d, "CONCAT(A1:A2,\"x\")"), t("12x"));
     assert_eq!(eval_with(&d, "CONCAT(A1:A6)"), t("12xTRUE4"));
@@ -576,7 +585,7 @@ fn concatenation_functions() {
         t("1-2-x-TRUE-4")
     );
     assert_eq!(eval_with(&d, "TEXTJOIN(\"-\",FALSE,A5:A6)"), t("-4"));
-    assert_eq!(eval("TEXTJOIN(\",\",TRUE)"), err(ValueErr));
+    assert_rejected("TEXTJOIN(\",\",TRUE)");
 }
 
 #[test]
@@ -660,7 +669,7 @@ fn countif() {
     assert_eq!(eval_with(&d, "COUNTIF(D1:D3,\"\")"), n(3.0));
     assert_eq!(eval_with(&d, "COUNTIF(D1:D3,\"=\")"), n(3.0));
     assert_eq!(eval_with(&d, "COUNTIF(B1:B6,\"\")"), n(0.0));
-    assert_eq!(eval_with(&d, "COUNTIF(B1:B6,\"apple\",1)"), err(ValueErr));
+    assert_rejected("COUNTIF(B1:B6,\"apple\",1)");
     let tilde = [("A1", t("a*b")), ("A2", t("axb"))];
     assert_eq!(eval_with(&tilde, "COUNTIF(A1:A2,\"a~*b\")"), n(1.0));
     assert_eq!(eval_with(&tilde, "COUNTIF(A1:A2,\"a*b\")"), n(2.0));
@@ -686,13 +695,13 @@ fn sumifs_and_countifs() {
     );
     assert_eq!(eval_with(&d, "SUMIFS(C1:C6,B1:B6,\"ap*\")"), n(7.0));
     assert_eq!(eval_with(&d, "SUMIFS(C1:C6,B1:B5,\"a*\")"), err(ValueErr));
-    assert_eq!(eval_with(&d, "SUMIFS(C1:C6,B1:B6)"), err(ValueErr));
+    assert_rejected("SUMIFS(C1:C6,B1:B6)");
     assert_eq!(
         eval_with(&d, "COUNTIFS(B1:B6,\"apple\",C1:C6,\">1\")"),
         n(1.0)
     );
     assert_eq!(eval_with(&d, "COUNTIFS(B1:B6,\"apple\")"), n(2.0));
-    assert_eq!(eval_with(&d, "COUNTIFS(B1:B6)"), err(ValueErr));
+    assert_rejected("COUNTIFS(B1:B6)");
     assert_eq!(
         eval_with(&d, "COUNTIFS(B1:B6,\"apple\",C1:C5,\">1\")"),
         err(ValueErr)
@@ -819,7 +828,7 @@ fn choose() {
     assert_eq!(eval("CHOOSE(2.9,\"a\",\"b\",\"c\")"), t("b"));
     assert_eq!(eval("CHOOSE(0,\"a\",\"b\")"), err(ValueErr));
     assert_eq!(eval("CHOOSE(4,\"a\",\"b\",\"c\")"), err(ValueErr));
-    assert_eq!(eval("CHOOSE(1)"), err(ValueErr));
+    assert_rejected("CHOOSE(1)");
     let d = [
         ("A1", n(1.0)),
         ("A2", n(2.0)),

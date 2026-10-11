@@ -224,13 +224,21 @@ pub(super) fn sortby(ctx: &EvalContext<'_>, args: &[Arg]) -> Res<Value> {
     finish(out)
 }
 
-fn same(a: &Value, b: &Value) -> bool {
-    rank(a) == rank(b)
-        && match (a, b) {
-            (Value::Error(x), Value::Error(y)) => x == y,
-            (Value::Empty, Value::Empty) => true,
-            _ => compare_values(a, b) == Ordering::Equal,
-        }
+/// Total order whose equal classes are the cells `UNIQUE` treats as the same value.
+fn cell_cmp(a: &Value, b: &Value) -> Ordering {
+    rank(a).cmp(&rank(b)).then_with(|| match (a, b) {
+        (Value::Error(x), Value::Error(y)) => (*x as u8).cmp(&(*y as u8)),
+        (Value::Empty, Value::Empty) => Ordering::Equal,
+        _ => compare_values(a, b),
+    })
+}
+
+fn row_cmp(a: &[Value], b: &[Value]) -> Ordering {
+    a.iter()
+        .zip(b)
+        .map(|(x, y)| cell_cmp(x, y))
+        .find(|o| *o != Ordering::Equal)
+        .unwrap_or(Ordering::Equal)
 }
 
 pub(super) fn unique(ctx: &EvalContext<'_>, args: &[Arg]) -> Res<Value> {
@@ -247,16 +255,20 @@ pub(super) fn unique(ctx: &EvalContext<'_>, args: &[Arg]) -> Res<Value> {
     if by_col {
         rows = transposed(&rows);
     }
+    // Sort the row indices (stable) and group neighbours that compare equal: n log n instead of the n^2 of
+    // comparing every row with every earlier distinct row. The first row of a group is its lowest index.
+    let mut order: Vec<usize> = (0..rows.len()).collect();
+    order.sort_by(|&a, &b| row_cmp(&rows[a], &rows[b]));
     let mut groups: Vec<(usize, usize)> = Vec::new();
-    for (i, row) in rows.iter().enumerate() {
-        match groups
-            .iter_mut()
-            .find(|(first, _)| rows[*first].iter().zip(row).all(|(a, b)| same(a, b)))
-        {
-            Some(g) => g.1 += 1,
-            None => groups.push((i, 1)),
+    let mut last: Option<usize> = None;
+    for &i in &order {
+        match (last, groups.last_mut()) {
+            (Some(l), Some(g)) if row_cmp(&rows[l], &rows[i]) == Ordering::Equal => g.1 += 1,
+            _ => groups.push((i, 1)),
         }
+        last = Some(i);
     }
+    groups.sort_unstable_by_key(|g| g.0);
     let mut out: Rows = groups
         .into_iter()
         .filter(|(_, n)| !once || *n == 1)

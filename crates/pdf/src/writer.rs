@@ -6,12 +6,27 @@ use flate2::Compression;
 use flate2::write::ZlibEncoder;
 
 /// Collects indirect objects and serialises them.
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct Pdf {
     objects: Vec<Option<Vec<u8>>>,
+    /// The header version: `1.7`, or `1.4` for PDF/A-1.
+    version: &'static str,
+}
+
+impl Default for Pdf {
+    fn default() -> Self {
+        Self::with_version("1.7")
+    }
 }
 
 impl Pdf {
+    pub fn with_version(version: &'static str) -> Self {
+        Self {
+            objects: Vec::new(),
+            version,
+        }
+    }
+
     /// Reserves an object number to be filled with [`Pdf::set`].
     pub fn reserve(&mut self) -> u32 {
         self.objects.push(None);
@@ -50,7 +65,8 @@ impl Pdf {
 
     /// Serialises the file. `extra_trailer` is appended to the trailer dictionary.
     pub fn finish(self, root: u32, extra_trailer: &str, id: [u8; 16]) -> Vec<u8> {
-        let mut out: Vec<u8> = b"%PDF-1.7\n%\xE2\xE3\xCF\xD3\n".to_vec();
+        let mut out: Vec<u8> = format!("%PDF-{}\n", self.version).into_bytes();
+        out.extend_from_slice(b"%\xE2\xE3\xCF\xD3\n");
         let mut offsets = Vec::with_capacity(self.objects.len());
         for (i, obj) in self.objects.iter().enumerate() {
             offsets.push(out.len());

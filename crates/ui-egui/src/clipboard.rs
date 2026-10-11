@@ -126,6 +126,7 @@ impl ClipboardState {
             col: c1,
             rows,
         };
+        grid.autofit_after(&command);
         match target.apply(command) {
             Ok(_) => {
                 grid.invalidate_layout();
@@ -161,6 +162,7 @@ impl ClipboardState {
             col: dest.col,
             rows,
         };
+        grid.autofit_after(&command);
         match target.apply(command) {
             Ok(_) => {
                 grid.invalidate_layout();

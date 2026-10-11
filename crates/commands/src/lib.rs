@@ -17,6 +17,7 @@ mod error;
 mod eval;
 mod find;
 mod format;
+mod merge;
 mod pdf;
 mod structure;
 mod target;
@@ -39,7 +40,8 @@ pub use format::{
     AlignmentChange, BorderChange, CellFormatChange, ColorSpec, FillChange, FontChange, HAlign,
     LineSpec, NumberFormatSpec, RangeRef, RotationSpec, UnderlineKind, VAlign,
 };
-pub use open365_docx::{Alignment, DocPos, RunPropsPatch};
+pub use merge::{MergeMode, merge_discards, merge_plan};
+pub use open365_docx::{Alignment, DocPos, RunPropsPatch, TabAlign};
 pub use open365_pdf::PdfMetadata;
 pub use pdf::PdfOptions;
 pub use target::{Target, apply};

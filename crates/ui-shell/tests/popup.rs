@@ -15,6 +15,8 @@ const M: f32 = 8.0;
 #[derive(Default)]
 struct Host {
     ran: Vec<String>,
+    /// Times the shell said a pop-up closed (the document takes the keyboard back).
+    closed: u32,
 }
 
 impl ShellHost for Host {
@@ -29,6 +31,9 @@ impl ShellHost for Host {
     }
     fn status_text(&self, _id: &str) -> Option<String> {
         None
+    }
+    fn chrome_closed(&mut self) {
+        self.closed += 1;
     }
     fn central(&mut self, ui: &mut egui::Ui) {
         ui.label("document");
@@ -132,6 +137,8 @@ fn click_opens_escape_and_outside_click_close() {
     assert_eq!(popup(&h), Some("home.font"));
     click(&mut h, pos2(W / 2.0, H - 100.0));
     assert_eq!(popup(&h), None);
+    // Every close told the host once (toggle, Escape, outside click).
+    assert_eq!(h.state().1.closed, 3);
 }
 
 #[test]

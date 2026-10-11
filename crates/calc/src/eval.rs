@@ -1348,6 +1348,11 @@ fn lift_binary(left: Operand, right: Operand, op: BinOp, nc: NumCtx) -> Arg {
         (Operand::Grid(a), Operand::Grid(b)) => {
             let rows = broadcast_len(a.len(), b.len());
             let cols = broadcast_len(a.first().map_or(0, Vec::len), b.first().map_or(0, Vec::len));
+            // The broadcast product of a column and a row is rows x cols cells: refuse it past the operand cap
+            // (R-CALC-2: 100000 x 702 cells is gigabytes).
+            if (rows as u64).saturating_mul(cols as u64) > MAX_ARRAY_CELLS {
+                return Arg::from_value(Value::Error(ErrorKind::Value));
+            }
             let pick = |g: &[Vec<Value>], r: usize, c: usize| -> Value {
                 let r = if g.len() == 1 { 0 } else { r };
                 let width = g.first().map_or(0, Vec::len);

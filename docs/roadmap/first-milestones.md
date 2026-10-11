@@ -1,6 +1,6 @@
 # First milestones
 
-Status: proposed, 2026-10-10. Each milestone is a vertical slice with an acceptance command. Durations are estimates for a small team, not commitments.
+Status: proposed, 2026-10-10; Teams ordering added 2026-10-11 (ADR-014). Each milestone is a vertical slice with an acceptance command. Durations are estimates for a small team, not commitments.
 
 ## Product scope (owner requirement, 2026-10-10)
 The target is the **full Microsoft 365 suite at 1:1 parity, including Teams**, built entirely by us (ADR-009). Everything below is in scope. The phases set order, not whether something gets built.
@@ -10,7 +10,7 @@ The target is the **full Microsoft 365 suite at 1:1 parity, including Teams**, b
 | Documents | Word | P0 |
 | Sheets | Excel | P0 |
 | Drive (files, sync, sharing, versions) | OneDrive / SharePoint files | P1 |
-| Teams (chat, channels, meetings, calls, screen share, files in channels) | Teams | P2 core chat → P3 meetings/calls |
+| Teams (chat, channels, threads, presence, file tabs, meetings with audio/video/screen share, calendar) plus its server | Teams | **Next after Word/Excel parity**: T0–T4 (owner, 2026-10-11) |
 | Slides | PowerPoint | P2 |
 | Mail and Calendar | Outlook / Exchange | P3 |
 | Admin, identity, tenancy, audit, retention | Entra ID / admin centre / Purview basics | P1 → P3 |
@@ -18,9 +18,14 @@ The target is the **full Microsoft 365 suite at 1:1 parity, including Teams**, b
 | Notes, Forms, Planner/tasks, Sites | OneNote, Forms, Planner, SharePoint sites | P4+ |
 | Federation between deployments | (no M365 equivalent) | P4 |
 | Web app (native DOM UI in Rust/WASM) | Office for the web | spike after M3, ships P2 |
-| iOS/iPadOS and Android apps (native UIKit / Android views driven from Rust) | Office mobile apps | spike after M3, ships P3 |
+| iOS/iPadOS and Android apps (native UIKit / Android views driven from Rust): Writer, Sheets, Teams | Office and Teams mobile apps | spike M5; Writer/Sheets M6; Teams from T2 |
 
-Teams moves forward from "P3 integration" to an owned product line. Its server foundation (identity, realtime transport, storage) is shared with Drive and co-editing, so it is designed in P1 and ships its chat core in P2.
+## Order of work (owner decision, 2026-10-11)
+1. **Word + Excel to parity** (M0–M6 below, including web and mobile Writer/Sheets). This is the current work.
+2. **Teams client and server** (T0–T4 below), cross-platform including mobile. The server is the sharing server (`adr-sharing.md`, Stage 1) extended, one Rust binary. Decisions are in `../architecture/adr-teams.md` (ADR-014).
+3. **The rest**: Slides, Mail and Calendar (full), Open CoWorker UI, Notes, Forms, Planner, Sites, federation.
+
+Teams is an owned product line. Its server foundation (identity, tenancy, storage, realtime transport) is shared with Drive and co-editing. Sharing Stage 1 is the prerequisite for T0 and may run in parallel with M4–M6.
 
 ## Recommended first slice
 **M1: headless lossless round-trip.** It tests the highest-risk assumption that most decides the product: can we open, edit, save and reopen real DOCX/XLSX without silent loss? It does this without being blocked on the UI toolkit decision. The UI spike (M2) runs in parallel on the same core.
@@ -56,11 +61,39 @@ Printing, rich clipboard, out-of-process parser sandbox, signed installers and u
 - Spike each platform's native UI (web: Rust-driven DOM; iOS: UIKit from Rust; Android: Android Views from Rust), each with open → edit → save → reopen.
 - **Accept:** the per-platform pass/fail sheet is complete (IME, screen reader, selection/clipboard, scroll p95, size, cold start), and ADR-010's stack is chosen per platform.
 
+## M6: Mobile Writer and Sheets (after the M5 spike; about 8–12 weeks per platform)
+- iOS/iPadOS (UIKit) and Android (Views) apps for Writer and Sheets on the shared Rust core: open, view, edit text and cells, save, reopen, share sheet. Web Writer/Sheets (Rust/WASM DOM) ship in the same window.
+- **Accept:** on the tier-A fixtures, open → edit → save → reopen passes on one phone and one tablet per OS and in two browsers. VoiceOver, TalkBack and IME checks from M5 pass. Output is validated by the same invariants as desktop.
+
+## Teams track (starts after M5; M6 may overlap T0–T1)
+Each slice is demonstrable end to end. Rationale and alternatives: `../architecture/adr-teams.md`.
+
+### T0: Server messaging core (about 3–4 weeks)
+- `open365-server` gains teams, channels, threads and messages (append-only events), a WebSocket sync endpoint with resume tokens, and a CLI/MCP surface (`open365 teams send|read|watch`).
+- **Accept:** two CLI clients exchange messages in a channel across a forced reconnect with no loss or duplicates. Tenant A cannot read, write or subscribe to tenant B (a test per route and per WebSocket subscription). Agent sends are `egress`-class and audited. SQLite and Postgres both pass.
+
+### T1: Chat client on desktop and web (about 6–8 weeks)
+- Team and channel list, threads, replies, edit/delete, reactions, @mentions, unread counts, attachments from Drive. Native UI per ADR-010 (own stack on desktop, Rust/WASM DOM on web).
+- **Accept:** a scripted two-user session passes on Windows, Linux, macOS and two browsers. IME and screen-reader checks pass (messages announced, composer usable). Pasted HTML is sanitised. A 50k-message channel scrolls inside a stated p95 frame-time target on stated hardware.
+
+### T2: Presence, file tabs, search, mobile chat and push (about 8–10 weeks)
+- Presence, typing, read receipts. File tabs: a channel tab opens a Drive document in Writer or Sheets, with permissions checked per user. Message search. Notification settings.
+- iOS and Android chat clients on the shared core. A push gateway delivers content-free wake-ups (APNs, FCM, UnifiedPush).
+- **Accept:** a message reaches a locked phone within a stated latency on both OSes. The push payload carries no message text. A user without Drive access sees the tab but not the content. Search never returns a channel the user left.
+
+### T3: Calls and meetings core (about 8–10 weeks)
+- 1:1 and group audio/video through the SFU behind a `MediaProvider` trait; join by link; lobby; host mute and remove; in-meeting chat; desktop, web and mobile clients.
+- **Accept:** 8 participants across desktop, web, iOS and Android hold a 30 min call within stated loss and latency on stated networks. A room token cannot be reused for another room. A host removal ends that participant's media within 2 s.
+
+### T4: Screen share, calendar and governance (about 8–10 weeks)
+- Screen and window share on every platform (ReplayKit, MediaProjection, ScreenCaptureKit, Windows Graphics Capture, PipeWire portal). Scheduled meetings with iCalendar import/export and a basic calendar view. Retention policy, legal-hold basics, admin audit view. Spikes: opt-in E2EE channels (MLS) and a Matrix bridge.
+- **Accept:** screen share runs on all client targets with an explicit picker each time. A scheduled meeting round-trips through a standard .ics file. A retention rule deletes messages and their search entries, verified by test. Spike reports are written.
+
 ## Later phases (planned boundaries, not scheduled)
-P2 co-editing (own sync service; CRDT primitives spike Loro vs Yrs) + CoWorker MVP (provider trait, Ollama/OpenAI-compatible + one BYOK API, read/suggest-only tools). P3 OIDC org identity, own chat and meetings (WebRTC), admin and audit. P4 federation (allowlist, OCM-style sharing, Matrix federation).
+After T4: document co-editing (own sync service; CRDT primitives spike Loro vs Yrs; pull it earlier only if Teams file tabs need it) and the CoWorker MVP (provider trait, Ollama/OpenAI-compatible + one BYOK API, read/suggest-only tools). Then Slides, full Mail and Calendar, OIDC org identity hardening, admin and audit depth, and federation (allowlist, OCM-style sharing, Matrix bridge per ADR-014).
 
 ## Non-goals for M0–M4
-Shipping (not designing) the server, co-editing, Teams, Slides or CoWorker UI; .doc/.xls/ODF; macro execution, pivot refresh, chart editing, mobile/web clients, claims of "full Office compatibility".
+Shipping (not designing) the server beyond sharing Stage 1, co-editing, Teams (T0–T4 start after M5), Slides or CoWorker UI; .doc/.xls/ODF; macro execution, pivot refresh, chart editing, mobile/web clients before M5/M6, claims of "full Office compatibility".
 
 ## Risk register
 | Risk | Likelihood | Impact | Mitigation / signal |
@@ -73,7 +106,9 @@ Shipping (not designing) the server, co-editing, Teams, Slides or CoWorker UI; .
 | Fixture licensing contaminates the repo | Low | High | Own fixtures only in the repo. Audit each external file. |
 | Malicious documents exploit parsers | Medium | High | Limits + fuzzing in M1, sandbox in M4. |
 | Provider terms change (CoWorker) | Medium | Medium | Adapters isolated. Re-verify terms per release. |
-| Scope creep into server/Teams before the editors are good | High | High | This roadmap's non-goals, plus an owner review point per milestone. |
+| Scope creep into server/Teams before the editors are good | High | High | Teams starts only after M5; non-goals above; an owner review point per milestone. |
+| Real-time media quality and cross-platform capture cost far more than estimated | High | High | Proven SFU first (ADR-014); T3 acceptance measures loss and latency; `MediaProvider` stays swappable. |
+| Push on self-hosted installs (APNs/FCM credentials belong to the app publisher) | Medium | Medium | Project-run content-free push gateway plus UnifiedPush; documented operator options. |
 
 ## Unresolved questions
 Formula function priority list; Qt licence fit; parser sandbox mechanism; CoWorker default context scope; fixture corpora licences; target OS priority; Open365's own licence.

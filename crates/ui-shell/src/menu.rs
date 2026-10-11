@@ -20,6 +20,12 @@ use crate::theme::{Theme, size};
 pub const FRAME: f32 = 2.0;
 pub const ITEM_H: f32 = 36.0;
 pub const HEADING_H: f32 = 37.0;
+/// The "Gallery Filters" strip above Excel's colour pickers (measured: group 340 x 52, switch button
+/// x 142, y 9, 193 x 35 in a 340 u popup).
+pub const FILTER_H: f32 = 52.0;
+const FILTER_SWITCH: [f32; 4] = [142.0, 9.0, 193.0, 35.0];
+/// WCAG contrast a colour needs against the menu background to stay while the filter is on.
+const HIGH_CONTRAST: f32 = 3.0;
 pub const SEPARATOR_H: f32 = 3.0;
 /// Colour cell and its pitch across a row.
 pub const CELL: f32 = 30.0;
@@ -106,6 +112,10 @@ pub fn plan(entries: &[MenuEntry], min_w: f32, max_h: f32, text_w: &dyn Fn(&str)
                 let sc = e.shortcut.as_deref().map_or(0.0, |s| text_w(s) + 24.0);
                 width = width.max(FRAME * 2.0 + extra + text_w(&e.label) + sc);
                 (h, Vec::new())
+            }
+            EntryKind::Filter => {
+                width = width.max(FRAME * 2.0 + FILTER_SWITCH[0] + FILTER_SWITCH[2]);
+                (FILTER_H, Vec::new())
             }
             EntryKind::Swatches { rows: r, tight } => {
                 let pad_top = if prev_was_heading { 3.0 } else { 1.0 };
@@ -229,6 +239,23 @@ fn entries_at<'a>(root: &'a [MenuEntry], path: &[usize], depth: usize) -> &'a [M
 
 fn interactive(e: &MenuEntry) -> bool {
     e.kind == EntryKind::Item && e.enabled
+}
+
+/// WCAG contrast ratio of a colour against the menu background.
+fn contrast(c: [u8; 3], bg: Color32) -> f32 {
+    let lum = |r: u8, g: u8, b: u8| {
+        let f = |v: u8| {
+            let v = f32::from(v) / 255.0;
+            if v <= 0.03928 {
+                v / 12.92
+            } else {
+                ((v + 0.055) / 1.055).powf(2.4)
+            }
+        };
+        0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b)
+    };
+    let (a, b) = (lum(c[0], c[1], c[2]), lum(bg.r(), bg.g(), bg.b()));
+    (a.max(b) + 0.05) / (a.min(b) + 0.05)
 }
 
 fn darker(c: [u8; 3]) -> Color32 {
@@ -504,12 +531,65 @@ pub fn show(
                                 }
                             }
                         }
+                        EntryKind::Filter => {
+                            let sw = rect_u(
+                                rect.min,
+                                [
+                                    FILTER_SWITCH[0],
+                                    rp.rect[1] + FILTER_SWITCH[1] - FRAME,
+                                    FILTER_SWITCH[2],
+                                    FILTER_SWITCH[3],
+                                ],
+                                dy,
+                            );
+                            let r = ui.interact(sw, Id::new(("mfilter", depth)), Sense::click());
+                            let key = Id::new("shell-menu-high-contrast");
+                            let mut on = ctx.data(|d| d.get_temp::<bool>(key)).unwrap_or(false);
+                            if r.clicked() {
+                                on = !on;
+                                ctx.data_mut(|d| d.insert_temp(key, on));
+                            }
+                            if r.hovered() {
+                                clip.rect_filled(sw, CornerRadius::ZERO, theme.menu_hot);
+                            }
+                            clip.text(
+                                pos2(sw.left() + 10.0 * K, sw.center().y),
+                                Align2::LEFT_CENTER,
+                                &e.label,
+                                FontId::proportional(size::LABEL),
+                                theme.text,
+                            );
+                            // The switch: a 36 x 18 u pill, knob left (off) or right (on). Derived.
+                            let pill = Rect::from_center_size(
+                                pos2(sw.right() - 28.0 * K, sw.center().y),
+                                vec2(36.0 * K, 18.0 * K),
+                            );
+                            let ink = if on { theme.text } else { theme.text_dim };
+                            clip.rect_stroke(
+                                pill,
+                                CornerRadius::same(255),
+                                Stroke::new(K, ink),
+                                StrokeKind::Inside,
+                            );
+                            let knob_x = if on {
+                                pill.right() - 9.0 * K
+                            } else {
+                                pill.left() + 9.0 * K
+                            };
+                            clip.circle_filled(pos2(knob_x, pill.center().y), 5.0 * K, ink);
+                        }
                         EntryKind::Swatches { rows, .. } => {
+                            let high = ctx
+                                .data(|d| d.get_temp::<bool>(Id::new("shell-menu-high-contrast")))
+                                .unwrap_or(false);
                             let mut k = 0;
                             for row in rows {
                                 for sw in row {
                                     let c = rp.cells[k];
                                     k += 1;
+                                    if high && contrast(sw.rgb, theme.menu_bg) < HIGH_CONTRAST {
+                                        continue;
+                                    }
                                     let cr = rect_u(rect.min, c, dy);
                                     if cr.bottom() < view.top() || cr.top() > view.bottom() {
                                         continue;
@@ -572,13 +652,44 @@ pub fn show(
                                 if r.hovered() || t.checked {
                                     clip.rect_filled(cr, CornerRadius::ZERO, theme.gallery_cell);
                                 }
-                                let inset = cr.shrink(3.0 * K);
+                                // The sample cell: 4 u inside the tile on every side (28 u of the
+                                // 36 u row, measured; the horizontal inset is derived), then the
+                                // style's real fill, borders and text size.
+                                let inset = cr.shrink(4.0 * K);
                                 clip.rect_filled(inset, CornerRadius::ZERO, fill);
+                                let line = |a: Pos2, b: Pos2, e: ([u8; 3], u8)| {
+                                    clip.line_segment(
+                                        [a, b],
+                                        Stroke::new(
+                                            f32::from(e.1) * K,
+                                            Color32::from_rgb(e.0[0], e.0[1], e.0[2]),
+                                        ),
+                                    );
+                                };
+                                if let Some(e) = t.borders[0] {
+                                    let x = inset.left() + f32::from(e.1) * K / 2.0;
+                                    line(pos2(x, inset.top()), pos2(x, inset.bottom()), e);
+                                }
+                                if let Some(e) = t.borders[1] {
+                                    let x = inset.right() - f32::from(e.1) * K / 2.0;
+                                    line(pos2(x, inset.top()), pos2(x, inset.bottom()), e);
+                                }
+                                if let Some(e) = t.borders[2] {
+                                    let y = inset.top() + f32::from(e.1) * K / 2.0;
+                                    line(pos2(inset.left(), y), pos2(inset.right(), y), e);
+                                }
+                                if let Some(e) = t.borders[3] {
+                                    let y = inset.bottom() - f32::from(e.1) * K / 2.0;
+                                    line(pos2(inset.left(), y), pos2(inset.right(), y), e);
+                                }
                                 clip.text(
                                     inset.center(),
                                     Align2::CENTER_CENTER,
                                     &t.label,
-                                    FontId::proportional(size::LABEL),
+                                    FontId::proportional(
+                                        (size::LABEL * t.text_pct.clamp(50, 250) as f32 / 100.0)
+                                            .min(size::LABEL * 2.0),
+                                    ),
                                     ink,
                                 );
                                 if r.hovered() || t.checked {

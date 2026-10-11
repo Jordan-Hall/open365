@@ -468,3 +468,43 @@ fn every_fixture_survives_an_edit_and_oracle_inputs_are_written() {
         }
     }
 }
+
+/// `replace_part` swaps one non-model part and leaves every other part byte-identical; the
+/// parts the model re-serialises itself are refused.
+#[test]
+fn replace_part_changes_only_that_part() {
+    use open365_opc::{Limits, PartName};
+    use open365_xlsx::Workbook;
+    let bytes = common::fixture("pivot-layouts");
+    let mut wb = Workbook::open(&bytes, &Limits::default()).unwrap();
+    let before: Vec<(String, Vec<u8>)> = wb
+        .package()
+        .parts()
+        .map(|p| (p.name().as_str().to_owned(), p.data().to_vec()))
+        .collect();
+    let target = before
+        .iter()
+        .find(|(n, _)| n.starts_with("xl/pivotTables/pivotTable") && n.ends_with(".xml"))
+        .map(|(n, _)| PartName::new(n).unwrap())
+        .expect("a pivot table part");
+    assert!(!wb.is_dirty());
+    wb.replace_part(&target, b"<changed/>".to_vec()).unwrap();
+    assert!(wb.is_dirty());
+    let saved = wb.save().unwrap();
+    assert!(!wb.is_dirty());
+    let again = Workbook::open(&saved, &Limits::default()).unwrap();
+    for (name, data) in &before {
+        let now = again.package().part(name).unwrap().data();
+        if *name == target.as_str() {
+            assert_eq!(now, b"<changed/>");
+        } else {
+            assert_eq!(now, data.as_slice(), "{name} changed");
+        }
+    }
+    let sheet = wb.sheet_part(0).unwrap().clone();
+    assert!(wb.replace_part(&sheet, Vec::new()).is_err());
+    assert!(
+        wb.replace_part(&PartName::new("xl/nothing.xml").unwrap(), Vec::new())
+            .is_err()
+    );
+}

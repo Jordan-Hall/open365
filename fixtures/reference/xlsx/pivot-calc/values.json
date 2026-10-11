@@ -1,0 +1,5568 @@
+{
+  "source": "fixtures/xlsx/pivot-calc.xlsx",
+  "sheets": [
+    {
+      "name": "Data",
+      "visible": -1,
+      "usedRange": "A1:G91",
+      "truncatedAt2000": false,
+      "cells": {
+        "A1": {
+          "value2": "Region",
+          "text": "Region",
+          "formula": null
+        },
+        "B1": {
+          "value2": "Product",
+          "text": "Product",
+          "formula": null
+        },
+        "C1": {
+          "value2": "Channel",
+          "text": "Channel",
+          "formula": null
+        },
+        "D1": {
+          "value2": "Units",
+          "text": "Units",
+          "formula": null
+        },
+        "E1": {
+          "value2": "Price",
+          "text": "Price",
+          "formula": null
+        },
+        "F1": {
+          "value2": "Revenue",
+          "text": "Revenue",
+          "formula": null
+        },
+        "G1": {
+          "value2": "Tier",
+          "text": "Tier",
+          "formula": null
+        },
+        "A2": {
+          "value2": "South",
+          "text": "South",
+          "formula": null
+        },
+        "B2": {
+          "value2": "Banana",
+          "text": "Banana",
+          "formula": null
+        },
+        "C2": {
+          "value2": "Online",
+          "text": "Online",
+          "formula": null
+        },
+        "D2": {
+          "value2": 26.0,
+          "text": "26",
+          "formula": null
+        },
+        "E2": {
+          "value2": 12.0,
+          "text": "12",
+          "formula": null
+        },
+        "F2": {
+          "value2": 312.0,
+          "text": "312",
+          "formula": null
+        },
+        "G2": {
+          "value2": "Silver",
+          "text": "Silver",
+          "formula": null
+        },
+        "A3": {
+          "value2": "East",
+          "text": "East",
+          "formula": null
+        },
+        "B3": {
+          "value2": "Banana",
+          "text": "Banana",
+          "formula": null
+        },
+        "C3": {
+          "value2": "Online",
+          "text": "Online",
+          "formula": null
+        },
+        "D3": {
+          "value2": 46.0,
+          "text": "46",
+          "formula": null
+        },
+        "E3": {
+          "value2": 2.0,
+          "text": "2",
+          "formula": null
+        },
+        "F3": {
+          "value2": 92.0,
+          "text": "92",
+          "formula": null
+        },
+        "G3": {
+          "value2": "Gold",
+          "text": "Gold",
+          "formula": null
+        },
+        "A4": {
+          "value2": "East",
+          "text": "East",
+          "formula": null
+        },
+        "B4": {
+          "value2": "Banana",
+          "text": "Banana",
+          "formula": null
+        },
+        "C4": {
+          "value2": "Online",
+          "text": "Online",
+          "formula": null
+        },
+        "D4": {
+          "value2": 38.0,
+          "text": "38",
+          "formula": null
+        },
+        "E4": {
+          "value2": 19.0,
+          "text": "19",
+          "formula": null
+        },
+        "F4": {
+          "value2": 722.0,
+          "text": "722",
+          "formula": null
+        },
+        "G4": {
+          "value2": "Gold",
+          "text": "Gold",
+          "formula": null
+        },
+        "A5": {
+          "value2": "South",
+          "text": "South",
+          "formula": null
+        },
+        "B5": {
+          "value2": "Banana",
+          "text": "Banana",
+          "formula": null
+        },
+        "C5": {
+          "value2": "Retail",
+          "text": "Retail",
+          "formula": null
+        },
+        "D5": {
+          "value2": 27.0,
+          "text": "27",
+          "formula": null
+        },
+        "E5": {
+          "value2": 26.0,
+          "text": "26",
+          "formula": null
+        },
+        "F5": {
+          "value2": 702.0,
+          "text": "702",
+          "formula": null
+        },
+        "G5": {
+          "value2": "Gold",
+          "text": "Gold",
+          "formula": null
+        },
+        "A6": {
+          "value2": "East",
+          "text": "East",
+          "formula": null
+        },
+        "B6": {
+          "value2": "Cherry",
+          "text": "Cherry",
+          "formula": null
+        },
+        "C6": {
+          "value2": "Retail",
+          "text": "Retail",
+          "formula": null
+        },
+        "D6": {
+          "value2": 11.0,
+          "text": "11",
+          "formula": null
+        },
+        "E6": {
+          "value2": 31.0,
+          "text": "31",
+          "formula": null
+        },
+        "F6": {
+          "value2": 341.0,
+          "text": "341",
+          "formula": null
+        },
+        "G6": {
+          "value2": "Bronze",
+          "text": "Bronze",
+          "formula": null
+        },
+        "A7": {
+          "value2": "West",
+          "text": "West",
+          "formula": null
+        },
+        "B7": {
+          "value2": "Cherry",
+          "text": "Cherry",
+          "formula": null
+        },
+        "C7": {
+          "value2": "Online",
+          "text": "Online",
+          "formula": null
+        },
+        "D7": {
+          "value2": 23.0,
+          "text": "23",
+          "formula": null
+        },
+        "E7": {
+          "value2": 12.0,
+          "text": "12",
+          "formula": null
+        },
+        "F7": {
+          "value2": 276.0,
+          "text": "276",
+          "formula": null
+        },
+        "G7": {
+          "value2": "Gold",
+          "text": "Gold",
+          "formula": null
+        },
+        "A8": {
+          "value2": "East",
+          "text": "East",
+          "formula": null
+        },
+        "B8": {
+          "value2": "Apple",
+          "text": "Apple",
+          "formula": null
+        },
+        "C8": {
+          "value2": "Partner",
+          "text": "Partner",
+          "formula": null
+        },
+        "D8": {
+          "value2": 3.0,
+          "text": "3",
+          "formula": null
+        },
+        "E8": {
+          "value2": 18.0,
+          "text": "18",
+          "formula": null
+        },
+        "F8": {
+          "value2": 54.0,
+          "text": "54",
+          "formula": null
+        },
+        "G8": {
+          "value2": "Gold",
+          "text": "Gold",
+          "formula": null
+        },
+        "A9": {
+          "value2": "West",
+          "text": "West",
+          "formula": null
+        },
+        "B9": {
+          "value2": "Cherry",
+          "text": "Cherry",
+          "formula": null
+        },
+        "C9": {
+          "value2": "Online",
+          "text": "Online",
+          "formula": null
+        },
+        "D9": {
+          "value2": 4.0,
+          "text": "4",
+          "formula": null
+        },
+        "E9": {
+          "value2": 6.0,
+          "text": "6",
+          "formula": null
+        },
+        "F9": {
+          "value2": 24.0,
+          "text": "24",
+          "formula": null
+        },
+        "G9": {
+          "value2": "Gold",
+          "text": "Gold",
+          "formula": null
+        },
+        "A10": {
+          "value2": "South",
+          "text": "South",
+          "formula": null
+        },
+        "B10": {
+          "value2": "Banana",
+          "text": "Banana",
+          "formula": null
+        },
+        "C10": {
+          "value2": "Partner",
+          "text": "Partner",
+          "formula": null
+        },
+        "D10": {
+          "value2": 36.0,
+          "text": "36",
+          "formula": null
+        },
+        "E10": {
+          "value2": 9.0,
+          "text": "9",
+          "formula": null
+        },
+        "F10": {
+          "value2": 324.0,
+          "text": "324",
+          "formula": null
+        },
+        "G10": {
+          "value2": "Bronze",
+          "text": "Bronze",
+          "formula": null
+        },
+        "A11": {
+          "value2": "West",
+          "text": "West",
+          "formula": null
+        },
+        "B11": {
+          "value2": "Walnut",
+          "text": "Walnut",
+          "formula": null
+        },
+        "C11": {
+          "value2": "Retail",
+          "text": "Retail",
+          "formula": null
+        },
+        "D11": {
+          "value2": 4.0,
+          "text": "4",
+          "formula": null
+        },
+        "E11": {
+          "value2": 21.0,
+          "text": "21",
+          "formula": null
+        },
+        "F11": {
+          "value2": 84.0,
+          "text": "84",
+          "formula": null
+        },
+        "G11": {
+          "value2": "Silver",
+          "text": "Silver",
+          "formula": null
+        },
+        "A12": {
+          "value2": "East",
+          "text": "East",
+          "formula": null
+        },
+        "B12": {
+          "value2": "Banana",
+          "text": "Banana",
+          "formula": null
+        },
+        "C12": {
+          "value2": "Retail",
+          "text": "Retail",
+          "formula": null
+        },
+        "D12": {
+          "value2": 31.0,
+          "text": "31",
+          "formula": null
+        },
+        "E12": {
+          "value2": 20.0,
+          "text": "20",
+          "formula": null
+        },
+        "F12": {
+          "value2": 620.0,
+          "text": "620",
+          "formula": null
+        },
+        "G12": {
+          "value2": "Silver",
+          "text": "Silver",
+          "formula": null
+        },
+        "A13": {
+          "value2": "West",
+          "text": "West",
+          "formula": null
+        },
+        "B13": {
+          "value2": "Walnut",
+          "text": "Walnut",
+          "formula": null
+        },
+        "C13": {
+          "value2": "Online",
+          "text": "Online",
+          "formula": null
+        },
+        "D13": {
+          "value2": 9.0,
+          "text": "9",
+          "formula": null
+        },
+        "E13": {
+          "value2": 32.0,
+          "text": "32",
+          "formula": null
+        },
+        "F13": {
+          "value2": 288.0,
+          "text": "288",
+          "formula": null
+        },
+        "G13": {
+          "value2": "Gold",
+          "text": "Gold",
+          "formula": null
+        },
+        "A14": {
+          "value2": "North",
+          "text": "North",
+          "formula": null
+        },
+        "B14": {
+          "value2": "Walnut",
+          "text": "Walnut",
+          "formula": null
+        },
+        "C14": {
+          "value2": "Online",
+          "text": "Online",
+          "formula": null
+        },
+        "D14": {
+          "value2": 17.0,
+          "text": "17",
+          "formula": null
+        },
+        "E14": {
+          "value2": 17.0,
+          "text": "17",
+          "formula": null
+        },
+        "F14": {
+          "value2": 289.0,
+          "text": "289",
+          "formula": null
+        },
+        "G14": {
+          "value2": "Silver",
+          "text": "Silver",
+          "formula": null
+        },
+        "A15": {
+          "value2": "North",
+          "text": "North",
+          "formula": null
+        },
+        "B15": {
+          "value2": "Cherry",
+          "text": "Cherry",
+          "formula": null
+        },
+        "C15": {
+          "value2": "Retail",
+          "text": "Retail",
+          "formula": null
+        },
+        "D15": {
+          "value2": 21.0,
+          "text": "21",
+          "formula": null
+        },
+        "E15": {
+          "value2": 39.0,
+          "text": "39",
+          "formula": null
+        },
+        "F15": {
+          "value2": 819.0,
+          "text": "819",
+          "formula": null
+        },
+        "G15": {
+          "value2": "Silver",
+          "text": "Silver",
+          "formula": null
+        },
+        "A16": {
+          "value2": "East",
+          "text": "East",
+          "formula": null
+        },
+        "B16": {
+          "value2": "Banana",
+          "text": "Banana",
+          "formula": null
+        },
+        "C16": {
+          "value2": "Retail",
+          "text": "Retail",
+          "formula": null
+        },
+        "D16": {
+          "value2": 28.0,
+          "text": "28",
+          "formula": null
+        },
+        "E16": {
+          "value2": 8.0,
+          "text": "8",
+          "formula": null
+        },
+        "F16": {
+          "value2": 224.0,
+          "text": "224",
+          "formula": null
+        },
+        "G16": {
+          "value2": "Bronze",
+          "text": "Bronze",
+          "formula": null
+        },
+        "A17": {
+          "value2": "West",
+          "text": "West",
+          "formula": null
+        },
+        "B17": {
+          "value2": "Cherry",
+          "text": "Cherry",
+          "formula": null
+        },
+        "C17": {
+          "value2": "Partner",
+          "text": "Partner",
+          "formula": null
+        },
+        "D17": {
+          "value2": 27.0,
+          "text": "27",
+          "formula": null
+        },
+        "E17": {
+          "value2": 7.0,
+          "text": "7",
+          "formula": null
+        },
+        "F17": {
+          "value2": 189.0,
+          "text": "189",
+          "formula": null
+        },
+        "G17": {
+          "value2": "Silver",
+          "text": "Silver",
+          "formula": null
+        },
+        "A18": {
+          "value2": "North",
+          "text": "North",
+          "formula": null
+        },
+        "B18": {
+          "value2": "Banana",
+          "text": "Banana",
+          "formula": null
+        },
+        "C18": {
+          "value2": "Partner",
+          "text": "Partner",
+          "formula": null
+        },
+        "D18": {
+          "value2": 6.0,
+          "text": "6",
+          "formula": null
+        },
+        "E18": {
+          "value2": 13.0,
+          "text": "13",
+          "formula": null
+        },
+        "F18": {
+          "value2": 78.0,
+          "text": "78",
+          "formula": null
+        },
+        "G18": {
+          "value2": "Gold",
+          "text": "Gold",
+          "formula": null
+        },
+        "A19": {
+          "value2": "West",
+          "text": "West",
+          "formula": null
+        },
+        "B19": {
+          "value2": "Walnut",
+          "text": "Walnut",
+          "formula": null
+        },
+        "C19": {
+          "value2": "Online",
+          "text": "Online",
+          "formula": null
+        },
+        "D19": {
+          "value2": 5.0,
+          "text": "5",
+          "formula": null
+        },
+        "E19": {
+          "value2": 4.0,
+          "text": "4",
+          "formula": null
+        },
+        "F19": {
+          "value2": 20.0,
+          "text": "20",
+          "formula": null
+        },
+        "G19": {
+          "value2": "Gold",
+          "text": "Gold",
+          "formula": null
+        },
+        "A20": {
+          "value2": "North",
+          "text": "North",
+          "formula": null
+        },
+        "B20": {
+          "value2": "Banana",
+          "text": "Banana",
+          "formula": null
+        },
+        "C20": {
+          "value2": "Retail",
+          "text": "Retail",
+          "formula": null
+        },
+        "D20": {
+          "value2": 5.0,
+          "text": "5",
+          "formula": null
+        },
+        "E20": {
+          "value2": 23.0,
+          "text": "23",
+          "formula": null
+        },
+        "F20": {
+          "value2": 115.0,
+          "text": "115",
+          "formula": null
+        },
+        "G20": {
+          "value2": "Bronze",
+          "text": "Bronze",
+          "formula": null
+        },
+        "A21": {
+          "value2": "South",
+          "text": "South",
+          "formula": null
+        },
+        "B21": {
+          "value2": "Cherry",
+          "text": "Cherry",
+          "formula": null
+        },
+        "C21": {
+          "value2": "Online",
+          "text": "Online",
+          "formula": null
+        },
+        "D21": {
+          "value2": 49.0,
+          "text": "49",
+          "formula": null
+        },
+        "E21": {
+          "value2": 35.0,
+          "text": "35",
+          "formula": null
+        },
+        "F21": {
+          "value2": 1715.0,
+          "text": "1715",
+          "formula": null
+        },
+        "G21": {
+          "value2": "Gold",
+          "text": "Gold",
+          "formula": null
+        },
+        "A22": {
+          "value2": "East",
+          "text": "East",
+          "formula": null
+        },
+        "B22": {
+          "value2": "Apple",
+          "text": "Apple",
+          "formula": null
+        },
+        "C22": {
+          "value2": "Online",
+          "text": "Online",
+          "formula": null
+        },
+        "D22": {
+          "value2": 49.0,
+          "text": "49",
+          "formula": null
+        },
+        "E22": {
+          "value2": 28.0,
+          "text": "28",
+          "formula": null
+        },
+        "F22": {
+          "value2": 1372.0,
+          "text": "1372",
+          "formula": null
+        },
+        "G22": {
+          "value2": "Bronze",
+          "text": "Bronze",
+          "formula": null
+        },
+        "A23": {
+          "value2": "South",
+          "text": "South",
+          "formula": null
+        },
+        "B23": {
+          "value2": "Walnut",
+          "text": "Walnut",
+          "formula": null
+        },
+        "C23": {
+          "value2": "Retail",
+          "text": "Retail",
+          "formula": null
+        },
+        "D23": {
+          "value2": 10.0,
+          "text": "10",
+          "formula": null
+        },
+        "E23": {
+          "value2": 5.0,
+          "text": "5",
+          "formula": null
+        },
+        "F23": {
+          "value2": 50.0,
+          "text": "50",
+          "formula": null
+        },
+        "G23": {
+          "value2": "Gold",
+          "text": "Gold",
+          "formula": null
+        },
+        "A24": {
+          "value2": "South",
+          "text": "South",
+          "formula": null
+        },
+        "B24": {
+          "value2": "Walnut",
+          "text": "Walnut",
+          "formula": null
+        },
+        "C24": {
+          "value2": "Retail",
+          "text": "Retail",
+          "formula": null
+        },
+        "D24": {
+          "value2": 48.0,
+          "text": "48",
+          "formula": null
+        },
+        "E24": {
+          "value2": 25.0,
+          "text": "25",
+          "formula": null
+        },
+        "F24": {
+          "value2": 1200.0,
+          "text": "1200",
+          "formula": null
+        },
+        "G24": {
+          "value2": "Bronze",
+          "text": "Bronze",
+          "formula": null
+        },
+        "A25": {
+          "value2": "North",
+          "text": "North",
+          "formula": null
+        },
+        "B25": {
+          "value2": "Cherry",
+          "text": "Cherry",
+          "formula": null
+        },
+        "C25": {
+          "value2": "Partner",
+          "text": "Partner",
+          "formula": null
+        },
+        "D25": {
+          "value2": 39.0,
+          "text": "39",
+          "formula": null
+        },
+        "E25": {
+          "value2": 13.0,
+          "text": "13",
+          "formula": null
+        },
+        "F25": {
+          "value2": 507.0,
+          "text": "507",
+          "formula": null
+        },
+        "G25": {
+          "value2": "Bronze",
+          "text": "Bronze",
+          "formula": null
+        },
+        "A26": {
+          "value2": "South",
+          "text": "South",
+          "formula": null
+        },
+        "B26": {
+          "value2": "Apple",
+          "text": "Apple",
+          "formula": null
+        },
+        "C26": {
+          "value2": "Retail",
+          "text": "Retail",
+          "formula": null
+        },
+        "D26": {
+          "value2": 25.0,
+          "text": "25",
+          "formula": null
+        },
+        "E26": {
+          "value2": 27.0,
+          "text": "27",
+          "formula": null
+        },
+        "F26": {
+          "value2": 675.0,
+          "text": "675",
+          "formula": null
+        },
+        "G26": {
+          "value2": "Silver",
+          "text": "Silver",
+          "formula": null
+        },
+        "A27": {
+          "value2": "West",
+          "text": "West",
+          "formula": null
+        },
+        "B27": {
+          "value2": "Cherry",
+          "text": "Cherry",
+          "formula": null
+        },
+        "C27": {
+          "value2": "Retail",
+          "text": "Retail",
+          "formula": null
+        },
+        "D27": {
+          "value2": 22.0,
+          "text": "22",
+          "formula": null
+        },
+        "E27": {
+          "value2": 12.0,
+          "text": "12",
+          "formula": null
+        },
+        "F27": {
+          "value2": 264.0,
+          "text": "264",
+          "formula": null
+        },
+        "G27": {
+          "value2": "Bronze",
+          "text": "Bronze",
+          "formula": null
+        },
+        "A28": {
+          "value2": "North",
+          "text": "North",
+          "formula": null
+        },
+        "B28": {
+          "value2": "Cherry",
+          "text": "Cherry",
+          "formula": null
+        },
+        "C28": {
+          "value2": "Retail",
+          "text": "Retail",
+          "formula": null
+        },
+        "D28": {
+          "value2": 7.0,
+          "text": "7",
+          "formula": null
+        },
+        "E28": {
+          "value2": 32.0,
+          "text": "32",
+          "formula": null
+        },
+        "F28": {
+          "value2": 224.0,
+          "text": "224",
+          "formula": null
+        },
+        "G28": {
+          "value2": "Bronze",
+          "text": "Bronze",
+          "formula": null
+        },
+        "A29": {
+          "value2": "West",
+          "text": "West",
+          "formula": null
+        },
+        "B29": {
+          "value2": "Apple",
+          "text": "Apple",
+          "formula": null
+        },
+        "C29": {
+          "value2": "Partner",
+          "text": "Partner",
+          "formula": null
+        },
+        "D29": {
+          "value2": 11.0,
+          "text": "11",
+          "formula": null
+        },
+        "E29": {
+          "value2": 33.0,
+          "text": "33",
+          "formula": null
+        },
+        "F29": {
+          "value2": 363.0,
+          "text": "363",
+          "formula": null
+        },
+        "G29": {
+          "value2": "Silver",
+          "text": "Silver",
+          "formula": null
+        },
+        "A30": {
+          "value2": "South",
+          "text": "South",
+          "formula": null
+        },
+        "B30": {
+          "value2": "Apple",
+          "text": "Apple",
+          "formula": null
+        },
+        "C30": {
+          "value2": "Online",
+          "text": "Online",
+          "formula": null
+        },
+        "D30": {
+          "value2": 13.0,
+          "text": "13",
+          "formula": null
+        },
+        "E30": {
+          "value2": 28.0,
+          "text": "28",
+          "formula": null
+        },
+        "F30": {
+          "value2": 364.0,
+          "text": "364",
+          "formula": null
+        },
+        "G30": {
+          "value2": "Bronze",
+          "text": "Bronze",
+          "formula": null
+        },
+        "A31": {
+          "value2": "West",
+          "text": "West",
+          "formula": null
+        },
+        "B31": {
+          "value2": "Banana",
+          "text": "Banana",
+          "formula": null
+        },
+        "C31": {
+          "value2": "Online",
+          "text": "Online",
+          "formula": null
+        },
+        "D31": {
+          "value2": 43.0,
+          "text": "43",
+          "formula": null
+        },
+        "E31": {
+          "value2": 27.0,
+          "text": "27",
+          "formula": null
+        },
+        "F31": {
+          "value2": 1161.0,
+          "text": "1161",
+          "formula": null
+        },
+        "G31": {
+          "value2": "Gold",
+          "text": "Gold",
+          "formula": null
+        },
+        "A32": {
+          "value2": "North",
+          "text": "North",
+          "formula": null
+        },
+        "B32": {
+          "value2": "Cherry",
+          "text": "Cherry",
+          "formula": null
+        },
+        "C32": {
+          "value2": "Partner",
+          "text": "Partner",
+          "formula": null
+        },
+        "D32": {
+          "value2": 41.0,
+          "text": "41",
+          "formula": null
+        },
+        "E32": {
+          "value2": 27.0,
+          "text": "27",
+          "formula": null
+        },
+        "F32": {
+          "value2": 1107.0,
+          "text": "1107",
+          "formula": null
+        },
+        "G32": {
+          "value2": "Silver",
+          "text": "Silver",
+          "formula": null
+        },
+        "A33": {
+          "value2": "East",
+          "text": "East",
+          "formula": null
+        },
+        "B33": {
+          "value2": "Cherry",
+          "text": "Cherry",
+          "formula": null
+        },
+        "C33": {
+          "value2": "Retail",
+          "text": "Retail",
+          "formula": null
+        },
+        "D33": {
+          "value2": 5.0,
+          "text": "5",
+          "formula": null
+        },
+        "E33": {
+          "value2": 19.0,
+          "text": "19",
+          "formula": null
+        },
+        "F33": {
+          "value2": 95.0,
+          "text": "95",
+          "formula": null
+        },
+        "G33": {
+          "value2": "Gold",
+          "text": "Gold",
+          "formula": null
+        },
+        "A34": {
+          "value2": "East",
+          "text": "East",
+          "formula": null
+        },
+        "B34": {
+          "value2": "Walnut",
+          "text": "Walnut",
+          "formula": null
+        },
+        "C34": {
+          "value2": "Online",
+          "text": "Online",
+          "formula": null
+        },
+        "D34": {
+          "value2": 10.0,
+          "text": "10",
+          "formula": null
+        },
+        "E34": {
+          "value2": 2.0,
+          "text": "2",
+          "formula": null
+        },
+        "F34": {
+          "value2": 20.0,
+          "text": "20",
+          "formula": null
+        },
+        "G34": {
+          "value2": "Bronze",
+          "text": "Bronze",
+          "formula": null
+        },
+        "A35": {
+          "value2": "North",
+          "text": "North",
+          "formula": null
+        },
+        "B35": {
+          "value2": "Apple",
+          "text": "Apple",
+          "formula": null
+        },
+        "C35": {
+          "value2": "Retail",
+          "text": "Retail",
+          "formula": null
+        },
+        "D35": {
+          "value2": 21.0,
+          "text": "21",
+          "formula": null
+        },
+        "E35": {
+          "value2": 27.0,
+          "text": "27",
+          "formula": null
+        },
+        "F35": {
+          "value2": 567.0,
+          "text": "567",
+          "formula": null
+        },
+        "G35": {
+          "value2": "Gold",
+          "text": "Gold",
+          "formula": null
+        },
+        "A36": {
+          "value2": "South",
+          "text": "South",
+          "formula": null
+        },
+        "B36": {
+          "value2": "Banana",
+          "text": "Banana",
+          "formula": null
+        },
+        "C36": {
+          "value2": "Retail",
+          "text": "Retail",
+          "formula": null
+        },
+        "D36": {
+          "value2": 12.0,
+          "text": "12",
+          "formula": null
+        },
+        "E36": {
+          "value2": 29.0,
+          "text": "29",
+          "formula": null
+        },
+        "F36": {
+          "value2": 348.0,
+          "text": "348",
+          "formula": null
+        },
+        "G36": {
+          "value2": "Silver",
+          "text": "Silver",
+          "formula": null
+        },
+        "A37": {
+          "value2": "East",
+          "text": "East",
+          "formula": null
+        },
+        "B37": {
+          "value2": "Apple",
+          "text": "Apple",
+          "formula": null
+        },
+        "C37": {
+          "value2": "Partner",
+          "text": "Partner",
+          "formula": null
+        },
+        "D37": {
+          "value2": 49.0,
+          "text": "49",
+          "formula": null
+        },
+        "E37": {
+          "value2": 39.0,
+          "text": "39",
+          "formula": null
+        },
+        "F37": {
+          "value2": 1911.0,
+          "text": "1911",
+          "formula": null
+        },
+        "G37": {
+          "value2": "Gold",
+          "text": "Gold",
+          "formula": null
+        },
+        "A38": {
+          "value2": "East",
+          "text": "East",
+          "formula": null
+        },
+        "B38": {
+          "value2": "Walnut",
+          "text": "Walnut",
+          "formula": null
+        },
+        "C38": {
+          "value2": "Online",
+          "text": "Online",
+          "formula": null
+        },
+        "D38": {
+          "value2": 15.0,
+          "text": "15",
+          "formula": null
+        },
+        "E38": {
+          "value2": 39.0,
+          "text": "39",
+          "formula": null
+        },
+        "F38": {
+          "value2": 585.0,
+          "text": "585",
+          "formula": null
+        },
+        "G38": {
+          "value2": "Silver",
+          "text": "Silver",
+          "formula": null
+        },
+        "A39": {
+          "value2": "East",
+          "text": "East",
+          "formula": null
+        },
+        "B39": {
+          "value2": "Banana",
+          "text": "Banana",
+          "formula": null
+        },
+        "C39": {
+          "value2": "Online",
+          "text": "Online",
+          "formula": null
+        },
+        "D39": {
+          "value2": 43.0,
+          "text": "43",
+          "formula": null
+        },
+        "E39": {
+          "value2": 30.0,
+          "text": "30",
+          "formula": null
+        },
+        "F39": {
+          "value2": 1290.0,
+          "text": "1290",
+          "formula": null
+        },
+        "G39": {
+          "value2": "Silver",
+          "text": "Silver",
+          "formula": null
+        },
+        "A40": {
+          "value2": "East",
+          "text": "East",
+          "formula": null
+        },
+        "B40": {
+          "value2": "Apple",
+          "text": "Apple",
+          "formula": null
+        },
+        "C40": {
+          "value2": "Partner",
+          "text": "Partner",
+          "formula": null
+        },
+        "D40": {
+          "value2": 23.0,
+          "text": "23",
+          "formula": null
+        },
+        "E40": {
+          "value2": 20.0,
+          "text": "20",
+          "formula": null
+        },
+        "F40": {
+          "value2": 460.0,
+          "text": "460",
+          "formula": null
+        },
+        "G40": {
+          "value2": "Silver",
+          "text": "Silver",
+          "formula": null
+        },
+        "A41": {
+          "value2": "South",
+          "text": "South",
+          "formula": null
+        },
+        "B41": {
+          "value2": "Walnut",
+          "text": "Walnut",
+          "formula": null
+        },
+        "C41": {
+          "value2": "Online",
+          "text": "Online",
+          "formula": null
+        },
+        "D41": {
+          "value2": 22.0,
+          "text": "22",
+          "formula": null
+        },
+        "E41": {
+          "value2": 16.0,
+          "text": "16",
+          "formula": null
+        },
+        "F41": {
+          "value2": 352.0,
+          "text": "352",
+          "formula": null
+        },
+        "G41": {
+          "value2": "Silver",
+          "text": "Silver",
+          "formula": null
+        },
+        "A42": {
+          "value2": "West",
+          "text": "West",
+          "formula": null
+        },
+        "B42": {
+          "value2": "Apple",
+          "text": "Apple",
+          "formula": null
+        },
+        "C42": {
+          "value2": "Partner",
+          "text": "Partner",
+          "formula": null
+        },
+        "D42": {
+          "value2": 23.0,
+          "text": "23",
+          "formula": null
+        },
+        "E42": {
+          "value2": 14.0,
+          "text": "14",
+          "formula": null
+        },
+        "F42": {
+          "value2": 322.0,
+          "text": "322",
+          "formula": null
+        },
+        "G42": {
+          "value2": "Silver",
+          "text": "Silver",
+          "formula": null
+        },
+        "A43": {
+          "value2": "North",
+          "text": "North",
+          "formula": null
+        },
+        "B43": {
+          "value2": "Walnut",
+          "text": "Walnut",
+          "formula": null
+        },
+        "C43": {
+          "value2": "Partner",
+          "text": "Partner",
+          "formula": null
+        },
+        "D43": {
+          "value2": 42.0,
+          "text": "42",
+          "formula": null
+        },
+        "E43": {
+          "value2": 5.0,
+          "text": "5",
+          "formula": null
+        },
+        "F43": {
+          "value2": 210.0,
+          "text": "210",
+          "formula": null
+        },
+        "G43": {
+          "value2": "Bronze",
+          "text": "Bronze",
+          "formula": null
+        },
+        "A44": {
+          "value2": "East",
+          "text": "East",
+          "formula": null
+        },
+        "B44": {
+          "value2": "Walnut",
+          "text": "Walnut",
+          "formula": null
+        },
+        "C44": {
+          "value2": "Retail",
+          "text": "Retail",
+          "formula": null
+        },
+        "D44": {
+          "value2": 26.0,
+          "text": "26",
+          "formula": null
+        },
+        "E44": {
+          "value2": 34.0,
+          "text": "34",
+          "formula": null
+        },
+        "F44": {
+          "value2": 884.0,
+          "text": "884",
+          "formula": null
+        },
+        "G44": {
+          "value2": "Silver",
+          "text": "Silver",
+          "formula": null
+        },
+        "A45": {
+          "value2": "North",
+          "text": "North",
+          "formula": null
+        },
+        "B45": {
+          "value2": "Apple",
+          "text": "Apple",
+          "formula": null
+        },
+        "C45": {
+          "value2": "Online",
+          "text": "Online",
+          "formula": null
+        },
+        "D45": {
+          "value2": 43.0,
+          "text": "43",
+          "formula": null
+        },
+        "E45": {
+          "value2": 26.0,
+          "text": "26",
+          "formula": null
+        },
+        "F45": {
+          "value2": 1118.0,
+          "text": "1118",
+          "formula": null
+        },
+        "G45": {
+          "value2": "Gold",
+          "text": "Gold",
+          "formula": null
+        },
+        "A46": {
+          "value2": "East",
+          "text": "East",
+          "formula": null
+        },
+        "B46": {
+          "value2": "Cherry",
+          "text": "Cherry",
+          "formula": null
+        },
+        "C46": {
+          "value2": "Online",
+          "text": "Online",
+          "formula": null
+        },
+        "D46": {
+          "value2": 11.0,
+          "text": "11",
+          "formula": null
+        },
+        "E46": {
+          "value2": 34.0,
+          "text": "34",
+          "formula": null
+        },
+        "F46": {
+          "value2": 374.0,
+          "text": "374",
+          "formula": null
+        },
+        "G46": {
+          "value2": "Silver",
+          "text": "Silver",
+          "formula": null
+        },
+        "A47": {
+          "value2": "North",
+          "text": "North",
+          "formula": null
+        },
+        "B47": {
+          "value2": "Apple",
+          "text": "Apple",
+          "formula": null
+        },
+        "C47": {
+          "value2": "Retail",
+          "text": "Retail",
+          "formula": null
+        },
+        "D47": {
+          "value2": 22.0,
+          "text": "22",
+          "formula": null
+        },
+        "E47": {
+          "value2": 2.0,
+          "text": "2",
+          "formula": null
+        },
+        "F47": {
+          "value2": 44.0,
+          "text": "44",
+          "formula": null
+        },
+        "G47": {
+          "value2": "Silver",
+          "text": "Silver",
+          "formula": null
+        },
+        "A48": {
+          "value2": "East",
+          "text": "East",
+          "formula": null
+        },
+        "B48": {
+          "value2": "Apple",
+          "text": "Apple",
+          "formula": null
+        },
+        "C48": {
+          "value2": "Online",
+          "text": "Online",
+          "formula": null
+        },
+        "D48": {
+          "value2": 23.0,
+          "text": "23",
+          "formula": null
+        },
+        "E48": {
+          "value2": 7.0,
+          "text": "7",
+          "formula": null
+        },
+        "F48": {
+          "value2": 161.0,
+          "text": "161",
+          "formula": null
+        },
+        "G48": {
+          "value2": "Silver",
+          "text": "Silver",
+          "formula": null
+        },
+        "A49": {
+          "value2": "North",
+          "text": "North",
+          "formula": null
+        },
+        "B49": {
+          "value2": "Walnut",
+          "text": "Walnut",
+          "formula": null
+        },
+        "C49": {
+          "value2": "Online",
+          "text": "Online",
+          "formula": null
+        },
+        "D49": {
+          "value2": 17.0,
+          "text": "17",
+          "formula": null
+        },
+        "E49": {
+          "value2": 31.0,
+          "text": "31",
+          "formula": null
+        },
+        "F49": {
+          "value2": 527.0,
+          "text": "527",
+          "formula": null
+        },
+        "G49": {
+          "value2": "Silver",
+          "text": "Silver",
+          "formula": null
+        },
+        "A50": {
+          "value2": "East",
+          "text": "East",
+          "formula": null
+        },
+        "B50": {
+          "value2": "Apple",
+          "text": "Apple",
+          "formula": null
+        },
+        "C50": {
+          "value2": "Retail",
+          "text": "Retail",
+          "formula": null
+        },
+        "D50": {
+          "value2": 16.0,
+          "text": "16",
+          "formula": null
+        },
+        "E50": {
+          "value2": 37.0,
+          "text": "37",
+          "formula": null
+        },
+        "F50": {
+          "value2": 592.0,
+          "text": "592",
+          "formula": null
+        },
+        "G50": {
+          "value2": "Bronze",
+          "text": "Bronze",
+          "formula": null
+        },
+        "A51": {
+          "value2": "East",
+          "text": "East",
+          "formula": null
+        },
+        "B51": {
+          "value2": "Apple",
+          "text": "Apple",
+          "formula": null
+        },
+        "C51": {
+          "value2": "Retail",
+          "text": "Retail",
+          "formula": null
+        },
+        "D51": {
+          "value2": 9.0,
+          "text": "9",
+          "formula": null
+        },
+        "E51": {
+          "value2": 23.0,
+          "text": "23",
+          "formula": null
+        },
+        "F51": {
+          "value2": 207.0,
+          "text": "207",
+          "formula": null
+        },
+        "G51": {
+          "value2": "Bronze",
+          "text": "Bronze",
+          "formula": null
+        },
+        "A52": {
+          "value2": "South",
+          "text": "South",
+          "formula": null
+        },
+        "B52": {
+          "value2": "Apple",
+          "text": "Apple",
+          "formula": null
+        },
+        "C52": {
+          "value2": "Online",
+          "text": "Online",
+          "formula": null
+        },
+        "D52": {
+          "value2": 2.0,
+          "text": "2",
+          "formula": null
+        },
+        "E52": {
+          "value2": 13.0,
+          "text": "13",
+          "formula": null
+        },
+        "F52": {
+          "value2": 26.0,
+          "text": "26",
+          "formula": null
+        },
+        "G52": {
+          "value2": "Bronze",
+          "text": "Bronze",
+          "formula": null
+        },
+        "A53": {
+          "value2": "East",
+          "text": "East",
+          "formula": null
+        },
+        "B53": {
+          "value2": "Banana",
+          "text": "Banana",
+          "formula": null
+        },
+        "C53": {
+          "value2": "Retail",
+          "text": "Retail",
+          "formula": null
+        },
+        "D53": {
+          "value2": 23.0,
+          "text": "23",
+          "formula": null
+        },
+        "E53": {
+          "value2": 38.0,
+          "text": "38",
+          "formula": null
+        },
+        "F53": {
+          "value2": 874.0,
+          "text": "874",
+          "formula": null
+        },
+        "G53": {
+          "value2": "Silver",
+          "text": "Silver",
+          "formula": null
+        },
+        "A54": {
+          "value2": "South",
+          "text": "South",
+          "formula": null
+        },
+        "B54": {
+          "value2": "Cherry",
+          "text": "Cherry",
+          "formula": null
+        },
+        "C54": {
+          "value2": "Partner",
+          "text": "Partner",
+          "formula": null
+        },
+        "D54": {
+          "value2": 4.0,
+          "text": "4",
+          "formula": null
+        },
+        "E54": {
+          "value2": 25.0,
+          "text": "25",
+          "formula": null
+        },
+        "F54": {
+          "value2": 100.0,
+          "text": "100",
+          "formula": null
+        },
+        "G54": {
+          "value2": "Gold",
+          "text": "Gold",
+          "formula": null
+        },
+        "A55": {
+          "value2": "East",
+          "text": "East",
+          "formula": null
+        },
+        "B55": {
+          "value2": "Apple",
+          "text": "Apple",
+          "formula": null
+        },
+        "C55": {
+          "value2": "Online",
+          "text": "Online",
+          "formula": null
+        },
+        "D55": {
+          "value2": 42.0,
+          "text": "42",
+          "formula": null
+        },
+        "E55": {
+          "value2": 38.0,
+          "text": "38",
+          "formula": null
+        },
+        "F55": {
+          "value2": 1596.0,
+          "text": "1596",
+          "formula": null
+        },
+        "G55": {
+          "value2": "Silver",
+          "text": "Silver",
+          "formula": null
+        },
+        "A56": {
+          "value2": "North",
+          "text": "North",
+          "formula": null
+        },
+        "B56": {
+          "value2": "Cherry",
+          "text": "Cherry",
+          "formula": null
+        },
+        "C56": {
+          "value2": "Retail",
+          "text": "Retail",
+          "formula": null
+        },
+        "D56": {
+          "value2": 50.0,
+          "text": "50",
+          "formula": null
+        },
+        "E56": {
+          "value2": 27.0,
+          "text": "27",
+          "formula": null
+        },
+        "F56": {
+          "value2": 1350.0,
+          "text": "1350",
+          "formula": null
+        },
+        "G56": {
+          "value2": "Silver",
+          "text": "Silver",
+          "formula": null
+        },
+        "A57": {
+          "value2": "East",
+          "text": "East",
+          "formula": null
+        },
+        "B57": {
+          "value2": "Walnut",
+          "text": "Walnut",
+          "formula": null
+        },
+        "C57": {
+          "value2": "Online",
+          "text": "Online",
+          "formula": null
+        },
+        "D57": {
+          "value2": 37.0,
+          "text": "37",
+          "formula": null
+        },
+        "E57": {
+          "value2": 39.0,
+          "text": "39",
+          "formula": null
+        },
+        "F57": {
+          "value2": 1443.0,
+          "text": "1443",
+          "formula": null
+        },
+        "G57": {
+          "value2": "Silver",
+          "text": "Silver",
+          "formula": null
+        },
+        "A58": {
+          "value2": "West",
+          "text": "West",
+          "formula": null
+        },
+        "B58": {
+          "value2": "Apple",
+          "text": "Apple",
+          "formula": null
+        },
+        "C58": {
+          "value2": "Retail",
+          "text": "Retail",
+          "formula": null
+        },
+        "D58": {
+          "value2": 23.0,
+          "text": "23",
+          "formula": null
+        },
+        "E58": {
+          "value2": 19.0,
+          "text": "19",
+          "formula": null
+        },
+        "F58": {
+          "value2": 437.0,
+          "text": "437",
+          "formula": null
+        },
+        "G58": {
+          "value2": "Gold",
+          "text": "Gold",
+          "formula": null
+        },
+        "A59": {
+          "value2": "South",
+          "text": "South",
+          "formula": null
+        },
+        "B59": {
+          "value2": "Apple",
+          "text": "Apple",
+          "formula": null
+        },
+        "C59": {
+          "value2": "Retail",
+          "text": "Retail",
+          "formula": null
+        },
+        "D59": {
+          "value2": 18.0,
+          "text": "18",
+          "formula": null
+        },
+        "E59": {
+          "value2": 15.0,
+          "text": "15",
+          "formula": null
+        },
+        "F59": {
+          "value2": 270.0,
+          "text": "270",
+          "formula": null
+        },
+        "G59": {
+          "value2": "Gold",
+          "text": "Gold",
+          "formula": null
+        },
+        "A60": {
+          "value2": "East",
+          "text": "East",
+          "formula": null
+        },
+        "B60": {
+          "value2": "Cherry",
+          "text": "Cherry",
+          "formula": null
+        },
+        "C60": {
+          "value2": "Retail",
+          "text": "Retail",
+          "formula": null
+        },
+        "D60": {
+          "value2": 17.0,
+          "text": "17",
+          "formula": null
+        },
+        "E60": {
+          "value2": 27.0,
+          "text": "27",
+          "formula": null
+        },
+        "F60": {
+          "value2": 459.0,
+          "text": "459",
+          "formula": null
+        },
+        "G60": {
+          "value2": "Gold",
+          "text": "Gold",
+          "formula": null
+        },
+        "A61": {
+          "value2": "West",
+          "text": "West",
+          "formula": null
+        },
+        "B61": {
+          "value2": "Apple",
+          "text": "Apple",
+          "formula": null
+        },
+        "C61": {
+          "value2": "Partner",
+          "text": "Partner",
+          "formula": null
+        },
+        "D61": {
+          "value2": 33.0,
+          "text": "33",
+          "formula": null
+        },
+        "E61": {
+          "value2": 32.0,
+          "text": "32",
+          "formula": null
+        },
+        "F61": {
+          "value2": 1056.0,
+          "text": "1056",
+          "formula": null
+        },
+        "G61": {
+          "value2": "Silver",
+          "text": "Silver",
+          "formula": null
+        },
+        "A62": {
+          "value2": "West",
+          "text": "West",
+          "formula": null
+        },
+        "B62": {
+          "value2": "Apple",
+          "text": "Apple",
+          "formula": null
+        },
+        "C62": {
+          "value2": "Partner",
+          "text": "Partner",
+          "formula": null
+        },
+        "D62": {
+          "value2": 5.0,
+          "text": "5",
+          "formula": null
+        },
+        "E62": {
+          "value2": 18.0,
+          "text": "18",
+          "formula": null
+        },
+        "F62": {
+          "value2": 90.0,
+          "text": "90",
+          "formula": null
+        },
+        "G62": {
+          "value2": "Silver",
+          "text": "Silver",
+          "formula": null
+        },
+        "A63": {
+          "value2": "North",
+          "text": "North",
+          "formula": null
+        },
+        "B63": {
+          "value2": "Banana",
+          "text": "Banana",
+          "formula": null
+        },
+        "C63": {
+          "value2": "Partner",
+          "text": "Partner",
+          "formula": null
+        },
+        "D63": {
+          "value2": 18.0,
+          "text": "18",
+          "formula": null
+        },
+        "E63": {
+          "value2": 5.0,
+          "text": "5",
+          "formula": null
+        },
+        "F63": {
+          "value2": 90.0,
+          "text": "90",
+          "formula": null
+        },
+        "G63": {
+          "value2": "Bronze",
+          "text": "Bronze",
+          "formula": null
+        },
+        "A64": {
+          "value2": "East",
+          "text": "East",
+          "formula": null
+        },
+        "B64": {
+          "value2": "Apple",
+          "text": "Apple",
+          "formula": null
+        },
+        "C64": {
+          "value2": "Partner",
+          "text": "Partner",
+          "formula": null
+        },
+        "D64": {
+          "value2": 48.0,
+          "text": "48",
+          "formula": null
+        },
+        "E64": {
+          "value2": 27.0,
+          "text": "27",
+          "formula": null
+        },
+        "F64": {
+          "value2": 1296.0,
+          "text": "1296",
+          "formula": null
+        },
+        "G64": {
+          "value2": "Silver",
+          "text": "Silver",
+          "formula": null
+        },
+        "A65": {
+          "value2": "East",
+          "text": "East",
+          "formula": null
+        },
+        "B65": {
+          "value2": "Walnut",
+          "text": "Walnut",
+          "formula": null
+        },
+        "C65": {
+          "value2": "Online",
+          "text": "Online",
+          "formula": null
+        },
+        "D65": {
+          "value2": 41.0,
+          "text": "41",
+          "formula": null
+        },
+        "E65": {
+          "value2": 20.0,
+          "text": "20",
+          "formula": null
+        },
+        "F65": {
+          "value2": 820.0,
+          "text": "820",
+          "formula": null
+        },
+        "G65": {
+          "value2": "Gold",
+          "text": "Gold",
+          "formula": null
+        },
+        "A66": {
+          "value2": "South",
+          "text": "South",
+          "formula": null
+        },
+        "B66": {
+          "value2": "Apple",
+          "text": "Apple",
+          "formula": null
+        },
+        "C66": {
+          "value2": "Retail",
+          "text": "Retail",
+          "formula": null
+        },
+        "D66": {
+          "value2": 10.0,
+          "text": "10",
+          "formula": null
+        },
+        "E66": {
+          "value2": 28.0,
+          "text": "28",
+          "formula": null
+        },
+        "F66": {
+          "value2": 280.0,
+          "text": "280",
+          "formula": null
+        },
+        "G66": {
+          "value2": "Gold",
+          "text": "Gold",
+          "formula": null
+        },
+        "A67": {
+          "value2": "South",
+          "text": "South",
+          "formula": null
+        },
+        "B67": {
+          "value2": "Walnut",
+          "text": "Walnut",
+          "formula": null
+        },
+        "C67": {
+          "value2": "Online",
+          "text": "Online",
+          "formula": null
+        },
+        "D67": {
+          "value2": 18.0,
+          "text": "18",
+          "formula": null
+        },
+        "E67": {
+          "value2": 1.0,
+          "text": "1",
+          "formula": null
+        },
+        "F67": {
+          "value2": 18.0,
+          "text": "18",
+          "formula": null
+        },
+        "G67": {
+          "value2": "Gold",
+          "text": "Gold",
+          "formula": null
+        },
+        "A68": {
+          "value2": "North",
+          "text": "North",
+          "formula": null
+        },
+        "B68": {
+          "value2": "Walnut",
+          "text": "Walnut",
+          "formula": null
+        },
+        "C68": {
+          "value2": "Online",
+          "text": "Online",
+          "formula": null
+        },
+        "D68": {
+          "value2": 38.0,
+          "text": "38",
+          "formula": null
+        },
+        "E68": {
+          "value2": 31.0,
+          "text": "31",
+          "formula": null
+        },
+        "F68": {
+          "value2": 1178.0,
+          "text": "1178",
+          "formula": null
+        },
+        "G68": {
+          "value2": "Bronze",
+          "text": "Bronze",
+          "formula": null
+        },
+        "A69": {
+          "value2": "West",
+          "text": "West",
+          "formula": null
+        },
+        "B69": {
+          "value2": "Cherry",
+          "text": "Cherry",
+          "formula": null
+        },
+        "C69": {
+          "value2": "Partner",
+          "text": "Partner",
+          "formula": null
+        },
+        "D69": {
+          "value2": 27.0,
+          "text": "27",
+          "formula": null
+        },
+        "E69": {
+          "value2": 22.0,
+          "text": "22",
+          "formula": null
+        },
+        "F69": {
+          "value2": 594.0,
+          "text": "594",
+          "formula": null
+        },
+        "G69": {
+          "value2": "Gold",
+          "text": "Gold",
+          "formula": null
+        },
+        "A70": {
+          "value2": "East",
+          "text": "East",
+          "formula": null
+        },
+        "B70": {
+          "value2": "Banana",
+          "text": "Banana",
+          "formula": null
+        },
+        "C70": {
+          "value2": "Online",
+          "text": "Online",
+          "formula": null
+        },
+        "D70": {
+          "value2": 41.0,
+          "text": "41",
+          "formula": null
+        },
+        "E70": {
+          "value2": 10.0,
+          "text": "10",
+          "formula": null
+        },
+        "F70": {
+          "value2": 410.0,
+          "text": "410",
+          "formula": null
+        },
+        "G70": {
+          "value2": "Bronze",
+          "text": "Bronze",
+          "formula": null
+        },
+        "A71": {
+          "value2": "North",
+          "text": "North",
+          "formula": null
+        },
+        "B71": {
+          "value2": "Apple",
+          "text": "Apple",
+          "formula": null
+        },
+        "C71": {
+          "value2": "Partner",
+          "text": "Partner",
+          "formula": null
+        },
+        "D71": {
+          "value2": 15.0,
+          "text": "15",
+          "formula": null
+        },
+        "E71": {
+          "value2": 5.0,
+          "text": "5",
+          "formula": null
+        },
+        "F71": {
+          "value2": 75.0,
+          "text": "75",
+          "formula": null
+        },
+        "G71": {
+          "value2": "Gold",
+          "text": "Gold",
+          "formula": null
+        },
+        "A72": {
+          "value2": "West",
+          "text": "West",
+          "formula": null
+        },
+        "B72": {
+          "value2": "Cherry",
+          "text": "Cherry",
+          "formula": null
+        },
+        "C72": {
+          "value2": "Retail",
+          "text": "Retail",
+          "formula": null
+        },
+        "D72": {
+          "value2": 4.0,
+          "text": "4",
+          "formula": null
+        },
+        "E72": {
+          "value2": 22.0,
+          "text": "22",
+          "formula": null
+        },
+        "F72": {
+          "value2": 88.0,
+          "text": "88",
+          "formula": null
+        },
+        "G72": {
+          "value2": "Gold",
+          "text": "Gold",
+          "formula": null
+        },
+        "A73": {
+          "value2": "West",
+          "text": "West",
+          "formula": null
+        },
+        "B73": {
+          "value2": "Apple",
+          "text": "Apple",
+          "formula": null
+        },
+        "C73": {
+          "value2": "Online",
+          "text": "Online",
+          "formula": null
+        },
+        "D73": {
+          "value2": 46.0,
+          "text": "46",
+          "formula": null
+        },
+        "E73": {
+          "value2": 35.0,
+          "text": "35",
+          "formula": null
+        },
+        "F73": {
+          "value2": 1610.0,
+          "text": "1610",
+          "formula": null
+        },
+        "G73": {
+          "value2": "Gold",
+          "text": "Gold",
+          "formula": null
+        },
+        "A74": {
+          "value2": "South",
+          "text": "South",
+          "formula": null
+        },
+        "B74": {
+          "value2": "Banana",
+          "text": "Banana",
+          "formula": null
+        },
+        "C74": {
+          "value2": "Partner",
+          "text": "Partner",
+          "formula": null
+        },
+        "D74": {
+          "value2": 4.0,
+          "text": "4",
+          "formula": null
+        },
+        "E74": {
+          "value2": 24.0,
+          "text": "24",
+          "formula": null
+        },
+        "F74": {
+          "value2": 96.0,
+          "text": "96",
+          "formula": null
+        },
+        "G74": {
+          "value2": "Bronze",
+          "text": "Bronze",
+          "formula": null
+        },
+        "A75": {
+          "value2": "West",
+          "text": "West",
+          "formula": null
+        },
+        "B75": {
+          "value2": "Walnut",
+          "text": "Walnut",
+          "formula": null
+        },
+        "C75": {
+          "value2": "Retail",
+          "text": "Retail",
+          "formula": null
+        },
+        "D75": {
+          "value2": 20.0,
+          "text": "20",
+          "formula": null
+        },
+        "E75": {
+          "value2": 34.0,
+          "text": "34",
+          "formula": null
+        },
+        "F75": {
+          "value2": 680.0,
+          "text": "680",
+          "formula": null
+        },
+        "G75": {
+          "value2": "Gold",
+          "text": "Gold",
+          "formula": null
+        },
+        "A76": {
+          "value2": "East",
+          "text": "East",
+          "formula": null
+        },
+        "B76": {
+          "value2": "Cherry",
+          "text": "Cherry",
+          "formula": null
+        },
+        "C76": {
+          "value2": "Online",
+          "text": "Online",
+          "formula": null
+        },
+        "D76": {
+          "value2": 30.0,
+          "text": "30",
+          "formula": null
+        },
+        "E76": {
+          "value2": 40.0,
+          "text": "40",
+          "formula": null
+        },
+        "F76": {
+          "value2": 1200.0,
+          "text": "1200",
+          "formula": null
+        },
+        "G76": {
+          "value2": "Silver",
+          "text": "Silver",
+          "formula": null
+        },
+        "A77": {
+          "value2": "North",
+          "text": "North",
+          "formula": null
+        },
+        "B77": {
+          "value2": "Apple",
+          "text": "Apple",
+          "formula": null
+        },
+        "C77": {
+          "value2": "Partner",
+          "text": "Partner",
+          "formula": null
+        },
+        "D77": {
+          "value2": 19.0,
+          "text": "19",
+          "formula": null
+        },
+        "E77": {
+          "value2": 13.0,
+          "text": "13",
+          "formula": null
+        },
+        "F77": {
+          "value2": 247.0,
+          "text": "247",
+          "formula": null
+        },
+        "G77": {
+          "value2": "Bronze",
+          "text": "Bronze",
+          "formula": null
+        },
+        "A78": {
+          "value2": "North",
+          "text": "North",
+          "formula": null
+        },
+        "B78": {
+          "value2": "Cherry",
+          "text": "Cherry",
+          "formula": null
+        },
+        "C78": {
+          "value2": "Online",
+          "text": "Online",
+          "formula": null
+        },
+        "D78": {
+          "value2": 27.0,
+          "text": "27",
+          "formula": null
+        },
+        "E78": {
+          "value2": 22.0,
+          "text": "22",
+          "formula": null
+        },
+        "F78": {
+          "value2": 594.0,
+          "text": "594",
+          "formula": null
+        },
+        "G78": {
+          "value2": "Gold",
+          "text": "Gold",
+          "formula": null
+        },
+        "A79": {
+          "value2": "West",
+          "text": "West",
+          "formula": null
+        },
+        "B79": {
+          "value2": "Cherry",
+          "text": "Cherry",
+          "formula": null
+        },
+        "C79": {
+          "value2": "Retail",
+          "text": "Retail",
+          "formula": null
+        },
+        "D79": {
+          "value2": 43.0,
+          "text": "43",
+          "formula": null
+        },
+        "E79": {
+          "value2": 27.0,
+          "text": "27",
+          "formula": null
+        },
+        "F79": {
+          "value2": 1161.0,
+          "text": "1161",
+          "formula": null
+        },
+        "G79": {
+          "value2": "Gold",
+          "text": "Gold",
+          "formula": null
+        },
+        "A80": {
+          "value2": "East",
+          "text": "East",
+          "formula": null
+        },
+        "B80": {
+          "value2": "Banana",
+          "text": "Banana",
+          "formula": null
+        },
+        "C80": {
+          "value2": "Retail",
+          "text": "Retail",
+          "formula": null
+        },
+        "D80": {
+          "value2": 12.0,
+          "text": "12",
+          "formula": null
+        },
+        "E80": {
+          "value2": 7.0,
+          "text": "7",
+          "formula": null
+        },
+        "F80": {
+          "value2": 84.0,
+          "text": "84",
+          "formula": null
+        },
+        "G80": {
+          "value2": "Bronze",
+          "text": "Bronze",
+          "formula": null
+        },
+        "A81": {
+          "value2": "West",
+          "text": "West",
+          "formula": null
+        },
+        "B81": {
+          "value2": "Apple",
+          "text": "Apple",
+          "formula": null
+        },
+        "C81": {
+          "value2": "Partner",
+          "text": "Partner",
+          "formula": null
+        },
+        "D81": {
+          "value2": 5.0,
+          "text": "5",
+          "formula": null
+        },
+        "E81": {
+          "value2": 17.0,
+          "text": "17",
+          "formula": null
+        },
+        "F81": {
+          "value2": 85.0,
+          "text": "85",
+          "formula": null
+        },
+        "G81": {
+          "value2": "Silver",
+          "text": "Silver",
+          "formula": null
+        },
+        "A82": {
+          "value2": "South",
+          "text": "South",
+          "formula": null
+        },
+        "B82": {
+          "value2": "Cherry",
+          "text": "Cherry",
+          "formula": null
+        },
+        "C82": {
+          "value2": "Online",
+          "text": "Online",
+          "formula": null
+        },
+        "D82": {
+          "value2": 36.0,
+          "text": "36",
+          "formula": null
+        },
+        "E82": {
+          "value2": 9.0,
+          "text": "9",
+          "formula": null
+        },
+        "F82": {
+          "value2": 324.0,
+          "text": "324",
+          "formula": null
+        },
+        "G82": {
+          "value2": "Bronze",
+          "text": "Bronze",
+          "formula": null
+        },
+        "A83": {
+          "value2": "South",
+          "text": "South",
+          "formula": null
+        },
+        "B83": {
+          "value2": "Banana",
+          "text": "Banana",
+          "formula": null
+        },
+        "C83": {
+          "value2": "Partner",
+          "text": "Partner",
+          "formula": null
+        },
+        "D83": {
+          "value2": 3.0,
+          "text": "3",
+          "formula": null
+        },
+        "E83": {
+          "value2": 40.0,
+          "text": "40",
+          "formula": null
+        },
+        "F83": {
+          "value2": 120.0,
+          "text": "120",
+          "formula": null
+        },
+        "G83": {
+          "value2": "Gold",
+          "text": "Gold",
+          "formula": null
+        },
+        "A84": {
+          "value2": "East",
+          "text": "East",
+          "formula": null
+        },
+        "B84": {
+          "value2": "Banana",
+          "text": "Banana",
+          "formula": null
+        },
+        "C84": {
+          "value2": "Online",
+          "text": "Online",
+          "formula": null
+        },
+        "D84": {
+          "value2": 22.0,
+          "text": "22",
+          "formula": null
+        },
+        "E84": {
+          "value2": 19.0,
+          "text": "19",
+          "formula": null
+        },
+        "F84": {
+          "value2": 418.0,
+          "text": "418",
+          "formula": null
+        },
+        "G84": {
+          "value2": "Silver",
+          "text": "Silver",
+          "formula": null
+        },
+        "A85": {
+          "value2": "South",
+          "text": "South",
+          "formula": null
+        },
+        "B85": {
+          "value2": "Walnut",
+          "text": "Walnut",
+          "formula": null
+        },
+        "C85": {
+          "value2": "Online",
+          "text": "Online",
+          "formula": null
+        },
+        "D85": {
+          "value2": 4.0,
+          "text": "4",
+          "formula": null
+        },
+        "E85": {
+          "value2": 18.0,
+          "text": "18",
+          "formula": null
+        },
+        "F85": {
+          "value2": 72.0,
+          "text": "72",
+          "formula": null
+        },
+        "G85": {
+          "value2": "Silver",
+          "text": "Silver",
+          "formula": null
+        },
+        "A86": {
+          "value2": "East",
+          "text": "East",
+          "formula": null
+        },
+        "B86": {
+          "value2": "Banana",
+          "text": "Banana",
+          "formula": null
+        },
+        "C86": {
+          "value2": "Online",
+          "text": "Online",
+          "formula": null
+        },
+        "D86": {
+          "value2": 16.0,
+          "text": "16",
+          "formula": null
+        },
+        "E86": {
+          "value2": 18.0,
+          "text": "18",
+          "formula": null
+        },
+        "F86": {
+          "value2": 288.0,
+          "text": "288",
+          "formula": null
+        },
+        "G86": {
+          "value2": "Gold",
+          "text": "Gold",
+          "formula": null
+        },
+        "A87": {
+          "value2": "South",
+          "text": "South",
+          "formula": null
+        },
+        "B87": {
+          "value2": "Banana",
+          "text": "Banana",
+          "formula": null
+        },
+        "C87": {
+          "value2": "Online",
+          "text": "Online",
+          "formula": null
+        },
+        "D87": {
+          "value2": 25.0,
+          "text": "25",
+          "formula": null
+        },
+        "E87": {
+          "value2": 28.0,
+          "text": "28",
+          "formula": null
+        },
+        "F87": {
+          "value2": 700.0,
+          "text": "700",
+          "formula": null
+        },
+        "G87": {
+          "value2": "Gold",
+          "text": "Gold",
+          "formula": null
+        },
+        "A88": {
+          "value2": "North",
+          "text": "North",
+          "formula": null
+        },
+        "B88": {
+          "value2": "Walnut",
+          "text": "Walnut",
+          "formula": null
+        },
+        "C88": {
+          "value2": "Online",
+          "text": "Online",
+          "formula": null
+        },
+        "D88": {
+          "value2": 2.0,
+          "text": "2",
+          "formula": null
+        },
+        "E88": {
+          "value2": 36.0,
+          "text": "36",
+          "formula": null
+        },
+        "F88": {
+          "value2": 72.0,
+          "text": "72",
+          "formula": null
+        },
+        "G88": {
+          "value2": "Bronze",
+          "text": "Bronze",
+          "formula": null
+        },
+        "A89": {
+          "value2": "West",
+          "text": "West",
+          "formula": null
+        },
+        "B89": {
+          "value2": "Walnut",
+          "text": "Walnut",
+          "formula": null
+        },
+        "C89": {
+          "value2": "Online",
+          "text": "Online",
+          "formula": null
+        },
+        "D89": {
+          "value2": 7.0,
+          "text": "7",
+          "formula": null
+        },
+        "E89": {
+          "value2": 27.0,
+          "text": "27",
+          "formula": null
+        },
+        "F89": {
+          "value2": 189.0,
+          "text": "189",
+          "formula": null
+        },
+        "G89": {
+          "value2": "Bronze",
+          "text": "Bronze",
+          "formula": null
+        },
+        "A90": {
+          "value2": "East",
+          "text": "East",
+          "formula": null
+        },
+        "B90": {
+          "value2": "Banana",
+          "text": "Banana",
+          "formula": null
+        },
+        "C90": {
+          "value2": "Partner",
+          "text": "Partner",
+          "formula": null
+        },
+        "D90": {
+          "value2": 4.0,
+          "text": "4",
+          "formula": null
+        },
+        "E90": {
+          "value2": 14.0,
+          "text": "14",
+          "formula": null
+        },
+        "F90": {
+          "value2": 56.0,
+          "text": "56",
+          "formula": null
+        },
+        "G90": {
+          "value2": "Gold",
+          "text": "Gold",
+          "formula": null
+        },
+        "A91": {
+          "value2": "East",
+          "text": "East",
+          "formula": null
+        },
+        "B91": {
+          "value2": "Cherry",
+          "text": "Cherry",
+          "formula": null
+        },
+        "C91": {
+          "value2": "Retail",
+          "text": "Retail",
+          "formula": null
+        },
+        "D91": {
+          "value2": 13.0,
+          "text": "13",
+          "formula": null
+        },
+        "E91": {
+          "value2": 15.0,
+          "text": "15",
+          "formula": null
+        },
+        "F91": {
+          "value2": 195.0,
+          "text": "195",
+          "formula": null
+        },
+        "G91": {
+          "value2": "Gold",
+          "text": "Gold",
+          "formula": null
+        }
+      }
+    },
+    {
+      "name": "P1",
+      "visible": -1,
+      "usedRange": "B4:D9",
+      "truncatedAt2000": false,
+      "cells": {
+        "B4": {
+          "value2": "Row Labels",
+          "text": "Row Labels",
+          "formula": null
+        },
+        "C4": {
+          "value2": "Sum of Margin",
+          "text": "Sum of Margin",
+          "formula": null
+        },
+        "D4": {
+          "value2": "Sum of Units",
+          "text": "Sum of Units",
+          "formula": null
+        },
+        "B5": {
+          "value2": "East",
+          "text": "East",
+          "formula": null
+        },
+        "C5": {
+          "value2": -545461.0,
+          "text": "-545461",
+          "formula": null
+        },
+        "D5": {
+          "value2": 782.0,
+          "text": "782",
+          "formula": null
+        },
+        "B6": {
+          "value2": "North",
+          "text": "North",
+          "formula": null
+        },
+        "C6": {
+          "value2": -168089.0,
+          "text": "-168089",
+          "formula": null
+        },
+        "D6": {
+          "value2": 450.0,
+          "text": "450",
+          "formula": null
+        },
+        "B7": {
+          "value2": "South",
+          "text": "South",
+          "formula": null
+        },
+        "C7": {
+          "value2": -153848.0,
+          "text": "-153848",
+          "formula": null
+        },
+        "D7": {
+          "value2": 392.0,
+          "text": "392",
+          "formula": null
+        },
+        "B8": {
+          "value2": "West",
+          "text": "West",
+          "formula": null
+        },
+        "C8": {
+          "value2": -152683.0,
+          "text": "-152683",
+          "formula": null
+        },
+        "D8": {
+          "value2": 384.0,
+          "text": "384",
+          "formula": null
+        },
+        "B9": {
+          "value2": "Grand Total",
+          "text": "Grand Total",
+          "formula": null
+        },
+        "C9": {
+          "value2": -3870217.0,
+          "text": "-3870217",
+          "formula": null
+        },
+        "D9": {
+          "value2": 2008.0,
+          "text": "2008",
+          "formula": null
+        }
+      }
+    },
+    {
+      "name": "P2",
+      "visible": -1,
+      "usedRange": "B4:F10",
+      "truncatedAt2000": false,
+      "cells": {
+        "B4": {
+          "value2": "Sum of Avg",
+          "text": "Sum of Avg",
+          "formula": null
+        },
+        "C4": {
+          "value2": "Column Labels",
+          "text": "Column Labels",
+          "formula": null
+        },
+        "B5": {
+          "value2": "Row Labels",
+          "text": "Row Labels",
+          "formula": null
+        },
+        "C5": {
+          "value2": "Online",
+          "text": "Online",
+          "formula": null
+        },
+        "D5": {
+          "value2": "Partner",
+          "text": "Partner",
+          "formula": null
+        },
+        "E5": {
+          "value2": "Retail",
+          "text": "Retail",
+          "formula": null
+        },
+        "F5": {
+          "value2": "Grand Total",
+          "text": "Grand Total",
+          "formula": null
+        },
+        "B6": {
+          "value2": "East",
+          "text": "East",
+          "formula": null
+        },
+        "C6": {
+          "value2": 23.25646551724138,
+          "text": "23.25646552",
+          "formula": null
+        },
+        "D6": {
+          "value2": 29.74015748031496,
+          "text": "29.74015748",
+          "formula": null
+        },
+        "E6": {
+          "value2": 23.952879581151834,
+          "text": "23.95287958",
+          "formula": null
+        },
+        "F6": {
+          "value2": 24.479539641943735,
+          "text": "24.47953964",
+          "formula": null
+        },
+        "B7": {
+          "value2": "North",
+          "text": "North",
+          "formula": null
+        },
+        "C7": {
+          "value2": 26.23611111111111,
+          "text": "26.23611111",
+          "formula": null
+        },
+        "D7": {
+          "value2": 12.855555555555556,
+          "text": "12.85555556",
+          "formula": null
+        },
+        "E7": {
+          "value2": 24.753968253968253,
+          "text": "24.75396825",
+          "formula": null
+        },
+        "F7": {
+          "value2": 20.468888888888888,
+          "text": "20.46888889",
+          "formula": null
+        },
+        "B8": {
+          "value2": "South",
+          "text": "South",
+          "formula": null
+        },
+        "C8": {
+          "value2": 19.912820512820513,
+          "text": "19.91282051",
+          "formula": null
+        },
+        "D8": {
+          "value2": 13.617021276595745,
+          "text": "13.61702128",
+          "formula": null
+        },
+        "E8": {
+          "value2": 23.5,
+          "text": "23.5",
+          "formula": null
+        },
+        "F8": {
+          "value2": 20.53061224489796,
+          "text": "20.53061224",
+          "formula": null
+        },
+        "B9": {
+          "value2": "West",
+          "text": "West",
+          "formula": null
+        },
+        "C9": {
+          "value2": 26.043795620437955,
+          "text": "26.04379562",
+          "formula": null
+        },
+        "D9": {
+          "value2": 20.603053435114504,
+          "text": "20.60305344",
+          "formula": null
+        },
+        "E9": {
+          "value2": 23.396551724137932,
+          "text": "23.39655172",
+          "formula": null
+        },
+        "F9": {
+          "value2": 23.388020833333332,
+          "text": "23.38802083",
+          "formula": null
+        },
+        "B10": {
+          "value2": "Grand Total",
+          "text": "Grand Total",
+          "formula": null
+        },
+        "C10": {
+          "value2": 23.425531914893618,
+          "text": "23.42553191",
+          "formula": null
+        },
+        "D10": {
+          "value2": 19.443298969072163,
+          "text": "19.44329897",
+          "formula": null
+        },
+        "E10": {
+          "value2": 23.898799313893655,
+          "text": "23.89879931",
+          "formula": null
+        },
+        "F10": {
+          "value2": 22.60109561752988,
+          "text": "22.60109562",
+          "formula": null
+        }
+      }
+    },
+    {
+      "name": "P3",
+      "visible": -1,
+      "usedRange": "B4:D9",
+      "truncatedAt2000": false,
+      "cells": {
+        "B4": {
+          "value2": "Row Labels",
+          "text": "Row Labels",
+          "formula": null
+        },
+        "C4": {
+          "value2": "Sum of Big",
+          "text": "Sum of Big",
+          "formula": null
+        },
+        "D4": {
+          "value2": "Sum of Units",
+          "text": "Sum of Units",
+          "formula": null
+        },
+        "B5": {
+          "value2": "Apple",
+          "text": "Apple",
+          "formula": null
+        },
+        "C5": {
+          "value2": 15278.0,
+          "text": "15278",
+          "formula": null
+        },
+        "D5": {
+          "value2": 596.0,
+          "text": "596",
+          "formula": null
+        },
+        "B6": {
+          "value2": "Banana",
+          "text": "Banana",
+          "formula": null
+        },
+        "C6": {
+          "value2": 9124.0,
+          "text": "9124",
+          "formula": null
+        },
+        "D6": {
+          "value2": 509.0,
+          "text": "509",
+          "formula": null
+        },
+        "B7": {
+          "value2": "Cherry",
+          "text": "Cherry",
+          "formula": null
+        },
+        "C7": {
+          "value2": 12000.0,
+          "text": "12000",
+          "formula": null
+        },
+        "D7": {
+          "value2": 511.0,
+          "text": "511",
+          "formula": null
+        },
+        "B8": {
+          "value2": "Walnut",
+          "text": "Walnut",
+          "formula": null
+        },
+        "C8": {
+          "value2": 8981.0,
+          "text": "8981",
+          "formula": null
+        },
+        "D8": {
+          "value2": 392.0,
+          "text": "392",
+          "formula": null
+        },
+        "B9": {
+          "value2": "Grand Total",
+          "text": "Grand Total",
+          "formula": null
+        },
+        "C9": {
+          "value2": 45383.0,
+          "text": "45383",
+          "formula": null
+        },
+        "D9": {
+          "value2": 2008.0,
+          "text": "2008",
+          "formula": null
+        }
+      }
+    },
+    {
+      "name": "P4",
+      "visible": -1,
+      "usedRange": "B4:D9",
+      "truncatedAt2000": false,
+      "cells": {
+        "B4": {
+          "value2": "Row Labels",
+          "text": "Row Labels",
+          "formula": null
+        },
+        "C4": {
+          "value2": "Sum of Scaled",
+          "text": "Sum of Scaled",
+          "formula": null
+        },
+        "D4": {
+          "value2": "Sum of Units",
+          "text": "Sum of Units",
+          "formula": null
+        },
+        "B5": {
+          "value2": "East",
+          "text": "East",
+          "formula": null
+        },
+        "C5": {
+          "value2": 632581.3,
+          "text": "632581.3",
+          "formula": null
+        },
+        "D5": {
+          "value2": 782.0,
+          "text": "782",
+          "formula": null
+        },
+        "B6": {
+          "value2": "North",
+          "text": "North",
+          "formula": null
+        },
+        "C6": {
+          "value2": 212632.1,
+          "text": "212632.1",
+          "formula": null
+        },
+        "D6": {
+          "value2": 450.0,
+          "text": "450",
+          "formula": null
+        },
+        "B7": {
+          "value2": "South",
+          "text": "South",
+          "formula": null
+        },
+        "C7": {
+          "value2": 162516.8,
+          "text": "162516.8",
+          "formula": null
+        },
+        "D7": {
+          "value2": 392.0,
+          "text": "392",
+          "formula": null
+        },
+        "B8": {
+          "value2": "West",
+          "text": "West",
+          "formula": null
+        },
+        "C8": {
+          "value2": 157335.1,
+          "text": "157335.1",
+          "formula": null
+        },
+        "D8": {
+          "value2": 384.0,
+          "text": "384",
+          "formula": null
+        },
+        "B9": {
+          "value2": "Grand Total",
+          "text": "Grand Total",
+          "formula": null
+        },
+        "C9": {
+          "value2": 4081985.3,
+          "text": "4081985.3",
+          "formula": null
+        },
+        "D9": {
+          "value2": 2008.0,
+          "text": "2008",
+          "formula": null
+        }
+      }
+    },
+    {
+      "name": "P5",
+      "visible": -1,
+      "usedRange": "B4:F25",
+      "truncatedAt2000": false,
+      "cells": {
+        "B4": {
+          "value2": "Region",
+          "text": "Region",
+          "formula": null
+        },
+        "C4": {
+          "value2": "Product",
+          "text": "Product",
+          "formula": null
+        },
+        "D4": {
+          "value2": "Sum of Margin",
+          "text": "Sum of Margin",
+          "formula": null
+        },
+        "E4": {
+          "value2": "Sum of Per unit",
+          "text": "Sum of Per unit",
+          "formula": null
+        },
+        "F4": {
+          "value2": "Sum of Units",
+          "text": "Sum of Units",
+          "formula": null
+        },
+        "B5": {
+          "value2": "East",
+          "text": "East",
+          "formula": null
+        },
+        "C5": {
+          "value2": "Apple",
+          "text": "Apple",
+          "formula": null
+        },
+        "D5": {
+          "value2": -54445.0,
+          "text": "-54445",
+          "formula": null
+        },
+        "E5": {
+          "value2": 29.19465648854962,
+          "text": "29.19465649",
+          "formula": null
+        },
+        "F5": {
+          "value2": 262.0,
+          "text": "262",
+          "formula": null
+        },
+        "C6": {
+          "value2": "Banana",
+          "text": "Banana",
+          "formula": null
+        },
+        "D6": {
+          "value2": -51162.0,
+          "text": "-51162",
+          "formula": null
+        },
+        "E6": {
+          "value2": 16.70394736842105,
+          "text": "16.70394737",
+          "formula": null
+        },
+        "F6": {
+          "value2": 304.0,
+          "text": "304",
+          "formula": null
+        },
+        "C7": {
+          "value2": "Cherry",
+          "text": "Cherry",
+          "formula": null
+        },
+        "D7": {
+          "value2": -11778.0,
+          "text": "-11778",
+          "formula": null
+        },
+        "E7": {
+          "value2": 30.620689655172413,
+          "text": "30.62068966",
+          "formula": null
+        },
+        "F7": {
+          "value2": 87.0,
+          "text": "87",
+          "formula": null
+        },
+        "C8": {
+          "value2": "Walnut",
+          "text": "Walnut",
+          "formula": null
+        },
+        "D8": {
+          "value2": -13534.0,
+          "text": "-13534",
+          "formula": null
+        },
+        "E8": {
+          "value2": 29.085271317829456,
+          "text": "29.08527132",
+          "formula": null
+        },
+        "F8": {
+          "value2": 129.0,
+          "text": "129",
+          "formula": null
+        },
+        "B9": {
+          "value2": "East Total",
+          "text": "East Total",
+          "formula": null
+        },
+        "D9": {
+          "value2": -545461.0,
+          "text": "-545461",
+          "formula": null
+        },
+        "E9": {
+          "value2": 24.479539641943735,
+          "text": "24.47953964",
+          "formula": null
+        },
+        "F9": {
+          "value2": 782.0,
+          "text": "782",
+          "formula": null
+        },
+        "B10": {
+          "value2": "North",
+          "text": "North",
+          "formula": null
+        },
+        "C10": {
+          "value2": "Apple",
+          "text": "Apple",
+          "formula": null
+        },
+        "D10": {
+          "value2": -6709.0,
+          "text": "-6709",
+          "formula": null
+        },
+        "E10": {
+          "value2": 17.091666666666665,
+          "text": "17.09166667",
+          "formula": null
+        },
+        "F10": {
+          "value2": 120.0,
+          "text": "120",
+          "formula": null
+        },
+        "C11": {
+          "value2": "Banana",
+          "text": "Banana",
+          "formula": null
+        },
+        "D11": {
+          "value2": -906.0,
+          "text": "-906",
+          "formula": null
+        },
+        "E11": {
+          "value2": 9.758620689655173,
+          "text": "9.75862069",
+          "formula": null
+        },
+        "F11": {
+          "value2": 29.0,
+          "text": "29",
+          "formula": null
+        },
+        "C12": {
+          "value2": "Cherry",
+          "text": "Cherry",
+          "formula": null
+        },
+        "D12": {
+          "value2": -24999.0,
+          "text": "-24999",
+          "formula": null
+        },
+        "E12": {
+          "value2": 24.87027027027027,
+          "text": "24.87027027",
+          "formula": null
+        },
+        "F12": {
+          "value2": 185.0,
+          "text": "185",
+          "formula": null
+        },
+        "C13": {
+          "value2": "Walnut",
+          "text": "Walnut",
+          "formula": null
+        },
+        "D13": {
+          "value2": -11644.0,
+          "text": "-11644",
+          "formula": null
+        },
+        "E13": {
+          "value2": 19.620689655172413,
+          "text": "19.62068966",
+          "formula": null
+        },
+        "F13": {
+          "value2": 116.0,
+          "text": "116",
+          "formula": null
+        },
+        "B14": {
+          "value2": "North Total",
+          "text": "North Total",
+          "formula": null
+        },
+        "D14": {
+          "value2": -168089.0,
+          "text": "-168089",
+          "formula": null
+        },
+        "E14": {
+          "value2": 20.468888888888888,
+          "text": "20.46888889",
+          "formula": null
+        },
+        "F14": {
+          "value2": 450.0,
+          "text": "450",
+          "formula": null
+        },
+        "B15": {
+          "value2": "South",
+          "text": "South",
+          "formula": null
+        },
+        "C15": {
+          "value2": "Apple",
+          "text": "Apple",
+          "formula": null
+        },
+        "D15": {
+          "value2": -5933.0,
+          "text": "-5933",
+          "formula": null
+        },
+        "E15": {
+          "value2": 23.75,
+          "text": "23.75",
+          "formula": null
+        },
+        "F15": {
+          "value2": 68.0,
+          "text": "68",
+          "formula": null
+        },
+        "C16": {
+          "value2": "Banana",
+          "text": "Banana",
+          "formula": null
+        },
+        "D16": {
+          "value2": -19742.0,
+          "text": "-19742",
+          "formula": null
+        },
+        "E16": {
+          "value2": 19.56390977443609,
+          "text": "19.56390977",
+          "formula": null
+        },
+        "F16": {
+          "value2": 133.0,
+          "text": "133",
+          "formula": null
+        },
+        "C17": {
+          "value2": "Cherry",
+          "text": "Cherry",
+          "formula": null
+        },
+        "D17": {
+          "value2": -4002.0,
+          "text": "-4002",
+          "formula": null
+        },
+        "E17": {
+          "value2": 24.03370786516854,
+          "text": "24.03370787",
+          "formula": null
+        },
+        "F17": {
+          "value2": 89.0,
+          "text": "89",
+          "formula": null
+        },
+        "C18": {
+          "value2": "Walnut",
+          "text": "Walnut",
+          "formula": null
+        },
+        "D18": {
+          "value2": -4938.0,
+          "text": "-4938",
+          "formula": null
+        },
+        "E18": {
+          "value2": 16.58823529411765,
+          "text": "16.58823529",
+          "formula": null
+        },
+        "F18": {
+          "value2": 102.0,
+          "text": "102",
+          "formula": null
+        },
+        "B19": {
+          "value2": "South Total",
+          "text": "South Total",
+          "formula": null
+        },
+        "D19": {
+          "value2": -153848.0,
+          "text": "-153848",
+          "formula": null
+        },
+        "E19": {
+          "value2": 20.53061224489796,
+          "text": "20.53061224",
+          "formula": null
+        },
+        "F19": {
+          "value2": 392.0,
+          "text": "392",
+          "formula": null
+        },
+        "B20": {
+          "value2": "West",
+          "text": "West",
+          "formula": null
+        },
+        "C20": {
+          "value2": "Apple",
+          "text": "Apple",
+          "formula": null
+        },
+        "D20": {
+          "value2": -20565.0,
+          "text": "-20565",
+          "formula": null
+        },
+        "E20": {
+          "value2": 27.143835616438356,
+          "text": "27.14383562",
+          "formula": null
+        },
+        "F20": {
+          "value2": 146.0,
+          "text": "146",
+          "formula": null
+        },
+        "C21": {
+          "value2": "Banana",
+          "text": "Banana",
+          "formula": null
+        },
+        "D21": {
+          "value2": 0.0,
+          "text": "0",
+          "formula": null
+        },
+        "E21": {
+          "value2": 27.0,
+          "text": "27",
+          "formula": null
+        },
+        "F21": {
+          "value2": 43.0,
+          "text": "43",
+          "formula": null
+        },
+        "C22": {
+          "value2": "Cherry",
+          "text": "Cherry",
+          "formula": null
+        },
+        "D22": {
+          "value2": -13604.0,
+          "text": "-13604",
+          "formula": null
+        },
+        "E22": {
+          "value2": 17.30666666666667,
+          "text": "17.30666667",
+          "formula": null
+        },
+        "F22": {
+          "value2": 150.0,
+          "text": "150",
+          "formula": null
+        },
+        "C23": {
+          "value2": "Walnut",
+          "text": "Walnut",
+          "formula": null
+        },
+        "D23": {
+          "value2": -4049.0,
+          "text": "-4049",
+          "formula": null
+        },
+        "E23": {
+          "value2": 28.022222222222222,
+          "text": "28.02222222",
+          "formula": null
+        },
+        "F23": {
+          "value2": 45.0,
+          "text": "45",
+          "formula": null
+        },
+        "B24": {
+          "value2": "West Total",
+          "text": "West Total",
+          "formula": null
+        },
+        "D24": {
+          "value2": -152683.0,
+          "text": "-152683",
+          "formula": null
+        },
+        "E24": {
+          "value2": 23.388020833333332,
+          "text": "23.38802083",
+          "formula": null
+        },
+        "F24": {
+          "value2": 384.0,
+          "text": "384",
+          "formula": null
+        },
+        "B25": {
+          "value2": "Grand Total",
+          "text": "Grand Total",
+          "formula": null
+        },
+        "D25": {
+          "value2": -3870217.0,
+          "text": "-3870217",
+          "formula": null
+        },
+        "E25": {
+          "value2": 22.60109561752988,
+          "text": "22.60109562",
+          "formula": null
+        },
+        "F25": {
+          "value2": 2008.0,
+          "text": "2008",
+          "formula": null
+        }
+      }
+    },
+    {
+      "name": "P6",
+      "visible": -1,
+      "usedRange": "B4:C9",
+      "truncatedAt2000": false,
+      "cells": {
+        "B4": {
+          "value2": "Row Labels",
+          "text": "Row Labels",
+          "formula": null
+        },
+        "C4": {
+          "value2": "Sum of Rounded",
+          "text": "Sum of Rounded",
+          "formula": null
+        },
+        "B5": {
+          "value2": "East",
+          "text": "East",
+          "formula": null
+        },
+        "C5": {
+          "value2": 84.5,
+          "text": "84.5",
+          "formula": null
+        },
+        "B6": {
+          "value2": "North",
+          "text": "North",
+          "formula": null
+        },
+        "C6": {
+          "value2": 76.5,
+          "text": "76.5",
+          "formula": null
+        },
+        "B7": {
+          "value2": "South",
+          "text": "South",
+          "formula": null
+        },
+        "C7": {
+          "value2": 41.5,
+          "text": "41.5",
+          "formula": null
+        },
+        "B8": {
+          "value2": "West",
+          "text": "West",
+          "formula": null
+        },
+        "C8": {
+          "value2": 60.4,
+          "text": "60.4",
+          "formula": null
+        },
+        "B9": {
+          "value2": "Grand Total",
+          "text": "Grand Total",
+          "formula": null
+        },
+        "C9": {
+          "value2": 80.6,
+          "text": "80.6",
+          "formula": null
+        }
+      }
+    },
+    {
+      "name": "P7",
+      "visible": -1,
+      "usedRange": "B4:H10",
+      "truncatedAt2000": false,
+      "cells": {
+        "B4": {
+          "value2": "Sum of Units",
+          "text": "Sum of Units",
+          "formula": null
+        },
+        "C4": {
+          "value2": "Column Labels",
+          "text": "Column Labels",
+          "formula": null
+        },
+        "B5": {
+          "value2": "Row Labels",
+          "text": "Row Labels",
+          "formula": null
+        },
+        "C5": {
+          "value2": "Apple",
+          "text": "Apple",
+          "formula": null
+        },
+        "D5": {
+          "value2": "Banana",
+          "text": "Banana",
+          "formula": null
+        },
+        "E5": {
+          "value2": "Cherry",
+          "text": "Cherry",
+          "formula": null
+        },
+        "F5": {
+          "value2": "Walnut",
+          "text": "Walnut",
+          "formula": null
+        },
+        "G5": {
+          "value2": "AppleBanana",
+          "text": "AppleBanana",
+          "formula": null
+        },
+        "H5": {
+          "value2": "Grand Total",
+          "text": "Grand Total",
+          "formula": null
+        },
+        "B6": {
+          "value2": "East",
+          "text": "East",
+          "formula": null
+        },
+        "C6": {
+          "value2": 262.0,
+          "text": "262",
+          "formula": null
+        },
+        "D6": {
+          "value2": 304.0,
+          "text": "304",
+          "formula": null
+        },
+        "E6": {
+          "value2": 87.0,
+          "text": "87",
+          "formula": null
+        },
+        "F6": {
+          "value2": 129.0,
+          "text": "129",
+          "formula": null
+        },
+        "G6": {
+          "value2": 566.0,
+          "text": "566",
+          "formula": "=Apple+Banana"
+        },
+        "H6": {
+          "value2": 1348.0,
+          "text": "1348",
+          "formula": null
+        },
+        "B7": {
+          "value2": "North",
+          "text": "North",
+          "formula": null
+        },
+        "C7": {
+          "value2": 120.0,
+          "text": "120",
+          "formula": null
+        },
+        "D7": {
+          "value2": 29.0,
+          "text": "29",
+          "formula": null
+        },
+        "E7": {
+          "value2": 185.0,
+          "text": "185",
+          "formula": null
+        },
+        "F7": {
+          "value2": 116.0,
+          "text": "116",
+          "formula": null
+        },
+        "G7": {
+          "value2": 149.0,
+          "text": "149",
+          "formula": "=Apple+Banana"
+        },
+        "H7": {
+          "value2": 599.0,
+          "text": "599",
+          "formula": null
+        },
+        "B8": {
+          "value2": "South",
+          "text": "South",
+          "formula": null
+        },
+        "C8": {
+          "value2": 68.0,
+          "text": "68",
+          "formula": null
+        },
+        "D8": {
+          "value2": 133.0,
+          "text": "133",
+          "formula": null
+        },
+        "E8": {
+          "value2": 89.0,
+          "text": "89",
+          "formula": null
+        },
+        "F8": {
+          "value2": 102.0,
+          "text": "102",
+          "formula": null
+        },
+        "G8": {
+          "value2": 201.0,
+          "text": "201",
+          "formula": "=Apple+Banana"
+        },
+        "H8": {
+          "value2": 593.0,
+          "text": "593",
+          "formula": null
+        },
+        "B9": {
+          "value2": "West",
+          "text": "West",
+          "formula": null
+        },
+        "C9": {
+          "value2": 146.0,
+          "text": "146",
+          "formula": null
+        },
+        "D9": {
+          "value2": 43.0,
+          "text": "43",
+          "formula": null
+        },
+        "E9": {
+          "value2": 150.0,
+          "text": "150",
+          "formula": null
+        },
+        "F9": {
+          "value2": 45.0,
+          "text": "45",
+          "formula": null
+        },
+        "G9": {
+          "value2": 189.0,
+          "text": "189",
+          "formula": "=Apple+Banana"
+        },
+        "H9": {
+          "value2": 573.0,
+          "text": "573",
+          "formula": null
+        },
+        "B10": {
+          "value2": "Grand Total",
+          "text": "Grand Total",
+          "formula": null
+        },
+        "C10": {
+          "value2": 596.0,
+          "text": "596",
+          "formula": null
+        },
+        "D10": {
+          "value2": 509.0,
+          "text": "509",
+          "formula": null
+        },
+        "E10": {
+          "value2": 511.0,
+          "text": "511",
+          "formula": null
+        },
+        "F10": {
+          "value2": 392.0,
+          "text": "392",
+          "formula": null
+        },
+        "G10": {
+          "value2": 1105.0,
+          "text": "1105",
+          "formula": null
+        },
+        "H10": {
+          "value2": 3113.0,
+          "text": "3113",
+          "formula": null
+        }
+      }
+    },
+    {
+      "name": "P8",
+      "visible": -1,
+      "usedRange": "B4:C10",
+      "truncatedAt2000": false,
+      "cells": {
+        "B4": {
+          "value2": "Row Labels",
+          "text": "Row Labels",
+          "formula": null
+        },
+        "C4": {
+          "value2": "Sum of Revenue",
+          "text": "Sum of Revenue",
+          "formula": null
+        },
+        "B5": {
+          "value2": "Apple",
+          "text": "Apple",
+          "formula": null
+        },
+        "C5": {
+          "value2": 15278.0,
+          "text": "15278",
+          "formula": null
+        },
+        "B6": {
+          "value2": "Banana",
+          "text": "Banana",
+          "formula": null
+        },
+        "C6": {
+          "value2": 9124.0,
+          "text": "9124",
+          "formula": null
+        },
+        "B7": {
+          "value2": "Cherry",
+          "text": "Cherry",
+          "formula": null
+        },
+        "C7": {
+          "value2": 12000.0,
+          "text": "12000",
+          "formula": null
+        },
+        "B8": {
+          "value2": "Walnut",
+          "text": "Walnut",
+          "formula": null
+        },
+        "C8": {
+          "value2": 8981.0,
+          "text": "8981",
+          "formula": null
+        },
+        "B9": {
+          "value2": "Diff",
+          "text": "Diff",
+          "formula": null
+        },
+        "C9": {
+          "value2": 6154.0,
+          "text": "6154",
+          "formula": "=Apple-Banana"
+        },
+        "B10": {
+          "value2": "Grand Total",
+          "text": "Grand Total",
+          "formula": null
+        },
+        "C10": {
+          "value2": 51537.0,
+          "text": "51537",
+          "formula": null
+        }
+      }
+    },
+    {
+      "name": "P9",
+      "visible": -1,
+      "usedRange": "B4:F11",
+      "truncatedAt2000": false,
+      "cells": {
+        "B4": {
+          "value2": "Sum of Units",
+          "text": "Sum of Units",
+          "formula": null
+        },
+        "C4": {
+          "value2": "Column Labels",
+          "text": "Column Labels",
+          "formula": null
+        },
+        "B5": {
+          "value2": "Row Labels",
+          "text": "Row Labels",
+          "formula": null
+        },
+        "C5": {
+          "value2": "Online",
+          "text": "Online",
+          "formula": null
+        },
+        "D5": {
+          "value2": "Partner",
+          "text": "Partner",
+          "formula": null
+        },
+        "E5": {
+          "value2": "Retail",
+          "text": "Retail",
+          "formula": null
+        },
+        "F5": {
+          "value2": "Grand Total",
+          "text": "Grand Total",
+          "formula": null
+        },
+        "B6": {
+          "value2": "Apple",
+          "text": "Apple",
+          "formula": null
+        },
+        "C6": {
+          "value2": 218.0,
+          "text": "218",
+          "formula": null
+        },
+        "D6": {
+          "value2": 234.0,
+          "text": "234",
+          "formula": null
+        },
+        "E6": {
+          "value2": 144.0,
+          "text": "144",
+          "formula": null
+        },
+        "F6": {
+          "value2": 596.0,
+          "text": "596",
+          "formula": null
+        },
+        "B7": {
+          "value2": "Banana",
+          "text": "Banana",
+          "formula": null
+        },
+        "C7": {
+          "value2": 300.0,
+          "text": "300",
+          "formula": null
+        },
+        "D7": {
+          "value2": 71.0,
+          "text": "71",
+          "formula": null
+        },
+        "E7": {
+          "value2": 138.0,
+          "text": "138",
+          "formula": null
+        },
+        "F7": {
+          "value2": 509.0,
+          "text": "509",
+          "formula": null
+        },
+        "B8": {
+          "value2": "Cherry",
+          "text": "Cherry",
+          "formula": null
+        },
+        "C8": {
+          "value2": 180.0,
+          "text": "180",
+          "formula": null
+        },
+        "D8": {
+          "value2": 138.0,
+          "text": "138",
+          "formula": null
+        },
+        "E8": {
+          "value2": 193.0,
+          "text": "193",
+          "formula": null
+        },
+        "F8": {
+          "value2": 511.0,
+          "text": "511",
+          "formula": null
+        },
+        "B9": {
+          "value2": "Walnut",
+          "text": "Walnut",
+          "formula": null
+        },
+        "C9": {
+          "value2": 242.0,
+          "text": "242",
+          "formula": null
+        },
+        "D9": {
+          "value2": 42.0,
+          "text": "42",
+          "formula": null
+        },
+        "E9": {
+          "value2": 108.0,
+          "text": "108",
+          "formula": null
+        },
+        "F9": {
+          "value2": 392.0,
+          "text": "392",
+          "formula": null
+        },
+        "B10": {
+          "value2": "Mean",
+          "text": "Mean",
+          "formula": null
+        },
+        "C10": {
+          "value2": 199.0,
+          "text": "199",
+          "formula": "=(Apple+Cherry)/2"
+        },
+        "D10": {
+          "value2": 186.0,
+          "text": "186",
+          "formula": "=(Apple+Cherry)/2"
+        },
+        "E10": {
+          "value2": 168.5,
+          "text": "168.5",
+          "formula": "=(Apple+Cherry)/2"
+        },
+        "F10": {
+          "value2": 553.5,
+          "text": "553.5",
+          "formula": null
+        },
+        "B11": {
+          "value2": "Grand Total",
+          "text": "Grand Total",
+          "formula": null
+        },
+        "C11": {
+          "value2": 1139.0,
+          "text": "1139",
+          "formula": null
+        },
+        "D11": {
+          "value2": 671.0,
+          "text": "671",
+          "formula": null
+        },
+        "E11": {
+          "value2": 751.5,
+          "text": "751.5",
+          "formula": null
+        },
+        "F11": {
+          "value2": 2561.5,
+          "text": "2561.5",
+          "formula": null
+        }
+      }
+    },
+    {
+      "name": "P10",
+      "visible": -1,
+      "usedRange": "B4:F11",
+      "truncatedAt2000": false,
+      "cells": {
+        "B4": {
+          "value2": "Sum of Revenue",
+          "text": "Sum of Revenue",
+          "formula": null
+        },
+        "C4": {
+          "value2": "Column Labels",
+          "text": "Column Labels",
+          "formula": null
+        },
+        "B5": {
+          "value2": "Row Labels",
+          "text": "Row Labels",
+          "formula": null
+        },
+        "C5": {
+          "value2": "Online",
+          "text": "Online",
+          "formula": null
+        },
+        "D5": {
+          "value2": "Partner",
+          "text": "Partner",
+          "formula": null
+        },
+        "E5": {
+          "value2": "Retail",
+          "text": "Retail",
+          "formula": null
+        },
+        "F5": {
+          "value2": "Grand Total",
+          "text": "Grand Total",
+          "formula": null
+        },
+        "B6": {
+          "value2": "East",
+          "text": "East",
+          "formula": null
+        },
+        "C6": {
+          "value2": 10791.0,
+          "text": "10791",
+          "formula": null
+        },
+        "D6": {
+          "value2": 3777.0,
+          "text": "3777",
+          "formula": null
+        },
+        "E6": {
+          "value2": 4575.0,
+          "text": "4575",
+          "formula": null
+        },
+        "F6": {
+          "value2": 19143.0,
+          "text": "19143",
+          "formula": null
+        },
+        "B7": {
+          "value2": "North",
+          "text": "North",
+          "formula": null
+        },
+        "C7": {
+          "value2": 3778.0,
+          "text": "3778",
+          "formula": null
+        },
+        "D7": {
+          "value2": 2314.0,
+          "text": "2314",
+          "formula": null
+        },
+        "E7": {
+          "value2": 3119.0,
+          "text": "3119",
+          "formula": null
+        },
+        "F7": {
+          "value2": 9211.0,
+          "text": "9211",
+          "formula": null
+        },
+        "B8": {
+          "value2": "South",
+          "text": "South",
+          "formula": null
+        },
+        "C8": {
+          "value2": 3883.0,
+          "text": "3883",
+          "formula": null
+        },
+        "D8": {
+          "value2": 640.0,
+          "text": "640",
+          "formula": null
+        },
+        "E8": {
+          "value2": 3525.0,
+          "text": "3525",
+          "formula": null
+        },
+        "F8": {
+          "value2": 8048.0,
+          "text": "8048",
+          "formula": null
+        },
+        "B9": {
+          "value2": "West",
+          "text": "West",
+          "formula": null
+        },
+        "C9": {
+          "value2": 3568.0,
+          "text": "3568",
+          "formula": null
+        },
+        "D9": {
+          "value2": 2699.0,
+          "text": "2699",
+          "formula": null
+        },
+        "E9": {
+          "value2": 2714.0,
+          "text": "2714",
+          "formula": null
+        },
+        "F9": {
+          "value2": 8981.0,
+          "text": "8981",
+          "formula": null
+        },
+        "B10": {
+          "value2": "Half",
+          "text": "Half",
+          "formula": null
+        },
+        "C10": {
+          "value2": 1889.0,
+          "text": "1889",
+          "formula": "=North*0.5"
+        },
+        "D10": {
+          "value2": 1157.0,
+          "text": "1157",
+          "formula": "=North*0.5"
+        },
+        "E10": {
+          "value2": 1559.5,
+          "text": "1559.5",
+          "formula": "=North*0.5"
+        },
+        "F10": {
+          "value2": 4605.5,
+          "text": "4605.5",
+          "formula": null
+        },
+        "B11": {
+          "value2": "Grand Total",
+          "text": "Grand Total",
+          "formula": null
+        },
+        "C11": {
+          "value2": 23909.0,
+          "text": "23909",
+          "formula": null
+        },
+        "D11": {
+          "value2": 10587.0,
+          "text": "10587",
+          "formula": null
+        },
+        "E11": {
+          "value2": 15492.5,
+          "text": "15492.5",
+          "formula": null
+        },
+        "F11": {
+          "value2": 49988.5,
+          "text": "49988.5",
+          "formula": null
+        }
+      }
+    },
+    {
+      "name": "P12",
+      "visible": -1,
+      "usedRange": "B4:C10",
+      "truncatedAt2000": false,
+      "cells": {
+        "B4": {
+          "value2": "Row Labels",
+          "text": "Row Labels",
+          "formula": null
+        },
+        "C4": {
+          "value2": "Count of Units",
+          "text": "Count of Units",
+          "formula": null
+        },
+        "B5": {
+          "value2": "Apple",
+          "text": "Apple",
+          "formula": null
+        },
+        "C5": {
+          "value2": 26.0,
+          "text": "26",
+          "formula": null
+        },
+        "B6": {
+          "value2": "Banana",
+          "text": "Banana",
+          "formula": null
+        },
+        "C6": {
+          "value2": 22.0,
+          "text": "22",
+          "formula": null
+        },
+        "B7": {
+          "value2": "Cherry",
+          "text": "Cherry",
+          "formula": null
+        },
+        "C7": {
+          "value2": 22.0,
+          "text": "22",
+          "formula": null
+        },
+        "B8": {
+          "value2": "Walnut",
+          "text": "Walnut",
+          "formula": null
+        },
+        "C8": {
+          "value2": 20.0,
+          "text": "20",
+          "formula": null
+        },
+        "B9": {
+          "value2": "Both",
+          "text": "Both",
+          "formula": null
+        },
+        "C9": {
+          "value2": 48.0,
+          "text": "48",
+          "formula": "=Apple+Banana"
+        },
+        "B10": {
+          "value2": "Grand Total",
+          "text": "Grand Total",
+          "formula": null
+        },
+        "C10": {
+          "value2": 138.0,
+          "text": "138",
+          "formula": null
+        }
+      }
+    },
+    {
+      "name": "P13",
+      "visible": -1,
+      "usedRange": "B4:C10",
+      "truncatedAt2000": false,
+      "cells": {
+        "B4": {
+          "value2": "Row Labels",
+          "text": "Row Labels",
+          "formula": null
+        },
+        "C4": {
+          "value2": "Max of Units",
+          "text": "Max of Units",
+          "formula": null
+        },
+        "B5": {
+          "value2": "Apple",
+          "text": "Apple",
+          "formula": null
+        },
+        "C5": {
+          "value2": 49.0,
+          "text": "49",
+          "formula": null
+        },
+        "B6": {
+          "value2": "Banana",
+          "text": "Banana",
+          "formula": null
+        },
+        "C6": {
+          "value2": 46.0,
+          "text": "46",
+          "formula": null
+        },
+        "B7": {
+          "value2": "Cherry",
+          "text": "Cherry",
+          "formula": null
+        },
+        "C7": {
+          "value2": 50.0,
+          "text": "50",
+          "formula": null
+        },
+        "B8": {
+          "value2": "Walnut",
+          "text": "Walnut",
+          "formula": null
+        },
+        "C8": {
+          "value2": 48.0,
+          "text": "48",
+          "formula": null
+        },
+        "B9": {
+          "value2": "Both",
+          "text": "Both",
+          "formula": null
+        },
+        "C9": {
+          "value2": 95.0,
+          "text": "95",
+          "formula": "=Apple+Banana"
+        },
+        "B10": {
+          "value2": "Grand Total",
+          "text": "Grand Total",
+          "formula": null
+        },
+        "C10": {
+          "value2": 95.0,
+          "text": "95",
+          "formula": null
+        }
+      }
+    },
+    {
+      "name": "P14",
+      "visible": -1,
+      "usedRange": "B4:D10",
+      "truncatedAt2000": false,
+      "cells": {
+        "B4": {
+          "value2": "Row Labels",
+          "text": "Row Labels",
+          "formula": null
+        },
+        "C4": {
+          "value2": "Sum of Margin",
+          "text": "Sum of Margin",
+          "formula": null
+        },
+        "D4": {
+          "value2": "Sum of Units",
+          "text": "Sum of Units",
+          "formula": null
+        },
+        "B5": {
+          "value2": "Apple",
+          "text": "Apple",
+          "formula": null
+        },
+        "C5": {
+          "value2": -335766.0,
+          "text": "-335766",
+          "formula": null
+        },
+        "D5": {
+          "value2": 596.0,
+          "text": "596",
+          "formula": null
+        },
+        "B6": {
+          "value2": "Banana",
+          "text": "Banana",
+          "formula": null
+        },
+        "C6": {
+          "value2": -205165.0,
+          "text": "-205165",
+          "formula": null
+        },
+        "D6": {
+          "value2": 509.0,
+          "text": "509",
+          "formula": null
+        },
+        "B7": {
+          "value2": "Cherry",
+          "text": "Cherry",
+          "formula": null
+        },
+        "C7": {
+          "value2": -245033.0,
+          "text": "-245033",
+          "formula": null
+        },
+        "D7": {
+          "value2": 511.0,
+          "text": "511",
+          "formula": null
+        },
+        "B8": {
+          "value2": "Walnut",
+          "text": "Walnut",
+          "formula": null
+        },
+        "C8": {
+          "value2": -162323.0,
+          "text": "-162323",
+          "formula": null
+        },
+        "D8": {
+          "value2": 392.0,
+          "text": "392",
+          "formula": null
+        },
+        "B9": {
+          "value2": "AB",
+          "text": "AB",
+          "formula": null
+        },
+        "C9": {
+          "value2": -1091648.0,
+          "text": "-1091648",
+          "formula": null
+        },
+        "D9": {
+          "value2": 1105.0,
+          "text": "1105",
+          "formula": "=Apple+Banana"
+        },
+        "B10": {
+          "value2": "Grand Total",
+          "text": "Grand Total",
+          "formula": null
+        },
+        "C10": {
+          "value2": -9144695.0,
+          "text": "-9144695",
+          "formula": null
+        },
+        "D10": {
+          "value2": 3113.0,
+          "text": "3113",
+          "formula": null
+        }
+      }
+    },
+    {
+      "name": "P15",
+      "visible": -1,
+      "usedRange": "B4:C29",
+      "truncatedAt2000": false,
+      "cells": {
+        "B4": {
+          "value2": "Row Labels",
+          "text": "Row Labels",
+          "formula": null
+        },
+        "C4": {
+          "value2": "Sum of Units",
+          "text": "Sum of Units",
+          "formula": null
+        },
+        "B5": {
+          "value2": "East",
+          "text": "East",
+          "formula": null
+        },
+        "C5": {
+          "value2": 1348.0,
+          "text": "1348",
+          "formula": null
+        },
+        "B6": {
+          "value2": "Apple",
+          "text": "Apple",
+          "formula": null
+        },
+        "C6": {
+          "value2": 262.0,
+          "text": "262",
+          "formula": null
+        },
+        "B7": {
+          "value2": "Banana",
+          "text": "Banana",
+          "formula": null
+        },
+        "C7": {
+          "value2": 304.0,
+          "text": "304",
+          "formula": null
+        },
+        "B8": {
+          "value2": "Cherry",
+          "text": "Cherry",
+          "formula": null
+        },
+        "C8": {
+          "value2": 87.0,
+          "text": "87",
+          "formula": null
+        },
+        "B9": {
+          "value2": "Walnut",
+          "text": "Walnut",
+          "formula": null
+        },
+        "C9": {
+          "value2": 129.0,
+          "text": "129",
+          "formula": null
+        },
+        "B10": {
+          "value2": "AB",
+          "text": "AB",
+          "formula": null
+        },
+        "C10": {
+          "value2": 566.0,
+          "text": "566",
+          "formula": "=Apple+Banana"
+        },
+        "B11": {
+          "value2": "North",
+          "text": "North",
+          "formula": null
+        },
+        "C11": {
+          "value2": 599.0,
+          "text": "599",
+          "formula": null
+        },
+        "B12": {
+          "value2": "Apple",
+          "text": "Apple",
+          "formula": null
+        },
+        "C12": {
+          "value2": 120.0,
+          "text": "120",
+          "formula": null
+        },
+        "B13": {
+          "value2": "Banana",
+          "text": "Banana",
+          "formula": null
+        },
+        "C13": {
+          "value2": 29.0,
+          "text": "29",
+          "formula": null
+        },
+        "B14": {
+          "value2": "Cherry",
+          "text": "Cherry",
+          "formula": null
+        },
+        "C14": {
+          "value2": 185.0,
+          "text": "185",
+          "formula": null
+        },
+        "B15": {
+          "value2": "Walnut",
+          "text": "Walnut",
+          "formula": null
+        },
+        "C15": {
+          "value2": 116.0,
+          "text": "116",
+          "formula": null
+        },
+        "B16": {
+          "value2": "AB",
+          "text": "AB",
+          "formula": null
+        },
+        "C16": {
+          "value2": 149.0,
+          "text": "149",
+          "formula": "=Apple+Banana"
+        },
+        "B17": {
+          "value2": "South",
+          "text": "South",
+          "formula": null
+        },
+        "C17": {
+          "value2": 593.0,
+          "text": "593",
+          "formula": null
+        },
+        "B18": {
+          "value2": "Apple",
+          "text": "Apple",
+          "formula": null
+        },
+        "C18": {
+          "value2": 68.0,
+          "text": "68",
+          "formula": null
+        },
+        "B19": {
+          "value2": "Banana",
+          "text": "Banana",
+          "formula": null
+        },
+        "C19": {
+          "value2": 133.0,
+          "text": "133",
+          "formula": null
+        },
+        "B20": {
+          "value2": "Cherry",
+          "text": "Cherry",
+          "formula": null
+        },
+        "C20": {
+          "value2": 89.0,
+          "text": "89",
+          "formula": null
+        },
+        "B21": {
+          "value2": "Walnut",
+          "text": "Walnut",
+          "formula": null
+        },
+        "C21": {
+          "value2": 102.0,
+          "text": "102",
+          "formula": null
+        },
+        "B22": {
+          "value2": "AB",
+          "text": "AB",
+          "formula": null
+        },
+        "C22": {
+          "value2": 201.0,
+          "text": "201",
+          "formula": "=Apple+Banana"
+        },
+        "B23": {
+          "value2": "West",
+          "text": "West",
+          "formula": null
+        },
+        "C23": {
+          "value2": 573.0,
+          "text": "573",
+          "formula": null
+        },
+        "B24": {
+          "value2": "Apple",
+          "text": "Apple",
+          "formula": null
+        },
+        "C24": {
+          "value2": 146.0,
+          "text": "146",
+          "formula": null
+        },
+        "B25": {
+          "value2": "Banana",
+          "text": "Banana",
+          "formula": null
+        },
+        "C25": {
+          "value2": 43.0,
+          "text": "43",
+          "formula": null
+        },
+        "B26": {
+          "value2": "Cherry",
+          "text": "Cherry",
+          "formula": null
+        },
+        "C26": {
+          "value2": 150.0,
+          "text": "150",
+          "formula": null
+        },
+        "B27": {
+          "value2": "Walnut",
+          "text": "Walnut",
+          "formula": null
+        },
+        "C27": {
+          "value2": 45.0,
+          "text": "45",
+          "formula": null
+        },
+        "B28": {
+          "value2": "AB",
+          "text": "AB",
+          "formula": null
+        },
+        "C28": {
+          "value2": 189.0,
+          "text": "189",
+          "formula": "=Apple+Banana"
+        },
+        "B29": {
+          "value2": "Grand Total",
+          "text": "Grand Total",
+          "formula": null
+        },
+        "C29": {
+          "value2": 3113.0,
+          "text": "3113",
+          "formula": null
+        }
+      }
+    },
+    {
+      "name": "P16",
+      "visible": -1,
+      "usedRange": "B4:E10",
+      "truncatedAt2000": false,
+      "cells": {
+        "B4": {
+          "value2": "Sum of Units",
+          "text": "Sum of Units",
+          "formula": null
+        },
+        "C4": {
+          "value2": "Column Labels",
+          "text": "Column Labels",
+          "formula": null
+        },
+        "B5": {
+          "value2": "Row Labels",
+          "text": "Row Labels",
+          "formula": null
+        },
+        "C5": {
+          "value2": "Online",
+          "text": "Online",
+          "formula": null
+        },
+        "D5": {
+          "value2": "Partner",
+          "text": "Partner",
+          "formula": null
+        },
+        "E5": {
+          "value2": "Retail",
+          "text": "Retail",
+          "formula": null
+        },
+        "B6": {
+          "value2": "Apple",
+          "text": "Apple",
+          "formula": null
+        },
+        "C6": {
+          "value2": 218.0,
+          "text": "218",
+          "formula": null
+        },
+        "D6": {
+          "value2": 234.0,
+          "text": "234",
+          "formula": null
+        },
+        "E6": {
+          "value2": 144.0,
+          "text": "144",
+          "formula": null
+        },
+        "B7": {
+          "value2": "Banana",
+          "text": "Banana",
+          "formula": null
+        },
+        "C7": {
+          "value2": 300.0,
+          "text": "300",
+          "formula": null
+        },
+        "D7": {
+          "value2": 71.0,
+          "text": "71",
+          "formula": null
+        },
+        "E7": {
+          "value2": 138.0,
+          "text": "138",
+          "formula": null
+        },
+        "B8": {
+          "value2": "Cherry",
+          "text": "Cherry",
+          "formula": null
+        },
+        "C8": {
+          "value2": 180.0,
+          "text": "180",
+          "formula": null
+        },
+        "D8": {
+          "value2": 138.0,
+          "text": "138",
+          "formula": null
+        },
+        "E8": {
+          "value2": 193.0,
+          "text": "193",
+          "formula": null
+        },
+        "B9": {
+          "value2": "Walnut",
+          "text": "Walnut",
+          "formula": null
+        },
+        "C9": {
+          "value2": 242.0,
+          "text": "242",
+          "formula": null
+        },
+        "D9": {
+          "value2": 42.0,
+          "text": "42",
+          "formula": null
+        },
+        "E9": {
+          "value2": 108.0,
+          "text": "108",
+          "formula": null
+        },
+        "B10": {
+          "value2": "AB",
+          "text": "AB",
+          "formula": null
+        },
+        "C10": {
+          "value2": 518.0,
+          "text": "518",
+          "formula": "=Apple+Banana"
+        },
+        "D10": {
+          "value2": 305.0,
+          "text": "305",
+          "formula": "=Apple+Banana"
+        },
+        "E10": {
+          "value2": 282.0,
+          "text": "282",
+          "formula": "=Apple+Banana"
+        }
+      }
+    }
+  ]
+}

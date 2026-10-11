@@ -69,6 +69,24 @@ impl Buf {
             .map(|l| serde_json::from_str(l).expect("audit json"))
             .collect()
     }
+
+    /// The `tool_call` result lines only (not intents, session starts or protocol errors).
+    fn calls(&self) -> Vec<Value> {
+        self.lines()
+            .into_iter()
+            .filter(|l| l["event"] == "tool_call")
+            .collect()
+    }
+}
+
+/// True when no leftover temporary file (`*.open365-tmp`) is in `dir`.
+fn no_temp_files(dir: &Path) -> bool {
+    std::fs::read_dir(dir).expect("ls").all(|e| {
+        !e.expect("entry")
+            .file_name()
+            .to_string_lossy()
+            .ends_with(".open365-tmp")
+    })
 }
 
 struct Rig {
@@ -190,7 +208,7 @@ fn json_rpc_session_covers_the_protocol() {
     assert_eq!(init["result"]["serverInfo"]["name"], "open365-mcp");
     assert!(init["result"]["capabilities"]["tools"].is_object());
     let newer = r.rpc("initialize", json!({"protocolVersion":"2099-01-01"}));
-    assert_eq!(newer["result"]["protocolVersion"], "2025-06-18");
+    assert_eq!(newer["result"]["protocolVersion"], "2025-11-25");
 
     // Notifications get no reply.
     let note = json!({"jsonrpc":"2.0","method":"notifications/initialized"});
@@ -217,7 +235,12 @@ fn json_rpc_session_covers_the_protocol() {
             "export_pdf",
             "new_from_template",
             "layout_summary",
-            "evaluate_formula"
+            "evaluate_formula",
+            "list_commands",
+            "read_formulas",
+            "get_styles",
+            "recalc",
+            "request_scope"
         ]
     );
     assert!(tools.iter().all(|t| t["inputSchema"].is_object()));
@@ -609,10 +632,10 @@ fn save_inside_apply_commands_is_refused_and_save_as_is_checked() {
         "save_as",
         json!({"document": id, "path": s(&scratch.outside().join("x.docx"))}),
     );
-    // Saving over the file it was opened from is a plain edit.
-    let (v, err) = r.call("save_as", json!({"document": id, "path": s(&docx)}));
-    assert!(!err, "{v}");
-    assert_eq!(v["effect"], "edit");
+    // Saving over the file it was opened from replaces an existing file: it needs the
+    // operator's confirmation, like any overwrite.
+    let why = r.refused("save_as", json!({"document": id, "path": s(&docx)}));
+    assert!(why.contains("--allow-destructive"), "{why}");
     // A new path is an export.
     let (v, err) = r.call("save_as", json!({"document": id, "path": "copy.docx"}));
     assert!(!err, "{v}");
@@ -628,6 +651,10 @@ fn save_inside_apply_commands_is_refused_and_save_as_is_checked() {
     let id = d.open(&docx);
     let (v, err) = d.call("save_as", json!({"document": id, "path": s(&other)}));
     assert!(!err, "{v}");
+    // With the flag, saving over the opened file goes through and is classed destructive.
+    let (v, err) = d.call("save_as", json!({"document": id, "path": s(&other)}));
+    assert!(!err, "{v}");
+    assert_eq!(v["effect"], "destructive");
 }
 
 #[test]
@@ -701,7 +728,7 @@ fn every_call_is_audited_including_refusals() {
     );
     r.refused("open_document", json!({"path": r"\\server\share\a.docx"}));
     r.call("get_outline", json!({"document": "doc99"}));
-    let lines = r.audit.lines();
+    let lines = r.audit.calls();
     assert_eq!(lines.len(), 5);
     let tools: Vec<&str> = lines
         .iter()
@@ -724,12 +751,22 @@ fn every_call_is_audited_including_refusals() {
     assert_eq!(statuses, ["ok", "ok", "refused", "refused", "invalid"]);
     assert_eq!(lines[2]["commands"], json!(["docx_insert_text"]));
     assert_eq!(lines[2]["origin"], "mcp");
+    assert!(lines.iter().all(|l| l["ts_ms"].is_string()));
+    // The whole log is numbered without gaps; the refused apply_commands left an intent line
+    // first, and its result line points back at it.
+    let all = r.audit.lines();
     assert!(
-        lines
-            .iter()
+        all.iter()
             .enumerate()
-            .all(|(i, l)| l["seq"] == i as u64 + 1 && l["ts_ms"].is_string())
+            .all(|(i, l)| l["seq"] == i as u64 + 1)
     );
+    assert_eq!(all[0]["event"], "session_start");
+    let intent = all
+        .iter()
+        .find(|l| l["event"] == "tool_intent")
+        .expect("intent line");
+    assert_eq!(intent["tool"], "apply_commands");
+    assert_eq!(lines[2]["intent_seq"], intent["seq"]);
     // Document text never reaches the audit log.
     assert!(!lines.iter().any(|l| l.to_string().contains("XY")));
 }
@@ -824,10 +861,10 @@ fn export_pdf_needs_edit_and_never_overwrites_without_the_flags() {
         json!({"document": id, "path": s(&out), "overwrite": true}),
     );
     assert!(!err, "{v}");
-    assert!(!scratch.root().join("out.pdf.open365-tmp").exists());
+    assert!(no_temp_files(&scratch.root()));
 
     // Audited: one line per call with the effect, the resolved path and the outcome.
-    let lines = r.audit.lines();
+    let lines = r.audit.calls();
     assert_eq!(lines[1]["tool"], "export_pdf");
     assert_eq!(lines[1]["status"], "ok");
     assert_eq!(lines[1]["effect"], "export");
@@ -837,7 +874,7 @@ fn export_pdf_needs_edit_and_never_overwrites_without_the_flags() {
             .as_str()
             .is_some_and(|p| p.ends_with("out.pdf"))
     );
-    assert_eq!(ro.audit.lines()[1]["status"], "refused");
+    assert_eq!(ro.audit.calls()[1]["status"], "refused");
 }
 
 #[test]
@@ -934,7 +971,7 @@ fn new_from_template_makes_documents_and_keeps_macros_unrun() {
     assert!(!err, "{v}");
     r.open(&scratch.root().join("n.xlsx"));
 
-    let lines = r.audit.lines();
+    let lines = r.audit.calls();
     assert_eq!(lines[0]["tool"], "new_from_template");
     assert_eq!(lines[0]["effect"], "export");
     assert_eq!(lines[0]["status"], "ok");
@@ -1038,7 +1075,7 @@ fn layout_summary_reports_pages_headings_and_tables_read_only() {
     let (v, err) = r.call("layout_summary", json!({"document": "doc99"}));
     assert!(err && v["status"] == "invalid", "{v}");
 
-    let lines = r.audit.lines();
+    let lines = r.audit.calls();
     assert_eq!(lines[1]["tool"], "layout_summary");
     assert_eq!(lines[1]["effect"], "read");
     assert_eq!(lines[1]["status"], "ok");
@@ -1199,7 +1236,7 @@ fn macro_enabled_files_and_templates_open_and_keep_their_vba_project() {
         let command = if docx {
             json!([{"command": "docx_insert_text", "para": 0, "offset": 0, "text": "X"}])
         } else {
-            json!([{"command": "xlsx_set_cell_value", "sheet": 0, "row": 1, "col": 1,
+            json!([{"command": "xlsx_set_cell_value", "sheet": 0, "row": 50, "col": 1,
                     "value": {"type": "number", "value": 7.0}}])
         };
         let (v, err) = r.call(
@@ -1263,7 +1300,7 @@ fn slow_tools_report_a_timeout_and_a_late_export_writes_nothing() {
     // The abandoned export saw the cancellation flag and never created the file.
     std::thread::sleep(std::time::Duration::from_millis(1500));
     assert!(!scratch.root().join("late.pdf").exists());
-    assert!(!scratch.root().join("late.pdf.open365-tmp").exists());
+    assert!(no_temp_files(&scratch.root()));
     let lines = r.audit.lines();
     assert!(lines.iter().any(|l| l["status"] == "timeout"));
 
@@ -1278,7 +1315,7 @@ fn slow_tools_report_a_timeout_and_a_late_export_writes_nothing() {
 fn the_formula_engine_is_cached_per_workbook_and_rebuilt_when_things_change() {
     let scratch = Scratch::new("engine");
     let xlsx = scratch.put("xlsx/formulas-basic.xlsx");
-    let mut r = rig(&scratch, true, false, false);
+    let mut r = rig(&scratch, true, true, false);
     let id = r.open(&xlsx);
     let eval = |r: &mut Rig, formula: &str| {
         let (v, err) = r.call(

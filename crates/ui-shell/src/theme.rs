@@ -82,6 +82,12 @@ pub struct Theme {
     pub menu_border: Color32,
     pub menu_hot: Color32,
     pub menu_ring: Color32,
+    /// Word's rulers: white track over the text area, the 1 px line under the band, marker fill and outline.
+    /// Dark values are sampled (`word-ruler.json`); light values are estimates.
+    pub ruler_track: Color32,
+    pub ruler_line: Color32,
+    pub ruler_marker: Color32,
+    pub ruler_marker_border: Color32,
 }
 
 impl Mode {
@@ -91,21 +97,12 @@ impl Mode {
     pub fn system() -> Self {
         #[cfg(windows)]
         {
-            let out = std::process::Command::new("reg")
-                .args([
-                    "query",
-                    r"HKCU\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize",
-                    "/v",
-                    "AppsUseLightTheme",
-                ])
-                .output();
-            if let Ok(o) = out {
-                let text = String::from_utf8_lossy(&o.stdout);
-                if let Some(v) = text.split_whitespace().last()
-                    && (v == "0x0" || v == "0")
-                {
-                    return Self::Dark;
-                }
+            let dark = windows_registry::CURRENT_USER
+                .open(r"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize")
+                .and_then(|k| k.get_u32("AppsUseLightTheme"))
+                .is_ok_and(|v| v == 0);
+            if dark {
+                return Self::Dark;
             }
         }
         Self::Light
@@ -172,6 +169,10 @@ impl Theme {
                 menu_border: Color32::from_rgb(0xad, 0xad, 0xad),
                 menu_hot: Color32::from_rgb(0x40, 0x40, 0x40),
                 menu_ring: Color32::from_rgb(0x40, 0x40, 0x40),
+                ruler_track: Color32::from_rgb(0x29, 0x29, 0x29),
+                ruler_line: Color32::from_rgb(0x61, 0x61, 0x61),
+                ruler_marker: Color32::from_rgb(0xbd, 0xbd, 0xbd),
+                ruler_marker_border: Color32::from_rgb(0x61, 0x61, 0x61),
             },
             Mode::Light => Self {
                 mode,
@@ -227,6 +228,10 @@ impl Theme {
                 menu_border: Color32::from_rgb(0xc6, 0xc6, 0xc6),
                 menu_hot: Color32::from_rgb(0xe6, 0xe6, 0xe6),
                 menu_ring: Color32::from_rgb(0xe1, 0xe1, 0xe1),
+                ruler_track: Color32::WHITE,
+                ruler_line: Color32::from_rgb(0xc6, 0xc6, 0xc6),
+                ruler_marker: Color32::from_rgb(0xf3, 0xf3, 0xf3),
+                ruler_marker_border: Color32::from_rgb(0x80, 0x80, 0x80),
             },
         }
     }
@@ -245,6 +250,14 @@ impl Theme {
         v.widgets.noninteractive.fg_stroke.color = self.text;
         v.widgets.inactive.fg_stroke.color = self.text;
         v.selection.stroke.color = self.accent;
+        // The text caret of the cell editor and formula bar follows Windows: blink time and width, drawn in the text colour.
+        let caret = crate::caret::CaretSettings::system();
+        v.text_cursor.stroke = egui::Stroke::new(caret.width, self.text);
+        v.text_cursor.blink = caret.blink_ms.is_some();
+        if let Some(s) = caret.blink_secs() {
+            v.text_cursor.on_duration = s as f32;
+            v.text_cursor.off_duration = s as f32;
+        }
         v
     }
 

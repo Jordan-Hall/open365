@@ -1,0 +1,5 @@
+feature = "pivot"
+made_with = "Microsoft Excel 20430 (Windows)"
+author = "project member"
+expect_dropped = []
+notes = "PivotTable table styles round 2: row headers off, blank rows, several page fields, subtotals at top (display format per cell)"

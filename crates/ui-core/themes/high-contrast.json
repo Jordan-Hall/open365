@@ -1,0 +1,16 @@
+{
+  "name": "high-contrast",
+  "colors": {
+    "frame": "#000000", "card": "#000000", "card_border": "#ffffff",
+    "text": "#ffffff", "text_dim": "#ffffff", "text_disabled": "#3ff23f",
+    "hover": "#1aebff", "pressed": "#1aebff", "checked": "#800080",
+    "separator": "#ffffff", "field": "#000000", "field_border": "#ffffff",
+    "accent": "#ffff00", "on_accent": "#000000", "focus_ring": "#ffff00",
+    "selection": "#1aebff", "selection_text": "#000000", "caret": "#ffffff",
+    "menu_bg": "#000000", "menu_border": "#ffffff", "menu_hot": "#1aebff",
+    "scroll_track": "#000000", "scroll_thumb": "#ffffff",
+    "tab_text": "#ffffff", "tab_underline": "#ffff00",
+    "tooltip_bg": "#000000", "tooltip_border": "#ffffff", "tooltip_text": "#ffffff",
+    "shadow": "#00000000", "keytip_bg": "#000000", "keytip_text": "#ffff00", "keytip_border": "#ffff00"
+  }
+}

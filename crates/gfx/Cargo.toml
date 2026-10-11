@@ -1,0 +1,22 @@
+[package]
+name = "open365-gfx"
+description = "wgpu 2D renderer for the Open365 UI: pixel-snapped rects and lines, clip stack, glyph and icon atlases, offscreen readback."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+bytemuck.workspace = true
+pollster.workspace = true
+resvg = { version = "0.48", default-features = false }
+skrifa.workspace = true
+thiserror = "2.0.21"
+wgpu = { workspace = true, features = ["dx12", "metal", "vulkan", "gles"] }
+
+[dev-dependencies]
+open365-text.workspace = true
+
+[lints]
+workspace = true

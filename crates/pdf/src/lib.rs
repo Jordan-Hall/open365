@@ -8,8 +8,13 @@
 //!
 //! Pictures are untrusted input: see [`image`] for the limits.
 
+mod align;
+mod cff;
 mod font;
+mod icc;
 mod image;
+mod lang;
+mod meta;
 mod structure;
 mod writer;
 
@@ -20,31 +25,70 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use open365_docx::Document;
 use open365_layout::{
     BorderLine, BorderStyle, ClusterKind, GlyphRun, ImagePlacement, ImageSource, Layout, Line,
-    Page, ParaRole, StoryKind,
+    Page, ParaRole, PlacedGlyph, StoryKind,
 };
 use open365_opc::{PartName, Relationships, TargetMode, rels_part_name, resolve_target};
 use open365_text::FontLibrary;
 
 use font::FaceDraw;
-use structure::{DocStructure, Node};
-use writer::{Pdf, digest, num, text_string, xml_escape};
+use lang::Languages;
+use meta::{write_info, write_xmp};
+use structure::{DocStructure, LinkSpec, LinkTarget, Node, ParaText};
+use writer::{Pdf, digest, num, text_string};
 
 pub use image::{MAX_BYTES as MAX_IMAGE_BYTES, MAX_PIXELS as MAX_IMAGE_PIXELS};
+pub use meta::PdfMetadata;
 
-/// Document information supplied by the caller. Nothing is filled in by default: no author, no
-/// dates, so an export does not leak the machine or the user.
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct PdfMetadata {
-    pub title: Option<String>,
-    pub author: Option<String>,
-    pub subject: Option<String>,
-    pub keywords: Option<String>,
-    /// The producing application; defaults to `Open365`.
-    pub creator: Option<String>,
-    /// A PDF date string such as `D:20260101120000Z`, written as is.
-    pub created: Option<String>,
-    /// BCP 47 language tag of the document (`/Lang`).
-    pub language: Option<String>,
+/// The archival profile to write, when one is wanted.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum Conformance {
+    /// A plain PDF 1.7 file, as Word writes by default.
+    #[default]
+    None,
+    /// PDF/A-1b (ISO 19005-1, level B): PDF 1.4, no transparency, an sRGB output intent.
+    PdfA1b,
+    /// PDF/A-2b (ISO 19005-2, level B): PDF 1.7 with an sRGB output intent.
+    PdfA2b,
+}
+
+impl Conformance {
+    /// The `pdfaid` part and conformance level, for the XMP packet.
+    pub(crate) fn pdfa(self) -> Option<(u8, &'static str)> {
+        match self {
+            Self::None => None,
+            Self::PdfA1b => Some((1, "B")),
+            Self::PdfA2b => Some((2, "B")),
+        }
+    }
+
+    fn version(self) -> &'static str {
+        match self {
+            Self::PdfA1b => "1.4",
+            _ => "1.7",
+        }
+    }
+}
+
+/// What the export writes beyond the page content.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct PdfOptions {
+    /// Archival profile; [`Conformance::None`] by default.
+    pub conformance: Conformance,
+    /// Bookmarks (the outline) from the headings, as Word's "Create bookmarks using Headings".
+    pub bookmarks: bool,
+    /// Declare PDF/UA-1 (`pdfuaid:part` in the XMP) and write what the profile needs besides the
+    /// tags: a title (the first heading when the caller gave none) shown in the title bar.
+    pub ua: bool,
+}
+
+impl Default for PdfOptions {
+    fn default() -> Self {
+        Self {
+            conformance: Conformance::None,
+            bookmarks: true,
+            ua: false,
+        }
+    }
 }
 
 /// The finished file plus what could not be represented.
@@ -100,11 +144,54 @@ enum Owner {
     Artifact,
 }
 
+/// A child of a structure element, in reading order.
+#[derive(Clone, Copy)]
+enum Kid {
+    /// Marked content: page index and MCID.
+    Mcr(usize, u32),
+    /// Another structure element (a link inside a paragraph).
+    Elem(u32),
+}
+
 struct FigureRec {
     id: u32,
     page: usize,
     mcid: u32,
     alt: Option<String>,
+}
+
+/// A hyperlink's `Link` structure element and the annotations it owns.
+struct LinkElem {
+    id: u32,
+    parent: u32,
+    /// (page index, annotation object) per line the link covers.
+    annots: Vec<(usize, u32)>,
+}
+
+/// A hyperlink's place in its paragraph: byte range in the paragraph text and index in
+/// [`DocStructure::links`].
+type Span = (usize, usize, usize);
+
+/// A link element to write: id, parent element, (page index, annotation) pairs.
+type LinkOut = (u32, u32, Vec<(usize, u32)>);
+
+/// A `Span` with a `/Lang`: id, parent element, language.
+struct LangElem {
+    id: u32,
+    parent: u32,
+    lang: String,
+}
+
+/// A language range of a paragraph in the layout's text: byte range and primary subtag.
+type LangSpan = (usize, usize, String);
+
+/// A heading for the outline: level, title, page index, x and top of its first line.
+struct Heading {
+    level: u8,
+    title: String,
+    page: usize,
+    x: f64,
+    top: f64,
 }
 
 struct Export<'a> {
@@ -113,8 +200,10 @@ struct Export<'a> {
     st: DocStructure,
     faces: BTreeMap<usize, FaceDraw>,
     page_ids: Vec<u32>,
-    /// struct element id -> (page index, mcid) pairs.
-    mcrs: HashMap<u32, Vec<(usize, u32)>>,
+    /// Page size as written to the MediaBox.
+    page_dims: Vec<(f64, f64)>,
+    /// struct element id -> its children in drawing order.
+    kids: HashMap<u32, Vec<Kid>>,
     /// parent struct element id -> figures.
     figures: HashMap<u32, Vec<FigureRec>>,
     /// (story, paragraph) -> extra element for note lines.
@@ -125,6 +214,25 @@ struct Export<'a> {
     drawn: std::collections::HashSet<(usize, usize)>,
     /// Glyph (face, id) to the text the font's ToUnicode CMap gives it.
     to_unicode: BTreeMap<(usize, u32), String>,
+    /// Main-story paragraph -> (page index, x, top) of its first line.
+    para_first: HashMap<usize, (usize, f64, f64)>,
+    link_spans: HashMap<usize, Vec<Span>>,
+    lang_spans: HashMap<usize, Vec<LangSpan>>,
+    lang_elems: HashMap<(usize, usize), LangElem>,
+    link_elems: HashMap<(usize, usize), LinkElem>,
+    /// Counter for link elements of annotations that have no paragraph element (header, footer).
+    free_links: usize,
+    /// Section of the page being drawn (the header and footer parts differ per section).
+    current_section: usize,
+    /// Link element of each annotation's `StructParent`, in key order.
+    struct_parents: Vec<u32>,
+    page_annots: Vec<Vec<u32>>,
+    /// PDF/A-1 has no transparency: pictures with alpha are composited onto white.
+    flatten: bool,
+    /// PDF/A and PDF/UA forbid references to the .notdef glyph: it is left out (the cursor
+    /// is corrected by the next glyph's position).
+    skip_notdef: bool,
+    ua: bool,
     warnings: Vec<String>,
     pdf: Pdf,
 }
@@ -142,7 +250,42 @@ impl PageBuf {
     }
 }
 
-/// Writes `layout` of `doc` as a tagged PDF 1.7 file.
+/// A hyperlink piece, a list label or plain text: what a run of glyphs on a line belongs to.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Seg {
+    Text,
+    Label,
+    Link(usize),
+    /// Text in another language than the document's: index in the paragraph's language spans.
+    Lang(usize),
+}
+
+/// Glyphs `from..to` of run `run`.
+struct Piece {
+    run: usize,
+    from: usize,
+    to: usize,
+}
+
+/// The size Word's PDF gives a page. Word lays the page out on a 600 dpi device grid, and for A4
+/// its MediaBox is 595.2 x 841.92 pt (4960 x 7016 device pixels), not the 595.3 x 841.9 pt of
+/// the section (11906 x 16838 twips). Evidence: all 51 A4 pages of the reference exports in
+/// `fixtures/reference/pdf`. Other sizes (US Letter, 612 x 792) are exact on that grid.
+fn page_dims(w: f64, h: f64) -> (f64, f64) {
+    let snap = |v: f64| {
+        if (v - 595.3).abs() < 0.06 {
+            595.2
+        } else if (v - 841.9).abs() < 0.06 {
+            841.92
+        } else {
+            v
+        }
+    };
+    (snap(w), snap(h))
+}
+
+/// Writes `layout` of `doc` as a tagged PDF 1.7 file with bookmarks and hyperlinks (see
+/// [`PdfOptions`] for the choices).
 ///
 /// `fonts` must be the library the layout was made with.
 pub fn export_pdf(
@@ -151,7 +294,14 @@ pub fn export_pdf(
     fonts: &FontLibrary,
     meta: &PdfMetadata,
 ) -> Result<PdfOutput, PdfError> {
-    export_pdf_cancellable(doc, layout, fonts, meta, &AtomicBool::new(false))
+    export_pdf_with(
+        doc,
+        layout,
+        fonts,
+        meta,
+        &PdfOptions::default(),
+        &AtomicBool::new(false),
+    )
 }
 
 /// As [`export_pdf`], but gives up with [`PdfError::Cancelled`] soon after `cancel` is set. The
@@ -161,6 +311,18 @@ pub fn export_pdf_cancellable(
     layout: &Layout,
     fonts: &FontLibrary,
     meta: &PdfMetadata,
+    cancel: &AtomicBool,
+) -> Result<PdfOutput, PdfError> {
+    export_pdf_with(doc, layout, fonts, meta, &PdfOptions::default(), cancel)
+}
+
+/// As [`export_pdf_cancellable`], with explicit [`PdfOptions`] (PDF/A, bookmarks).
+pub fn export_pdf_with(
+    doc: &Document,
+    layout: &Layout,
+    fonts: &FontLibrary,
+    meta: &PdfMetadata,
+    options: &PdfOptions,
     cancel: &AtomicBool,
 ) -> Result<PdfOutput, PdfError> {
     let check = || {
@@ -174,7 +336,7 @@ pub fn export_pdf_cancellable(
     if layout.pages.is_empty() {
         return Err(PdfError::NoPages);
     }
-    let mut pdf = Pdf::default();
+    let mut pdf = Pdf::with_version(options.conformance.version());
     let mut warnings: Vec<String> = Vec::new();
 
     // Fonts: the glyphs each face draws.
@@ -202,6 +364,7 @@ pub fn export_pdf_cancellable(
             learned.get(index).unwrap_or(&no_extra),
             format!("F{n}"),
             &mut warnings,
+            options.conformance == Conformance::PdfA1b,
         )?;
         font_objects.push((draw.resource.clone(), id));
         face_draw.insert(*index, draw);
@@ -213,23 +376,66 @@ pub fn export_pdf_cancellable(
             roles.entry(line.paragraph).or_insert(line.role);
         }
     }
-    let st = structure::analyse(doc, &roles, &mut pdf);
+    let main_rels = relationships(doc, doc.main_part());
+    let langs = Languages::read(doc);
+    // The document language: the caller's, else the document's own default (Word writes the
+    // primary subtag). Text in another language gets a `Span` with its own `/Lang`.
+    let catalog_lang: Option<String> = meta
+        .language
+        .clone()
+        .filter(|l| !l.is_empty())
+        .or_else(|| langs.default_tag().and_then(lang::primary));
+    let base_lang = catalog_lang.as_deref().and_then(lang::primary);
+    let mut st = structure::analyse(
+        doc,
+        &roles,
+        main_rels.as_ref(),
+        &langs,
+        base_lang.as_deref(),
+        &mut pdf,
+    );
+    add_story_texts(doc, layout, &langs, base_lang.as_deref(), &mut st);
+    if st.dropped_links > 0 {
+        warnings.push(format!(
+            "{} hyperlink(s) without a usable target were left out",
+            st.dropped_links
+        ));
+    }
     let resources_id = pdf.reserve();
     let pages_id = pdf.reserve();
     let page_ids: Vec<u32> = layout.pages.iter().map(|_| pdf.reserve()).collect();
+    let dims: Vec<(f64, f64)> = layout
+        .pages
+        .iter()
+        .map(|p| page_dims(p.section.page_width, p.section.page_height))
+        .collect();
+    let (para_first, link_spans, lang_spans, headings) = index_main_story(layout, &st);
     let mut ex = Export {
         layout,
         doc,
         st,
         faces: face_draw,
         page_ids,
-        mcrs: HashMap::new(),
+        page_dims: dims,
+        kids: HashMap::new(),
         figures: HashMap::new(),
         extras: Vec::new(),
         extra_keys: HashMap::new(),
         images: HashMap::new(),
         drawn: std::collections::HashSet::new(),
         to_unicode,
+        para_first,
+        link_spans,
+        lang_spans,
+        lang_elems: HashMap::new(),
+        free_links: 0,
+        current_section: 0,
+        link_elems: HashMap::new(),
+        struct_parents: Vec::new(),
+        page_annots: vec![Vec::new(); layout.pages.len()],
+        flatten: options.conformance == Conformance::PdfA1b,
+        skip_notdef: options.conformance != Conformance::None || options.ua,
+        ua: options.ua,
         warnings,
         pdf,
     };
@@ -239,11 +445,20 @@ pub fn export_pdf_cancellable(
         check()?;
         let (content, owners) = ex.render_page(i, page);
         let content_id = ex.pdf.add_stream("", content.as_bytes(), true);
-        let (w, h) = (page.section.page_width, page.section.page_height);
+        let (w, h) = ex.page_dims[i];
+        let annots = if ex.page_annots[i].is_empty() {
+            String::new()
+        } else {
+            let refs: String = ex.page_annots[i]
+                .iter()
+                .map(|a| format!("{a} 0 R "))
+                .collect();
+            format!(" /Annots [{refs}]")
+        };
         ex.pdf.set(
             ex.page_ids[i],
             format!(
-                "<< /Type /Page /Parent {pages_id} 0 R /MediaBox [0 0 {} {}] /Resources {resources_id} 0 R /Contents {content_id} 0 R /StructParents {i} /Tabs /S >>",
+                "<< /Type /Page /Parent {pages_id} 0 R /MediaBox [0 0 {} {}] /Resources {resources_id} 0 R /Contents {content_id} 0 R /StructParents {i} /Tabs /S{annots} >>",
                 num(w, 3),
                 num(h, 3)
             ),
@@ -279,17 +494,41 @@ pub fn export_pdf_cancellable(
 
     check()?;
     let struct_root = ex.write_structure(&page_owners);
-    let info = write_info(&mut ex.pdf, meta);
-    let xmp = write_xmp(&mut ex.pdf, meta);
+    let outlines = if options.bookmarks {
+        ex.write_outlines(&headings)
+    } else {
+        None
+    };
+    let mut meta = meta.clone();
+    if options.ua && meta.title.as_deref().is_none_or(str::is_empty) {
+        // PDF/UA needs a title in the title bar: the first heading, else a plain name.
+        let title = headings.first().map_or("Document", |h| h.title.as_str());
+        ex.warnings.push(format!(
+            "PDF/UA needs a document title; \"{title}\" was used (pass one with --title)"
+        ));
+        meta.title = Some(title.to_owned());
+    }
+    let info = write_info(&mut ex.pdf, &meta);
+    let xmp = write_xmp(&mut ex.pdf, &meta, options.conformance, options.ua);
     let catalog = ex.pdf.reserve();
     let mut cat = format!(
         "<< /Type /Catalog /Pages {pages_id} 0 R /MarkInfo << /Marked true >> /StructTreeRoot {struct_root} 0 R /Metadata {xmp} 0 R"
     );
-    if let Some(lang) = meta.language.as_deref().filter(|l| !l.is_empty()) {
+    if let Some(o) = outlines {
+        cat.push_str(&format!(" /Outlines {o} 0 R"));
+    }
+    if let Some(lang) = catalog_lang.as_deref() {
         cat.push_str(&format!(" /Lang {}", text_string(lang)));
     }
-    if meta.title.as_deref().is_some_and(|t| !t.is_empty()) {
+    if meta.title.as_deref().is_some_and(|t| !t.is_empty()) || options.ua {
         cat.push_str(" /ViewerPreferences << /DisplayDocTitle true >>");
+    }
+    if options.conformance != Conformance::None {
+        let profile = icc::srgb_profile();
+        let icc_id = ex.pdf.add_stream("/N 3", &profile, true);
+        cat.push_str(&format!(
+            " /OutputIntents [<< /Type /OutputIntent /S /GTS_PDFA1 /OutputConditionIdentifier (sRGB IEC61966-2.1) /RegistryName (http://www.color.org) /Info (sRGB IEC61966-2.1) /DestOutputProfile {icc_id} 0 R >>]"
+        ));
     }
     cat.push_str(" >>");
     ex.pdf.set(catalog, cat);
@@ -297,8 +536,9 @@ pub fn export_pdf_cancellable(
     let warnings = std::mem::take(&mut ex.warnings);
     let identity = digest(
         format!(
-            "{:?}{}{}",
+            "{:?}{:?}{}{}",
             meta,
+            options,
             ex.page_ids.len(),
             ex.layout.lines().count()
         )
@@ -308,6 +548,195 @@ pub fn export_pdf_cancellable(
         .pdf
         .finish(catalog, &format!("/Info {info} 0 R"), identity);
     Ok(PdfOutput { bytes, warnings })
+}
+
+type MainIndex = (
+    HashMap<usize, (usize, f64, f64)>,
+    HashMap<usize, Vec<Span>>,
+    HashMap<usize, Vec<LangSpan>>,
+    Vec<Heading>,
+);
+
+/// The key of a paragraph in the maps of links and languages: the paragraph index for the main
+/// story, a composite for the other stories (headers and footers per section).
+fn story_key(story: StoryKind, section: usize, paragraph: usize) -> usize {
+    if story == StoryKind::Main {
+        return paragraph;
+    }
+    let section = match story {
+        StoryKind::Footnotes | StoryKind::Endnotes => 0,
+        _ => section.min(0xFFFF),
+    };
+    (usize::from(story.word_code()) << 48) | (section << 32) | (paragraph & 0xFFFF_FFFF)
+}
+
+fn line_key(line: &Line, section: usize) -> usize {
+    story_key(line.story, section, line.paragraph)
+}
+
+/// The first line of every main-story paragraph, where each hyperlink and each foreign-language
+/// run sits in the paragraph text the layout drew (found by aligning the model's text with it, so
+/// a field that shows another value does not lose them), and the headings for the outline.
+fn index_main_story(layout: &Layout, st: &DocStructure) -> MainIndex {
+    let mut first = HashMap::new();
+    let mut spans: HashMap<usize, Vec<Span>> = HashMap::new();
+    let mut langs: HashMap<usize, Vec<LangSpan>> = HashMap::new();
+    let mut seen = std::collections::HashSet::new();
+    let mut headings = Vec::new();
+    for (pi, page) in layout.pages.iter().enumerate() {
+        for line in page
+            .header
+            .iter()
+            .chain(&page.lines)
+            .chain(&page.notes)
+            .chain(&page.footer)
+        {
+            if line.story == StoryKind::Main && !first.contains_key(&line.paragraph) {
+                first.insert(line.paragraph, (pi, line.left, line.top));
+                if let Some(level) = st.paras.get(line.paragraph).and_then(|p| p.heading) {
+                    let label = line.label.as_deref().unwrap_or("");
+                    let raw = format!("{label} {}", line.text);
+                    let title: String = raw
+                        .chars()
+                        .map(|c| if c.is_control() { ' ' } else { c })
+                        .collect();
+                    let title = title.split_whitespace().collect::<Vec<_>>().join(" ");
+                    if !title.is_empty() {
+                        headings.push(Heading {
+                            level,
+                            title,
+                            page: pi,
+                            x: line.left,
+                            top: line.top,
+                        });
+                    }
+                }
+            }
+            let key = line_key(line, page.section_index);
+            if !seen.insert(key) {
+                continue;
+            }
+            let Some(pt) = st.texts.get(&key) else {
+                continue;
+            };
+            if pt.links.is_empty() && pt.langs.is_empty() {
+                continue;
+            }
+            let al = align::Alignment::new(&pt.text, &line.text);
+            let found: Vec<Span> = pt
+                .links
+                .iter()
+                .enumerate()
+                .filter_map(|(k, r)| al.map(r.clone()).map(|m| (m.start, m.end, k)))
+                .collect();
+            if !found.is_empty() {
+                spans.insert(key, found);
+            }
+            let found: Vec<LangSpan> = pt
+                .langs
+                .iter()
+                .filter_map(|(r, l)| al.map(r.clone()).map(|m| (m.start, m.end, l.clone())))
+                .collect();
+            if !found.is_empty() {
+                langs.insert(key, found);
+            }
+        }
+    }
+    (first, spans, langs, headings)
+}
+
+/// Reads the text and hyperlinks of the header, footer and note paragraphs the layout drew, so
+/// that links there are found too. The paragraphs of a story are numbered as the layout numbers
+/// them: in file order, tables included; notes by their top-level paragraphs.
+fn add_story_texts(
+    doc: &Document,
+    layout: &Layout,
+    langs: &Languages,
+    base: Option<&str>,
+    st: &mut DocStructure,
+) {
+    let put = |story: StoryKind,
+               section: usize,
+               stories: Vec<(ParaText, Vec<LinkSpec>)>,
+               st: &mut DocStructure| {
+        for (i, (mut text, links)) in stories.into_iter().enumerate() {
+            let key = story_key(story, section, i);
+            if links.is_empty() && text.langs.is_empty() {
+                continue;
+            }
+            if base.is_some() {
+                text.langs.retain(|(_, l)| Some(l.as_str()) != base);
+            }
+            if !links.is_empty() {
+                st.links.insert(key, links);
+            }
+            st.texts.insert(key, text);
+        }
+    };
+    // Headers and footers: the part each (story, section) shows.
+    let sections = doc.sections();
+    let mut wanted = std::collections::BTreeMap::new();
+    for page in &layout.pages {
+        for line in page.header.iter().chain(&page.footer) {
+            wanted.insert((line.story.word_code(), page.section_index), line.story);
+        }
+    }
+    for ((_, section), story) in wanted {
+        let (footer, kind) = match story {
+            StoryKind::PrimaryHeader => (false, open365_docx::HeaderFooterType::Default),
+            StoryKind::FirstHeader => (false, open365_docx::HeaderFooterType::First),
+            StoryKind::EvenHeader => (false, open365_docx::HeaderFooterType::Even),
+            StoryKind::PrimaryFooter => (true, open365_docx::HeaderFooterType::Default),
+            StoryKind::FirstFooter => (true, open365_docx::HeaderFooterType::First),
+            StoryKind::EvenFooter => (true, open365_docx::HeaderFooterType::Even),
+            _ => continue,
+        };
+        // A kind a section does not name is inherited from the one before.
+        let Some(rel) = sections
+            .iter()
+            .take(section + 1)
+            .rev()
+            .flat_map(|s| s.header_footer_refs.iter())
+            .find(|r| r.footer == footer && r.kind == kind)
+            .map(|r| r.rel_id.clone())
+        else {
+            continue;
+        };
+        let (Some(blocks), Some(part)) = (
+            doc.header_footer_blocks(&rel),
+            related(doc, doc.main_part(), |r| r.id == rel),
+        ) else {
+            continue;
+        };
+        let rels = relationships(doc, &part);
+        let texts = structure::story_texts(&blocks, rels.as_ref(), langs, base);
+        put(story, section, texts, st);
+    }
+    // Footnotes and endnotes.
+    for (story, notes, suffix) in [
+        (StoryKind::Footnotes, doc.footnotes(), "/footnotes"),
+        (StoryKind::Endnotes, doc.endnotes(), "/endnotes"),
+    ] {
+        let rels = related(doc, doc.main_part(), |r| r.rel_type.ends_with(suffix))
+            .and_then(|part| relationships(doc, &part));
+        let mut all = Vec::new();
+        for note in notes
+            .iter()
+            .filter(|n| n.kind == open365_docx::NoteKind::Normal)
+        {
+            for block in &note.blocks {
+                if matches!(block, open365_docx::Block::Paragraph(_)) {
+                    all.extend(structure::story_texts(
+                        std::slice::from_ref(block),
+                        rels.as_ref(),
+                        langs,
+                        base,
+                    ));
+                }
+            }
+        }
+        put(story, 0, all, st);
+    }
 }
 
 /// True when `text` is one character that `shown` only draws in another case: a character set in
@@ -381,52 +810,12 @@ fn cluster_text(
     (extra, table)
 }
 
-fn write_info(pdf: &mut Pdf, meta: &PdfMetadata) -> u32 {
-    let mut d = String::from("<< ");
-    for (key, value) in [
-        ("Title", &meta.title),
-        ("Author", &meta.author),
-        ("Subject", &meta.subject),
-        ("Keywords", &meta.keywords),
-        ("CreationDate", &meta.created),
-    ] {
-        if let Some(v) = value.as_deref().filter(|v| !v.is_empty()) {
-            d.push_str(&format!("/{key} {} ", text_string(v)));
-        }
-    }
-    let creator = meta.creator.as_deref().unwrap_or("Open365");
-    d.push_str(&format!(
-        "/Creator {} /Producer (Open365) >>",
-        text_string(creator)
-    ));
-    pdf.add(d)
-}
-
-fn write_xmp(pdf: &mut Pdf, meta: &PdfMetadata) -> u32 {
-    let mut x = String::from(
-        "<?xpacket begin=\"\u{feff}\" id=\"W5M0MpCehiHzreSzNTczkc9d\"?>\n<x:xmpmeta xmlns:x=\"adobe:ns:meta/\"><rdf:RDF xmlns:rdf=\"http://www.w3.org/1999/02/22-rdf-syntax-ns#\"><rdf:Description rdf:about=\"\" xmlns:dc=\"http://purl.org/dc/elements/1.1/\" xmlns:pdf=\"http://ns.adobe.com/pdf/1.3/\"><dc:format>application/pdf</dc:format>",
-    );
-    if let Some(t) = meta.title.as_deref().filter(|t| !t.is_empty()) {
-        x.push_str(&format!(
-            "<dc:title><rdf:Alt><rdf:li xml:lang=\"x-default\">{}</rdf:li></rdf:Alt></dc:title>",
-            xml_escape(t)
-        ));
-    }
-    if let Some(a) = meta.author.as_deref().filter(|a| !a.is_empty()) {
-        x.push_str(&format!(
-            "<dc:creator><rdf:Seq><rdf:li>{}</rdf:li></rdf:Seq></dc:creator>",
-            xml_escape(a)
-        ));
-    }
-    x.push_str("<pdf:Producer>Open365</pdf:Producer></rdf:Description></rdf:RDF></x:xmpmeta>\n<?xpacket end=\"w\"?>");
-    pdf.add_stream("/Type /Metadata /Subtype /XML", x.as_bytes(), false)
-}
-
 impl Export<'_> {
     fn render_page(&mut self, index: usize, page: &Page) -> (String, Vec<u32>) {
+        self.current_section = page.section_index;
         let mut buf = PageBuf {
             index,
-            height: page.section.page_height,
+            height: self.page_dims[index].1,
             content: String::new(),
             owners: Vec::new(),
         };
@@ -461,14 +850,17 @@ impl Export<'_> {
         (buf.content, buf.owners)
     }
 
-    /// Opens a marked-content sequence; returns whether one was opened.
+    /// Opens a marked-content sequence.
     fn begin(&mut self, buf: &mut PageBuf, owner: &Owner) {
         match owner {
             Owner::Artifact => buf.content.push_str("/Artifact BMC\n"),
             Owner::Struct(id, tag) => {
                 let mcid = buf.owners.len() as u32;
                 buf.owners.push(*id);
-                self.mcrs.entry(*id).or_default().push((buf.index, mcid));
+                self.kids
+                    .entry(*id)
+                    .or_default()
+                    .push(Kid::Mcr(buf.index, mcid));
                 buf.content
                     .push_str(&format!("/{tag} << /MCID {mcid} >> BDC\n"));
             }
@@ -500,34 +892,268 @@ impl Export<'_> {
         }
     }
 
+    /// Splits the glyphs of a line into what each belongs to: list label, hyperlink or text.
+    fn segments(
+        &self,
+        line: &Line,
+        key: usize,
+        links: bool,
+        label_apart: bool,
+    ) -> Vec<(Seg, Vec<Piece>)> {
+        let spans = if links {
+            self.link_spans.get(&key)
+        } else {
+            None
+        };
+        let langs = if links {
+            self.lang_spans.get(&key)
+        } else {
+            None
+        };
+        let mut out: Vec<(Seg, Vec<Piece>)> = Vec::new();
+        let mut prev = Seg::Text;
+        for (ri, run) in line.runs.iter().enumerate() {
+            for (gi, g) in run.glyphs.iter().enumerate() {
+                let c = g.cluster;
+                let key = match c.kind {
+                    // A heading's number is part of the heading's own marked content.
+                    ClusterKind::Label if label_apart => Seg::Label,
+                    ClusterKind::Label => Seg::Text,
+                    ClusterKind::Other => Seg::Text,
+                    // The later glyphs of a cluster belong with the first.
+                    ClusterKind::Text if c.text_start == c.text_end => match prev {
+                        Seg::Label => Seg::Text,
+                        other => other,
+                    },
+                    ClusterKind::Text => {
+                        let at = c.text_start as usize;
+                        spans
+                            .and_then(|s| s.iter().find(|(a, b, _)| *a <= at && at < *b))
+                            .map(|(_, _, k)| Seg::Link(*k))
+                            .or_else(|| {
+                                langs.and_then(|l| {
+                                    l.iter()
+                                        .position(|(a, b, _)| *a <= at && at < *b)
+                                        .map(Seg::Lang)
+                                })
+                            })
+                            .unwrap_or(Seg::Text)
+                    }
+                };
+                prev = key;
+                match out.last_mut() {
+                    Some((seg, pieces)) if *seg == key => match pieces.last_mut() {
+                        Some(p) if p.run == ri && p.to == gi => p.to = gi + 1,
+                        _ => pieces.push(Piece {
+                            run: ri,
+                            from: gi,
+                            to: gi + 1,
+                        }),
+                    },
+                    _ => out.push((
+                        key,
+                        vec![Piece {
+                            run: ri,
+                            from: gi,
+                            to: gi + 1,
+                        }],
+                    )),
+                }
+            }
+        }
+        out
+    }
+
     fn draw_line(&mut self, buf: &mut PageBuf, line: &Line) {
         if line.runs.iter().all(|r| r.glyphs.is_empty()) {
             return;
         }
         let owner = self.owner_of(line);
-        self.begin(buf, &owner);
-        let actual = self.actual_text(line);
-        if let Some(t) = &actual {
-            buf.content
-                .push_str(&format!("/Span << /ActualText {} >> BDC\n", text_string(t)));
-        }
-        for run in &line.runs {
-            self.draw_run(buf, line, run);
-        }
-        if actual.is_some() {
+        let structured = matches!(owner, Owner::Struct(..));
+        let main = line.story == StoryKind::Main && structured;
+        let key = line_key(line, self.section_of(line));
+        let label_owner = if main {
+            self.st
+                .paras
+                .get(line.paragraph)
+                .and_then(|p| p.label)
+                .map(|id| Owner::Struct(id, "Lbl".to_owned()))
+        } else {
+            None
+        };
+        // Links and languages are looked for in the main story, the notes and (links only, they
+        // are artifacts) the header and footer.
+        let tagged = structured || self.link_spans.contains_key(&key);
+        for (seg, pieces) in self.segments(line, key, tagged, label_owner.is_some()) {
+            let seg_owner = match (seg, &owner) {
+                (Seg::Label, _) => label_owner.clone().unwrap_or_else(|| owner.clone()),
+                (Seg::Link(k), Owner::Struct(parent, _)) => self.link_owner(key, k, *parent),
+                (Seg::Lang(i), Owner::Struct(parent, _)) => self.lang_owner(key, i, *parent),
+                _ => owner.clone(),
+            };
+            self.begin(buf, &seg_owner);
+            let glyphs: Vec<&PlacedGlyph> = pieces
+                .iter()
+                .flat_map(|p| line.runs[p.run].glyphs[p.from..p.to].iter())
+                .collect();
+            let actual = self.actual_text(line, &glyphs);
+            if let Some(t) = &actual {
+                buf.content
+                    .push_str(&format!("/Span << /ActualText {} >> BDC\n", text_string(t)));
+            }
+            for p in &pieces {
+                self.draw_run(buf, line, &line.runs[p.run], p.from..p.to);
+            }
+            if actual.is_some() {
+                buf.content.push_str("EMC\n");
+            }
             buf.content.push_str("EMC\n");
+            if let Seg::Link(k) = seg {
+                let x0 = glyphs.iter().map(|g| g.x).fold(f64::INFINITY, f64::min);
+                let x1 = glyphs
+                    .iter()
+                    .map(|g| g.x + g.advance)
+                    .fold(f64::NEG_INFINITY, f64::max);
+                if x0.is_finite() && x1.is_finite() {
+                    self.add_link(buf, line, key, k, (x0, x1));
+                }
+            }
         }
-        buf.content.push_str("EMC\n");
     }
 
-    /// The text of the line when the ToUnicode CMap cannot say it glyph by glyph: a glyph that
+    /// The `Link` element of hyperlink `k` of `paragraph`, made on first use and hung under the
+    /// paragraph's element at that point of the reading order.
+    fn link_owner(&mut self, paragraph: usize, k: usize, parent: u32) -> Owner {
+        let id = match self.link_elems.get(&(paragraph, k)) {
+            Some(l) => l.id,
+            None => {
+                let id = self.pdf.reserve();
+                self.kids.entry(parent).or_default().push(Kid::Elem(id));
+                self.link_elems.insert(
+                    (paragraph, k),
+                    LinkElem {
+                        id,
+                        parent,
+                        annots: Vec::new(),
+                    },
+                );
+                id
+            }
+        };
+        Owner::Struct(id, "Link".to_owned())
+    }
+
+    /// The `Span` element carrying the `/Lang` of language span `i` of a paragraph, made on first
+    /// use and hung under the paragraph's element.
+    fn lang_owner(&mut self, key: usize, i: usize, parent: u32) -> Owner {
+        let lang = self
+            .lang_spans
+            .get(&key)
+            .and_then(|l| l.get(i))
+            .map(|(_, _, l)| l.clone())
+            .unwrap_or_default();
+        let id = match self.lang_elems.get(&(key, i)) {
+            Some(l) => l.id,
+            None => {
+                let id = self.pdf.reserve();
+                self.kids.entry(parent).or_default().push(Kid::Elem(id));
+                self.lang_elems
+                    .insert((key, i), LangElem { id, parent, lang });
+                id
+            }
+        };
+        Owner::Struct(id, "Span".to_owned())
+    }
+
+    /// The section a line's story belongs to (headers and footers differ per section).
+    fn section_of(&self, line: &Line) -> usize {
+        match line.story {
+            StoryKind::Main | StoryKind::Footnotes | StoryKind::Endnotes => 0,
+            _ => self.current_section,
+        }
+    }
+
+    /// A `Link` annotation over `x` on `line`, to the hyperlink's target.
+    fn add_link(&mut self, buf: &mut PageBuf, line: &Line, key: usize, k: usize, x: (f64, f64)) {
+        let Some(spec) = self.st.links.get(&key).and_then(|l| l.get(k)).cloned() else {
+            return;
+        };
+        let action = match &spec.target {
+            LinkTarget::Uri(u) => format!("/A << /S /URI /URI ({}) >>", uri_string(u)),
+            LinkTarget::Anchor(name) => {
+                let dest = self
+                    .st
+                    .bookmarks
+                    .get(name)
+                    .and_then(|p| self.para_first.get(p))
+                    .map(|(page, left, top)| {
+                        format!(
+                            "/Dest [{} 0 R /XYZ {} {} 0]",
+                            self.page_ids[*page],
+                            num(*left, 3),
+                            num(self.page_dims[*page].1 - top, 3)
+                        )
+                    });
+                match dest {
+                    Some(d) => d,
+                    None => {
+                        self.warnings.push(format!(
+                            "hyperlink to unknown bookmark {name} left inactive"
+                        ));
+                        return;
+                    }
+                }
+            }
+        };
+        let annot = self.pdf.reserve();
+        let mut parent_key = self.link_elems.get_mut(&(key, k)).map(|l| {
+            l.annots.push((buf.index, annot));
+            l.id
+        });
+        if parent_key.is_none() {
+            // A link in an artifact (header, footer): its annotation still gets a `Link` element
+            // under the document element, so that no link annotation is left untagged.
+            let id = self.pdf.reserve();
+            let root = self.st.root.id;
+            self.kids.entry(root).or_default().push(Kid::Elem(id));
+            self.free_links += 1;
+            self.link_elems.insert(
+                (usize::MAX - self.free_links, 0),
+                LinkElem {
+                    id,
+                    parent: root,
+                    annots: vec![(buf.index, annot)],
+                },
+            );
+            parent_key = Some(id);
+        }
+        let struct_parent = parent_key.map(|id| {
+            self.struct_parents.push(id);
+            self.layout.pages.len() + self.struct_parents.len() - 1
+        });
+        let sp = struct_parent.map_or(String::new(), |k| format!(" /StructParent {k}"));
+        self.pdf.set(
+            annot,
+            format!(
+                "<< /Type /Annot /Subtype /Link /Rect [{} {} {} {}] /Border [0 0 0] /F 4 {action} /Contents {}{sp} >>",
+                num(x.0, 3),
+                num(buf.y(line.top + line.height), 3),
+                num(x.1, 3),
+                num(buf.y(line.top), 3),
+                text_string(&spec.text)
+            ),
+        );
+        self.page_annots[buf.index].push(annot);
+    }
+
+    /// The text of the glyphs when the ToUnicode CMap cannot say it glyph by glyph: a glyph that
     /// stands for other characters than the CMap gives it (a character the font draws with the
     /// glyph of another, an accent merged into its base). `None` when the CMap is enough.
-    fn actual_text(&self, line: &Line) -> Option<String> {
+    fn actual_text(&self, line: &Line, glyphs: &[&PlacedGlyph]) -> Option<String> {
         let private = |c: char| ('\u{e000}'..='\u{f8ff}').contains(&c);
         let mut text = String::new();
         let mut differs = false;
-        for g in line.runs.iter().flat_map(|r| &r.glyphs) {
+        for g in glyphs {
             if g.cluster.kind != ClusterKind::Text {
                 continue;
             }
@@ -556,8 +1182,16 @@ impl Export<'_> {
         differs.then_some(text)
     }
 
-    fn draw_run(&mut self, buf: &mut PageBuf, line: &Line, run: &GlyphRun) {
-        let (Some(first), Some(last)) = (run.glyphs.first(), run.glyphs.last()) else {
+    /// Draws glyphs `range` of `run`.
+    fn draw_run(
+        &mut self,
+        buf: &mut PageBuf,
+        line: &Line,
+        run: &GlyphRun,
+        range: std::ops::Range<usize>,
+    ) {
+        let glyphs = &run.glyphs[range];
+        let (Some(first), Some(last)) = (glyphs.first(), glyphs.last()) else {
             return;
         };
         if run.size.is_nan() || run.size <= 0.0 {
@@ -566,12 +1200,17 @@ impl Export<'_> {
         let color = run.color.map_or_else(|| "0 0 0".to_owned(), pdf_color);
         buf.content.push_str(&format!("{color} rg\n"));
         let mut start = 0;
-        while start < run.glyphs.len() {
-            let g0 = run.glyphs[start];
+        while start < glyphs.len() {
+            let g0 = glyphs[start];
+            if self.skip_notdef && g0.glyph_id == 0 {
+                start += 1;
+                continue;
+            }
             let mut end = start + 1;
-            while end < run.glyphs.len()
-                && run.glyphs[end].face == g0.face
-                && (run.glyphs[end].y_offset - g0.y_offset).abs() < 1e-6
+            while end < glyphs.len()
+                && glyphs[end].face == g0.face
+                && !(self.skip_notdef && glyphs[end].glyph_id == 0)
+                && (glyphs[end].y_offset - g0.y_offset).abs() < 1e-6
             {
                 end += 1;
             }
@@ -585,7 +1224,7 @@ impl Export<'_> {
             let mut cursor = x0;
             let mut parts = String::new();
             let mut in_string = false;
-            for (k, g) in run.glyphs[start..end].iter().enumerate() {
+            for (k, g) in glyphs[start..end].iter().enumerate() {
                 if k > 0 {
                     let adj = (-(g.x - cursor) * 1000.0 / size * 1000.0).round() / 1000.0;
                     if adj != 0.0 {
@@ -620,28 +1259,26 @@ impl Export<'_> {
         if (run.underline || run.strike)
             && let Some(fd) = self.faces.get(&first.face.index())
         {
-            {
-                let x0 = first.x;
-                let x1 = last.x + last.advance;
-                let base = buf.y(line.baseline) + first.y_offset;
-                let mut stroke = |pos: f64, thick: f64| {
-                    let yy = base + pos * run.size;
-                    buf.content.push_str(&format!(
-                        "{} RG {} w {} {} m {} {} l S\n",
-                        color,
-                        num(thick * run.size, 3),
-                        num(x0, 4),
-                        num(yy, 4),
-                        num(x1, 4),
-                        num(yy, 4)
-                    ));
-                };
-                if run.underline {
-                    stroke(fd.underline_pos, fd.underline_thickness);
-                }
-                if run.strike {
-                    stroke(fd.strike_pos, fd.strike_thickness);
-                }
+            let x0 = first.x;
+            let x1 = last.x + last.advance;
+            let base = buf.y(line.baseline) + first.y_offset;
+            let mut stroke = |pos: f64, thick: f64| {
+                let yy = base + pos * run.size;
+                buf.content.push_str(&format!(
+                    "{} RG {} w {} {} m {} {} l S\n",
+                    color,
+                    num(thick * run.size, 3),
+                    num(x0, 4),
+                    num(yy, 4),
+                    num(x1, 4),
+                    num(yy, 4)
+                ));
+            };
+            if run.underline {
+                stroke(fd.underline_pos, fd.underline_thickness);
+            }
+            if run.strike {
+                stroke(fd.strike_pos, fd.strike_thickness);
             }
         }
     }
@@ -746,14 +1383,16 @@ impl Export<'_> {
                         .push(format!("picture {embed}: image part not found"));
                     None
                 }
-                Some((part_name, bytes)) => match image::embed(&mut self.pdf, bytes) {
-                    Ok(id) => Some((format!("Im{}", self.images.len()), id)),
-                    Err(e) => {
-                        self.warnings
-                            .push(format!("picture {embed} ({part_name}): {e}"));
-                        None
+                Some((part_name, bytes)) => {
+                    match image::embed(&mut self.pdf, bytes, self.flatten) {
+                        Ok(id) => Some((format!("Im{}", self.images.len()), id)),
+                        Err(e) => {
+                            self.warnings
+                                .push(format!("picture {embed} ({part_name}): {e}"));
+                            None
+                        }
                     }
-                },
+                }
             };
             self.images.insert(key.clone(), entry);
         }
@@ -766,7 +1405,11 @@ impl Export<'_> {
         } else {
             None
         };
-        let alt = img.description.clone().filter(|d| !d.trim().is_empty());
+        let mut alt = img.description.clone().filter(|d| !d.trim().is_empty());
+        if alt.is_none() && self.ua && tagged {
+            // PDF/UA needs a description on every figure.
+            alt = Some("Picture without description".to_owned());
+        }
         match parent {
             Some(parent) => {
                 let id = self.pdf.reserve();
@@ -814,10 +1457,46 @@ impl Export<'_> {
         // Extra elements (note lines) hang off the document element.
         let extras = self.extras.clone();
         for id in &extras {
-            let k = self.mcr_list(*id);
+            let k = self.kid_list(*id);
             self.pdf.set(
                 *id,
                 format!("<< /Type /StructElem /S /P /P {root_id} 0 R /K [{k}] >>"),
+            );
+        }
+        // Hyperlinks: the marked content of the link text, then the annotations.
+        let mut links: Vec<LinkOut> = self
+            .link_elems
+            .values()
+            .map(|l| (l.id, l.parent, l.annots.clone()))
+            .collect();
+        links.sort_unstable_by_key(|l| l.0);
+        for (id, parent, annots) in links {
+            let mut k = self.kid_list(id);
+            for (page, annot) in annots {
+                k.push_str(&format!(
+                    "<< /Type /OBJR /Obj {annot} 0 R /Pg {} 0 R >> ",
+                    self.page_ids[page]
+                ));
+            }
+            self.pdf.set(
+                id,
+                format!("<< /Type /StructElem /S /Link /P {parent} 0 R /K [{k}] >>"),
+            );
+        }
+        let mut spans: Vec<(u32, u32, String)> = self
+            .lang_elems
+            .values()
+            .map(|l| (l.id, l.parent, l.lang.clone()))
+            .collect();
+        spans.sort_unstable_by_key(|l| l.0);
+        for (id, parent, lang) in spans {
+            let k = self.kid_list(id);
+            self.pdf.set(
+                id,
+                format!(
+                    "<< /Type /StructElem /S /Span /P {parent} 0 R /Lang {} /K [{k}] >>",
+                    text_string(&lang)
+                ),
             );
         }
         let mut nums = String::new();
@@ -825,15 +1504,98 @@ impl Export<'_> {
             let refs: String = owners.iter().map(|id| format!("{id} 0 R ")).collect();
             nums.push_str(&format!("{i} [{refs}] "));
         }
+        for (j, id) in self.struct_parents.iter().enumerate() {
+            nums.push_str(&format!("{} {id} 0 R ", page_owners.len() + j));
+        }
         let parent_tree = self.pdf.add(format!("<< /Nums [{nums}] >>"));
+        // Table header cells carry an /ID that the cells' /Headers name: the IDTree maps them.
+        let mut ids = std::mem::take(&mut self.st.ids);
+        ids.sort();
+        let id_tree = if ids.is_empty() {
+            String::new()
+        } else {
+            let names: String = ids
+                .iter()
+                .map(|(name, obj)| format!("{} {obj} 0 R ", text_string(name)))
+                .collect();
+            let tree = self.pdf.add(format!("<< /Names [{names}] >>"));
+            format!(" /IDTree {tree} 0 R")
+        };
         self.pdf.set(
             tree_id,
             format!(
-                "<< /Type /StructTreeRoot /K {root_id} 0 R /ParentTree {parent_tree} 0 R /ParentTreeNextKey {} >>",
-                page_owners.len()
+                "<< /Type /StructTreeRoot /K {root_id} 0 R /ParentTree {parent_tree} 0 R{id_tree} /ParentTreeNextKey {} >>",
+                page_owners.len() + self.struct_parents.len()
             ),
         );
         tree_id
+    }
+
+    /// The outline (Word's "bookmarks using headings"): a tree by heading level, each entry a
+    /// destination at the top of its heading. A level that skips (H1 then H3) nests under the
+    /// nearest shallower heading.
+    fn write_outlines(&mut self, headings: &[Heading]) -> Option<u32> {
+        if headings.is_empty() {
+            return None;
+        }
+        let ids: Vec<u32> = headings.iter().map(|_| self.pdf.reserve()).collect();
+        let root = self.pdf.reserve();
+        let parent = outline_parents(&headings.iter().map(|h| h.level).collect::<Vec<_>>());
+        let children = |p: Option<usize>| -> Vec<usize> {
+            (0..headings.len()).filter(|i| parent[*i] == p).collect()
+        };
+        let descendants = |p: usize| -> usize {
+            let mut n = 0;
+            let mut frontier = vec![p];
+            while let Some(x) = frontier.pop() {
+                for c in children(Some(x)) {
+                    n += 1;
+                    frontier.push(c);
+                }
+            }
+            n
+        };
+        for (i, h) in headings.iter().enumerate() {
+            let siblings = children(parent[i]);
+            let pos = siblings.iter().position(|s| *s == i).unwrap_or(0);
+            let mut d = format!(
+                "<< /Title {} /Parent {} 0 R /Dest [{} 0 R /XYZ {} {} 0]",
+                text_string(&h.title),
+                parent[i].map_or(root, |p| ids[p]),
+                self.page_ids[h.page],
+                num(h.x, 3),
+                num(self.page_dims[h.page].1 - h.top, 3)
+            );
+            if pos > 0 {
+                d.push_str(&format!(" /Prev {} 0 R", ids[siblings[pos - 1]]));
+            }
+            if let Some(next) = siblings.get(pos + 1) {
+                d.push_str(&format!(" /Next {} 0 R", ids[*next]));
+            }
+            let kids = children(Some(i));
+            if let (Some(first), Some(last)) = (kids.first(), kids.last()) {
+                d.push_str(&format!(
+                    " /First {} 0 R /Last {} 0 R /Count {}",
+                    ids[*first],
+                    ids[*last],
+                    descendants(i)
+                ));
+            }
+            d.push_str(" >>");
+            self.pdf.set(ids[i], d);
+        }
+        let top = children(None);
+        let (first, last) = (top.first()?, top.last()?);
+        self.pdf.set(
+            root,
+            format!(
+                "<< /Type /Outlines /First {} 0 R /Last {} 0 R /Count {} >>",
+                ids[*first],
+                ids[*last],
+                headings.len()
+            ),
+        );
+        Some(root)
     }
 
     fn emit_node(&mut self, node: &Node, parent: u32) {
@@ -841,7 +1603,7 @@ impl Export<'_> {
         for kid in &node.kids {
             k.push_str(&format!("{} 0 R ", kid.id));
         }
-        k.push_str(&self.mcr_list(node.id));
+        k.push_str(&self.kid_list(node.id));
         if let Some(figs) = self.figures.remove(&node.id) {
             for f in figs {
                 k.push_str(&format!("{} 0 R ", f.id));
@@ -880,19 +1642,51 @@ impl Export<'_> {
         }
     }
 
-    fn mcr_list(&self, id: u32) -> String {
-        self.mcrs
+    /// The children of a leaf element in reading order: its marked content and its links.
+    fn kid_list(&self, id: u32) -> String {
+        self.kids
             .get(&id)
             .into_iter()
             .flatten()
-            .map(|(page, mcid)| {
-                format!(
+            .map(|kid| match kid {
+                Kid::Mcr(page, mcid) => format!(
                     "<< /Type /MCR /Pg {} 0 R /MCID {mcid} >> ",
                     self.page_ids[*page]
-                )
+                ),
+                Kid::Elem(e) => format!("{e} 0 R "),
             })
             .collect()
     }
+}
+
+/// For each heading level in document order, the index of the heading it nests under (`None` at
+/// the top). A level that skips (1 then 3) nests under the nearest shallower heading, and a
+/// deeper heading after a shallower one never becomes its sibling.
+fn outline_parents(levels: &[u8]) -> Vec<Option<usize>> {
+    let mut parent = Vec::with_capacity(levels.len());
+    let mut stack: Vec<usize> = Vec::new();
+    for (i, level) in levels.iter().enumerate() {
+        while stack.last().is_some_and(|j| levels[*j] >= *level) {
+            stack.pop();
+        }
+        parent.push(stack.last().copied());
+        stack.push(i);
+    }
+    parent
+}
+
+/// A URI as a PDF literal string: ASCII only, so anything else (and the string delimiters) is
+/// written percent-encoded.
+fn uri_string(url: &str) -> String {
+    let mut out = String::new();
+    for b in url.trim().bytes() {
+        if b.is_ascii_graphic() && !matches!(b, b'(' | b')' | b'\\') {
+            out.push(char::from(b));
+        } else {
+            out.push_str(&format!("%{b:02X}"));
+        }
+    }
+    out
 }
 
 /// The part and bytes a picture's `embed` id names, through the relationships of the part the
@@ -991,5 +1785,45 @@ fn draw_border_strip(
             ));
         }
         BorderStyle::Solid => fill(out, x, y, w, h),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn outline_nesting_follows_heading_levels() {
+        // H1 H2 H2 H3 H1 H3 H2
+        assert_eq!(
+            outline_parents(&[1, 2, 2, 3, 1, 3, 2]),
+            [None, Some(0), Some(0), Some(2), None, Some(4), Some(4)]
+        );
+        // The first heading is H2: it is a top-level entry; an H1 after it is too.
+        assert_eq!(outline_parents(&[2, 1, 2]), [None, None, Some(1)]);
+        assert!(outline_parents(&[]).is_empty());
+    }
+
+    #[test]
+    fn a4_pages_take_words_600_dpi_size() {
+        assert_eq!(page_dims(595.3, 841.9), (595.2, 841.92));
+        assert_eq!(page_dims(841.9, 595.3), (841.92, 595.2));
+        assert_eq!(page_dims(612.0, 792.0), (612.0, 792.0));
+    }
+
+    #[test]
+    fn uris_are_written_as_ascii() {
+        assert_eq!(
+            uri_string("https://a.example/p q"),
+            "https://a.example/p%20q"
+        );
+        assert_eq!(
+            uri_string("https://a.example/(x)"),
+            "https://a.example/%28x%29"
+        );
+        assert_eq!(
+            uri_string("https://a.example/é"),
+            "https://a.example/%C3%A9"
+        );
     }
 }

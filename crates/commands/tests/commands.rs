@@ -355,7 +355,8 @@ fn save_effect_depends_on_the_path() {
     let other = Command::Save {
         path: scratch("elsewhere.docx"),
     };
-    assert_eq!(same.effect(t.path()), EffectClass::Edit);
+    // Saving over the file the document came from replaces an existing file: destructive.
+    assert_eq!(same.effect(t.path()), EffectClass::Destructive);
     assert_eq!(other.effect(t.path()), EffectClass::Export);
     assert_eq!(same.effect(None), EffectClass::Export);
     assert_eq!(
@@ -394,9 +395,9 @@ fn save_writes_a_reopenable_docx_and_clears_dirty() {
         reopened.docx().and_then(|d| d.paragraph_text(0)).as_deref(),
         Some(">> First paragraph of plain text.")
     );
-    // Saving the same path again is an overwrite, i.e. an Edit.
+    // Saving the same path again replaces an existing file: destructive.
     let again = apply(&mut t, Command::Save { path }).expect("save again");
-    assert_eq!(again.effect, EffectClass::Edit);
+    assert_eq!(again.effect, EffectClass::Destructive);
     // Undo after save still works and marks the document dirty.
     t.undo().expect("undo after save");
     assert!(t.is_dirty());

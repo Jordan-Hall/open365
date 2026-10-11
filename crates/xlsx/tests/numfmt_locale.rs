@@ -323,3 +323,71 @@ fn the_rust_table_matches_the_committed_windows_data() {
         }
     }
 }
+
+/// `Workbook::set_number_format_locale` and the typed-code reverse lookup: under en-GB the
+/// built-in id 14 is `dd/mm/yyyy`, so typing it maps back to id 14, and the specification's
+/// `m/d/yyyy` is an ordinary custom format; without a locale it is the other way round.
+#[test]
+fn workbook_locale_setter_and_reverse_lookup() {
+    use open365_opc::Limits;
+    use open365_xlsx::{FormatPatch, NumberFormat, Workbook};
+    let bytes = std::fs::read(
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../fixtures/xlsx/grid-styles.xlsx"),
+    )
+    .unwrap();
+    let fmt_id = |locale: Option<u32>, code: &str| -> u32 {
+        let mut wb = Workbook::open(&bytes, &Limits::default()).unwrap();
+        wb.set_number_format_locale(locale);
+        assert_eq!(wb.styles().number_format_locale(), locale);
+        let patch = FormatPatch {
+            number_format: Some(NumberFormat::Code(code.to_owned())),
+            ..FormatPatch::default()
+        };
+        wb.format_range(0, (1, 1, 1, 1), &patch).unwrap();
+        let xf = wb.cell_xf(0, 1, 1);
+        wb.styles().num_fmt_id(xf)
+    };
+    assert_eq!(fmt_id(None, "m/d/yyyy"), 14);
+    assert!(fmt_id(None, "dd/mm/yyyy") >= 164);
+    assert_eq!(fmt_id(Some(0x0809), "dd/mm/yyyy"), 14);
+    assert!(fmt_id(Some(0x0809), "m/d/yyyy") >= 164);
+    assert_eq!(fmt_id(Some(0x0409), "m/d/yyyy"), 14);
+    assert_eq!(fmt_id(Some(0x0809), "General"), 0);
+    assert_eq!(fmt_id(Some(0x0809), "0.00"), 2);
+}
+
+/// FNV-1a over every (LCID, id, code) the built-in tables answer for all LCIDs of the table, so moving the
+/// tables between crates cannot change any result. The value was taken from the tables before they moved
+/// from this crate to `open365-locale`.
+#[test]
+fn builtin_codes_for_every_lcid_are_unchanged() {
+    let mut hash: u64 = 0xcbf2_9ce4_8422_2325;
+    let mut feed = |bytes: &[u8]| {
+        for &b in bytes {
+            hash ^= u64::from(b);
+            hash = hash.wrapping_mul(0x0000_0100_0000_01b3);
+        }
+        hash ^= 0xff;
+        hash = hash.wrapping_mul(0x0000_0100_0000_01b3);
+    };
+    let mut lcids = 0;
+    for (lcid, _) in Locale::all_lcids() {
+        lcids += 1;
+        feed(&lcid.to_le_bytes());
+        feed(&resolve_number_format_lcid(lcid).to_le_bytes());
+        for id in 0..=60 {
+            feed(
+                builtin_number_format_in(id, lcid)
+                    .unwrap_or_else(|| "<none>".into())
+                    .as_bytes(),
+            );
+        }
+    }
+    assert_eq!(builtin_number_format_lcids().count(), 417);
+    assert_eq!(lcids, 419);
+    assert_eq!(
+        hash, 10_411_882_379_492_369_372,
+        "FNV-1a of the built-in codes"
+    );
+}

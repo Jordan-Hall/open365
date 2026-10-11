@@ -22,7 +22,7 @@ use crate::DocxError;
 use crate::document::Document;
 use crate::edit::needs_preserve;
 use crate::model::{
-    Block, Break, Group, Inline, Paragraph, Row, RowChild, Run, RunContent, SdtChild, Table,
+    Block, Break, Cell, Group, Inline, Paragraph, Row, RowChild, Run, RunContent, SdtChild, Table,
     TableChild,
 };
 use crate::props::RunProps;
@@ -55,9 +55,32 @@ pub enum RevisionKind {
     RowInserted,
     /// `w:trPr/w:del`: a deleted table row.
     RowDeleted,
+    /// `w:tcPr/w:cellIns`: an inserted table cell (Word: `CellInsertion`).
+    CellInserted,
+    /// `w:tcPr/w:cellDel`: a deleted table cell (Word: `CellDeletion`).
+    CellDeleted,
+    /// `w:tcPr/w:cellMerge`: a vertical merge or split of a cell (Word: `CellMerge`).
+    CellMerged,
 }
 
 impl RevisionKind {
+    /// Name of Word's `WdRevisionType` for this kind (`Revision.Type`).
+    pub fn word_type_name(self) -> &'static str {
+        match self {
+            Self::Insertion | Self::ParagraphMarkInserted | Self::RowInserted => "Insert",
+            Self::Deletion | Self::ParagraphMarkDeleted | Self::RowDeleted => "Delete",
+            Self::MovedFrom => "MovedFrom",
+            Self::MovedTo => "MovedTo",
+            Self::RunFormat => "Property",
+            Self::ParagraphFormat => "ParagraphProperty",
+            Self::TableFormat => "TableProperty",
+            Self::SectionFormat => "SectionProperty",
+            Self::CellInserted => "CellInsertion",
+            Self::CellDeleted => "CellDeletion",
+            Self::CellMerged => "CellMerge",
+        }
+    }
+
     /// True for the kinds whose text is part of the final view.
     pub fn is_deletion_like(self) -> bool {
         matches!(self, Self::Deletion | Self::MovedFrom)
@@ -77,6 +100,14 @@ pub struct Revision {
     pub id: Option<String>,
     /// Paragraph the change starts in (see [`Document::paragraph`]).
     pub paragraph: usize,
+    /// Last paragraph the change touches (equals `paragraph` for a change inside one).
+    pub last_paragraph: usize,
+    /// `w:name` of the move range this revision belongs to (moves only); both halves of a
+    /// move share it.
+    pub move_name: Option<String>,
+    /// Names of the other moves whose range starts inside this move's range. Word accepts
+    /// those too when it accepts this revision (rejecting leaves them).
+    pub(crate) link_moves: Vec<String>,
     /// Character offset in the paragraph's final-view text where the change starts.
     pub offset: usize,
     /// The text the change covers: inserted text, deleted text, or the formatted text.
@@ -272,7 +303,7 @@ fn element_text(e: &XmlElement) -> String {
 }
 
 /// Text of a run including `w:delText` (the markup view).
-fn run_markup_text(run: &Run, out: &mut String) {
+pub(crate) fn run_markup_text(run: &Run, out: &mut String) {
     for item in &run.content {
         match item {
             RunContent::Text { text, .. } => out.push_str(text),
@@ -412,12 +443,69 @@ enum Family {
     SectFmt,
     RowIns,
     RowDel,
+    CellIns,
+    CellDel,
+    CellMerge,
 }
 
 impl Family {
     fn merges(self) -> bool {
-        !matches!(self, Self::TblFmt | Self::SectFmt)
+        !matches!(
+            self,
+            Self::TblFmt | Self::SectFmt | Self::CellIns | Self::CellDel | Self::CellMerge
+        )
     }
+}
+
+/// A cell-level revision element of `w:tcPr`, in schema order.
+const CELL_MARKS: [(&str, Family, RevisionKind); 3] = [
+    ("cellIns", Family::CellIns, RevisionKind::CellInserted),
+    ("cellDel", Family::CellDel, RevisionKind::CellDeleted),
+    ("cellMerge", Family::CellMerge, RevisionKind::CellMerged),
+];
+
+/// The `w:tcPr` block of a cell.
+fn cell_tc_pr(cell: &Cell) -> Option<&XmlElement> {
+    cell.blocks.iter().find_map(|b| match b {
+        Block::Raw(RawXml::Element(e)) if e.head.is_w("tcPr") => Some(e),
+        _ => None,
+    })
+}
+
+fn cell_tc_pr_mut(cell: &mut Cell) -> Option<&mut XmlElement> {
+    cell.blocks.iter_mut().find_map(|b| match b {
+        Block::Raw(RawXml::Element(e)) if e.head.is_w("tcPr") => Some(e),
+        _ => None,
+    })
+}
+
+/// Paragraphs of `blocks`, counted as the lister counts them (nested tables included).
+fn count_paragraphs(blocks: &[Block]) -> usize {
+    blocks
+        .iter()
+        .map(|b| match b {
+            Block::Paragraph(_) => 1,
+            Block::Table(t) => t
+                .rows()
+                .flat_map(Row::cells)
+                .map(|c| count_paragraphs(&c.blocks))
+                .sum(),
+            Block::Sdt(s) => s.content().map(|c| count_paragraphs(&c.blocks)).sum(),
+            Block::Raw(_) => 0,
+        })
+        .sum()
+}
+
+/// Paragraph text of a cell, joined by newlines.
+fn cell_text(cell: &Cell) -> String {
+    cell.blocks
+        .iter()
+        .filter_map(|b| match b {
+            Block::Paragraph(p) => Some(p.markup_text()),
+            _ => None,
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
 }
 
 impl GroupRev {
@@ -429,6 +517,18 @@ impl GroupRev {
             Self::MoveTo => Family::MoveTo,
         }
     }
+}
+
+/// Paragraphs a Word range must touch to resolve an atom, and the row it is resolved with.
+type AtomRange = ((usize, usize), Option<(usize, usize)>);
+
+/// Where a `w:moveFromRangeStart` / `w:moveToRangeStart` range starts and ends.
+struct MoveRange {
+    name: String,
+    to: bool,
+    id: Option<String>,
+    start: usize,
+    end: Option<usize>,
 }
 
 /// Walks the story in the order [`Pass`] does and numbers every revision-bearing element
@@ -443,6 +543,25 @@ struct Lister {
     absorb: Option<(Family, usize)>,
     /// First paragraph of the section being walked.
     sect_start: usize,
+    /// Paragraphs a Word range must touch to resolve an atom (first, last), by atom number.
+    atom_span: Vec<(usize, usize)>,
+    /// Family of every atom, by atom number (`None` for hidden atoms).
+    atom_family: Vec<Option<Family>>,
+    /// Paragraphs of the table row an atom belongs to, for the atoms Word resolves per row:
+    /// resolving one through a range resolves every revision in the row.
+    atom_row: Vec<Option<(usize, usize)>>,
+    /// Paragraphs of the row being walked.
+    row_span: Option<(usize, usize)>,
+    /// Name of the last move range opened in the paragraph being walked.
+    cur_move: Option<String>,
+    /// Index in `move_ranges` of the move range opened last in the paragraph being walked.
+    cur_range: Option<usize>,
+    /// Every move range marker seen so far, as positions in a running marker count.
+    move_ranges: Vec<MoveRange>,
+    seq: usize,
+    /// The table-format revision of the table being walked: every table, grid, row, row
+    /// exception and cell property change of one table is a single revision in Word.
+    table_rev: Option<usize>,
 }
 
 impl Lister {
@@ -456,10 +575,20 @@ impl Lister {
     ) {
         let id = self.atom;
         self.atom += 1;
+        self.atom_span.push((self.para, self.para));
+        self.atom_family.push(Some(family));
+        self.atom_row.push(None);
+        if family == Family::TblFmt
+            && let Some(idx) = self.table_rev
+        {
+            self.out[idx].atoms.push(id);
+            return;
+        }
         if let Some((fam, idx)) = self.absorb
             && fam == family
         {
             self.out[idx].atoms.push(id);
+            self.out[idx].last_paragraph = self.para;
             return;
         }
         let (author, date, rid) = revision_attrs(head);
@@ -470,7 +599,11 @@ impl Lister {
         {
             let idx = *idx;
             self.out[idx].atoms.push(id);
+            if self.out[idx].last_paragraph != self.para && !text.is_empty() {
+                self.out[idx].text.push(char::from(10));
+            }
             self.out[idx].text.push_str(text);
+            self.out[idx].last_paragraph = self.para;
             return;
         }
         let index = self.out.len();
@@ -481,11 +614,140 @@ impl Lister {
             date,
             id: rid,
             paragraph: self.para,
+            last_paragraph: self.para,
+            move_name: matches!(family, Family::MoveFrom | Family::MoveTo)
+                .then(|| self.cur_move.clone())
+                .flatten(),
+            link_moves: Vec::new(),
             offset,
             text: text.to_owned(),
             atoms: vec![id],
         });
+        if family == Family::TblFmt {
+            self.table_rev = Some(index);
+        }
         self.prev = Some((family, author, index));
+    }
+
+    /// Counts an element that Word resolves but does not list (the mark of a cell's last
+    /// paragraph is the end-of-cell mark, not a paragraph mark).
+    fn atom_hidden(&mut self) {
+        self.atom += 1;
+        self.atom_span.push((self.para, self.para));
+        self.atom_family.push(None);
+        self.atom_row.push(None);
+    }
+
+    /// Sets the paragraphs a Word range must touch to resolve the atom listed last. `row`:
+    /// the atom belongs to the table row of that span.
+    fn span_last(&mut self, span: (usize, usize), row: bool) {
+        let id = self.atom - 1;
+        self.atom_span[id] = span;
+        self.atom_row[id] = row.then_some(span);
+    }
+
+    /// Reserves the number of a cell revision, listed after the cell's content.
+    fn reserve_atom(&mut self, family: Family) -> usize {
+        let id = self.atom;
+        self.atom += 1;
+        self.atom_span.push((self.para, self.para));
+        self.atom_family.push(Some(family));
+        self.atom_row.push(None);
+        id
+    }
+
+    /// Lists the cell revision `id` once its cell content (atoms `inner`) has been walked.
+    /// Word's range for it runs from the previous cell to the end of the row. Resolving
+    /// it also resolves the cell's own insertions (`cellIns`) or deletions (`cellDel`).
+    fn cell_revision(
+        &mut self,
+        id: usize,
+        kind: RevisionKind,
+        head: &ElementHead,
+        span: (usize, usize),
+        inner: std::ops::Range<usize>,
+        text: String,
+    ) {
+        let own = match kind {
+            RevisionKind::CellInserted => Some(Family::Ins),
+            RevisionKind::CellDeleted => Some(Family::Del),
+            _ => None,
+        };
+        let mut atoms = vec![id];
+        atoms.extend(inner.filter(|&a| own.is_some() && self.atom_family[a] == own));
+        self.atom_span[id] = span;
+        let (author, date, rid) = revision_attrs(head);
+        let index = self.out.len();
+        self.out.push(Revision {
+            index,
+            kind,
+            author,
+            date,
+            id: rid,
+            paragraph: span.0,
+            last_paragraph: span.1,
+            move_name: None,
+            link_moves: Vec::new(),
+            offset: 0,
+            text,
+            atoms,
+        });
+        self.prev = None;
+    }
+
+    /// A move range marker (`w:moveFromRangeStart`, `w:moveToRangeEnd`...), inline or between
+    /// paragraphs.
+    fn move_marker(&mut self, e: &XmlElement) {
+        let local = e.head.local_name();
+        let to = local.starts_with("moveTo");
+        self.seq += 1;
+        if local.ends_with("RangeStart") {
+            // A new move range starts a new revision, as in Word.
+            self.gap();
+            let name = e.head.attr_w("name").unwrap_or_default().to_owned();
+            self.cur_move = Some(name.clone());
+            self.cur_range = Some(self.move_ranges.len());
+            self.move_ranges.push(MoveRange {
+                name,
+                to,
+                id: e.head.attr_w("id").map(str::to_owned),
+                start: self.seq,
+                end: None,
+            });
+        } else if local.ends_with("RangeEnd") {
+            let id = e.head.attr_w("id");
+            if let Some(r) = self
+                .move_ranges
+                .iter_mut()
+                .rev()
+                .find(|r| r.to == to && r.id.as_deref() == id && r.end.is_none())
+            {
+                r.end = Some(self.seq);
+            }
+        }
+    }
+
+    /// Fills `link_moves` of the move revisions.
+    fn link_moves(&mut self) {
+        for r in &mut self.out {
+            let Some(name) = &r.move_name else { continue };
+            let to =
+                r.kind == RevisionKind::MovedTo || r.kind == RevisionKind::ParagraphMarkInserted;
+            let Some(range) = self
+                .move_ranges
+                .iter()
+                .find(|m| m.name == *name && m.to == to)
+            else {
+                continue;
+            };
+            let end = range.end.unwrap_or(range.start);
+            r.link_moves = self
+                .move_ranges
+                .iter()
+                .filter(|m| m.name != *name && m.start > range.start && m.start < end)
+                .map(|m| m.name.clone())
+                .collect();
+        }
     }
 
     /// Plain text follows: the open revision cannot continue.
@@ -534,28 +796,55 @@ fn list_inlines(content: &[Inline], l: &mut Lister, acc: &mut usize, covered: bo
                 }
                 list_inlines(&g.content, l, acc, covered || rev.is_some());
             }
+            Inline::Raw(RawXml::Element(e))
+                if matches!(
+                    e.head.local_name(),
+                    "moveFromRangeStart"
+                        | "moveToRangeStart"
+                        | "moveFromRangeEnd"
+                        | "moveToRangeEnd"
+                ) =>
+            {
+                l.move_marker(e);
+            }
             Inline::Raw(_) => {}
         }
     }
 }
 
-fn list_paragraph(p: &Paragraph, l: &mut Lister) {
+/// `w:numPr` of a paragraph carries `w:numberingChange` or `w:ins`. Word lists no revision for
+/// these (measured: `rev-numbering-xml`) and drops both from the paragraph when all changes
+/// are accepted or rejected, so they are hidden atoms.
+fn has_numbering_marks(p: &Paragraph) -> bool {
+    p.props
+        .as_ref()
+        .and_then(|ppr| child_el(ppr, "numPr"))
+        .is_some_and(|n| child_el(n, "numberingChange").is_some() || child_el(n, "ins").is_some())
+}
+
+fn list_paragraph(p: &Paragraph, l: &mut Lister, cell_end: bool) {
+    l.cur_move = None;
+    l.cur_range = None;
     let mut acc = 0;
-    list_inlines(&p.content, l, &mut acc, false);
     let text = p.markup_text();
     let mut marks: Vec<Family> = Vec::new();
     let mut has_section = false;
+    // Word sorts a paragraph's property change at the start of the paragraph.
+    if let Some(change) = p.props.as_ref().and_then(|ppr| child_el(ppr, "pPrChange")) {
+        l.atom(
+            Family::ParaFmt,
+            RevisionKind::ParagraphFormat,
+            &change.head,
+            0,
+            &text,
+        );
+        marks.push(Family::ParaFmt);
+    }
+    if has_numbering_marks(p) {
+        l.atom_hidden();
+    }
+    list_inlines(&p.content, l, &mut acc, false);
     if let Some(ppr) = &p.props {
-        if let Some(change) = child_el(ppr, "pPrChange") {
-            l.atom(
-                Family::ParaFmt,
-                RevisionKind::ParagraphFormat,
-                &change.head,
-                0,
-                &text,
-            );
-            marks.push(Family::ParaFmt);
-        }
         if let Some(sect) = child_el(ppr, "sectPr") {
             has_section = true;
             if let Some(change) = child_el(sect, "sectPrChange") {
@@ -595,8 +884,12 @@ fn list_paragraph(p: &Paragraph, l: &mut Lister) {
                 ),
             ] {
                 if let Some(mark) = child_el(rpr, local) {
-                    l.atom(family, kind, &mark.head, acc, "");
-                    marks.push(family);
+                    if cell_end {
+                        l.atom_hidden();
+                    } else {
+                        l.atom(family, kind, &mark.head, acc, "");
+                        marks.push(family);
+                    }
                 }
             }
         }
@@ -611,10 +904,26 @@ fn list_paragraph(p: &Paragraph, l: &mut Lister) {
 }
 
 fn list_table(t: &Table, l: &mut Lister) {
+    let outer_rev = l.table_rev.take();
+    let outer_row = l.row_span.take();
+    let first = l.para;
+    let total: usize = t
+        .rows()
+        .flat_map(Row::cells)
+        .map(|c| count_paragraphs(&c.blocks))
+        .sum();
+    let table_span = (first, first + total.saturating_sub(1));
     for child in &t.children {
         match child {
-            TableChild::Raw(RawXml::Element(e)) if e.head.is_w("tblPr") => {
-                if let Some(change) = child_el(e, "tblPrChange") {
+            TableChild::Raw(RawXml::Element(e))
+                if e.head.is_w("tblPr") || e.head.is_w("tblGrid") =>
+            {
+                let local = if e.head.is_w("tblPr") {
+                    "tblPrChange"
+                } else {
+                    "tblGridChange"
+                };
+                if let Some(change) = child_el(e, local) {
                     l.atom(
                         Family::TblFmt,
                         RevisionKind::TableFormat,
@@ -622,18 +931,49 @@ fn list_table(t: &Table, l: &mut Lister) {
                         0,
                         "",
                     );
+                    l.span_last(table_span, false);
                 }
             }
             TableChild::Raw(_) => {}
             TableChild::Row(row) => {
                 let mut absorbing = false;
+                let row_first = l.para;
+                let row_total: usize = row.cells().map(|c| count_paragraphs(&c.blocks)).sum();
+                let span = (row_first, row_first + row_total.saturating_sub(1));
+                l.row_span = Some(span);
+                for rc in &row.children {
+                    if let RowChild::Raw(RawXml::Element(e)) = rc
+                        && e.head.is_w("tblPrEx")
+                        && let Some(change) = child_el(e, "tblPrExChange")
+                    {
+                        l.atom(
+                            Family::TblFmt,
+                            RevisionKind::TableFormat,
+                            &change.head,
+                            0,
+                            "",
+                        );
+                        l.span_last(span, true);
+                    }
+                }
                 if let Some(trpr) = row_props(row) {
+                    if let Some(change) = child_el(trpr, "trPrChange") {
+                        l.atom(
+                            Family::TblFmt,
+                            RevisionKind::TableFormat,
+                            &change.head,
+                            0,
+                            "",
+                        );
+                        l.span_last(span, true);
+                    }
                     for (local, family, kind) in [
                         ("ins", Family::RowIns, RevisionKind::RowInserted),
                         ("del", Family::RowDel, RevisionKind::RowDeleted),
                     ] {
                         if let Some(mark) = child_el(trpr, local) {
                             l.atom(family, kind, &mark.head, 0, &row_text(row));
+                            l.span_last(span, true);
                             if let Some((_, _, idx)) = l.prev {
                                 let absorbed = if family == Family::RowIns {
                                     Family::Ins
@@ -646,15 +986,52 @@ fn list_table(t: &Table, l: &mut Lister) {
                         }
                     }
                 }
-                for rc in &row.children {
-                    if let RowChild::Cell(cell) = rc {
-                        list_blocks(&cell.blocks, l);
-                    }
-                }
+                list_cells(row, l);
+                l.row_span = None;
                 if absorbing {
                     l.absorb = None;
                 }
             }
+        }
+    }
+    if let Some(idx) = l.table_rev {
+        l.out[idx].last_paragraph = table_span.1;
+    }
+    l.table_rev = outer_rev;
+    l.row_span = outer_row;
+}
+
+/// Walks the cells of a row and lists their cell revisions after the cell content.
+fn list_cells(row: &Row, l: &mut Lister) {
+    let cells: Vec<&Cell> = row.cells().collect();
+    let mut starts = Vec::with_capacity(cells.len());
+    let mut counts = Vec::with_capacity(cells.len());
+    let mut at = l.para;
+    for c in &cells {
+        let n = count_paragraphs(&c.blocks);
+        starts.push(at);
+        counts.push(n);
+        at += n;
+    }
+    for (k, cell) in cells.iter().enumerate() {
+        let marks: Vec<(usize, RevisionKind, &ElementHead)> = cell_tc_pr(cell)
+            .map(|pr| {
+                CELL_MARKS
+                    .iter()
+                    .filter_map(|(local, family, kind)| {
+                        child_el(pr, local).map(|m| (l.reserve_atom(*family), *kind, &m.head))
+                    })
+                    .collect()
+            })
+            .unwrap_or_default();
+        let first = l.atom;
+        list_blocks(&cell.blocks, l, true);
+        let last = l.atom;
+        let from = if k > 0 { starts[k - 1] } else { starts[k] };
+        // The range runs to the end of the row (measured on three-cell rows).
+        let to = at.saturating_sub(1).max(starts[k]);
+        for (id, kind, head) in marks {
+            l.cell_revision(id, kind, head, (from, to), first..last, cell_text(cell));
         }
     }
 }
@@ -678,18 +1055,43 @@ fn row_props(row: &Row) -> Option<&XmlElement> {
     })
 }
 
-fn list_blocks(blocks: &[Block], l: &mut Lister) {
-    for block in blocks {
+fn list_blocks(blocks: &[Block], l: &mut Lister, in_cell: bool) {
+    for (bi, block) in blocks.iter().enumerate() {
         match block {
             Block::Paragraph(p) => {
-                list_paragraph(p, l);
+                list_paragraph(p, l, in_cell && bi + 1 == blocks.len());
                 l.para += 1;
             }
             Block::Table(t) => list_table(t, l),
             Block::Sdt(sdt) => {
                 for c in sdt.content() {
-                    list_blocks(&c.blocks, l);
+                    list_blocks(&c.blocks, l, false);
                 }
+            }
+            Block::Raw(RawXml::Element(e)) if e.head.is_w("tcPr") => {
+                if let Some(change) = child_el(e, "tcPrChange") {
+                    l.atom(
+                        Family::TblFmt,
+                        RevisionKind::TableFormat,
+                        &change.head,
+                        0,
+                        "",
+                    );
+                    if let Some(span) = l.row_span {
+                        l.span_last(span, true);
+                    }
+                }
+            }
+            Block::Raw(RawXml::Element(e))
+                if matches!(
+                    e.head.local_name(),
+                    "moveFromRangeEnd"
+                        | "moveToRangeEnd"
+                        | "moveFromRangeStart"
+                        | "moveToRangeStart"
+                ) =>
+            {
+                l.move_marker(e);
             }
             Block::Raw(RawXml::Element(e)) if e.head.is_w("sectPr") => {
                 if let Some(change) = child_el(e, "sectPrChange") {
@@ -941,14 +1343,26 @@ enum Mark {
 }
 
 fn pass_paragraph(p: &mut Paragraph, pass: &mut Pass) -> Mark {
+    let numbering_marks = has_numbering_marks(p);
+    // Same order as the lister: the property change first, then the content.
+    if let Some(ppr) = &mut p.props
+        && child_el(ppr, "pPrChange").is_some()
+        && pass.hit()
+    {
+        resolve_prop_change(ppr, "pPrChange", &[], &["rPr", "sectPr"], pass.action);
+    }
+    if numbering_marks
+        && pass.hit()
+        && let Some(num) = p.props.as_mut().and_then(|ppr| child_el_mut(ppr, "numPr"))
+    {
+        remove_children(num, "numberingChange");
+        remove_children(num, "ins");
+    }
     pass_inlines(&mut p.content, pass);
     let mut mark = Mark::Stays;
     let Some(ppr) = &mut p.props else {
         return mark;
     };
-    if child_el(ppr, "pPrChange").is_some() && pass.hit() {
-        resolve_prop_change(ppr, "pPrChange", &[], &["rPr", "sectPr"], pass.action);
-    }
     if let Some(sect) = child_el_mut(ppr, "sectPr")
         && child_el(sect, "sectPrChange").is_some()
         && pass.hit()
@@ -996,10 +1410,15 @@ fn pass_paragraph(p: &mut Paragraph, pass: &mut Pass) -> Mark {
 /// surviving mark is the second paragraph's, so its properties win (as in Word), unless the
 /// first paragraph ends a section.
 fn join_with_next(blocks: &mut Vec<Block>, i: usize) {
-    if !matches!(blocks.get(i + 1), Some(Block::Paragraph(_))) {
+    // Range markers (`w:moveFromRangeEnd`...) can sit between the two paragraphs; they stay.
+    let mut j = i + 1;
+    while matches!(blocks.get(j), Some(Block::Raw(_))) {
+        j += 1;
+    }
+    if !matches!(blocks.get(j), Some(Block::Paragraph(_))) {
         return;
     }
-    let Block::Paragraph(next) = blocks.remove(i + 1) else {
+    let Block::Paragraph(next) = blocks.remove(j) else {
         return;
     };
     let Some(Block::Paragraph(first)) = blocks.get_mut(i) else {
@@ -1022,6 +1441,148 @@ pub(crate) fn join_paragraphs(blocks: &mut Vec<Block>, i: usize) {
     join_with_next(blocks, i);
 }
 
+/// Sets the vertical merge state a `w:cellMerge` names (`cont`: merged into the cell above,
+/// `rest`: not merged) in `w:tcPr`.
+fn set_vertical_merge(pr: &mut XmlElement, state: &str) {
+    let pos = pr
+        .children
+        .iter()
+        .position(|c| matches!(c, RawXml::Element(e) if e.head.is_w("vMerge")));
+    match (state, pos) {
+        ("cont", Some(i)) => {
+            if let RawXml::Element(e) = &mut pr.children[i] {
+                e.head.remove_attr_w("val");
+            }
+        }
+        ("cont", None) => {
+            let at = pr
+                .children
+                .iter()
+                .rposition(|c| {
+                    matches!(c, RawXml::Element(e)
+                        if ["cnfStyle", "tcW", "gridSpan", "hMerge"].iter().any(|n| e.head.is_w(n)))
+                })
+                .map_or(0, |i| i + 1);
+            let merge = pr.head.sibling("vMerge").into_empty();
+            pr.children.insert(at, RawXml::Element(merge));
+        }
+        ("rest", Some(i)) => {
+            let restart = matches!(&pr.children[i],
+                RawXml::Element(e) if e.head.attr_w("val") == Some("restart"));
+            if !restart {
+                pr.children.remove(i);
+            }
+        }
+        _ => {}
+    }
+}
+
+/// Resolves the `w:cellIns`, `w:cellDel` and `w:cellMerge` of a cell; true when the cell goes.
+fn pass_cell_marks(cell: &mut Cell, pass: &mut Pass) -> bool {
+    let Some(pr) = cell_tc_pr_mut(cell) else {
+        return false;
+    };
+    let mut remove = false;
+    for (local, family, _) in CELL_MARKS {
+        let Some(mark) = child_el(pr, local) else {
+            continue;
+        };
+        let target = match pass.action {
+            Action::Accept => mark.head.attr_w("vMerge"),
+            Action::Reject => mark.head.attr_w("vMergeOrig"),
+        }
+        .map(str::to_owned);
+        if !pass.hit() {
+            continue;
+        }
+        remove_children(pr, local);
+        match (family, pass.action) {
+            (Family::CellIns, Action::Reject) | (Family::CellDel, Action::Accept) => remove = true,
+            (Family::CellMerge, _) => {
+                if let Some(state) = target {
+                    set_vertical_merge(pr, &state);
+                }
+            }
+            _ => {}
+        }
+    }
+    remove
+}
+
+/// Grid span and width of a cell, for handing them to a neighbour when the cell goes.
+fn cell_extent(cell: &Cell) -> (u32, Option<u32>) {
+    let Some(pr) = cell_tc_pr(cell) else {
+        return (1, None);
+    };
+    let span = child_el(pr, "gridSpan")
+        .and_then(|e| e.head.attr_w("val"))
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(1);
+    let width = child_el(pr, "tcW")
+        .filter(|e| e.head.attr_w("type").is_none_or(|t| t == "dxa"))
+        .and_then(|e| e.head.attr_w("w"))
+        .and_then(|v| v.parse().ok());
+    (span, width)
+}
+
+/// Removes the cells at `drop` from `row`. The space of a removed cell goes to the cell
+/// before it (Word widens that cell and spans it over the freed grid column), or to the next
+/// cell when the first one goes.
+fn remove_cells(row: &mut Row, drop: &[usize]) {
+    for &k in drop.iter().rev() {
+        let RowChild::Cell(gone) = row.children.remove(k) else {
+            continue;
+        };
+        let (span, width) = cell_extent(&gone);
+        let heir = row.children[..k]
+            .iter()
+            .rposition(|c| matches!(c, RowChild::Cell(_)))
+            .or_else(|| {
+                row.children[k..]
+                    .iter()
+                    .position(|c| matches!(c, RowChild::Cell(_)))
+                    .map(|i| i + k)
+            });
+        let Some(RowChild::Cell(heir)) = heir.map(|i| &mut row.children[i]) else {
+            continue;
+        };
+        let (heir_span, heir_width) = cell_extent(heir);
+        let Some(pr) = cell_tc_pr_mut(heir) else {
+            continue;
+        };
+        if let (Some(w), Some(hw)) = (width, heir_width)
+            && let Some(RawXml::Element(tcw)) = pr
+                .children
+                .iter_mut()
+                .find(|c| matches!(c, RawXml::Element(e) if e.head.is_w("tcW")))
+        {
+            tcw.head.set_attr_w("w", &(w + hw).to_string());
+        }
+        if span + heir_span > 1 {
+            let total = (span + heir_span).to_string();
+            if let Some(RawXml::Element(gs)) = pr
+                .children
+                .iter_mut()
+                .find(|c| matches!(c, RawXml::Element(e) if e.head.is_w("gridSpan")))
+            {
+                gs.head.set_attr_w("val", &total);
+            } else {
+                let at = pr
+                    .children
+                    .iter()
+                    .rposition(|c| {
+                        matches!(c, RawXml::Element(e)
+                            if e.head.is_w("cnfStyle") || e.head.is_w("tcW"))
+                    })
+                    .map_or(0, |i| i + 1);
+                let mut gs = pr.head.sibling("gridSpan").into_empty();
+                gs.head.set_attr_w("val", &total);
+                pr.children.insert(at, RawXml::Element(gs));
+            }
+        }
+    }
+}
+
 fn pass_table(t: &mut Table, pass: &mut Pass) -> bool {
     let mut drop_rows = Vec::new();
     for (ci, child) in t.children.iter_mut().enumerate() {
@@ -1031,15 +1592,34 @@ fn pass_table(t: &mut Table, pass: &mut Pass) -> bool {
                     resolve_prop_change(e, "tblPrChange", &[], &[], pass.action);
                 }
             }
+            TableChild::Raw(RawXml::Element(e)) if e.head.is_w("tblGrid") => {
+                if child_el(e, "tblGridChange").is_some() && pass.hit() {
+                    resolve_prop_change(e, "tblGridChange", &[], &[], pass.action);
+                }
+            }
             TableChild::Raw(_) => {}
             TableChild::Row(row) => {
                 let mut remove_row = false;
+                for rc in &mut row.children {
+                    let RowChild::Raw(RawXml::Element(ex)) = rc else {
+                        continue;
+                    };
+                    if ex.head.is_w("tblPrEx")
+                        && child_el(ex, "tblPrExChange").is_some()
+                        && pass.hit()
+                    {
+                        resolve_prop_change(ex, "tblPrExChange", &[], &[], pass.action);
+                    }
+                }
                 for rc in &mut row.children {
                     let RowChild::Raw(RawXml::Element(trpr)) = rc else {
                         continue;
                     };
                     if !trpr.head.is_w("trPr") {
                         continue;
+                    }
+                    if child_el(trpr, "trPrChange").is_some() && pass.hit() {
+                        resolve_prop_change(trpr, "trPrChange", &[], &["ins", "del"], pass.action);
                     }
                     for (local, inserted) in [("ins", true), ("del", false)] {
                         if child_el(trpr, local).is_some() && pass.hit() {
@@ -1054,11 +1634,16 @@ fn pass_table(t: &mut Table, pass: &mut Pass) -> bool {
                     }
                 }
                 // The cells are walked even when the row goes, to keep the numbering.
-                for rc in &mut row.children {
+                let mut drop_cells = Vec::new();
+                for (k, rc) in row.children.iter_mut().enumerate() {
                     if let RowChild::Cell(cell) = rc {
+                        if pass_cell_marks(cell, pass) {
+                            drop_cells.push(k);
+                        }
                         pass_blocks(&mut cell.blocks, pass);
                     }
                 }
+                remove_cells(row, &drop_cells);
                 if remove_row {
                     drop_rows.push(ci);
                 }
@@ -1093,6 +1678,17 @@ fn pass_blocks(blocks: &mut Vec<Block>, pass: &mut Pass) {
                     }
                 }
             }
+            Block::Raw(RawXml::Element(e)) if e.head.is_w("tcPr") => {
+                if child_el(e, "tcPrChange").is_some() && pass.hit() {
+                    resolve_prop_change(
+                        e,
+                        "tcPrChange",
+                        &[],
+                        &["cellIns", "cellDel", "cellMerge"],
+                        pass.action,
+                    );
+                }
+            }
             Block::Raw(RawXml::Element(e)) if e.head.is_w("sectPr") => {
                 if child_el(e, "sectPrChange").is_some() && pass.hit() {
                     resolve_prop_change(
@@ -1116,7 +1712,7 @@ fn pass_blocks(blocks: &mut Vec<Block>, pass: &mut Pass) {
 }
 
 /// Removes move-range markers when no moved text is left.
-fn drop_orphan_move_markers(blocks: &mut [Block]) {
+fn drop_orphan_move_markers(blocks: &mut Vec<Block>) {
     fn has_move(content: &[Inline]) -> bool {
         content.iter().any(|i| match i {
             Inline::Group(g) => {
@@ -1156,7 +1752,13 @@ fn drop_orphan_move_markers(blocks: &mut [Block]) {
             }
         }
     }
-    fn strip_blocks(blocks: &mut [Block]) {
+    fn strip_blocks(blocks: &mut Vec<Block>) {
+        blocks.retain(|b| {
+            !matches!(b, Block::Raw(RawXml::Element(e)) if matches!(
+                e.head.local_name(),
+                "moveFromRangeStart" | "moveFromRangeEnd" | "moveToRangeStart" | "moveToRangeEnd"
+            ))
+        });
         for b in blocks {
             match b {
                 Block::Paragraph(p) => strip(&mut p.content),
@@ -1187,10 +1789,30 @@ fn drop_orphan_move_markers(blocks: &mut [Block]) {
     }
 }
 
+/// Names of the moves resolved together with `hit`: their own, and on accept the moves that
+/// start inside their range (measured: Word accepts those too, rejecting leaves them).
+fn move_names(hit: &[&Revision], action: Action) -> HashSet<String> {
+    let mut names = HashSet::new();
+    for r in hit {
+        if let Some(n) = &r.move_name {
+            names.insert(n.clone());
+            if action == Action::Accept {
+                names.extend(r.link_moves.iter().cloned());
+            }
+        }
+    }
+    names
+}
+
 impl Document {
     /// Every tracked change in the main story, in document order. Adjacent changes of one
     /// kind by one author count as one, as in Word.
     pub fn revisions(&self) -> Vec<Revision> {
+        self.list_revisions().0
+    }
+
+    /// The revisions plus the paragraph of every revision-bearing element (atom).
+    fn list_revisions(&self) -> (Vec<Revision>, Vec<AtomRange>) {
         let mut l = Lister {
             out: Vec::new(),
             para: 0,
@@ -1198,20 +1820,31 @@ impl Document {
             prev: None,
             absorb: None,
             sect_start: 0,
+            atom_span: Vec::new(),
+            atom_family: Vec::new(),
+            atom_row: Vec::new(),
+            row_span: None,
+            cur_move: None,
+            cur_range: None,
+            move_ranges: Vec::new(),
+            seq: 0,
+            table_rev: None,
         };
-        list_blocks(&self.body().blocks, &mut l);
+        list_blocks(&self.body().blocks, &mut l, false);
+        l.link_moves();
         place_section_revisions(&mut l.out);
-        l.out
+        let rows = l.atom_row;
+        (l.out, l.atom_span.into_iter().zip(rows).collect())
     }
 
     /// Accepts the revision at `index` of [`Document::revisions`].
     pub fn accept_revision(&mut self, index: usize) -> Result<(), DocxError> {
-        self.resolve(Action::Accept, Some(index)).map(drop)
+        self.resolve(Action::Accept, Some(&[index])).map(drop)
     }
 
     /// Rejects the revision at `index` of [`Document::revisions`].
     pub fn reject_revision(&mut self, index: usize) -> Result<(), DocxError> {
-        self.resolve(Action::Reject, Some(index)).map(drop)
+        self.resolve(Action::Reject, Some(&[index])).map(drop)
     }
 
     /// Accepts every tracked change; returns how many revisions were resolved.
@@ -1224,31 +1857,81 @@ impl Document {
         self.resolve(Action::Reject, None).unwrap_or(0)
     }
 
-    fn resolve(&mut self, action: Action, which: Option<usize>) -> Result<usize, DocxError> {
-        let revs = self.revisions();
-        let selected = match which {
-            Some(index) => {
-                let r = revs.get(index).ok_or(DocxError::NoSuchRevision {
-                    index,
-                    count: revs.len(),
-                })?;
-                let mut atoms: HashSet<usize> = r.atoms.iter().copied().collect();
-                // Word resolves both halves of a move together; pair them by order.
-                let partner = match r.kind {
-                    RevisionKind::MovedFrom => Some(RevisionKind::MovedTo),
-                    RevisionKind::MovedTo => Some(RevisionKind::MovedFrom),
-                    _ => None,
-                };
-                if let Some(other) = partner {
-                    let ordinal = revs[..index].iter().filter(|v| v.kind == r.kind).count();
-                    if let Some(p) = revs.iter().filter(|v| v.kind == other).nth(ordinal) {
-                        atoms.extend(p.atoms.iter().copied());
-                    }
-                }
-                Some(atoms)
+    /// Accepts the revisions at `indices` of [`Document::revisions`] (one call, so the
+    /// indices all refer to the same list); returns how many were resolved.
+    pub fn accept_revisions(&mut self, indices: &[usize]) -> Result<usize, DocxError> {
+        self.resolve(Action::Accept, Some(indices))
+    }
+
+    /// Rejects the revisions at `indices` of [`Document::revisions`].
+    pub fn reject_revisions(&mut self, indices: &[usize]) -> Result<usize, DocxError> {
+        self.resolve(Action::Reject, Some(indices))
+    }
+
+    /// Indices of the revisions that touch any paragraph of `first..=last`, as Word's
+    /// `Range.Revisions` does for a range of whole paragraphs.
+    pub fn revisions_in_paragraphs(&self, first: usize, last: usize) -> Vec<usize> {
+        self.revisions()
+            .iter()
+            .filter(|r| r.paragraph <= last && r.last_paragraph >= first)
+            .map(|r| r.index)
+            .collect()
+    }
+
+    /// Accepts the tracked changes located in paragraphs `first..=last`, as Word's
+    /// `Range.Revisions.AcceptAll` does for a range of whole paragraphs: a revision that
+    /// continues past the range is resolved only inside it. Returns the elements resolved.
+    pub fn accept_revisions_in_paragraphs(
+        &mut self,
+        first: usize,
+        last: usize,
+    ) -> Result<usize, DocxError> {
+        Ok(self.resolve_in_paragraphs(Action::Accept, first, last))
+    }
+
+    /// Rejects the tracked changes located in paragraphs `first..=last` (see
+    /// [`Document::accept_revisions_in_paragraphs`]).
+    pub fn reject_revisions_in_paragraphs(
+        &mut self,
+        first: usize,
+        last: usize,
+    ) -> Result<usize, DocxError> {
+        Ok(self.resolve_in_paragraphs(Action::Reject, first, last))
+    }
+
+    fn resolve_in_paragraphs(&mut self, action: Action, first: usize, last: usize) -> usize {
+        let (revs, ranges) = self.list_revisions();
+        let mut atoms: HashSet<usize> = ranges
+            .iter()
+            .enumerate()
+            .filter(|(_, ((a, b), _))| *a <= last && *b >= first)
+            .map(|(i, _)| i)
+            .collect();
+        // Word resolves a table row's revision together with everything else in the row.
+        let rows: HashSet<(usize, usize)> = atoms.iter().filter_map(|&a| ranges[a].1).collect();
+        for (i, ((a, b), _)) in ranges.iter().enumerate() {
+            if rows.iter().any(|(ra, rb)| a >= ra && b <= rb) {
+                atoms.insert(i);
             }
-            None => None,
-        };
+        }
+        // The other half of a move goes with it, wherever it is.
+        let hit: Vec<&Revision> = revs
+            .iter()
+            .filter(|r| r.atoms.iter().any(|a| atoms.contains(a)))
+            .collect();
+        let names = move_names(&hit, action);
+        for r in revs
+            .iter()
+            .filter(|r| r.move_name.as_ref().is_some_and(|n| names.contains(n)))
+        {
+            atoms.extend(r.atoms.iter().copied());
+        }
+        let n = atoms.len();
+        self.run_pass(action, Some(atoms));
+        n
+    }
+
+    fn run_pass(&mut self, action: Action, selected: Option<HashSet<usize>>) {
         let mut pass = Pass {
             action,
             selected,
@@ -1261,7 +1944,48 @@ impl Document {
         if pass.touched {
             self.edited();
         }
-        Ok(if which.is_some() { 1 } else { revs.len() })
+    }
+
+    fn resolve(&mut self, action: Action, which: Option<&[usize]>) -> Result<usize, DocxError> {
+        let revs = self.revisions();
+        let selected = match which {
+            Some(indices) => {
+                let mut atoms: HashSet<usize> = HashSet::new();
+                let mut chosen: Vec<&Revision> = Vec::new();
+                for &index in indices {
+                    let r = revs.get(index).ok_or(DocxError::NoSuchRevision {
+                        index,
+                        count: revs.len(),
+                    })?;
+                    atoms.extend(r.atoms.iter().copied());
+                    chosen.push(r);
+                    // Word resolves both halves of a move together. Halves are paired by the
+                    // name of their move range; a half without a name pairs by order.
+                    let partner = match r.kind {
+                        RevisionKind::MovedFrom => Some(RevisionKind::MovedTo),
+                        RevisionKind::MovedTo => Some(RevisionKind::MovedFrom),
+                        _ => None,
+                    };
+                    if let (Some(other), None) = (partner, &r.move_name) {
+                        let ordinal = revs[..index].iter().filter(|v| v.kind == r.kind).count();
+                        if let Some(p) = revs.iter().filter(|v| v.kind == other).nth(ordinal) {
+                            atoms.extend(p.atoms.iter().copied());
+                        }
+                    }
+                }
+                let names = move_names(&chosen, action);
+                for v in revs
+                    .iter()
+                    .filter(|v| v.move_name.as_ref().is_some_and(|n| names.contains(n)))
+                {
+                    atoms.extend(v.atoms.iter().copied());
+                }
+                Some(atoms)
+            }
+            None => None,
+        };
+        self.run_pass(action, selected);
+        Ok(which.map_or(revs.len(), <[usize]>::len))
     }
 
     /// The paragraphs of the final view: a paragraph whose mark is deleted joins the next one

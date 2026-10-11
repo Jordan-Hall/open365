@@ -1,0 +1,24 @@
+[package]
+name = "open365-ui-host"
+description = "winit application host for the Open365 UI: window, wgpu surface, per-monitor DPI, frame scheduling, AccessKit and IME plumbing."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+accesskit.workspace = true
+accesskit_winit.workspace = true
+arboard.workspace = true
+open365-gfx.workspace = true
+open365-ui-core.workspace = true
+thiserror = "2.0.21"
+wgpu.workspace = true
+winit.workspace = true
+
+[dev-dependencies]
+open365-text.workspace = true
+
+[lints]
+workspace = true

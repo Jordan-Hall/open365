@@ -114,6 +114,12 @@ pub(super) struct Section {
     pub lcid: Option<u32>,
     /// `[DBNum1]` to `[DBNum3]`: digits are written with CJK numerals (only under the CJK language prefixes).
     pub dbnum: Option<u8>,
+    /// The number-shape byte of a `[$-xxxxxxxx]` tag (bits 24 to 31): the digit set of numbers and dates.
+    pub shape: u8,
+    /// The calendar byte of the tag (bits 16 to 23), or the `B1` (Gregorian, 1) and `B2` (Hijri, 6) prefix.
+    pub calendar: u8,
+    /// The section uses the Thai date letters without a `[$-]` tag: Thai digits, names and Buddhist years.
+    pub thai: bool,
 }
 
 /// A parsed format code.
@@ -205,6 +211,9 @@ struct Tokenizer<'a> {
     cond: Option<Cond>,
     lcid: Option<u32>,
     dbnum: Option<u8>,
+    shape: u8,
+    calendar: u8,
+    thai: bool,
     _src: &'a str,
 }
 
@@ -217,6 +226,9 @@ impl<'a> Tokenizer<'a> {
             cond: None,
             lcid: None,
             dbnum: None,
+            shape: 0,
+            calendar: 0,
+            thai: false,
             _src: src,
         }
     }
@@ -402,9 +414,33 @@ impl<'a> Tokenizer<'a> {
                     let n = self.run_of(c);
                     self.out.push(Tok::EraYear(n));
                 }
+                'b' | 'B'
+                    if self.out.is_empty() && self.peek(1).is_some_and(|d| d.is_ascii_digit()) =>
+                {
+                    // `B1` selects the Gregorian calendar and `B2` the Hijri one; Excel refuses the other digits.
+                    self.calendar = match self.peek(1) {
+                        Some('1') => 1,
+                        Some('2') => 6,
+                        _ => return Err(FormatError::new("unknown calendar prefix")),
+                    };
+                    self.pos += 2;
+                }
                 'b' | 'B' => {
                     let n = self.run_of(c);
                     self.out.push(Tok::BuddhistYear(n));
+                }
+                // The Thai date letters: day, month, year (Buddhist), hour, minute, second.
+                '\u{0e27}' | '\u{0e14}' | '\u{0e1b}' | '\u{0e0a}' | '\u{0e19}' | '\u{0e17}' => {
+                    let n = self.run_of(c);
+                    self.thai = true;
+                    self.out.push(match c {
+                        '\u{0e27}' => Tok::Day(n),
+                        '\u{0e14}' => Tok::Month(n),
+                        '\u{0e1b}' => Tok::BuddhistYear(if n <= 2 { 2 } else { 4 }),
+                        '\u{0e0a}' => Tok::Hour(n),
+                        '\u{0e19}' => Tok::Minute(n),
+                        _ => Tok::Second(n),
+                    });
                 }
                 'g' | 'G' => {
                     let n = self.run_of(c);
@@ -468,6 +504,8 @@ impl<'a> Tokenizer<'a> {
                 && let Ok(code) = u32::from_str_radix(tail, 16)
             {
                 self.lcid = Some(code & 0xFFFF);
+                self.shape = ((code >> 24) & 0xFF) as u8;
+                self.calendar = ((code >> 16) & 0xFF) as u8;
             }
             let text = currency_text(&body);
             self.lit(&text);
@@ -543,6 +581,7 @@ fn finish_section(
     cond: Option<Cond>,
     lcid: Option<u32>,
     dbnum: Option<u8>,
+    (shape, calendar, thai): (u8, u8, bool),
 ) -> Result<Section, FormatError> {
     let kind = classify(&toks);
     let mut grouping = false;
@@ -684,6 +723,9 @@ fn finish_section(
         has_ampm,
         lcid,
         dbnum,
+        shape,
+        calendar,
+        thai: thai && lcid.is_none(),
     })
 }
 
@@ -727,6 +769,7 @@ impl NumberFormat {
             let cond = tk.cond;
             let lcid = tk.lcid;
             let dbnum = tk.dbnum;
+            let extra = (tk.shape, tk.calendar, tk.thai);
             let mut toks = tk.out;
             // Fractional seconds are recognised here, where the token order is known.
             let mut i = 0;
@@ -744,7 +787,7 @@ impl NumberFormat {
                 }
                 i += 1;
             }
-            sections.push(finish_section(toks, cond, lcid, dbnum)?);
+            sections.push(finish_section(toks, cond, lcid, dbnum, extra)?);
         }
         Ok(NumberFormat { sections })
     }

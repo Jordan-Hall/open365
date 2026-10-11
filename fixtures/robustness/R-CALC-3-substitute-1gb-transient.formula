@@ -1,0 +1,1 @@
+SUBSTITUTE(REPT("a",32767),"a",REPT("a",32767))

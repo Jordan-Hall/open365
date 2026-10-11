@@ -105,7 +105,7 @@ impl BorderSpec {
 }
 
 /// A restyle closure that may also edit the style sheet: `(styles, old xf, row, col)`.
-type StyleFn<'a> = dyn FnMut(&mut Styles, u32, u32, u32) -> Result<u32, XlsxError> + 'a;
+pub(super) type StyleFn<'a> = dyn FnMut(&mut Styles, u32, u32, u32) -> Result<u32, XlsxError> + 'a;
 
 fn check_rect(rect: Rect) -> Result<(), XlsxError> {
     let (r1, c1, r2, c2) = rect;
@@ -154,7 +154,7 @@ impl Workbook {
 
     /// Core of every action: restyles `rect` with `f(styles, old xf, row, col)`, undoing the
     /// action if `f` fails.
-    fn restyle(
+    pub(super) fn restyle(
         &mut self,
         sheet: usize,
         rect: Rect,

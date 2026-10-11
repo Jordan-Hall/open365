@@ -187,6 +187,8 @@ pub struct Workbook {
     styles_dirty: bool,
     workbook_dirty: bool,
     sst_dirty: bool,
+    /// A part the model does not own was replaced ([`Workbook::replace_part`]).
+    parts_dirty: bool,
     hygiene_done: bool,
     dropped: Vec<DroppedItem>,
     hygiene: Vec<HygieneAction>,
@@ -195,6 +197,8 @@ pub struct Workbook {
 
 mod cellformat;
 pub use cellformat::{BorderSpec, FormatSnapshot};
+mod merge;
+pub use merge::{MergeKind, merge_areas};
 mod structure;
 
 fn is_true(v: &str) -> bool {
@@ -408,6 +412,7 @@ impl Workbook {
             styles_dirty: false,
             workbook_dirty: false,
             sst_dirty: false,
+            parts_dirty: false,
             hygiene_done: false,
             dropped,
             hygiene: Vec::new(),
@@ -546,6 +551,15 @@ impl Workbook {
         self.date1904
     }
 
+    /// Makes the built-in number format ids resolve as Excel does under the Windows locale `lcid`
+    /// (`None`: the specification's codes). The file does not record the locale, so the
+    /// application supplies the one of the user who opens it. It changes how ids read
+    /// ([`Styles::format_code`], [`Workbook::number_format`]) and which id a typed format code
+    /// maps to when a cell is formatted; it never changes the saved bytes by itself.
+    pub fn set_number_format_locale(&mut self, lcid: Option<u32>) {
+        self.styles.set_number_format_locale(lcid);
+    }
+
     pub fn styles(&self) -> &Styles {
         &self.styles
     }
@@ -576,12 +590,43 @@ impl Workbook {
     /// True when anything changed since opening or the last save.
     pub fn is_dirty(&self) -> bool {
         self.workbook_dirty
+            || self.parts_dirty
             || self.sst_dirty
             || self.styles_dirty
             || self.sheets.iter().any(|s| s.dirty)
     }
 
     // ---- editing -------------------------------------------------------------------
+
+    /// Replaces the bytes of an existing package part the workbook model does not own (for
+    /// example a pivot table, pivot cache definition or pivot cache records part). Every other
+    /// part is still written back byte-identical by [`Workbook::save`]. Refused for the parts
+    /// the model re-serialises itself (workbook, worksheets, shared strings, styles), for
+    /// `[Content_Types].xml` and for relationship parts, and for a part that does not exist.
+    pub fn replace_part(&mut self, name: &PartName, bytes: Vec<u8>) -> Result<(), XlsxError> {
+        let owned = *name == self.workbook_part
+            || self.sheets.iter().any(|s| s.part == *name)
+            || self.sst.as_ref().is_some_and(|(p, _)| p == name)
+            || self.styles_part.as_ref() == Some(name)
+            || name.as_str() == CONTENT_TYPES_PART
+            || name.as_str().ends_with(".rels");
+        if owned {
+            return Err(XlsxError::UnsupportedEdit(format!(
+                "part {} is owned by the workbook model",
+                name.as_str()
+            )));
+        }
+        let existing = self
+            .package
+            .part(name.as_str())
+            .ok_or_else(|| XlsxError::UnsupportedEdit(format!("no part {}", name.as_str())))?;
+        if existing.data() == bytes.as_slice() {
+            return Ok(());
+        }
+        self.package.set_part(name.clone(), bytes);
+        self.parts_dirty = true;
+        Ok(())
+    }
 
     fn check_target(&self, sheet: usize, row: u32, col: u32) -> Result<&Worksheet, XlsxError> {
         let entry = self.sheets.get(sheet).ok_or(XlsxError::SheetOutOfRange {
@@ -641,6 +686,57 @@ impl Workbook {
             })
             .fold(0.0, f64::max);
         MAX_COLUMN_WIDTH + padding
+    }
+
+    /// Stores measured auto-fit widths (`(column, stored width)`; `bestFit` set, like Excel's
+    /// AutoFit Column Width) and returns the previous `cols` state.
+    pub fn autofit_columns(
+        &mut self,
+        sheet: usize,
+        columns: &[(u32, f64)],
+    ) -> Result<ColumnsSnapshot, XlsxError> {
+        let max = self.max_column_width();
+        if let Some((c, w)) = columns
+            .iter()
+            .find(|(_, w)| !w.is_finite() || !(0.0..=max).contains(w))
+        {
+            return Err(XlsxError::UnsupportedEdit(format!(
+                "column {c} width {w} is outside 0..={max}"
+            )));
+        }
+        self.edit_columns(sheet, |ws| {
+            columns
+                .iter()
+                .try_for_each(|&(c, w)| ws.set_column_best_fit(c, w))
+        })
+    }
+
+    /// Stores measured auto-fit heights (`(row, points)`; no `customHeight`, like Excel's AutoFit
+    /// Row Height) and returns the previous state of the rows' span.
+    pub fn autofit_rows(
+        &mut self,
+        sheet: usize,
+        rows: &[(u32, f64)],
+    ) -> Result<RowHeightsSnapshot, XlsxError> {
+        if let Some((r, h)) = rows
+            .iter()
+            .find(|(_, h)| !h.is_finite() || !(0.0..=MAX_ROW_HEIGHT).contains(h))
+        {
+            return Err(XlsxError::UnsupportedEdit(format!(
+                "row {r} height {h} is outside 0..={MAX_ROW_HEIGHT}"
+            )));
+        }
+        let first = rows.iter().map(|r| r.0).min().unwrap_or(1);
+        let last = rows.iter().map(|r| r.0).max().unwrap_or(1);
+        if last - first >= 16_384 {
+            return Err(XlsxError::UnsupportedEdit(
+                "an auto-fit covers at most 16384 rows".to_owned(),
+            ));
+        }
+        self.edit_rows(sheet, first, last, |ws| {
+            rows.iter()
+                .try_for_each(|&(r, h)| ws.set_row_auto_height(r, h))
+        })
     }
 
     /// Hides columns `first..=last`; their stored widths are kept.
@@ -1136,6 +1232,7 @@ impl Workbook {
             self.package.set_part(self.workbook_part.clone(), bytes);
             self.workbook_dirty = false;
         }
+        self.parts_dirty = false;
         for entry in &mut self.sheets {
             if entry.dirty
                 && let Some(ws) = &entry.data

@@ -1,0 +1,5 @@
+feature = "pivot"
+made_with = "Microsoft Excel 20430 (Windows)"
+author = "project member"
+expect_dropped = []
+notes = "PivotTable custom table styles (styles.xml tableStyles and dxfs), random elements, layouts and flags (display format per cell)"

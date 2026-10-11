@@ -87,6 +87,9 @@ pub(super) fn mmult(ctx: &EvalContext<'_>, args: &[Arg]) -> Res<Value> {
     if m != m2 {
         return Err(ErrorKind::Value);
     }
+    if n.saturating_mul(k) > super::MAX_ARRAY_CELLS {
+        return Err(ErrorKind::Value);
+    }
     let mut out = vec![vec![0.0; k]; n];
     for i in 0..n {
         for j in 0..k {
@@ -212,19 +215,21 @@ pub(super) fn munit(ctx: &EvalContext<'_>, args: &[Arg]) -> Res<Value> {
     if n < 1.0 {
         return Err(ErrorKind::Value);
     }
-    if n * n > 4.0e6 {
-        return Err(ErrorKind::Value);
+    // Excel gives up above 7326 (53.7 million cells); the cell then reads 0 instead of an error.
+    if n >= 7327.0 {
+        return Ok(Value::Number(0.0));
     }
     let n = n as usize;
-    Ok(Value::Array(
-        (0..n)
-            .map(|i| {
-                (0..n)
-                    .map(|j| Value::Number(if i == j { 1.0 } else { 0.0 }))
-                    .collect()
-            })
-            .collect(),
-    ))
+    let mut rows: Vec<Vec<Value>> = Vec::new();
+    rows.try_reserve_exact(n).map_err(|_| ErrorKind::Value)?;
+    for i in 0..n {
+        let mut row: Vec<Value> = Vec::new();
+        row.try_reserve_exact(n).map_err(|_| ErrorKind::Value)?;
+        row.resize(n, Value::Number(0.0));
+        row[i] = Value::Number(1.0);
+        rows.push(row);
+    }
+    Ok(Value::Array(rows))
 }
 
 /// Sums `f(x, y)` over the pairs of two arrays with the same number of cells (paired in row-major order); a pair

@@ -34,6 +34,13 @@ pub enum SpellError {
         /// The requested BCP-47 tag.
         tag: String,
     },
+    /// A dictionary was found but failed to load; the message is the original error.
+    Load {
+        /// The dictionary that failed (`en-GB`, or a file name).
+        dictionary: String,
+        /// What went wrong.
+        message: String,
+    },
 }
 
 impl fmt::Display for SpellError {
@@ -46,6 +53,10 @@ impl fmt::Display for SpellError {
             Self::Aff { line, message } => write!(f, ".aff line {line}: {message}"),
             Self::Dic { line, message } => write!(f, ".dic line {line}: {message}"),
             Self::NoDictionary { tag } => write!(f, "no dictionary found for `{tag}`"),
+            Self::Load {
+                dictionary,
+                message,
+            } => write!(f, "cannot load dictionary `{dictionary}`: {message}"),
         }
     }
 }

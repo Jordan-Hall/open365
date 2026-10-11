@@ -51,7 +51,10 @@ param(
   # -Popups: only these AutomationIds (comma separated); default is the full list.
   [string]$PopupIds = '',
   # Word: scan a three-page document at 100 % (page edge, shadow, gap, ruler) into word-page.json.
-  [switch]$PageGeometry
+  [switch]$PageGeometry,
+  # Word: the ruler at one pixel resolution (band rows, corner, vertical ruler columns) for a plain paragraph and for one with
+  # indents and tab stops, into word-ruler.json. The ruler is switched back in `finally`.
+  [switch]$RulerGeometry
 )
 $ErrorActionPreference = 'Stop'
 $ResponsiveList = @($ResponsiveWidths -split ',' | Where-Object { $_ } | ForEach-Object { [int]$_ })
@@ -725,6 +728,43 @@ function Invoke-Oracle([string]$Which) {
       Write-Host ("Word page geometry: {0} bytes" -f $gj.Length)
     }
 
+    # Word ruler at pixel resolution: every row of the horizontal band and every column of the vertical ruler, for a plain
+    # paragraph and for one with indents and one tab stop of each kind. The view setting is restored in `finally`.
+    if ($RulerGeometry -and $Which -eq 'Word') {
+      $doc = $office.ActiveDocument; $aw = $office.ActiveWindow
+      $doc.Content.Text = "One"
+      $aw.View.Type = 3
+      $aw.View.Zoom.Percentage = 100
+      $script:RulerWas = [bool]$aw.ActivePane.DisplayRulers
+      $aw.ActivePane.DisplayRulers = $true
+      $rgRec = New-Object System.Collections.ArrayList
+      foreach ($variant in @('plain', 'marks')) {
+        $pf = $doc.Paragraphs(1)
+        $pf.TabStops.ClearAll()
+        if ($variant -eq 'marks') {
+          $pf.LeftIndent = 36; $pf.FirstLineIndent = 18; $pf.RightIndent = 36
+          [void]$pf.TabStops.Add(144, 0, 0); [void]$pf.TabStops.Add(216, 1, 0)
+          [void]$pf.TabStops.Add(288, 2, 0); [void]$pf.TabStops.Add(360, 3, 0)
+        } else { $pf.LeftIndent = 0; $pf.FirstLineIndent = 0; $pf.RightIndent = 0 }
+        $aw.ActivePane.VerticalPercentScrolled = 0
+        Start-Sleep -Milliseconds 1800
+        $shot = Join-Path $ShotDir ("word-ruler-{0}.png" -f $variant)
+        Save-Shot $hwnd $shot $WindowWidth $WindowHeight
+        $rows = [ordered]@{}
+        for ($yy = 220; $yy -le 256; $yy++) { $rows["y$yy"] = @(Scan-Runs $shot 0 $yy 1 0 1500 260) }
+        $cols = [ordered]@{}
+        for ($xx = 6; $xx -le 42; $xx++) { $cols["x$xx"] = @(Scan-Runs $shot $xx 220 0 1 700 120) }
+        [void]$rgRec.Add([ordered]@{ variant = $variant; zoom = $aw.View.Zoom.Percentage
+            pageSetupPt = @($doc.PageSetup.PageWidth, $doc.PageSetup.PageHeight, $doc.PageSetup.LeftMargin, $doc.PageSetup.RightMargin, $doc.PageSetup.TopMargin)
+            paragraphPt = @($pf.LeftIndent, $pf.FirstLineIndent, $pf.RightIndent)
+            rows = $rows; cols = $cols })
+      }
+      $aw.ActivePane.DisplayRulers = $script:RulerWas
+      $rj = [ordered]@{ schema = 1; app = 'Word'; measuredScale = $scale; window = $winRect; note = 'Runs [start, length, rrggbb] along x (rows, from x 0) or y (cols, from y 220), physical px, window-relative.'; states = $rgRec.ToArray() } | ConvertTo-Json -Depth 12 -Compress
+      [IO.File]::WriteAllText((Join-Path $chromeOutDir 'word-ruler.json'), $rj, (New-Object Text.UTF8Encoding($false)))
+      Write-Host ("Word ruler geometry: {0} bytes" -f $rj.Length)
+    }
+
     # Backstage: open the File tab, record the navigation list and layout, then go back.
     try {
       $fileTab = (Find-All $ribbonPane { param($e) $e.Current.AutomationId -eq 'FileTabButton' } 6) | Select-Object -First 1
@@ -742,7 +782,7 @@ function Invoke-Oracle([string]$Which) {
       }
     } catch { $result.backstageError = $_.Exception.Message }
 
-    $path = Join-Path $(if ($ChromeOnly -or $Popups -or $PageGeometry) { $ShotDir } else { $outDir }) ("{0}-ribbon.json" -f $Which.ToLower())
+    $path = Join-Path $(if ($ChromeOnly -or $Popups -or $PageGeometry -or $RulerGeometry) { $ShotDir } else { $outDir }) ("{0}-ribbon.json" -f $Which.ToLower())
     $json = $result | ConvertTo-Json -Depth 40 -Compress
     foreach ($t in $script:Scrub) { if ($t) { $json = $json.Replace($t, '<user>') } }
     [IO.File]::WriteAllText($path, $json, (New-Object Text.UTF8Encoding($false)))

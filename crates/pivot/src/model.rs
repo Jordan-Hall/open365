@@ -4,6 +4,7 @@
 use open365_xlsx::{ParsedXml, XmlElement, parse_xml};
 
 use crate::error::PivotError;
+use crate::location::Location;
 use crate::value::{Value, iso_to_serial};
 use crate::xmlutil::{attr_bool, attr_f64, attr_string, attr_u32, children_main};
 
@@ -81,11 +82,24 @@ impl CacheField {
     }
 }
 
+/// A calculated item (`calculatedItems/calculatedItem`): a formula over the items of one field,
+/// shown as a normal item whose shared item (`item`) has no cache records.
+#[derive(Debug, Clone, PartialEq)]
+pub struct CalculatedItem {
+    /// Cache field the item belongs to.
+    pub field: usize,
+    /// Index into the field's shared items (the `pivotArea` reference).
+    pub item: u32,
+    /// Formula as stored, e.g. `Product[Apple]+Product[Banana]`.
+    pub formula: String,
+}
+
 /// `xl/pivotCache/pivotCacheDefinitionN.xml`.
 #[derive(Debug, Clone)]
 pub struct CacheDefinition {
     pub source: CacheSource,
     pub fields: Vec<CacheField>,
+    pub calculated_items: Vec<CalculatedItem>,
     pub record_count: Option<u32>,
     pub refresh_on_load: bool,
     xml: ParsedXml,
@@ -154,9 +168,29 @@ impl CacheDefinition {
                 });
             }
         }
+        let calculated_items = root
+            .child_main("calculatedItems")
+            .map(|ci| {
+                children_main(ci, "calculatedItem")
+                    .filter_map(|c| {
+                        let formula = attr_string(c, "formula")?;
+                        let reference = c
+                            .child_main("pivotArea")?
+                            .child_main("references")?
+                            .child_main("reference")?;
+                        Some(CalculatedItem {
+                            field: attr_u32(reference, "field")? as usize,
+                            item: attr_u32(reference.elements().next()?, "v")?,
+                            formula,
+                        })
+                    })
+                    .collect()
+            })
+            .unwrap_or_default();
         Ok(Self {
             source,
             fields,
+            calculated_items,
             record_count: attr_u32(root, "recordCount"),
             refresh_on_load: attr_bool(root, "refreshOnLoad", false),
             xml,
@@ -165,6 +199,17 @@ impl CacheDefinition {
 
     pub fn xml(&self) -> &ParsedXml {
         &self.xml
+    }
+
+    /// Sets `refreshOnLoad`: Excel rebuilds the cache (shared items, records) and the pivot
+    /// tables from the source range when it opens the file.
+    pub fn set_refresh_on_load(&mut self, on: bool) {
+        if on {
+            self.xml.root.head.set_attr("refreshOnLoad", "1");
+        } else {
+            self.xml.root.head.remove_attr("refreshOnLoad");
+        }
+        self.refresh_on_load = on;
     }
 
     /// The part bytes, unchanged when nothing was edited.
@@ -320,6 +365,7 @@ pub struct PivotTable {
     pub first_data_row: u32,
     pub first_data_col: u32,
     pub row_page_count: u32,
+    pub col_page_count: u32,
     pub fields: Vec<PivotField>,
     pub row_fields: Vec<u32>,
     pub col_fields: Vec<u32>,
@@ -338,7 +384,6 @@ pub struct PivotTable {
     pub col_header_caption: Option<String>,
     pub missing_caption: Option<String>,
     pub error_caption: Option<String>,
-    pub calculated_items: bool,
     xml: ParsedXml,
 }
 
@@ -471,6 +516,7 @@ impl PivotTable {
             first_data_row: loc.and_then(|l| attr_u32(l, "firstDataRow")).unwrap_or(1),
             first_data_col: loc.and_then(|l| attr_u32(l, "firstDataCol")).unwrap_or(1),
             row_page_count: loc.and_then(|l| attr_u32(l, "rowPageCount")).unwrap_or(0),
+            col_page_count: loc.and_then(|l| attr_u32(l, "colPageCount")).unwrap_or(0),
             fields,
             row_fields: field_list("rowFields"),
             col_fields: field_list("colFields"),
@@ -487,13 +533,49 @@ impl PivotTable {
             col_header_caption: attr_string(r, "colHeaderCaption"),
             missing_caption: attr_string(r, "missingCaption"),
             error_caption: attr_string(r, "errorCaption"),
-            calculated_items: r.child_main("calculatedItems").is_some(),
             xml,
         })
     }
 
     pub fn xml(&self) -> &ParsedXml {
         &self.xml
+    }
+
+    pub(crate) fn xml_mut(&mut self) -> &mut ParsedXml {
+        &mut self.xml
+    }
+
+    /// Writes `loc` into the `location` element (and the typed fields). Page counts of 0 are
+    /// omitted, as Excel does.
+    pub fn set_location(&mut self, loc: &Location) {
+        for node in &mut self.xml.root.children {
+            let Some(e) = node.as_element_mut().filter(|e| e.head.is_main("location")) else {
+                continue;
+            };
+            e.head.set_attr("ref", &loc.reference);
+            e.head
+                .set_attr("firstHeaderRow", &loc.first_header_row.to_string());
+            e.head
+                .set_attr("firstDataRow", &loc.first_data_row.to_string());
+            e.head
+                .set_attr("firstDataCol", &loc.first_data_col.to_string());
+            for (name, n) in [
+                ("rowPageCount", loc.row_page_count),
+                ("colPageCount", loc.col_page_count),
+            ] {
+                if n == 0 {
+                    e.head.remove_attr(name);
+                } else {
+                    e.head.set_attr(name, &n.to_string());
+                }
+            }
+        }
+        self.reference.clone_from(&loc.reference);
+        self.first_header_row = loc.first_header_row;
+        self.first_data_row = loc.first_data_row;
+        self.first_data_col = loc.first_data_col;
+        self.row_page_count = loc.row_page_count;
+        self.col_page_count = loc.col_page_count;
     }
 
     pub fn to_bytes(&self) -> Vec<u8> {
@@ -532,4 +614,17 @@ fn x14_show_as(f: &XmlElement) -> Option<String> {
         .flat_map(|ext| ext.elements())
         .find(|e| e.head.local_name() == "dataField")
         .and_then(|e| e.head.attr("pivotShowAs").map(str::to_owned))
+}
+
+/// `pivotTableStyleInfo` of a pivot table definition.
+pub(crate) fn read_style_info(xml: &ParsedXml) -> Option<crate::style::StyleInfo> {
+    let e = xml.root.child_main("pivotTableStyleInfo")?;
+    Some(crate::style::StyleInfo {
+        name: attr_string(e, "name")?,
+        show_row_headers: attr_bool(e, "showRowHeaders", false),
+        show_col_headers: attr_bool(e, "showColHeaders", false),
+        show_row_stripes: attr_bool(e, "showRowStripes", false),
+        show_col_stripes: attr_bool(e, "showColStripes", false),
+        show_last_column: attr_bool(e, "showLastColumn", false),
+    })
 }

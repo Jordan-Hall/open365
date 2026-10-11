@@ -85,7 +85,8 @@ pub(crate) struct Out {
     /// numbers and dates (literal text and names keep theirs).
     digits: Option<[char; 10]>,
     /// `[DBNum1]`: an unpadded date part of 10 or more is written in tens (`十五`).
-    tens: bool,
+    /// 0 none, 1 `[DBNum1]` (`十五`), 2 `[DBNum2]` (`壱拾伍`, the tens digit is always written).
+    tens: u8,
 }
 
 /// The numerals of `[DBNum1]` (`n` = 1), `[DBNum2]` (2) and `[DBNum3]` (3) under a language prefix, measured in
@@ -129,6 +130,57 @@ fn dbnum_digits(n: u8, lcid: u32) -> Option<[char; 10]> {
     Some(*table)
 }
 
+/// The Thai digits, which the Thai date letters use when the code has no `[$-]` tag.
+const THAI_DIGITS: [char; 10] = [
+    '\u{0e50}', '\u{0e51}', '\u{0e52}', '\u{0e53}', '\u{0e54}', '\u{0e55}', '\u{0e56}', '\u{0e57}',
+    '\u{0e58}', '\u{0e59}',
+];
+
+/// The digit set of a `[$-xxxxxxxx]` tag's number-shape byte (bits 24 to 31), measured in Excel with the same result under
+/// every language (`fixtures/calc/numfmt-nonlatin`). Bytes 0, 1 and the unlisted ones keep the ASCII digits. Tamil and
+/// Ethiopic have no zero digit, so 0 stays `0` there.
+#[rustfmt::skip]
+fn shape_digits(shape: u8) -> Option<[char; 10]> {
+    fn run(zero: u32) -> [char; 10] {
+        std::array::from_fn(|i| char::from_u32(zero + i as u32).unwrap_or('0'))
+    }
+    fn no_zero(zero: u32) -> [char; 10] {
+        let mut d = run(zero);
+        d[0] = '0';
+        d
+    }
+    Some(match shape {
+        0x02 => run(0x0660),
+        0x03 => run(0x06f0),
+        0x04 => run(0x0966),
+        0x05 => run(0x09e6),
+        0x06 => run(0x0a66),
+        0x07 => run(0x0ae6),
+        0x08 => run(0x0b66),
+        0x09 => no_zero(0x0be6),
+        0x0a => run(0x0c66),
+        0x0b => run(0x0ce6),
+        0x0c => run(0x0d66),
+        0x0d => THAI_DIGITS,
+        0x0e => run(0x0ed0),
+        0x0f => run(0x0f20),
+        0x10 => run(0x1040),
+        0x11 => no_zero(0x1368),
+        0x12 => run(0x17e0),
+        0x13 => run(0x1810),
+        0x1b => ['\u{3007}', '\u{4e00}', '\u{4e8c}', '\u{4e09}', '\u{56db}', '\u{4e94}', '\u{516d}', '\u{4e03}', '\u{516b}', '\u{4e5d}'],
+        0x1c => ['\u{3007}', '\u{58f1}', '\u{5f10}', '\u{53c2}', '\u{56db}', '\u{4f0d}', '\u{516d}', '\u{4e03}', '\u{516b}', '\u{4e5d}'],
+        0x1d | 0x20 | 0x23 | 0x26 => run(0xff10),
+        0x1e | 0x21 => ['\u{25cb}', '\u{4e00}', '\u{4e8c}', '\u{4e09}', '\u{56db}', '\u{4e94}', '\u{516d}', '\u{4e03}', '\u{516b}', '\u{4e5d}'],
+        0x1f => ['\u{96f6}', '\u{58f9}', '\u{8d30}', '\u{53c1}', '\u{8086}', '\u{4f0d}', '\u{9646}', '\u{67d2}', '\u{634c}', '\u{7396}'],
+        0x22 => ['\u{96f6}', '\u{58f9}', '\u{8cb3}', '\u{53c3}', '\u{8086}', '\u{4f0d}', '\u{9678}', '\u{67d2}', '\u{634c}', '\u{7396}'],
+        0x24 => ['\u{ff10}', '\u{4e00}', '\u{4e8c}', '\u{4e09}', '\u{56db}', '\u{4e94}', '\u{f9d1}', '\u{4e03}', '\u{516b}', '\u{4e5d}'],
+        0x25 => ['\u{f9b2}', '\u{58f9}', '\u{8cb3}', '\u{f96b}', '\u{56db}', '\u{4f0d}', '\u{f9d1}', '\u{4e03}', '\u{516b}', '\u{4e5d}'],
+        0x27 => ['\u{c601}', '\u{c77c}', '\u{c774}', '\u{c0bc}', '\u{c0ac}', '\u{c624}', '\u{c721}', '\u{ce60}', '\u{d314}', '\u{ad6c}'],
+        _ => return None,
+    })
+}
+
 impl Out {
     fn new(target: Target) -> Self {
         Out {
@@ -137,7 +189,7 @@ impl Out {
             fill: None,
             no_fill: target == Target::Function,
             digits: None,
-            tens: false,
+            tens: 0,
         }
     }
 
@@ -164,16 +216,29 @@ impl Out {
         self.width += s.chars().map(glyph_units).sum::<f64>();
     }
 
+    /// A two-digit date or time part (`dd`, `mm`, `hh`, `ss`): in tens under `[DBNum1]` and `[DBNum2]` from 10 up.
+    pub(crate) fn push_padded(&mut self, n: i64) {
+        if self.tens > 0 && n >= 10 {
+            self.push_unpadded(n);
+        } else {
+            self.push(&format!("{n:02}"));
+        }
+    }
+
     /// An unpadded date part (`d`, `m`, `h`).
     pub(crate) fn push_unpadded(&mut self, n: i64) {
         match self.digits {
-            Some(table) if self.tens && n >= 10 => {
+            Some(table) if self.tens > 0 && n >= 10 => {
                 let (t, u) = ((n / 10) as usize, (n % 10) as usize);
                 let mut s = String::new();
-                if t > 1 {
+                if t > 1 || self.tens == 2 {
                     s.push(table[t]);
                 }
-                s.push('\u{5341}');
+                s.push(if self.tens == 2 {
+                    '\u{62fe}'
+                } else {
+                    '\u{5341}'
+                });
                 if u > 0 {
                     s.push(table[u]);
                 }
@@ -510,8 +575,13 @@ fn render_section(
     out.digits = sec
         .dbnum
         .zip(sec.lcid)
-        .and_then(|(n, lcid)| dbnum_digits(n, lcid));
-    out.tens = sec.dbnum == Some(1);
+        .and_then(|(n, lcid)| dbnum_digits(n, lcid))
+        .or_else(|| shape_digits(sec.shape))
+        .or_else(|| sec.thai.then_some(THAI_DIGITS));
+    out.tens = match sec.dbnum {
+        Some(n @ (1 | 2)) if out.digits.is_some() => n,
+        _ => 0,
+    };
     match sec.kind {
         Kind::Date => {
             // The 1900 system has no negative dates; the 1904 system shows the magnitude with a minus sign.

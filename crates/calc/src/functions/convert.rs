@@ -306,6 +306,15 @@ fn from_celsius(name: &str, c: f64) -> f64 {
 
 pub(super) fn convert(ctx: &EvalContext<'_>, args: &[Arg]) -> Res<Value> {
     arity(args, 3, 3)?;
+    // An omitted number is #N/A; a boolean anywhere is #VALUE! (the unit names are text, the number is not coerced).
+    if matches!(args[0], Arg::Missing) {
+        return Err(ErrorKind::NA);
+    }
+    for arg in args {
+        if matches!(ctx.scalar(arg), Value::Bool(_)) {
+            return Err(ErrorKind::Value);
+        }
+    }
     let x = num_arg(ctx, &args[0])?;
     let from = text_arg(ctx, &args[1])?;
     let to = text_arg(ctx, &args[2])?;
@@ -316,9 +325,16 @@ pub(super) fn convert(ctx: &EvalContext<'_>, args: &[Arg]) -> Res<Value> {
             .find_map(|a| fb.iter().find(|b| b.cat == a.cat).map(|b| (*a, *b)));
         pair.ok_or(ErrorKind::NA)?
     };
-    let result = if a.cat == Cat::Temperature {
+    let result = if from == to {
+        // The same unit name gives the number back untouched, whatever the constants do to the last digit.
+        x
+    } else if a.cat == Cat::Temperature {
+        // Prefixes on kelvin are ignored here; Excel applies one only on some paths (`CONVERT(0,"C","kK")` is 0.27315
+        // but `CONVERT(37,"kK","Rank")` is 37 * 1.8), which is not modelled (listed in known-differences.toml).
         if canonical(a.name) == canonical(b.name) {
             x
+        } else if a.name == "Rank" && b.name == "K" {
+            x * 5.0 / 9.0
         } else {
             from_celsius(b.name, to_celsius(a.name, x))
         }

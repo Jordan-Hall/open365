@@ -83,6 +83,8 @@ pub struct Target {
     /// Replacements the last replace-all made, taken by `apply`.
     replaced: usize,
     pdf_options: PdfOptions,
+    /// Canonical folders a save must stay inside; empty means unrestricted.
+    write_roots: Vec<PathBuf>,
 }
 
 impl Target {
@@ -100,7 +102,16 @@ impl Target {
             notes: Vec::new(),
             replaced: 0,
             pdf_options: PdfOptions::default(),
+            write_roots: Vec::new(),
         }
+    }
+
+    /// Confines saves to `roots` (canonical folder paths, as `Fence::roots` gives). Right
+    /// before the final rename a save re-checks that the destination folder still resolves
+    /// inside one of them. This narrows, but cannot close, the race between the caller's own
+    /// path check and the write (see `write_atomic_within`). An empty list lifts the limit.
+    pub fn restrict_writes_to(&mut self, roots: &[PathBuf]) {
+        self.write_roots = roots.to_vec();
     }
 
     /// Sets the metadata, font policy and size limit `ExportPdf` uses. Not a document edit.
@@ -133,13 +144,19 @@ impl Target {
             path: path.display().to_string(),
             source,
         })?;
+        Self::open_path_bytes(path, &bytes)
+    }
+
+    /// Opens `bytes` already read from `path` (for a caller that reads under its own size
+    /// limit) as [`Target::open_path`] would.
+    pub fn open_path_bytes(path: &Path, bytes: &[u8]) -> Result<Self, CommandError> {
         let ext = path
             .extension()
             .and_then(|e| e.to_str())
             .map(str::to_ascii_lowercase);
         let mut target = match ext.as_deref() {
-            Some("xlsx" | "xlsm" | "xltx" | "xltm") => Self::open_xlsx(&bytes)?,
-            _ => Self::open_docx(&bytes)?,
+            Some("xlsx" | "xlsm" | "xltx" | "xltm") => Self::open_xlsx(bytes)?,
+            _ => Self::open_docx(bytes)?,
         };
         target.path = Some(path.to_path_buf());
         Ok(target)
@@ -208,7 +225,7 @@ impl Target {
 
     /// Applies one command. A failed command changes nothing and is not logged.
     pub fn apply(&mut self, command: Command) -> Result<Outcome, CommandError> {
-        let effect = command.effect(self.path.as_deref());
+        let effect = command.effect_in(self);
         let outcome = if let Command::Save { path } = &command {
             self.save_to(path, effect)?
         } else if let Command::ExportPdf { path, overwrite } = &command {
@@ -468,6 +485,26 @@ impl Target {
                     Vec::new(),
                 ))
             }
+            (Content::Xlsx(x), Command::AutoFitColumns { sheet, columns }) => {
+                let before = x.workbook.autofit_columns(*sheet, columns)?;
+                Ok((
+                    Inverse::Columns {
+                        sheet: *sheet,
+                        before,
+                    },
+                    Vec::new(),
+                ))
+            }
+            (Content::Xlsx(x), Command::AutoFitRows { sheet, rows }) => {
+                let before = x.workbook.autofit_rows(*sheet, rows)?;
+                Ok((
+                    Inverse::RowHeights {
+                        sheet: *sheet,
+                        before,
+                    },
+                    Vec::new(),
+                ))
+            }
             (Content::Xlsx(x), Command::HideColumns { sheet, first, last }) => {
                 let before = x.workbook.hide_columns(*sheet, *first, *last)?;
                 Ok((
@@ -518,6 +555,16 @@ impl Target {
                     Vec::new(),
                 ))
             }
+            (Content::Xlsx(x), Command::MergeCells { sheet, range, mode }) => {
+                let before = Box::new(x.workbook.clone());
+                match crate::merge::run(x, *sheet, *range, *mode) {
+                    Ok(changed) => Ok((Inverse::Workbook(before), changed)),
+                    Err(e) => {
+                        x.restore_workbook(*before);
+                        Err(e)
+                    }
+                }
+            }
             (Content::Xlsx(x), command) if crate::format::is_format_command(command) => {
                 let before = crate::format::run(&mut x.workbook, command)?;
                 Ok((
@@ -540,7 +587,7 @@ impl Target {
             Content::Docx(s) => s.doc.save()?,
             Content::Xlsx(x) => x.workbook.save()?,
         };
-        write_atomic(path, &bytes)?;
+        write_atomic_within(path, &bytes, &self.write_roots)?;
         self.path = Some(path.to_path_buf());
         self.saved_state = self.state;
         Ok(Outcome {
@@ -607,6 +654,10 @@ fn is_docx_edit(command: &Command) -> bool {
             | Command::DocxSetRunProps { .. }
             | Command::DocxSetParagraphStyle { .. }
             | Command::DocxSetAlignment { .. }
+            | Command::DocxSetIndents { .. }
+            | Command::DocxAddTab { .. }
+            | Command::DocxMoveTab { .. }
+            | Command::DocxClearTab { .. }
             | Command::DocxReplaceRange { .. }
             | Command::DocxReplaceAll { .. }
     )
@@ -625,7 +676,11 @@ fn capture_docx(doc: &Document, command: &Command) -> Result<Vec<Snapshot>, Comm
         Command::DocxInsertText { para, .. }
         | Command::DocxSetBold { para, .. }
         | Command::DocxSetParagraphStyle { para, .. }
-        | Command::DocxSetAlignment { para, .. } => vec![one(*para)?],
+        | Command::DocxSetAlignment { para, .. }
+        | Command::DocxSetIndents { para, .. }
+        | Command::DocxAddTab { para, .. }
+        | Command::DocxMoveTab { para, .. }
+        | Command::DocxClearTab { para, .. } => vec![one(*para)?],
         Command::DocxSplitParagraph { pos } => vec![one(pos.para)?],
         Command::DocxDeleteRange { start, end } | Command::DocxReplaceRange { start, end, .. } => {
             let (s, e) = ordered(*start, *end);
@@ -690,6 +745,19 @@ fn replay_docx(doc: &mut Document, command: &Command) -> Result<usize, CommandEr
             doc.set_paragraph_style(*para, style_id)?;
         }
         Command::DocxSetAlignment { para, alignment } => doc.set_alignment(*para, *alignment)?,
+        Command::DocxSetIndents {
+            para,
+            left_pt,
+            first_line_pt,
+            right_pt,
+        } => doc.set_indents(*para, *left_pt, *first_line_pt, *right_pt)?,
+        Command::DocxAddTab { para, pos_pt, kind } => doc.add_tab(*para, *pos_pt, *kind)?,
+        Command::DocxMoveTab {
+            para,
+            from_pt,
+            to_pt,
+        } => doc.move_tab(*para, *from_pt, *to_pt)?,
+        Command::DocxClearTab { para, pos_pt } => doc.clear_tab(*para, *pos_pt)?,
         Command::DocxReplaceRange { start, end, text } => {
             doc.replace_range(*start, *end, text)?;
         }
@@ -746,17 +814,139 @@ fn paste_entries(
 /// Writes to a sibling temporary file, then renames over `path`, so a failed write never
 /// leaves a truncated document.
 pub(crate) fn write_atomic(path: &Path, bytes: &[u8]) -> Result<(), CommandError> {
+    write_atomic_within(path, bytes, &[])
+}
+
+/// An unpredictable temporary file name, so nobody can plant a link at it in advance.
+fn temp_name() -> String {
+    use std::hash::{BuildHasher, Hasher, RandomState};
+    let mut hasher = RandomState::new().build_hasher();
+    hasher.write_u32(std::process::id());
+    hasher.write_u128(
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map_or(0, |d| d.as_nanos()),
+    );
+    format!(".{:016x}.open365-tmp", hasher.finish())
+}
+
+/// [`write_atomic`] with a folder limit. The temporary file gets a random name, is created in
+/// the destination's folder with `create_new` (so an existing file or link of that name is
+/// never opened) and is flushed to disk. With a non-empty `roots` (canonical paths) the
+/// destination folder is resolved again right before the rename, and the write is abandoned
+/// if it is no longer inside a root.
+///
+/// What this does not close: between that last check and the rename (and between the caller's
+/// own path check and the temporary file's creation) a local attacker who can replace the
+/// folder with a link to somewhere else can still redirect the write. Closing it needs
+/// directory handles (`openat`, `renameat`, or `NtSetInformationFile` on Windows), which
+/// `std` does not offer and this workspace cannot reach without `unsafe`. The folder named by
+/// a root must therefore not be writable by anyone the operator does not trust.
+pub(crate) fn write_atomic_within(
+    path: &Path,
+    bytes: &[u8],
+    roots: &[PathBuf],
+) -> Result<(), CommandError> {
+    use std::io::Write;
     let io = |op: &'static str, source| CommandError::Io {
         op,
         path: path.display().to_string(),
         source,
     };
-    let mut tmp = path.as_os_str().to_owned();
-    tmp.push(".open365-tmp");
-    let tmp = PathBuf::from(tmp);
-    std::fs::write(&tmp, bytes).map_err(|e| io("write", e))?;
-    std::fs::rename(&tmp, path).map_err(|e| {
+    let parent = match path.parent() {
+        Some(p) if !p.as_os_str().is_empty() => p.to_path_buf(),
+        _ => PathBuf::from("."),
+    };
+    let mut attempts = 0;
+    let (tmp, mut file) = loop {
+        let tmp = parent.join(temp_name());
+        match std::fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&tmp)
+        {
+            Ok(file) => break (tmp, file),
+            Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists && attempts < 16 => {
+                attempts += 1;
+            }
+            Err(e) => return Err(io("write", e)),
+        }
+    };
+    let fail = |op: &'static str, source: std::io::Error| {
         let _ = std::fs::remove_file(&tmp);
-        io("rename", e)
-    })
+        io(op, source)
+    };
+    file.write_all(bytes)
+        .and_then(|()| file.sync_all())
+        .map_err(|e| fail("write", e))?;
+    drop(file);
+    if !roots.is_empty() {
+        let inside = parent
+            .canonicalize()
+            .is_ok_and(|p| roots.iter().any(|r| p.starts_with(r)));
+        if !inside {
+            return Err(fail(
+                "write",
+                std::io::Error::new(
+                    std::io::ErrorKind::PermissionDenied,
+                    "the destination folder is outside the allowed folders",
+                ),
+            ));
+        }
+    }
+    std::fs::rename(&tmp, path).map_err(|e| fail("rename", e))
+}
+
+#[cfg(test)]
+mod write_tests {
+    use super::*;
+
+    fn dir(name: &str) -> PathBuf {
+        let d = std::env::temp_dir().join(format!("open365-wa-{}-{name}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&d);
+        std::fs::create_dir_all(&d).expect("dir");
+        d
+    }
+
+    #[test]
+    fn a_planted_file_at_the_old_predictable_temp_name_is_left_alone() {
+        let d = dir("planted");
+        let target = d.join("out.docx");
+        let planted = d.join("out.docx.open365-tmp");
+        std::fs::write(&planted, b"victim").expect("plant");
+        write_atomic(&target, b"new").expect("write");
+        assert_eq!(std::fs::read(&target).expect("read"), b"new");
+        assert_eq!(std::fs::read(&planted).expect("read"), b"victim");
+        let leftovers = std::fs::read_dir(&d).expect("ls").count();
+        assert_eq!(leftovers, 2, "no temporary file may stay behind");
+        let _ = std::fs::remove_dir_all(&d);
+    }
+
+    #[test]
+    fn temp_names_are_not_repeated() {
+        let names: std::collections::HashSet<String> = (0..64).map(|_| temp_name()).collect();
+        assert_eq!(names.len(), 64);
+    }
+
+    #[test]
+    fn a_destination_outside_the_roots_is_refused_and_leaves_nothing() {
+        let (root, other) = (dir("root"), dir("other"));
+        let root_canon = root.canonicalize().expect("canon");
+        let err = write_atomic_within(
+            &other.join("x.docx"),
+            b"x",
+            std::slice::from_ref(&root_canon),
+        );
+        assert!(err.is_err());
+        assert_eq!(std::fs::read_dir(&other).expect("ls").count(), 0);
+        write_atomic_within(
+            &root.join("x.docx"),
+            b"x",
+            std::slice::from_ref(&root_canon),
+        )
+        .expect("inside");
+        assert_eq!(std::fs::read(root.join("x.docx")).expect("read"), b"x");
+        let _ = std::fs::remove_dir_all(&root);
+        let _ = std::fs::remove_dir_all(&other);
+    }
 }

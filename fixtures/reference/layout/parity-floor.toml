@@ -433,7 +433,7 @@ matched = 35
 total = 35
 
 [fixtures.layout-tblp-bottom]
-matched = 62
+matched = 97
 total = 97
 
 [fixtures.layout-tblp-margin]
@@ -688,6 +688,10 @@ total = 75
 matched = 40
 total = 40
 
+[system.layout-float-incell-before]
+matched = 38
+total = 38
+
 [system.layout-float-incell-compat14]
 matched = 39
 total = 39
@@ -771,6 +775,26 @@ total = 43
 [system.layout-frame-page]
 matched = 39
 total = 41
+
+[system.layout-hdr-none]
+matched = 121
+total = 121
+
+[system.layout-hdr-none-big]
+matched = 121
+total = 121
+
+[system.layout-hdr-none-near]
+matched = 121
+total = 121
+
+[system.layout-hdr-none-normal]
+matched = 61
+total = 61
+
+[system.layout-hdr-none-style]
+matched = 121
+total = 121
 
 [system.layout-hf-basic]
 matched = 115
@@ -933,7 +957,7 @@ matched = 35
 total = 35
 
 [system.layout-tblp-bottom]
-matched = 62
+matched = 97
 total = 97
 
 [system.layout-tblp-margin]

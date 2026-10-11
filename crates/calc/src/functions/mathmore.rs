@@ -82,12 +82,20 @@ pub(super) fn multinomial(ctx: &EvalContext<'_>, args: &[Arg]) -> Res<Value> {
             Arg::Missing if i == 0 => return Err(ErrorKind::NA),
             Arg::Missing => parts.push(0.0),
             Arg::Value(_) => parts.push(strict_num(ctx, arg)?),
+            Arg::Range(r) if r.is_single_cell() => {
+                // A blank cell counts as 0 beside other arguments; alone it is #VALUE!.
+                if matches!(ctx.scalar(arg), Value::Empty) && args.len() == 1 {
+                    return Err(ErrorKind::Value);
+                }
+                parts.push(strict_num(ctx, arg)?);
+            }
             _ => {
+                // Blank cells are skipped; numeric text counts; other text and booleans are #VALUE!.
                 for v in ctx.cells(arg) {
                     match v {
-                        Value::Number(n) => parts.push(n),
-                        Value::Error(e) => return Err(e),
-                        _ => {}
+                        Value::Empty => {}
+                        Value::Bool(_) => return Err(ErrorKind::Value),
+                        other => parts.push(other.to_number_in(ctx.date1904)?),
                     }
                 }
             }

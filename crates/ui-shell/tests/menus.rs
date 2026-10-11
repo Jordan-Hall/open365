@@ -240,13 +240,7 @@ fn cell_style_gallery_matches_the_reference() {
     let fx = fixture();
     let tiles = |n: usize| -> Vec<Tile> {
         (0..n)
-            .map(|i| Tile {
-                id: i.to_string(),
-                label: i.to_string(),
-                fill: None,
-                ink: None,
-                checked: false,
-            })
+            .map(|i| Tile::plain(&i.to_string(), &i.to_string(), false))
             .collect()
     };
     let mut entries = Vec::new();
@@ -296,4 +290,23 @@ fn cell_style_gallery_matches_the_reference() {
         }
     }
     assert_eq!(g, 5);
+}
+
+/// The strip itself: Excel's "Gallery Filters" group is 52 u tall at the top of the popup, so the first
+/// heading starts at y 54 (`excel-popups.json`, CellFillColorPicker_Dropdown).
+#[test]
+fn the_filter_strip_is_52_u_and_pushes_the_colours_down() {
+    let entries = vec![
+        MenuEntry::filter("High-contrast only"),
+        MenuEntry::heading("Theme Colours"),
+        MenuEntry::swatches(vec![swatch_row(10)], false),
+    ];
+    let p = open365_ui_shell::menu::plan(&entries, 0.0, 10_000.0, &|s| s.len() as f32 * 8.0);
+    assert_eq!(p.rows[0].rect[3], 52.0);
+    assert!(
+        (p.rows[1].rect[1] - 54.0).abs() <= 1.0,
+        "{:?}",
+        p.rows[1].rect
+    );
+    assert!(p.width >= 340.0 - 4.0, "{}", p.width);
 }

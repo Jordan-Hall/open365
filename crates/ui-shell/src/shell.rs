@@ -220,6 +220,12 @@ impl Shell {
         self.backstage.is_some()
     }
 
+    /// The combo box being edited: its control id and the text in its editor.
+    #[must_use]
+    pub fn combo_edit(&self) -> Option<(&str, &str)> {
+        self.edit.as_ref().map(|e| (e.id.as_str(), e.text.as_str()))
+    }
+
     /// How far the tab strip is scrolled (points), 0 when the tabs fit.
     #[must_use]
     pub fn tab_scroll_offset(&self) -> f32 {
@@ -252,6 +258,7 @@ impl Shell {
         let full = ui.max_rect();
         let origin = full.min;
         let spec = std::rc::Rc::clone(&self.spec);
+        let chrome_was_open = self.chrome_open();
         let base = LayoutInput {
             scale: ppp,
             window: (
@@ -334,6 +341,17 @@ impl Shell {
         if let Some((id, v)) = run {
             host.run(&id, v);
         }
+        if chrome_was_open && !self.chrome_open() {
+            host.chrome_closed();
+        }
+    }
+
+    /// A pop-up, combo editor or the Backstage view holds the keyboard.
+    fn chrome_open(&self) -> bool {
+        self.menu.is_some()
+            || self.edit.is_some()
+            || self.group_popup.is_some()
+            || self.backstage.is_some()
     }
 
     /// Saves the rendered frame as a binary PPM (no image dependency), then closes the window.
@@ -1735,7 +1753,8 @@ impl Shell {
                 self.edit = Some(ComboEdit {
                     id: id.to_owned(),
                     text: shown.clone(),
-                    typed: shown.chars().count(),
+                    // The whole text is selected: the first typed character counts as growth, so it completes too.
+                    typed: 0,
                     focus: true,
                 });
             }
@@ -1812,7 +1831,8 @@ impl Shell {
         if esc {
             ui.memory_mut(|m| m.surrender_focus(eid));
             self.menu = None;
-        } else if enter && out.has_focus() && !list_hot {
+        // A single-line egui TextEdit gives up its focus on Enter itself, so the editor has already lost it here.
+        } else if enter && (out.has_focus() || out.lost_focus()) && !list_hot {
             if let Some(cmd) = host.combo_commit(id, &text) {
                 *run = Some((cmd, None));
             }

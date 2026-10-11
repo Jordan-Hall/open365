@@ -9,6 +9,8 @@ use open365_xlsx::{
 
 fn state_with_workbook() -> State {
     let mut s = State::new();
+    // A frozen clock: the Format Painter double click window never depends on real time.
+    s.clock.frozen = Some(0.0);
     s.new_blank();
     s
 }
@@ -448,6 +450,15 @@ fn format_painter_double_click_locks_until_escape() {
 }
 
 #[test]
+fn format_painter_click_after_the_window_through_the_host_switches_it_off() {
+    let mut s = state_with_workbook();
+    click(&mut s, "home.clipboard.format-painter");
+    s.clock.frozen = Some(0.6);
+    click(&mut s, "home.clipboard.format-painter");
+    assert!(!s.fmt.painter_active());
+}
+
+#[test]
 fn format_painter_second_slow_click_switches_it_off() {
     let mut ui = FormatUi::default();
     let s = state_with_workbook();
@@ -551,4 +562,133 @@ fn number_shortcuts_apply_the_excel_formats() {
     assert_eq!(cell(&s, 2, 2).border.bottom.style, B::Thin);
     click(&mut s, "fmt.number-shortcut#no-outline");
     assert_eq!(cell(&s, 1, 1).border.left.style, B::None);
+}
+
+fn put_text(s: &mut State, row: u32, col: u32, t: &str) {
+    s.apply(Command::XlsxSetCellValue {
+        sheet: 0,
+        row,
+        col,
+        value: open365_commands::CellEntry::Text(t.into()),
+    });
+}
+
+fn merged(s: &State) -> Vec<(u32, u32, u32, u32)> {
+    wb(s)
+        .sheet(0)
+        .map(open365_xlsx::Worksheet::merged_cells)
+        .unwrap_or_default()
+}
+
+#[test]
+fn merge_menu_lists_the_four_items_and_the_button_toggles() {
+    let mut s = state_with_workbook();
+    let ids: Vec<String> = host(&mut s)
+        .menu("home.alignment.merge-centre")
+        .expect("menu")
+        .into_iter()
+        .map(|e| e.id)
+        .collect();
+    assert_eq!(
+        ids,
+        [
+            "fmt.merge#center",
+            "fmt.merge#across",
+            "fmt.merge#cells",
+            "fmt.merge#unmerge"
+        ]
+    );
+    assert!(!host(&mut s).state("fmt.merge#unmerge").enabled);
+
+    // Empty cells merge without a question and the button centres them.
+    s.grid.select_range((2, 2), (2, 4));
+    click(&mut s, "home.alignment.merge-centre");
+    assert!(s.prompt.is_none());
+    assert_eq!(merged(&s), vec![(2, 2, 2, 4)]);
+    assert_eq!(cell(&s, 2, 2).alignment.horizontal, H::Center);
+    assert!(host(&mut s).state("home.alignment.merge-centre").checked);
+    assert!(host(&mut s).state("fmt.merge#unmerge").enabled);
+
+    // Pressed again it splits the merge and keeps the centring.
+    click(&mut s, "home.alignment.merge-centre");
+    assert!(merged(&s).is_empty());
+    assert_eq!(cell(&s, 2, 2).alignment.horizontal, H::Center);
+
+    // Merge Across and Merge Cells from the menu; one undo each.
+    s.grid.select_range((5, 1), (6, 3));
+    click(&mut s, "fmt.merge#across");
+    assert_eq!(merged(&s), vec![(5, 1, 5, 3), (6, 1, 6, 3)]);
+    click(&mut s, "fmt.merge#cells");
+    assert_eq!(merged(&s), vec![(5, 1, 6, 3)]);
+    click(&mut s, "fmt.merge#unmerge");
+    assert!(merged(&s).is_empty());
+    s.undo();
+    assert_eq!(merged(&s), vec![(5, 1, 6, 3)]);
+}
+
+#[test]
+fn merging_values_asks_first_and_keeps_only_the_top_left() {
+    let mut s = state_with_workbook();
+    put_text(&mut s, 3, 1, "keep");
+    put_text(&mut s, 3, 2, "lose");
+    s.grid.select_range((3, 1), (3, 2));
+    click(&mut s, "fmt.merge#cells");
+    let (text, _) = s.prompt.as_ref().expect("prompt");
+    assert_eq!(
+        *text,
+        "Merging cells only keeps the upper-left value and discards other values."
+    );
+    assert!(merged(&s).is_empty(), "nothing happens before OK");
+    // OK runs the command the prompt holds.
+    let (_, command) = s.prompt.take().expect("prompt");
+    s.apply(command);
+    assert_eq!(merged(&s), vec![(3, 1, 3, 2)]);
+    assert!(
+        wb(&s)
+            .cell(0, 3, 2)
+            .is_none_or(|c| c.value.as_text().is_none())
+    );
+    assert_eq!(
+        wb(&s).cell(0, 3, 1).and_then(|c| c.value.as_text()),
+        Some("keep")
+    );
+    // A selection holding one value needs no question.
+    put_text(&mut s, 8, 1, "only");
+    s.grid.select_range((8, 1), (8, 2));
+    click(&mut s, "fmt.merge#cells");
+    assert!(s.prompt.is_none());
+}
+
+/// The Cell Styles gallery tiles show each style's real fill, text colour and border, as Excel's
+/// gallery does (`fixtures/reference/ui/excel-popups.json`: Neutral ffeb9c on 9c5700, Heading 1 with a
+/// 3 u bottom rule, Output with a 3f3f3f frame).
+#[test]
+fn cell_style_tiles_show_the_style_look() {
+    let mut s = state_with_workbook();
+    let entries = host(&mut s)
+        .menu("home.styles.cell-styles")
+        .expect("gallery menu");
+    let tile = |name: &str| {
+        entries
+            .iter()
+            .find_map(|e| match &e.kind {
+                open365_ui_shell::EntryKind::Tiles { tiles, .. } => {
+                    tiles.iter().find(|t| t.label == name).cloned()
+                }
+                _ => None,
+            })
+            .unwrap_or_else(|| panic!("tile {name}"))
+    };
+    let neutral = tile("Neutral");
+    assert_eq!(neutral.fill, Some([0xff, 0xeb, 0x9c]));
+    assert_eq!(neutral.ink, Some([0x9c, 0x57, 0x00]));
+    let normal = tile("Normal");
+    assert_eq!(normal.fill, Some([255; 3]));
+    assert!(normal.borders.iter().all(Option::is_none));
+    let heading = tile("Heading 1");
+    assert_eq!(heading.borders[3].map(|b| b.1), Some(3));
+    assert!(heading.text_pct > 100);
+    let output = tile("Output");
+    assert!(output.borders.iter().all(Option::is_some));
+    assert_eq!(output.borders[0].map(|b| b.0), Some([0x3f, 0x3f, 0x3f]));
 }

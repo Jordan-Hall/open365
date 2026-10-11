@@ -6,6 +6,7 @@
 //! command ids; the ribbon layout is data (`spec/*.json`) measured from the reference
 //! applications (see `docs/architecture/app-shell.md`).
 
+pub mod caret;
 pub mod chrome;
 pub mod fonts;
 pub mod host;
@@ -17,6 +18,7 @@ mod shell;
 pub mod spec;
 pub mod theme;
 
+pub use caret::CaretSettings;
 pub use host::{CommandState, EntryKind, MenuEntry, ShellHost, Swatch, Tile};
 pub use shell::{Shell, ShellOptions};
 pub use theme::{AppKind, Mode, Theme};

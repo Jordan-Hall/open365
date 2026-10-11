@@ -21,6 +21,25 @@ const MAX_NESTING: usize = 128;
 const MAX_HEIGHT: usize = 1000;
 const XLFN_PREFIX: &str = "_xlfn.";
 
+// The argument counts Excel accepts per function (generated from Excel's behaviour; see the file header).
+#[path = "parser_arity.rs"]
+mod arity_table;
+
+/// Whether Excel accepts `given` arguments in a call of the registered function `name` (upper case). Unknown names pass:
+/// the evaluator answers `#NAME?`.
+pub fn accepts_argument_count(name: &str, given: usize) -> bool {
+    let Ok(i) = arity_table::ARITY.binary_search_by(|row| row.0.cmp(name)) else {
+        return true;
+    };
+    let (_, min, max, step) = arity_table::ARITY[i];
+    let (min, max, step) = (usize::from(min), usize::from(max), usize::from(step));
+    let regular = given >= min && given <= max && (given - min).is_multiple_of(step);
+    regular
+        || arity_table::EXTRA
+            .iter()
+            .any(|&(n, extra)| n == name && usize::from(extra) == given)
+}
+
 /// What went wrong while parsing.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ParseErrorKind {
@@ -48,6 +67,13 @@ pub enum ParseErrorKind {
     RaggedArray,
     /// Valid Excel syntax that this engine does not support.
     Unsupported(&'static str),
+    /// A call of a registered function with an argument count Excel refuses when the formula is entered.
+    ArgumentCount {
+        /// The upper-case function name (without `_xlfn.`).
+        name: String,
+        /// The number of arguments in the call (omitted arguments count).
+        given: usize,
+    },
 }
 
 /// A parse failure with the byte offset where it was detected.
@@ -76,6 +102,9 @@ impl fmt::Display for ParseError {
             ParseErrorKind::InvalidReference(r) => write!(f, "invalid reference {r:?}"),
             ParseErrorKind::RaggedArray => write!(f, "array rows differ in length"),
             ParseErrorKind::Unsupported(what) => write!(f, "unsupported syntax: {what}"),
+            ParseErrorKind::ArgumentCount { name, given } => {
+                write!(f, "{name} does not take {given} arguments")
+            }
         }?;
         write!(f, " at byte {}", self.position)
     }
@@ -583,6 +612,15 @@ impl Parser {
             _ => (raw_name.to_ascii_uppercase(), false),
         };
         let args = self.call_args()?;
+        if !accepts_argument_count(&name, args.len()) {
+            return err(
+                ParseErrorKind::ArgumentCount {
+                    name,
+                    given: args.len(),
+                },
+                open.pos,
+            );
+        }
         self.invoke_chain(Ast::Func { name, xlfn, args })
     }
 
@@ -1360,7 +1398,7 @@ mod tests {
                     args[0] = num(1.0);
                 }
                 Ast::Func {
-                    name: ["SUM", "IF", "XLOOKUP", "MY_FN"][g.below(4) as usize].to_owned(),
+                    name: ["MY_SUM", "MY_IF", "NEWFN", "MY_FN"][g.below(4) as usize].to_owned(),
                     xlfn: g.below(4) == 0,
                     args,
                 }
@@ -1390,7 +1428,7 @@ mod tests {
                         if g.below(2) == 0 {
                             Ast::Name("alpha".to_owned())
                         } else {
-                            Ast::call("OFFSET", vec![gen_ref(g)])
+                            Ast::call("MY_OFFSET", vec![gen_ref(g)])
                         }
                     };
                     Ast::binary(BinOp::Range, f(g), f(g))

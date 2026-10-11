@@ -36,6 +36,7 @@ mod ppr;
 mod props;
 mod ranges;
 mod review;
+mod revisions;
 mod search;
 mod section;
 mod settings;
@@ -46,7 +47,7 @@ mod track;
 mod xml;
 mod xmlq;
 
-pub use comments::{Comment, CommentAnchor, NewComment};
+pub use comments::{Comment, CommentAnchor, NewComment, Person};
 pub use document::{Document, DocumentKind, DroppedItem, HygieneAction};
 pub use drawing::{
     Align, Drawing, EMU_PER_POINT, HorizontalRelativeFrom, ImagePart, Position, TextBox,
@@ -75,12 +76,13 @@ pub use numbering::{
     AbstractNum, IndentOverride, LEVELS, LevelJustification, LevelOverride, LevelRun, LevelSuffix,
     Num, NumLevel, NumPr, Numbering, ParagraphNumbering, ResolvedNum, StyleNumPr,
 };
-pub use ppr::Alignment;
+pub use ppr::{Alignment, TabAlign};
 pub use props::{RunPropItem, RunPropKind, RunProps, RunPropsPatch};
 pub use ranges::{DocPos, EditLogEntry, Snapshot};
 pub use review::{
     FinalParagraph, Revision, RevisionKind, SpanMark, TextSpan, TextView, TrackChanges,
 };
+pub use revisions::FormatRun;
 pub use search::{DocMatch, FindError, FindOptions, find_in_text};
 pub use section::{
     Column, Columns, DocGrid, DocGridType, HeaderFooterRef, HeaderFooterType, Orientation,

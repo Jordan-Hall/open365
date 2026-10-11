@@ -46,9 +46,20 @@ pub struct Word<'a> {
     pub utf16_range: Range<usize>,
 }
 
-/// A misspelled word with its position.
+/// What is wrong with a flagged word.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum IssueKind {
+    /// The word is not in the dictionary (red squiggle).
+    Misspelled,
+    /// The word repeats the previous word (`the the`); the range covers the second one.
+    RepeatedWord,
+}
+
+/// A flagged word with its position.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Misspelling {
+    /// Why the word was flagged.
+    pub kind: IssueKind,
     /// The misspelled text as written.
     pub word: String,
     /// Offsets in UTF-8 bytes.
@@ -62,6 +73,7 @@ pub struct Misspelling {
 impl From<&Word<'_>> for Misspelling {
     fn from(word: &Word<'_>) -> Self {
         Self {
+            kind: IssueKind::Misspelled,
             word: word.text.to_owned(),
             byte_range: word.byte_range.clone(),
             char_range: word.char_range.clone(),
@@ -70,9 +82,29 @@ impl From<&Word<'_>> for Misspelling {
     }
 }
 
+/// A word-like token and whether the options say it should be spell-checked.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct Token<'a> {
+    pub word: Word<'a>,
+    /// False for ALL-CAPS words, words with digits, addresses and ideographs.
+    pub checkable: bool,
+    /// True when the token takes part in repeated-word detection: Word flags `GE GE` although
+    /// it skips ALL-CAPS words for spelling, but not words with digits or addresses.
+    pub repeatable: bool,
+}
+
 /// Finds the words of `text` that should be spell-checked under `options`.
 #[must_use]
 pub fn find_words<'a>(text: &'a str, options: &TokenizerOptions) -> Vec<Word<'a>> {
+    scan(text, options)
+        .into_iter()
+        .filter(|t| t.checkable)
+        .map(|t| t.word)
+        .collect()
+}
+
+/// Every word-like token of `text`, including the ones the options skip.
+pub(crate) fn scan<'a>(text: &'a str, options: &TokenizerOptions) -> Vec<Token<'a>> {
     let segments = split_segments(text, options);
     let ignored = if options.ignore_internet_addresses {
         internet_address_ranges(text)
@@ -99,19 +131,28 @@ pub fn find_words<'a>(text: &'a str, options: &TokenizerOptions) -> Vec<Word<'a>
             i += 2;
         }
         let token = &text[start..end];
-        if !is_reportable(token, options) {
+        if !token.chars().any(char::is_alphabetic) {
             continue;
         }
-        if ignored.iter().any(|r| r.start <= start && end <= r.end) {
-            continue;
-        }
+        let in_address = ignored.iter().any(|r| r.start <= start && end <= r.end);
+        let checkable = is_reportable(token, options) && !in_address;
+        let repeatable = !in_address
+            && !token.chars().any(char::is_numeric)
+            && !token
+                .chars()
+                .filter(|c| c.is_alphabetic())
+                .all(is_ideographic);
         let (char_start, utf16_start) = offsets.at(start);
         let (char_end, utf16_end) = offsets.at(end);
-        words.push(Word {
-            text: token,
-            byte_range: start..end,
-            char_range: char_start..char_end,
-            utf16_range: utf16_start..utf16_end,
+        words.push(Token {
+            word: Word {
+                text: token,
+                byte_range: start..end,
+                char_range: char_start..char_end,
+                utf16_range: utf16_start..utf16_end,
+            },
+            checkable,
+            repeatable,
         });
     }
     words
@@ -280,6 +321,7 @@ fn looks_like_address(chunk: &str) -> bool {
     }
     (chunk.starts_with('/') && chunk[1..].contains('/') && chunk.len() > 3)
         || chunk.starts_with("~/")
+        || ((chunk.starts_with("./") || chunk.starts_with("../")) && chunk.len() > 3)
 }
 
 fn is_email(chunk: &str) -> bool {

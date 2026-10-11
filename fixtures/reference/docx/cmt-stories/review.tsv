@@ -1,0 +1,9 @@
+comment	0	Author A	AA	body	Body comment	0	-1	0
+para	markup	0	Body text with a note\u0002 here.	0	Normal	0	B0I0U0S22x27
+para	markup	1	Second body paragraph.	0	Normal	0	B0I0U0S22x22
+para	final	0	Body text with a note\u0002 here.	0	Normal	0	B0I0U0S22x27
+para	final	1	Second body paragraph.	0	Normal	0	B0I0U0S22x22
+para	accept	0	Body text with a note\u0002 here.	0	Normal	0	B0I0U0S22x27
+para	accept	1	Second body paragraph.	0	Normal	0	B0I0U0S22x22
+para	reject	0	Body text with a note\u0002 here.	0	Normal	0	B0I0U0S22x27
+para	reject	1	Second body paragraph.	0	Normal	0	B0I0U0S22x22

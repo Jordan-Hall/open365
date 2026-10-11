@@ -8,6 +8,7 @@ use open365_commands::evaluate_formula;
 use open365_opc::Limits;
 use open365_xlsx::{Workbook, parse_cell_ref};
 
+use crate::output::Report;
 use crate::{CliError, read};
 
 #[derive(Debug, ClapArgs)]
@@ -25,7 +26,7 @@ pub(crate) struct Args {
     formula: Option<String>,
 }
 
-pub(crate) fn run(args: &Args) -> Result<(), CliError> {
+pub(crate) fn run(args: &Args) -> Result<Report, CliError> {
     let bytes = read(&args.file)?;
     let wb = Workbook::open(&bytes, &Limits::default())
         .map_err(|e| CliError::Other(format!("{}: {e}", args.file.display())))?;
@@ -48,6 +49,7 @@ pub(crate) fn run(args: &Args) -> Result<(), CliError> {
     v["sheet"] = serde_json::json!(sheet);
     v["cell"] = serde_json::json!(args.cell);
     v["saved"] = serde_json::json!(false);
-    println!("{v}");
-    Ok(())
+    // Without --json the result is printed as one compact JSON line, as it always was.
+    let human = v.to_string();
+    Ok(Report::new(v, human))
 }

@@ -1,0 +1,222 @@
+rev	0	SectionProperty	Author A	2026-10-11T16:39:00Z	Section one.\u000c
+rev	1	Insert	Author A	2026-10-11T16:39:00Z	\u000c
+rev	2	SectionProperty	Author A	2026-10-11T16:39:00Z	\rSection two.\u000c
+rev	3	Insert	Author A	2026-10-11T16:39:00Z	\u000c
+rev	4	SectionProperty	Author A	2026-10-11T16:39:00Z	\rSection three.\u000c
+rev	5	Insert	Author A	2026-10-11T16:39:00Z	\u000c
+rev	6	SectionProperty	Author A	2026-10-11T16:39:00Z	\rSection four.
+para	markup	0	Section one.\u000c	0	Normal	0	B0I0U0S22x13
+para	markup	1		0	Normal	0	
+para	markup	2	Section two.\u000c	0	Normal	0	B0I0U0S22x13
+para	markup	3		0	Normal	0	
+para	markup	4	Section three.\u000c	0	Normal	0	B0I0U0S22x15
+para	markup	5		0	Normal	0	
+para	markup	6	Section four.	0	Normal	0	B0I0U0S22x13
+para	final	0	Section one.\u000c	0	Normal	0	B0I0U0S22x13
+para	final	1		0	Normal	0	
+para	final	2	Section two.\u000c	0	Normal	0	B0I0U0S22x13
+para	final	3		0	Normal	0	
+para	final	4	Section three.\u000c	0	Normal	0	B0I0U0S22x15
+para	final	5		0	Normal	0	
+para	final	6	Section four.	0	Normal	0	B0I0U0S22x13
+para	accept	0	Section one.\u000c	0	Normal	0	B0I0U0S22x13
+para	accept	1		0	Normal	0	
+para	accept	2	Section two.\u000c	0	Normal	0	B0I0U0S22x13
+para	accept	3		0	Normal	0	
+para	accept	4	Section three.\u000c	0	Normal	0	B0I0U0S22x15
+para	accept	5		0	Normal	0	
+para	accept	6	Section four.	0	Normal	0	B0I0U0S22x13
+para	reject	0	Section one.	0	Normal	0	B0I0U0S22x12
+para	reject	1	Section two.	0	Normal	0	B0I0U0S22x12
+para	reject	2	Section three.	0	Normal	0	B0I0U0S22x14
+para	reject	3	Section four.	0	Normal	0	B0I0U0S22x13
+para	accept1:0	0	Section one.\u000c	0	Normal	0	B0I0U0S22x13
+para	accept1:0	1		0	Normal	0	
+para	accept1:0	2	Section two.\u000c	0	Normal	0	B0I0U0S22x13
+para	accept1:0	3		0	Normal	0	
+para	accept1:0	4	Section three.\u000c	0	Normal	0	B0I0U0S22x15
+para	accept1:0	5		0	Normal	0	
+para	accept1:0	6	Section four.	0	Normal	0	B0I0U0S22x13
+para	reject1:0	0	Section one.\u000c	0	Normal	0	B0I0U0S22x13
+para	reject1:0	1		0	Normal	0	
+para	reject1:0	2	Section two.\u000c	0	Normal	0	B0I0U0S22x13
+para	reject1:0	3		0	Normal	0	
+para	reject1:0	4	Section three.\u000c	0	Normal	0	B0I0U0S22x15
+para	reject1:0	5		0	Normal	0	
+para	reject1:0	6	Section four.	0	Normal	0	B0I0U0S22x13
+para	accept1:1	0	Section one.\u000c	0	Normal	0	B0I0U0S22x13
+para	accept1:1	1		0	Normal	0	
+para	accept1:1	2	Section two.\u000c	0	Normal	0	B0I0U0S22x13
+para	accept1:1	3		0	Normal	0	
+para	accept1:1	4	Section three.\u000c	0	Normal	0	B0I0U0S22x15
+para	accept1:1	5		0	Normal	0	
+para	accept1:1	6	Section four.	0	Normal	0	B0I0U0S22x13
+para	reject1:1	0	Section one.	0	Normal	0	B0I0U0S22x12
+para	reject1:1	1	Section two.\u000c	0	Normal	0	B0I0U0S22x13
+para	reject1:1	2		0	Normal	0	
+para	reject1:1	3	Section three.\u000c	0	Normal	0	B0I0U0S22x15
+para	reject1:1	4		0	Normal	0	
+para	reject1:1	5	Section four.	0	Normal	0	B0I0U0S22x13
+para	accept1:2	0	Section one.\u000c	0	Normal	0	B0I0U0S22x13
+para	accept1:2	1		0	Normal	0	
+para	accept1:2	2	Section two.\u000c	0	Normal	0	B0I0U0S22x13
+para	accept1:2	3		0	Normal	0	
+para	accept1:2	4	Section three.\u000c	0	Normal	0	B0I0U0S22x15
+para	accept1:2	5		0	Normal	0	
+para	accept1:2	6	Section four.	0	Normal	0	B0I0U0S22x13
+para	reject1:2	0	Section one.\u000c	0	Normal	0	B0I0U0S22x13
+para	reject1:2	1		0	Normal	0	
+para	reject1:2	2	Section two.\u000c	0	Normal	0	B0I0U0S22x13
+para	reject1:2	3		0	Normal	0	
+para	reject1:2	4	Section three.\u000c	0	Normal	0	B0I0U0S22x15
+para	reject1:2	5		0	Normal	0	
+para	reject1:2	6	Section four.	0	Normal	0	B0I0U0S22x13
+para	accept1:3	0	Section one.\u000c	0	Normal	0	B0I0U0S22x13
+para	accept1:3	1		0	Normal	0	
+para	accept1:3	2	Section two.\u000c	0	Normal	0	B0I0U0S22x13
+para	accept1:3	3		0	Normal	0	
+para	accept1:3	4	Section three.\u000c	0	Normal	0	B0I0U0S22x15
+para	accept1:3	5		0	Normal	0	
+para	accept1:3	6	Section four.	0	Normal	0	B0I0U0S22x13
+para	reject1:3	0	Section one.\u000c	0	Normal	0	B0I0U0S22x13
+para	reject1:3	1		0	Normal	0	
+para	reject1:3	2	Section two.	0	Normal	0	B0I0U0S22x12
+para	reject1:3	3	Section three.\u000c	0	Normal	0	B0I0U0S22x15
+para	reject1:3	4		0	Normal	0	
+para	reject1:3	5	Section four.	0	Normal	0	B0I0U0S22x13
+para	accept1:4	0	Section one.\u000c	0	Normal	0	B0I0U0S22x13
+para	accept1:4	1		0	Normal	0	
+para	accept1:4	2	Section two.\u000c	0	Normal	0	B0I0U0S22x13
+para	accept1:4	3		0	Normal	0	
+para	accept1:4	4	Section three.\u000c	0	Normal	0	B0I0U0S22x15
+para	accept1:4	5		0	Normal	0	
+para	accept1:4	6	Section four.	0	Normal	0	B0I0U0S22x13
+para	reject1:4	0	Section one.\u000c	0	Normal	0	B0I0U0S22x13
+para	reject1:4	1		0	Normal	0	
+para	reject1:4	2	Section two.\u000c	0	Normal	0	B0I0U0S22x13
+para	reject1:4	3		0	Normal	0	
+para	reject1:4	4	Section three.\u000c	0	Normal	0	B0I0U0S22x15
+para	reject1:4	5		0	Normal	0	
+para	reject1:4	6	Section four.	0	Normal	0	B0I0U0S22x13
+para	accept1:5	0	Section one.\u000c	0	Normal	0	B0I0U0S22x13
+para	accept1:5	1		0	Normal	0	
+para	accept1:5	2	Section two.\u000c	0	Normal	0	B0I0U0S22x13
+para	accept1:5	3		0	Normal	0	
+para	accept1:5	4	Section three.\u000c	0	Normal	0	B0I0U0S22x15
+para	accept1:5	5		0	Normal	0	
+para	accept1:5	6	Section four.	0	Normal	0	B0I0U0S22x13
+para	reject1:5	0	Section one.\u000c	0	Normal	0	B0I0U0S22x13
+para	reject1:5	1		0	Normal	0	
+para	reject1:5	2	Section two.\u000c	0	Normal	0	B0I0U0S22x13
+para	reject1:5	3		0	Normal	0	
+para	reject1:5	4	Section three.	0	Normal	0	B0I0U0S22x14
+para	reject1:5	5	Section four.	0	Normal	0	B0I0U0S22x13
+para	accept1:6	0	Section one.\u000c	0	Normal	0	B0I0U0S22x13
+para	accept1:6	1		0	Normal	0	
+para	accept1:6	2	Section two.\u000c	0	Normal	0	B0I0U0S22x13
+para	accept1:6	3		0	Normal	0	
+para	accept1:6	4	Section three.\u000c	0	Normal	0	B0I0U0S22x15
+para	accept1:6	5		0	Normal	0	
+para	accept1:6	6	Section four.	0	Normal	0	B0I0U0S22x13
+para	reject1:6	0	Section one.\u000c	0	Normal	0	B0I0U0S22x13
+para	reject1:6	1		0	Normal	0	
+para	reject1:6	2	Section two.\u000c	0	Normal	0	B0I0U0S22x13
+para	reject1:6	3		0	Normal	0	
+para	reject1:6	4	Section three.\u000c	0	Normal	0	B0I0U0S22x15
+para	reject1:6	5		0	Normal	0	
+para	reject1:6	6	Section four.	0	Normal	0	B0I0U0S22x13
+para	acceptp:0	0	Section one.\u000c	0	Normal	0	B0I0U0S22x13
+para	acceptp:0	1		0	Normal	0	
+para	acceptp:0	2	Section two.\u000c	0	Normal	0	B0I0U0S22x13
+para	acceptp:0	3		0	Normal	0	
+para	acceptp:0	4	Section three.\u000c	0	Normal	0	B0I0U0S22x15
+para	acceptp:0	5		0	Normal	0	
+para	acceptp:0	6	Section four.	0	Normal	0	B0I0U0S22x13
+para	rejectp:0	0	Section one.	0	Normal	0	B0I0U0S22x12
+para	rejectp:0	1	Section two.\u000c	0	Normal	0	B0I0U0S22x13
+para	rejectp:0	2		0	Normal	0	
+para	rejectp:0	3	Section three.\u000c	0	Normal	0	B0I0U0S22x15
+para	rejectp:0	4		0	Normal	0	
+para	rejectp:0	5	Section four.	0	Normal	0	B0I0U0S22x13
+para	acceptp:1	0	Section one.\u000c	0	Normal	0	B0I0U0S22x13
+para	acceptp:1	1		0	Normal	0	
+para	acceptp:1	2	Section two.\u000c	0	Normal	0	B0I0U0S22x13
+para	acceptp:1	3		0	Normal	0	
+para	acceptp:1	4	Section three.\u000c	0	Normal	0	B0I0U0S22x15
+para	acceptp:1	5		0	Normal	0	
+para	acceptp:1	6	Section four.	0	Normal	0	B0I0U0S22x13
+para	rejectp:1	0	Section one.\u000c	0	Normal	0	B0I0U0S22x13
+para	rejectp:1	1		0	Normal	0	
+para	rejectp:1	2	Section two.\u000c	0	Normal	0	B0I0U0S22x13
+para	rejectp:1	3		0	Normal	0	
+para	rejectp:1	4	Section three.\u000c	0	Normal	0	B0I0U0S22x15
+para	rejectp:1	5		0	Normal	0	
+para	rejectp:1	6	Section four.	0	Normal	0	B0I0U0S22x13
+para	acceptp:2	0	Section one.\u000c	0	Normal	0	B0I0U0S22x13
+para	acceptp:2	1		0	Normal	0	
+para	acceptp:2	2	Section two.\u000c	0	Normal	0	B0I0U0S22x13
+para	acceptp:2	3		0	Normal	0	
+para	acceptp:2	4	Section three.\u000c	0	Normal	0	B0I0U0S22x15
+para	acceptp:2	5		0	Normal	0	
+para	acceptp:2	6	Section four.	0	Normal	0	B0I0U0S22x13
+para	rejectp:2	0	Section one.\u000c	0	Normal	0	B0I0U0S22x13
+para	rejectp:2	1		0	Normal	0	
+para	rejectp:2	2	Section two.	0	Normal	0	B0I0U0S22x12
+para	rejectp:2	3	Section three.\u000c	0	Normal	0	B0I0U0S22x15
+para	rejectp:2	4		0	Normal	0	
+para	rejectp:2	5	Section four.	0	Normal	0	B0I0U0S22x13
+para	acceptp:3	0	Section one.\u000c	0	Normal	0	B0I0U0S22x13
+para	acceptp:3	1		0	Normal	0	
+para	acceptp:3	2	Section two.\u000c	0	Normal	0	B0I0U0S22x13
+para	acceptp:3	3		0	Normal	0	
+para	acceptp:3	4	Section three.\u000c	0	Normal	0	B0I0U0S22x15
+para	acceptp:3	5		0	Normal	0	
+para	acceptp:3	6	Section four.	0	Normal	0	B0I0U0S22x13
+para	rejectp:3	0	Section one.\u000c	0	Normal	0	B0I0U0S22x13
+para	rejectp:3	1		0	Normal	0	
+para	rejectp:3	2	Section two.\u000c	0	Normal	0	B0I0U0S22x13
+para	rejectp:3	3		0	Normal	0	
+para	rejectp:3	4	Section three.\u000c	0	Normal	0	B0I0U0S22x15
+para	rejectp:3	5		0	Normal	0	
+para	rejectp:3	6	Section four.	0	Normal	0	B0I0U0S22x13
+para	acceptp:4	0	Section one.\u000c	0	Normal	0	B0I0U0S22x13
+para	acceptp:4	1		0	Normal	0	
+para	acceptp:4	2	Section two.\u000c	0	Normal	0	B0I0U0S22x13
+para	acceptp:4	3		0	Normal	0	
+para	acceptp:4	4	Section three.\u000c	0	Normal	0	B0I0U0S22x15
+para	acceptp:4	5		0	Normal	0	
+para	acceptp:4	6	Section four.	0	Normal	0	B0I0U0S22x13
+para	rejectp:4	0	Section one.\u000c	0	Normal	0	B0I0U0S22x13
+para	rejectp:4	1		0	Normal	0	
+para	rejectp:4	2	Section two.\u000c	0	Normal	0	B0I0U0S22x13
+para	rejectp:4	3		0	Normal	0	
+para	rejectp:4	4	Section three.	0	Normal	0	B0I0U0S22x14
+para	rejectp:4	5	Section four.	0	Normal	0	B0I0U0S22x13
+para	acceptp:5	0	Section one.\u000c	0	Normal	0	B0I0U0S22x13
+para	acceptp:5	1		0	Normal	0	
+para	acceptp:5	2	Section two.\u000c	0	Normal	0	B0I0U0S22x13
+para	acceptp:5	3		0	Normal	0	
+para	acceptp:5	4	Section three.\u000c	0	Normal	0	B0I0U0S22x15
+para	acceptp:5	5		0	Normal	0	
+para	acceptp:5	6	Section four.	0	Normal	0	B0I0U0S22x13
+para	rejectp:5	0	Section one.\u000c	0	Normal	0	B0I0U0S22x13
+para	rejectp:5	1		0	Normal	0	
+para	rejectp:5	2	Section two.\u000c	0	Normal	0	B0I0U0S22x13
+para	rejectp:5	3		0	Normal	0	
+para	rejectp:5	4	Section three.\u000c	0	Normal	0	B0I0U0S22x15
+para	rejectp:5	5		0	Normal	0	
+para	rejectp:5	6	Section four.	0	Normal	0	B0I0U0S22x13
+para	acceptp:6	0	Section one.\u000c	0	Normal	0	B0I0U0S22x13
+para	acceptp:6	1		0	Normal	0	
+para	acceptp:6	2	Section two.\u000c	0	Normal	0	B0I0U0S22x13
+para	acceptp:6	3		0	Normal	0	
+para	acceptp:6	4	Section three.\u000c	0	Normal	0	B0I0U0S22x15
+para	acceptp:6	5		0	Normal	0	
+para	acceptp:6	6	Section four.	0	Normal	0	B0I0U0S22x13
+para	rejectp:6	0	Section one.\u000c	0	Normal	0	B0I0U0S22x13
+para	rejectp:6	1		0	Normal	0	
+para	rejectp:6	2	Section two.\u000c	0	Normal	0	B0I0U0S22x13
+para	rejectp:6	3		0	Normal	0	
+para	rejectp:6	4	Section three.\u000c	0	Normal	0	B0I0U0S22x15
+para	rejectp:6	5		0	Normal	0	
+para	rejectp:6	6	Section four.	0	Normal	0	B0I0U0S22x13

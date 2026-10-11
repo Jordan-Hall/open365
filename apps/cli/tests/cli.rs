@@ -55,6 +55,14 @@ fn stdout(o: &Output) -> String {
     String::from_utf8_lossy(&o.stdout).into_owned()
 }
 
+/// The `result` of a successful `--json` envelope.
+fn result(o: &Output) -> Value {
+    let v: Value = serde_json::from_slice(&o.stdout).expect("json envelope");
+    assert_eq!(v["schema"], "open365.cli/1", "{v}");
+    assert_eq!(v["ok"], true, "{v}");
+    v["result"].clone()
+}
+
 fn stderr(o: &Output) -> String {
     String::from_utf8_lossy(&o.stderr).into_owned()
 }
@@ -82,14 +90,14 @@ fn docx_inspect_lists_parts_relationships_and_content_types() {
 fn inspect_json_is_valid_and_has_hidden_only_on_request() {
     let f = fixture("xlsx/hidden-sheet.xlsx");
     let plain = run(&[s("xlsx"), s("inspect"), s("--json"), &f]);
-    let v: Value = serde_json::from_slice(&plain.stdout).expect("json");
+    let v = result(&plain);
     assert!(v["parts"].as_array().is_some_and(|p| !p.is_empty()));
     assert!(v["relationships"].is_array());
     assert!(v["content_types"]["defaults"].is_array());
     assert!(v.get("hidden").is_none());
 
     let with = run(&[s("xlsx"), s("inspect"), s("--hidden"), s("--json"), &f]);
-    let v: Value = serde_json::from_slice(&with.stdout).expect("json");
+    let v = result(&with);
     let cats: Vec<&str> = v["hidden"]
         .as_array()
         .expect("hidden array")
@@ -213,7 +221,18 @@ fn apply_edits_an_xlsx_formula() {
     );
     let out = scratch.path("out.xlsx");
     let input = fixture("xlsx/formulas-basic.xlsx");
+    // The fixture's A1 and A2 hold data, so overwriting them needs the operator's flag.
     let o = run(&[s("apply"), &cmds, &input, s("-o"), &out]);
+    assert_eq!(o.status.code(), Some(3), "{}", stderr(&o));
+    assert!(!out.exists());
+    let o = run(&[
+        s("apply"),
+        &cmds,
+        &input,
+        s("-o"),
+        &out,
+        s("--allow-destructive"),
+    ]);
     assert!(o.status.success(), "{}", stderr(&o));
     assert_eq!(audit_lines(&o).len(), 3);
     let check = run(&[s("roundtrip"), s("--check"), &out]);
@@ -279,7 +298,7 @@ fn destructive_commands_are_refused_without_the_flag() {
     let input = fixture("docx/plain-paragraphs.docx");
     let o = run(&[s("apply"), &cmds, &input, s("-o"), &out]);
     assert_eq!(o.status.code(), Some(3), "{}", stderr(&o));
-    assert!(stdout(&o).contains("destructive"), "{}", stdout(&o));
+    assert!(stderr(&o).contains("destructive"), "{}", stderr(&o));
     assert!(!out.exists(), "refused run must not write output");
     let lines = audit_lines(&o);
     assert_eq!(lines.len(), 1);
@@ -467,7 +486,7 @@ fn docx_layout_json_has_pages_lines_roles_and_cell_boxes() {
         &fixture("docx/styles-headings.docx"),
     ]);
     assert!(o.status.success(), "{}", stderr(&o));
-    let v: Value = serde_json::from_slice(&o.stdout).expect("json");
+    let v = result(&o);
     assert_eq!(v["page_count"], 1);
     assert_eq!(v["truncated"], false);
     let lines = v["pages"][0]["lines"].as_array().expect("lines");
@@ -482,7 +501,7 @@ fn docx_layout_json_has_pages_lines_roles_and_cell_boxes() {
         s("--json"),
         &fixture("docx/layout-table-basic.docx"),
     ]);
-    let v: Value = serde_json::from_slice(&o.stdout).expect("json");
+    let v = result(&o);
     let cell = &v["pages"][0]["cells"][0];
     for key in ["table", "row", "col", "x", "y", "width", "height"] {
         assert!(cell[key].is_number(), "{key}: {cell}");
@@ -500,7 +519,7 @@ fn docx_layout_caps_pages_and_has_a_text_form() {
         s("1"),
         &f,
     ]);
-    let v: Value = serde_json::from_slice(&o.stdout).expect("json");
+    let v = result(&o);
     assert_eq!(v["pages"].as_array().expect("pages").len(), 1);
     assert_eq!(v["truncated"], true);
     assert!(v["page_count"].as_u64().expect("count") > 1);
@@ -514,7 +533,9 @@ fn docx_layout_rejects_a_bad_file() {
     let bad = scratch.write("bad.docx", "not a zip");
     let o = run(&[s("docx"), s("layout"), s("--json"), &bad]);
     assert!(!o.status.success());
-    assert!(o.stdout.is_empty());
+    let v: Value = serde_json::from_slice(&o.stdout).expect("json envelope");
+    assert_eq!(v["ok"], false);
+    assert!(v["error"]["message"].is_string());
 }
 
 #[test]
@@ -617,6 +638,18 @@ fn new_from_template_writes_documents_and_refuses_to_overwrite() {
         &docx,
         s("--overwrite"),
     ]);
+    // Replacing a file is destructive under the shared policy: --overwrite alone is refused.
+    assert_eq!(over.status.code(), Some(3), "{}", stderr(&over));
+    assert_eq!(std::fs::read(&docx).expect("read"), first);
+    let over = run(&[
+        s("docx"),
+        s("new-from-template"),
+        &fixture("docx/template-basic.dotx"),
+        s("-o"),
+        &docx,
+        s("--overwrite"),
+        s("--allow-destructive"),
+    ]);
     assert!(over.status.success(), "{}", stderr(&over));
 
     let macro_out = scratch.path("m.xlsm");
@@ -680,6 +713,7 @@ fn docx_export_pdf_never_overwrites_without_the_flag() {
     assert!(!o.status.success());
     assert!(stderr(&o).contains("--overwrite"), "{}", stderr(&o));
     assert_eq!(std::fs::read(&out).expect("read"), b"keep");
+    // Replacing a file is destructive under the shared policy: --overwrite alone is refused.
     let o = run(&[
         s("docx"),
         s("export-pdf"),
@@ -688,6 +722,138 @@ fn docx_export_pdf_never_overwrites_without_the_flag() {
         &out,
         s("--overwrite"),
     ]);
+    assert!(!o.status.success());
+    assert!(stderr(&o).contains("--allow-destructive"), "{}", stderr(&o));
+    assert!(
+        stderr(&o).contains("\"status\":\"refused\""),
+        "{}",
+        stderr(&o)
+    );
+    assert_eq!(std::fs::read(&out).expect("read"), b"keep");
+    let o = run(&[
+        s("docx"),
+        s("export-pdf"),
+        &input,
+        s("-o"),
+        &out,
+        s("--overwrite"),
+        s("--allow-destructive"),
+    ]);
     assert!(o.status.success(), "{}", stderr(&o));
+    assert!(
+        stderr(&o).contains("\"status\":\"applied\""),
+        "{}",
+        stderr(&o)
+    );
     assert!(std::fs::read(&out).expect("pdf").starts_with(b"%PDF-"));
+}
+
+#[test]
+fn docx_export_pdf_root_fence_refuses_outside_and_writes_the_resolved_path() {
+    let scratch = Scratch::new("export-pdf-root");
+    let inside = scratch.path("inside");
+    let outside = scratch.path("outside");
+    std::fs::create_dir_all(&inside).expect("dir");
+    std::fs::create_dir_all(&outside).expect("dir");
+    let input = fixture("docx/styles-headings.docx");
+    let stray = outside.join("out.pdf");
+    let o = run(&[
+        s("docx"),
+        s("export-pdf"),
+        &input,
+        s("-o"),
+        &stray,
+        s("--root"),
+        &inside,
+    ]);
+    assert!(!o.status.success());
+    assert!(!stray.exists(), "nothing is written outside the root");
+    assert!(
+        stderr(&o).contains("\"status\":\"refused\""),
+        "{}",
+        stderr(&o)
+    );
+    assert!(
+        stderr(&o).contains("outside the allowed roots"),
+        "{}",
+        stderr(&o)
+    );
+
+    let good = inside.join("out.pdf");
+    let o = run(&[
+        s("docx"),
+        s("export-pdf"),
+        &input,
+        s("-o"),
+        &good,
+        s("--root"),
+        &inside,
+    ]);
+    assert!(o.status.success(), "{}", stderr(&o));
+    let resolved = inside.canonicalize().expect("canonical").join("out.pdf");
+    let audit: serde_json::Value = stderr(&o)
+        .lines()
+        .find_map(|l| serde_json::from_str(l).ok())
+        .expect("one audit line on stderr");
+    assert_eq!(audit["status"], "applied");
+    assert_eq!(audit["command"], "export_pdf");
+    assert_eq!(audit["path"], resolved.display().to_string());
+    assert!(good.exists());
+}
+
+#[test]
+fn docx_export_pdf_writes_pdfa_and_can_drop_bookmarks() {
+    let scratch = Scratch::new("export-pdf-pdfa");
+    let input = fixture("docx/styles-headings.docx");
+    let plain = scratch.path("plain.pdf");
+    let o = run(&[s("docx"), s("export-pdf"), &input, s("-o"), &plain]);
+    assert!(o.status.success(), "{}", stderr(&o));
+    assert!(String::from_utf8_lossy(&std::fs::read(&plain).expect("pdf")).contains("/Outlines"));
+
+    let a1 = scratch.path("a1.pdf");
+    let o = run(&[
+        s("docx"),
+        s("export-pdf"),
+        &input,
+        s("-o"),
+        &a1,
+        s("--pdfa"),
+        s("1b"),
+        s("--no-bookmarks"),
+        s("--lang"),
+        s("de-DE"),
+    ]);
+    assert!(o.status.success(), "{}", stderr(&o));
+    let bytes = std::fs::read(&a1).expect("pdf");
+    let text = String::from_utf8_lossy(&bytes);
+    assert!(bytes.starts_with(b"%PDF-1.4"));
+    assert!(text.contains("<pdfaid:part>1</pdfaid:part>"));
+    assert!(text.contains("/OutputIntents") && text.contains("/Lang (de-DE)"));
+    assert!(!text.contains("/Outlines"), "--no-bookmarks");
+
+    let a2 = scratch.path("a2.pdf");
+    let o = run(&[
+        s("docx"),
+        s("export-pdf"),
+        &input,
+        s("-o"),
+        &a2,
+        s("--pdfa"),
+        s("2b"),
+    ]);
+    assert!(o.status.success(), "{}", stderr(&o));
+    let bytes = std::fs::read(&a2).expect("pdf");
+    assert!(bytes.starts_with(b"%PDF-1.7"));
+    assert!(String::from_utf8_lossy(&bytes).contains("<pdfaid:part>2</pdfaid:part>"));
+
+    let o = run(&[
+        s("docx"),
+        s("export-pdf"),
+        &input,
+        s("-o"),
+        &scratch.path("bad.pdf"),
+        s("--pdfa"),
+        s("3b"),
+    ]);
+    assert!(!o.status.success());
 }

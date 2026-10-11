@@ -217,6 +217,27 @@ impl Styles {
         names
     }
 
+    /// What a cell looks like with each of the cell styles `names` applied to a Normal cell: the
+    /// format a gallery tile shows (fill, font, border). Styles the workbook lacks are the built-in
+    /// definitions; the style sheet itself is not changed.
+    pub fn cell_style_previews(
+        &self,
+        names: &[String],
+    ) -> Vec<(String, Option<crate::format::CellFormat>)> {
+        let mut scratch = self.clone();
+        names
+            .iter()
+            .map(|n| {
+                let format = scratch
+                    .derive_named_style(n)
+                    .ok()
+                    .flatten()
+                    .map(|xf| scratch.cell_format(xf).clone());
+                (n.clone(), format)
+            })
+            .collect()
+    }
+
     /// The name of the cell style the format `xf` is based on.
     pub fn cell_style_name(&self, xf: u32) -> Option<String> {
         let root = self.root().ok()?;

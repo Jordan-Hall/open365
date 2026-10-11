@@ -7,8 +7,10 @@
 //!   change the decimal or group separator of a number: `TEXT(1234567.891,"[$-407]#,##0.00")` is `1,234,567.89`.
 //! * Date text follows the system locale: under en-GB `1/2/2024` is 1 February, `15.03.2024` and month-first
 //!   names (`March 15, 2024`) are refused, `$1` is refused (`£1` and `€5` are numbers).
-//! * The built-in format ids (14, 22, ...) cannot be set from the oracle (Excel keeps the en-US code it is given),
-//!   so their locale forms are derived from CLDR and are not verified against Excel.
+//! * The built-in format ids (14, 22, ...) cannot be set from the oracle (Excel keeps the en-US code it is given).
+//!   Their locale forms come from `open365_locale::builtin_number_format_in`: measured under en-GB, the
+//!   specification's tables for the East Asian and Thai locales, derived from Windows locale data elsewhere
+//!   (`docs/testing/xlsx-numfmt-locale.md`).
 
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -173,9 +175,16 @@ impl FormatLocale {
         }
     }
 
-    /// The Excel format code of a built-in `numFmtId` in this locale. `None` for ids that are not built in.
-    /// Ids 14 and 22 and the currency ids follow the locale; the others are the same everywhere.
+    /// The Excel format code of a built-in `numFmtId` in this locale, in the invariant syntax a file stores. `None`
+    /// for ids that are not built in (23 to 26 and 82 up show as General).
+    ///
+    /// A locale with an LCID uses the shared table of `open365-locale` (the same rules and data as the XLSX reader:
+    /// ECMA-376 18.8.30 tables for the East Asian and Thai locales, the measured en-GB rules and the NLS data for
+    /// the others). A locale without one derives 14, 22 and the currency ids from CLDR.
     pub fn builtin_format_code(&self, id: u32) -> Option<String> {
+        if let Some(lcid) = self.lcid {
+            return open365_locale::builtin_number_format_in(id, lcid);
+        }
         let en = crate::numfmt::builtin_format_code(id)?;
         let sym = format!("\"{}\"", self.currency);
         Some(match id {

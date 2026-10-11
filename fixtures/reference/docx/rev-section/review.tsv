@@ -1,0 +1,41 @@
+rev	0	Insert	Author A	2026-10-11T15:20:00Z	\u000c
+rev	1	SectionProperty	Author A	2026-10-11T15:20:00Z	\rSection two text.
+para	markup	0	Section one text.\u000c	0	Normal	0	B0I0U0S22x18
+para	markup	1		0	Normal	0	
+para	markup	2	Section two text.	0	Normal	0	B0I0U0S22x17
+para	final	0	Section one text.\u000c	0	Normal	0	B0I0U0S22x18
+para	final	1		0	Normal	0	
+para	final	2	Section two text.	0	Normal	0	B0I0U0S22x17
+para	accept	0	Section one text.\u000c	0	Normal	0	B0I0U0S22x18
+para	accept	1		0	Normal	0	
+para	accept	2	Section two text.	0	Normal	0	B0I0U0S22x17
+para	reject	0	Section one text.	0	Normal	0	B0I0U0S22x17
+para	reject	1	Section two text.	0	Normal	0	B0I0U0S22x17
+para	accept1:0	0	Section one text.\u000c	0	Normal	0	B0I0U0S22x18
+para	accept1:0	1		0	Normal	0	
+para	accept1:0	2	Section two text.	0	Normal	0	B0I0U0S22x17
+para	reject1:0	0	Section one text.	0	Normal	0	B0I0U0S22x17
+para	reject1:0	1	Section two text.	0	Normal	0	B0I0U0S22x17
+para	accept1:1	0	Section one text.\u000c	0	Normal	0	B0I0U0S22x18
+para	accept1:1	1		0	Normal	0	
+para	accept1:1	2	Section two text.	0	Normal	0	B0I0U0S22x17
+para	reject1:1	0	Section one text.\u000c	0	Normal	0	B0I0U0S22x18
+para	reject1:1	1		0	Normal	0	
+para	reject1:1	2	Section two text.	0	Normal	0	B0I0U0S22x17
+para	acceptp:0	0	Section one text.\u000c	0	Normal	0	B0I0U0S22x18
+para	acceptp:0	1		0	Normal	0	
+para	acceptp:0	2	Section two text.	0	Normal	0	B0I0U0S22x17
+para	rejectp:0	0	Section one text.	0	Normal	0	B0I0U0S22x17
+para	rejectp:0	1	Section two text.	0	Normal	0	B0I0U0S22x17
+para	acceptp:1	0	Section one text.\u000c	0	Normal	0	B0I0U0S22x18
+para	acceptp:1	1		0	Normal	0	
+para	acceptp:1	2	Section two text.	0	Normal	0	B0I0U0S22x17
+para	rejectp:1	0	Section one text.\u000c	0	Normal	0	B0I0U0S22x18
+para	rejectp:1	1		0	Normal	0	
+para	rejectp:1	2	Section two text.	0	Normal	0	B0I0U0S22x17
+para	acceptp:2	0	Section one text.\u000c	0	Normal	0	B0I0U0S22x18
+para	acceptp:2	1		0	Normal	0	
+para	acceptp:2	2	Section two text.	0	Normal	0	B0I0U0S22x17
+para	rejectp:2	0	Section one text.\u000c	0	Normal	0	B0I0U0S22x18
+para	rejectp:2	1		0	Normal	0	
+para	rejectp:2	2	Section two text.	0	Normal	0	B0I0U0S22x17

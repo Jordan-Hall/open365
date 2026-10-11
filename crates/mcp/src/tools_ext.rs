@@ -7,18 +7,18 @@ use std::path::Path;
 use std::sync::Arc;
 use std::sync::atomic::AtomicBool;
 
-use open365_commands::{
-    Command, CommandError, EffectClass, PdfOptions, Target, template_output_extension,
-};
+use open365_commands::{Command, CommandError, PdfOptions, Target, template_output_extension};
 use open365_docx::Document;
 use open365_layout::{LayoutOptions, ParaRole, layout_document_cancellable};
 use open365_text::{FontLibrary, FontMatch};
 use open365_xlsx::parse_cell_ref;
 use serde_json::{Value, json};
 
+use crate::audit::put_text;
 use crate::bounded::{self, BoundedError, EvalWorker, Stamp};
+use crate::policy::assess_new_file;
 use crate::server::{MAX_DOCUMENT_BYTES, Server, Session};
-use crate::tools::{Detail, NOTICE, ToolError, display, policy, str_arg};
+use crate::tools::{Detail, NOTICE, ToolError, display, read_limited, str_arg};
 use crate::views;
 
 /// Largest PDF `export_pdf` writes, in bytes.
@@ -45,22 +45,31 @@ fn extension(path: &Path) -> String {
         .unwrap_or_default()
 }
 
-/// The write policy shared by the two tools that create files: `--allow-edit` for a new
-/// file; replacing one needs `overwrite: true` and `--allow-destructive`.
-fn check_create(server: &Server, path: &Path, overwrite: bool) -> Result<(), ToolError> {
-    let c = &server.config;
-    if let Some(why) = policy(c.allow_edit, c.allow_destructive, EffectClass::Export) {
-        return Err(ToolError::refused(why));
-    }
+/// The write policy shared by the two tools that create files: the `export` scope for a new
+/// file; replacing one needs `overwrite: true` and the operator's confirmation.
+fn check_create(
+    server: &mut Server,
+    tool: &str,
+    path: &Path,
+    overwrite: bool,
+    detail: &mut Detail,
+) -> Result<(), ToolError> {
+    let risk = assess_new_file(path, overwrite);
+    server.require(risk.scope)?;
     if path.exists() {
         if !overwrite {
             return Err(ToolError::refused(
                 "the target exists; pass overwrite: true to replace it",
-            ));
+            )
+            .coded("target_exists"));
         }
-        if let Some(why) = policy(c.allow_edit, c.allow_destructive, EffectClass::Destructive) {
-            return Err(ToolError::refused(format!("replacing a file: {why}")));
-        }
+        let summary = format!("replace the existing file {}", display(path));
+        server
+            .confirm_destructive(tool, &summary, detail)
+            .map_err(|e| {
+                ToolError::refused(format!("replacing a file: {}", e.message))
+                    .coded("confirmation_denied")
+            })?;
     }
     Ok(())
 }
@@ -77,15 +86,15 @@ impl Server {
     ) -> Result<Value, ToolError> {
         detail.insert("effect".to_owned(), json!("export"));
         let raw = str_arg(args, "path")?;
-        detail.insert("requested_path".to_owned(), json!(raw));
+        put_text(detail, "requested_path", raw);
         let overwrite = bool_arg(args, "overwrite");
         detail.insert("overwrite".to_owned(), json!(overwrite));
         let path = self
             .fence
             .resolve_new(raw)
-            .map_err(|d| ToolError::refused(d.0))?;
-        detail.insert("path".to_owned(), json!(display(&path)));
-        check_create(self, &path, overwrite)?;
+            .map_err(|d| ToolError::refused(d.0).coded("path_denied"))?;
+        put_text(detail, "path", &display(&path));
+        check_create(self, "export_pdf", &path, overwrite, detail)?;
         if extension(&path) != "pdf" {
             return Err(ToolError::invalid("the file extension must be .pdf"));
         }
@@ -96,10 +105,12 @@ impl Server {
         }
         let bytes = snapshot(s)?;
         let target_path = path.clone();
+        let roots = self.fence.roots().to_vec();
         // The export is the `export_pdf` command on a private copy of the document, so the
         // open document is not borrowed while the layout runs.
         let done = bounded::run(deadline, move |cancel| {
             let mut copy = Target::open_docx(&bytes)?;
+            copy.restrict_writes_to(&roots);
             copy.set_pdf_options(PdfOptions {
                 max_bytes: Some(MAX_EXPORT_BYTES),
                 cancel: Some(cancel),
@@ -115,18 +126,20 @@ impl Server {
             Ok(Err(CommandError::Exists { .. })) => {
                 return Err(ToolError::refused(
                     "the target exists; pass overwrite: true to replace it",
-                ));
+                )
+                .coded("target_exists"));
             }
             Ok(Err(e @ CommandError::TooLarge { .. })) => {
-                return Err(ToolError::refused(e.to_string()));
+                return Err(ToolError::refused(e.to_string()).coded("limit_exceeded"));
             }
             Ok(Err(CommandError::Cancelled)) | Err(BoundedError::TimedOut) => {
                 // The timeout set the request's flag; the writer removes a file it created.
                 return Err(ToolError::timeout("export_pdf", deadline));
             }
-            Ok(Err(e)) => return Err(ToolError::failed(e.to_string())),
+            Ok(Err(e)) => return Err(ToolError::failed(e.to_string()).coded("export_failed")),
             Err(BoundedError::Failed) => {
-                return Err(ToolError::failed("the export worker stopped unexpectedly"));
+                return Err(ToolError::failed("the export worker stopped unexpectedly")
+                    .coded("worker_failed"));
             }
         };
         detail.insert("bytes_written".to_owned(), json!(out.bytes_written));
@@ -148,48 +161,43 @@ impl Server {
         detail.insert("effect".to_owned(), json!("export"));
         let raw = str_arg(args, "path")?;
         let raw_out = str_arg(args, "output")?;
-        detail.insert("requested_path".to_owned(), json!(raw));
-        detail.insert("requested_output".to_owned(), json!(raw_out));
+        put_text(detail, "requested_path", raw);
+        put_text(detail, "requested_output", raw_out);
         let overwrite = bool_arg(args, "overwrite");
         detail.insert("overwrite".to_owned(), json!(overwrite));
         let template = self
             .fence
             .resolve_existing(raw)
-            .map_err(|d| ToolError::refused(d.0))?;
+            .map_err(|d| ToolError::refused(d.0).coded("path_denied"))?;
         let output = self
             .fence
             .resolve_new(raw_out)
-            .map_err(|d| ToolError::refused(d.0))?;
-        detail.insert("path".to_owned(), json!(display(&template)));
-        detail.insert("output".to_owned(), json!(display(&output)));
-        check_create(self, &output, overwrite)?;
+            .map_err(|d| ToolError::refused(d.0).coded("path_denied"))?;
+        put_text(detail, "path", &display(&template));
+        put_text(detail, "output", &display(&output));
+        check_create(self, "new_from_template", &output, overwrite, detail)?;
         let ext = extension(&template);
         let want = template_output_extension(&ext).ok_or_else(|| {
             ToolError::invalid("the template must be a .dotx, .dotm, .xltx or .xltm file")
+                .coded("bad_extension")
         })?;
         if extension(&output) != want {
             return Err(ToolError::invalid(format!(
                 "a .{ext} template makes a .{want} file; the output extension must be .{want}"
-            )));
+            ))
+            .coded("bad_extension"));
         }
-        let len = std::fs::metadata(&template)
-            .map_err(|e| ToolError::failed(e.to_string()))?
-            .len();
-        if len > MAX_DOCUMENT_BYTES {
-            return Err(ToolError::refused(format!(
-                "file is larger than {MAX_DOCUMENT_BYTES} bytes"
-            )));
-        }
-        let bytes = std::fs::read(&template).map_err(|e| ToolError::failed(e.to_string()))?;
-        let mut target =
-            Target::open_template(&bytes, &ext).map_err(|e| ToolError::invalid(e.to_string()))?;
+        let bytes = read_limited(&template, MAX_DOCUMENT_BYTES)?;
+        let mut target = Target::open_template(&bytes, &ext)
+            .map_err(|e| ToolError::invalid(e.to_string()).coded("open_failed"))?;
+        target.restrict_writes_to(self.fence.roots());
         let macros = target.docx().is_some_and(|d| d.has_vba_project())
             || target.xlsx().is_some_and(|w| w.has_vba_project());
         let out = target
             .apply(Command::Save {
                 path: output.clone(),
             })
-            .map_err(|e| ToolError::failed(e.to_string()))?;
+            .map_err(|e| ToolError::failed(e.to_string()).coded("save_failed"))?;
         detail.insert("bytes_written".to_owned(), json!(out.bytes_written));
         Ok(json!({
             "created": display(&output),
@@ -241,7 +249,7 @@ impl Server {
         detail.insert("effect".to_owned(), json!("read"));
         let hidden = self.config.include_hidden;
         let cell = str_arg(args, "cell")?.to_owned();
-        detail.insert("cell".to_owned(), json!(cell));
+        put_text(detail, "cell", &cell);
         let formula = match args.get("formula") {
             None | Some(Value::Null) => None,
             Some(Value::String(f)) => Some(f.as_str()),
@@ -308,7 +316,7 @@ impl Server {
 
 /// The bytes of the session's document as it is now: the file as opened while nothing was
 /// edited, otherwise a fresh serialisation. Worker threads reopen their own copy from them.
-fn snapshot(s: &mut Session) -> Result<Vec<u8>, ToolError> {
+pub(crate) fn snapshot(s: &mut Session) -> Result<Vec<u8>, ToolError> {
     if s.target.revision() == 0 {
         return Ok(s.original.clone());
     }

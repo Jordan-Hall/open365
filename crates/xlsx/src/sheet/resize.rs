@@ -80,6 +80,9 @@ impl Piece {
 enum ColOp {
     /// Positive width; shows a hidden column.
     Width(f64),
+    /// Auto-fitted width (`bestFit="1"`), as Excel writes it (measured: `fixtures/reference/xlsx/
+    /// autofit-implicit/autofit.json`: `bestFit="1" customWidth="1"`).
+    BestFit(f64),
     Hide,
     /// Shows the column; a missing or zero width becomes the given default.
     Unhide(f64),
@@ -108,6 +111,12 @@ impl ColOp {
             Self::Width(w) => {
                 p.head.set_attr("width", &num(w));
                 p.head.set_attr("customWidth", "1");
+                p.head.remove_attr("hidden");
+            }
+            Self::BestFit(w) => {
+                p.head.set_attr("width", &num(w));
+                p.head.set_attr("customWidth", "1");
+                p.head.set_attr("bestFit", "1");
                 p.head.remove_attr("hidden");
             }
             Self::Hide => {
@@ -251,6 +260,12 @@ impl Worksheet {
             return Ok(());
         }
         self.edit_columns(first, last, ColOp::Width(width))
+    }
+
+    /// Stores a measured auto-fit width (stored characters, padding included) on one column.
+    pub(crate) fn set_column_best_fit(&mut self, col: u32, width: f64) -> Result<(), XlsxError> {
+        check_span(col, col, MAX_COL, "column")?;
+        self.edit_columns(col, col, ColOp::BestFit(width))
     }
 
     pub(crate) fn hide_columns(&mut self, first: u32, last: u32) -> Result<(), XlsxError> {
@@ -487,6 +502,23 @@ impl Worksheet {
             head.set_attr("customHeight", "1");
             head.remove_attr("hidden");
         }
+        Ok(())
+    }
+
+    /// Stores a measured auto-fit height on row `r`: `ht` without `customHeight`, as Excel does
+    /// (measured); a height equal to the sheet default writes no `ht`. The row is shown.
+    pub(crate) fn set_row_auto_height(&mut self, r: u32, points: f64) -> Result<(), XlsxError> {
+        check_span(r, r, MAX_ROW, "row")?;
+        let default = self.sheet_format().default_row_height;
+        let i = self.row_index_or_create(r);
+        let head = &mut self.rows[i].head;
+        if (points - default).abs() < 0.05 {
+            head.remove_attr("ht");
+        } else {
+            head.set_attr("ht", &num(points));
+        }
+        head.remove_attr("customHeight");
+        head.remove_attr("hidden");
         Ok(())
     }
 

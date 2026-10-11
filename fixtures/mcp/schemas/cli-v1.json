@@ -1,0 +1,234 @@
+{
+  "$comment": "open365.cli/1: the --json contract of the open365 CLI. A bundle of the envelope and one result schema per command. Subset of JSON Schema (type, required, properties, items, enum, const); extra fields are allowed and do not change the version. docs/reference/cli.md explains it; apps/cli/tests/schema.rs checks every command against it.",
+  "schema": "open365.cli/1",
+  "envelope": {
+    "type": "object",
+    "required": ["schema", "command", "ok"],
+    "properties": {
+      "schema": {"const": "open365.cli/1"},
+      "command": {"type": "string"},
+      "ok": {"type": "boolean"},
+      "result": {"type": "object"},
+      "error": {
+        "type": "object",
+        "required": ["code", "message"],
+        "properties": {
+          "code": {"enum": ["io", "format", "refused", "error", "check_failed"]},
+          "message": {"type": "string"}
+        }
+      }
+    }
+  },
+  "results": {
+    "commands": {
+      "type": "object",
+      "required": ["schema", "count", "commands"],
+      "properties": {
+        "schema": {"const": "open365.commands/1"},
+        "count": {"type": "integer"},
+        "commands": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["name", "domain", "summary", "example", "cli", "mcp"],
+            "properties": {
+              "name": {"type": "string"},
+              "domain": {"enum": ["docx", "xlsx", "any"]},
+              "summary": {"type": "string"},
+              "example_effect": {"type": ["string", "null"]},
+              "example": {"type": "object"},
+              "cli": {"type": "string"},
+              "mcp": {"type": "string"}
+            }
+          }
+        }
+      }
+    },
+    "run": {
+      "type": "object",
+      "required": ["input", "dry_run", "commands"],
+      "properties": {
+        "input": {"type": "string"},
+        "dry_run": {"type": "boolean"},
+        "output": {"type": ["string", "null"]},
+        "bytes_written": {"type": ["integer", "null"]},
+        "commands": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["seq", "command", "effect", "status"],
+            "properties": {
+              "seq": {"type": "integer"},
+              "command": {"type": "string"},
+              "effect": {"enum": ["read", "edit", "destructive", "egress", "export"]},
+              "status": {"enum": ["applied", "dry_run_ok"]}
+            }
+          }
+        }
+      }
+    },
+    "inspect": {
+      "type": "object",
+      "required": ["parts", "relationships", "content_types", "integrity_issues"],
+      "properties": {
+        "parts": {
+          "type": "array",
+          "items": {"type": "object", "required": ["name", "size"], "properties": {"name": {"type": "string"}, "size": {"type": "integer"}}}
+        },
+        "relationships": {"type": "array"},
+        "content_types": {"type": "object", "required": ["defaults", "overrides"]},
+        "integrity_issues": {"type": "array", "items": {"type": "string"}},
+        "hidden": {"type": "array"}
+      }
+    },
+    "docx outline": {
+      "type": "object",
+      "required": ["kind", "paragraph_count", "headings"],
+      "properties": {
+        "kind": {"const": "docx"},
+        "paragraph_count": {"type": "integer"},
+        "headings": {
+          "type": "array",
+          "items": {"type": "object", "required": ["paragraph", "level", "text"], "properties": {"paragraph": {"type": "integer"}, "level": {"type": "integer"}, "text": {"type": "string"}}}
+        }
+      }
+    },
+    "docx text": {
+      "type": "object",
+      "required": ["paragraph_count", "paragraphs", "truncated"],
+      "properties": {
+        "paragraph_count": {"type": "integer"},
+        "truncated": {"type": "boolean"},
+        "next_paragraph": {"type": ["integer", "null"]},
+        "paragraphs": {
+          "type": "array",
+          "items": {"type": "object", "required": ["paragraph", "text"], "properties": {"paragraph": {"type": "integer"}, "text": {"type": "string"}}}
+        }
+      }
+    },
+    "docx styles": {
+      "type": "object",
+      "required": ["kind", "count", "styles", "truncated"],
+      "properties": {
+        "kind": {"const": "docx"},
+        "count": {"type": "integer"},
+        "truncated": {"type": "boolean"},
+        "styles": {
+          "type": "array",
+          "items": {"type": "object", "required": ["id", "name", "type", "default"], "properties": {"id": {"type": "string"}, "name": {"type": "string"}, "type": {"enum": ["paragraph", "character", "table", "numbering"]}, "default": {"type": "boolean"}}}
+        }
+      }
+    },
+    "xlsx outline": {
+      "type": "object",
+      "required": ["kind", "sheets"],
+      "properties": {
+        "kind": {"const": "xlsx"},
+        "sheets": {
+          "type": "array",
+          "items": {"type": "object", "required": ["sheet", "name", "state", "worksheet"], "properties": {"sheet": {"type": "integer"}, "name": {"type": "string"}, "state": {"type": "string"}, "worksheet": {"type": "boolean"}, "used_range": {"type": ["string", "null"]}}}
+        }
+      }
+    },
+    "xlsx cells": {
+      "type": "object",
+      "required": ["range", "sheet", "cells", "truncated"],
+      "properties": {
+        "range": {"type": "string"},
+        "sheet": {"type": "integer"},
+        "truncated": {"type": "boolean"},
+        "cells": {
+          "type": "array",
+          "items": {"type": "object", "required": ["ref", "value"], "properties": {"ref": {"type": "string"}, "formula": {"type": "string"}}}
+        }
+      }
+    },
+    "xlsx formulas": {
+      "type": "object",
+      "required": ["range", "sheet", "count", "formulas", "truncated"],
+      "properties": {
+        "range": {"type": "string"},
+        "sheet": {"type": "integer"},
+        "count": {"type": "integer"},
+        "truncated": {"type": "boolean"},
+        "formulas": {
+          "type": "array",
+          "items": {"type": "object", "required": ["ref", "value"], "properties": {"ref": {"type": "string"}, "formula": {"type": ["string", "null"]}}}
+        }
+      }
+    },
+    "xlsx styles": {
+      "type": "object",
+      "required": ["kind", "cell_styles", "cell_format_count", "number_formats"],
+      "properties": {
+        "kind": {"const": "xlsx"},
+        "cell_styles": {"type": "array", "items": {"type": "string"}},
+        "cell_format_count": {"type": "integer"},
+        "number_formats": {"type": "array", "items": {"type": "object", "required": ["id", "code"]}},
+        "cells": {
+          "type": "array",
+          "items": {"type": "object", "required": ["ref", "number_format", "font", "fill", "alignment"]}
+        }
+      }
+    },
+    "xlsx recalc": {
+      "type": "object",
+      "required": ["sheet", "range", "formulas_checked", "stale", "differences", "truncated", "saved"],
+      "properties": {
+        "sheet": {"type": "integer"},
+        "range": {"type": "string"},
+        "formulas_checked": {"type": "integer"},
+        "stale": {"type": "integer"},
+        "differences": {"type": "array", "items": {"type": "object", "required": ["ref", "stored", "recalculated"]}},
+        "truncated": {"type": "boolean"},
+        "saved": {"const": false}
+      }
+    },
+    "xlsx eval": {
+      "type": "object",
+      "required": ["formula", "result", "truncated", "sheet", "cell", "saved"],
+      "properties": {
+        "formula": {"type": "string"},
+        "result": {"type": "object", "required": ["type"]},
+        "truncated": {"type": "boolean"},
+        "sheet": {"type": "integer"},
+        "cell": {"type": "string"},
+        "saved": {"const": false}
+      }
+    },
+    "export-pdf": {
+      "type": "object",
+      "required": ["output", "pages", "bytes_written", "warnings"],
+      "properties": {
+        "output": {"type": "string"},
+        "pages": {"type": "integer"},
+        "bytes_written": {"type": "integer"},
+        "warnings": {"type": "array", "items": {"type": "string"}}
+      }
+    },
+    "layout": {
+      "type": "object",
+      "required": ["page_count", "pages", "truncated", "notes"],
+      "properties": {
+        "page_count": {"type": "integer"},
+        "pages": {"type": "array", "items": {"type": "object", "required": ["number", "lines", "cells"]}},
+        "truncated": {"type": "boolean"},
+        "notes": {"type": "array"}
+      }
+    },
+    "new-from-template": {
+      "type": "object",
+      "required": ["output", "bytes_written"],
+      "properties": {"output": {"type": "string"}, "bytes_written": {"type": "integer"}}
+    },
+    "roundtrip": {
+      "type": "object",
+      "required": ["files", "passed", "failed"],
+      "properties": {
+        "files": {"type": "array", "items": {"type": "object", "required": ["file", "passed"]}},
+        "passed": {"type": "integer"},
+        "failed": {"type": "integer"}
+      }
+    }
+  }
+}

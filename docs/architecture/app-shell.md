@@ -156,3 +156,64 @@ minimal (no templates, no Account/Options/Share), most tabs are present but disa
 - Open: Excel's "High-contrast only" filter strip (52 u) in colour pickers is not drawn; sub-menu offsets, popup text widths and
   the font list's maximum height are assumptions; light-mode menu colours are estimates; Writer has no ruler yet (numbers only in the
   fixture); light-mode page shadow unmeasured; Name Box / formula bar / sheet tabs at narrow widths not done.
+
+## Update 2026-10-11 (caret, Format Painter clock, ruler measurement)
+- Caret: `DocView` blinks like a Windows caret. Blink time and width come from `HKCU\Control Panel\Desktop`
+  (`CursorBlinkRate`, `CaretWidth`; read only, via the safe `windows-registry` crate, cached: `ui-shell/src/caret.rs`; the
+  workspace forbids `unsafe`, so not `GetCaretBlinkTime`; `Mode::system` reads `AppsUseLightTheme` the same way). Default 530 ms, 1 px; a negative rate means no blink. The cycle restarts on every key, click, caret
+  move and focus change; the caret hides while the window is inactive; repaints are scheduled for the next toggle only. The cell
+  editor and formula bar use egui's own blink, configured from the same settings in `Theme::visuals`. Time is egui's input time, so
+  `tests/caret.rs` runs without a wall clock. Writer focuses the document at launch, after every ribbon command and when a menu,
+  list, group pop-up, combo editor or Backstage closes (`ShellHost::chrome_closed`).
+- Sheets: the Format Painter double-click window reads an injected `Clock` (tests freeze it); 20 consecutive runs pass.
+- Ruler measurement: `ribbon-oracle.ps1 -App Word -RulerGeometry` writes `word-ruler.json` (every row 220..256, every column
+  6..42; plain paragraph, and one with indents 36/18/36 pt and left/centre/right/decimal tabs at 144/216/288/360 pt). Findings at
+  125 % (px, window): band y 222..252 with a 1 px 0x61 line at y 251; vertical ruler x 9..39 with a line at x 38; track fill 0x29,
+  y 226..243 (vertical: x 13..31, from y 252); tick zero about 3 px left of the margin edge (426.2 for 429), half-cm pitch 23.62;
+  half-cm ticks 6 high (y 233..238), quarter ticks 2 high (y 235..236), digits 9 high (y 231..239) at every cm inside the text
+  area only, margins carry ticks without digits; vertical ruler digits are rotated; first-line marker 14 wide at margin - 8
+  (flat 224..228, taper to a point at 234), hanging marker plus 0xbd box 245..250 under it, right-indent marker 14 wide at
+  margin edge - 60 px - 6 with no box; tab glyph: 2 px stem y 238..243 ending at p-1, foot 2 px high y 244..245, 8 wide (left
+  [p-2,p+6), right [p-8,p)) or 10 wide (centre/decimal [p-6,p+4)), decimal adds a 2x2 dot; corner shows only a left-tab glyph
+  (stem 3x8 at x 20, foot 8x3). Not implemented yet.
+
+
+## Update 2026-10-11 (Writer ruler)
+- Reconciled the content top: the shell's content starts at y 222 (pane height), Word's first page outline is at y 243 with the ruler
+  off and 273 with it on (band 222..252), so the page is 21 u under the canvas or band, not 15. `PAGE_TOP_PT` is now 12.6 (21 u).
+- `crates/ui-egui/src/ruler.rs` (egui-free, `u`; 1 u = 0.8 points, 1.667 u per point at 100 %): `RulerInfo`, `horizontal()` /
+  `vertical()` geometry, `hit_test`, `drag_edit`, `click_edit`, `preview`, `RulerEdit`. `ruler_view.rs` draws and handles the pointer
+  (`DocView::set_ruler`, `ruler_info(&Target)` getter, `take_ruler_edit`). Measured (125 %, dark): band 30 u with a 1 u line on its
+  last row; track y 4..22, x from margin - 1 to right margin - 2; tick zero = margin - 1.8, half-cm pitch 23.62 u; tall tick rows
+  11..17, quarter 13..15, digits 9..18 (text area only); markers 14 u wide centred on the position: first-line pentagon rows 2..13
+  (flat to 8, then taper), hanging/right pentagon rows 13..23, left-indent box rows 23..29; tab glyph stem 2 x 6 (rows 16..22),
+  foot 2 high (rows 22..24), left [p-1,p+7), right [p-7,p+1), centre/decimal [p-5,p+5), decimal dot [p+3,p+5) x rows 19..21;
+  corner selector stem 3 x 8 at x 10, foot 8 x 3. Vertical ruler: same numbers turned on their side (not in the fixture; digits
+  rotated, unmeasured). With the ruler the page moves 30 u down and 15 u right (centred in the area minus the 30 u vertical band).
+  View > Show > Ruler toggles it (`view.show.ruler`); Writer starts with it on. Tests: `ruler::tests` against `word-ruler.json`
+  (+-1 px), `tests/ruler.rs` (page shift, info getter).
+- Open: dragging and clicking compute the edit and preview it, but `open365-commands`/`open365-docx` have no paragraph indent or tab
+  stop command, so `apply_ruler_edit` only hands the edit to the host (Writer shows it in the status line). Needed: commands
+  `DocxSetIndents { para, left_pt, first_line_pt, right_pt }`, `DocxAddTab { para, pos_pt, kind }`, `DocxMoveTab`, `DocxClearTab`
+  and the matching `ppr.rs` setters (`w:ind`, `w:tabs`). Light-mode ruler colours are estimates.
+- Combo editors: `Shell::combo_edit()`; two bugs fixed (`tests/combo.rs`): Enter never committed (a single-line egui TextEdit
+  gives up focus on Enter itself, so `has_focus()` was already false), and the first typed letter did not auto-complete.
+  Open: after an inline completion the headless harness resets the cursor to 0 on the next frame, so a second typed letter is
+  inserted at the start; not yet checked in the real window.
+
+## Update 2026-10-11 (ruler commands, Merge & Centre)
+- Ruler edits run through the command layer: `DocxSetIndents`, `DocxAddTab`, `DocxMoveTab`, `DocxClearTab`
+  (`crates/commands`), setters in `crates/docx/src/ppr.rs` (`w:ind` left/right plus `firstLine` or `hanging`; `w:tabs` kept
+  sorted; clearing a style-inherited stop writes `w:val="clear"`). `DocView::apply_ruler_edit` dispatches them and refreshes the
+  paragraph; `take_ruler_edit` is gone. One undo step each. Writer has no Paragraph dialog yet, so no dialog fields are wired.
+  Only the caret paragraph is edited (Word applies to the whole selection).
+- Merge & Centre: `Command::MergeCells { sheet, range, mode: MergeMode }` (`MergeCenter`, `Across`, `Cells`, `Unmerge`);
+  model in `crates/xlsx/src/workbook/merge.rs` (`Workbook::merge_cells`, `merge_discards`) over `mergeCells`. Only the
+  upper-left value of each area stays (others are emptied with recalculation), Merge & Centre also centres, Unmerge keeps value and
+  alignment, an overlapped merge is replaced. Sheets: the split button toggles merge/unmerge and lights while a merged cell is
+  selected; the four menu items; a modal asks "Merging cells only keeps the upper-left value and discards other values." (OK/Cancel,
+  Enter/Escape) when values would be lost. Not measured: covered-cell styles after a merge, menu item icons and row geometry.
+- Combo inline-completion caret (checked, NOT fixed): in `egui 0.36.2` the text edit's caret is 0 at the start of the frame after a
+  completion although `TextEditState` held (1, 7) before it and the pointer was removed, so the next letter lands at index 0. It
+  also resets on idle frames. The cause was not found in the text edit code; a cut-back-and-set-caret workaround did not help, so the
+  shell is unchanged. Real window not checked.

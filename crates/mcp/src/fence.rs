@@ -18,9 +18,42 @@ pub struct Fence {
     roots: Vec<PathBuf>,
 }
 
+/// Windows device names, with or without an extension, in any case. Includes the console
+/// devices `CONIN$` and `CONOUT$`, `COM0` and `LPT0`, and the superscript-digit forms
+/// `COM¹²³` and `LPT¹²³`, which the Win32 path rules also treat as devices.
 const RESERVED: &[&str] = &[
-    "CON", "PRN", "AUX", "NUL", "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8",
-    "COM9", "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9",
+    "CON",
+    "PRN",
+    "AUX",
+    "NUL",
+    "CONIN$",
+    "CONOUT$",
+    "COM0",
+    "COM1",
+    "COM2",
+    "COM3",
+    "COM4",
+    "COM5",
+    "COM6",
+    "COM7",
+    "COM8",
+    "COM9",
+    "COM\u{b9}",
+    "COM\u{b2}",
+    "COM\u{b3}",
+    "LPT0",
+    "LPT1",
+    "LPT2",
+    "LPT3",
+    "LPT4",
+    "LPT5",
+    "LPT6",
+    "LPT7",
+    "LPT8",
+    "LPT9",
+    "LPT\u{b9}",
+    "LPT\u{b2}",
+    "LPT\u{b3}",
 ];
 
 /// Rejects shapes that are never a plain file below a root, before touching the file system:
@@ -140,5 +173,37 @@ impl Fence {
             }
         }
         Ok(target)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn every_windows_device_name_is_refused_in_any_case_and_with_an_extension() {
+        for name in [
+            "CONIN$",
+            "conout$",
+            "COM0",
+            "lpt0.txt",
+            "COM\u{b9}",
+            "com\u{b2}.docx",
+            "LPT\u{b3}",
+            "CONIN$.docx",
+            "NUL",
+            "com1 .x",
+            "Aux.tar.gz",
+        ] {
+            assert_eq!(
+                check_shape(name),
+                Err(Denied::new("reserved device name")),
+                "{name}"
+            );
+            assert!(check_shape(&format!("sub/{name}")).is_err(), "{name}");
+        }
+        for name in ["COM10", "CONSOLE.docx", "LPT", "report.docx", "COM\u{2074}"] {
+            assert!(check_shape(name).is_ok(), "{name}");
+        }
     }
 }

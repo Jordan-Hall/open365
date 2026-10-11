@@ -7,6 +7,7 @@ use crate::casing::CaseKind;
 use crate::dictionary::Dictionary;
 use crate::error::SpellError;
 use crate::library::{DictionaryLibrary, ResolvedDictionary};
+use crate::paragraph::{ProofOptions, proof_text};
 use crate::suggest::{SuggestOptions, bounded_distance};
 use crate::tokenize::{Misspelling, TokenizerOptions, find_words};
 use crate::user::UserDictionary;
@@ -89,34 +90,7 @@ impl Checker {
     /// Suggestions with explicit limits. User dictionary words one edit away come first.
     #[must_use]
     pub fn suggest_with(&self, word: &str, options: &SuggestOptions) -> Vec<String> {
-        if self.check(word) {
-            return Vec::new();
-        }
-        let caser = &self.dictionary.caser;
-        let typed: Vec<char> = caser.lower(word).chars().collect();
-        let kind = caser.kind(word);
-        let mut out: Vec<String> = self
-            .user
-            .words()
-            .filter(|w| {
-                let candidate: Vec<char> = caser.lower(w).chars().collect();
-                bounded_distance(&typed, &candidate, 1).is_some()
-            })
-            .map(|w| match kind {
-                CaseKind::Upper => caser.upper(w),
-                CaseKind::Title if w.chars().next().is_some_and(char::is_lowercase) => {
-                    caser.capitalize_first(w)
-                }
-                _ => w.to_owned(),
-            })
-            .collect();
-        for suggestion in self.dictionary.suggest(word, options) {
-            if !out.contains(&suggestion) {
-                out.push(suggestion);
-            }
-        }
-        out.truncate(options.max_suggestions);
-        out
+        suggest_with_user(&self.dictionary, &self.user, word, options)
     }
 
     /// Finds the misspelled words of a paragraph, with byte, `char` and UTF-16 offsets.
@@ -125,7 +99,29 @@ impl Checker {
     /// default; see [`TokenizerOptions`].
     #[must_use]
     pub fn find_misspellings(&self, text: &str, options: &TokenizerOptions) -> Vec<Misspelling> {
-        let mut options = options.clone();
+        let options = self.tokenizer_for(options);
+        find_words(text, &options)
+            .iter()
+            .filter(|word| !self.check(word.text))
+            .map(Misspelling::from)
+            .collect()
+    }
+
+    /// Proofs a paragraph: misspelled words and, per `options`, repeated words.
+    #[must_use]
+    pub fn proof(&self, text: &str, options: &ProofOptions) -> Vec<Misspelling> {
+        let tokenizer = self.tokenizer_for(&options.tokenizer);
+        proof_text(
+            text,
+            options,
+            &tokenizer,
+            &self.dictionary.caser,
+            &mut |w| self.check(w),
+        )
+    }
+
+    fn tokenizer_for(&self, base: &TokenizerOptions) -> TokenizerOptions {
+        let mut options = base.clone();
         options.extra_word_chars.extend(
             self.dictionary
                 .word_chars()
@@ -133,11 +129,7 @@ impl Checker {
                 .copied()
                 .filter(|c| !c.is_alphanumeric()),
         );
-        find_words(text, &options)
-            .iter()
-            .filter(|word| !self.check(word.text))
-            .map(Misspelling::from)
-            .collect()
+        options
     }
 
     /// The user's own words.
@@ -165,4 +157,40 @@ impl Checker {
     pub fn ignore_word(&mut self, word: &str) -> bool {
         self.user.ignore(word)
     }
+}
+
+/// Suggestions for `word` from `dictionary`, with the user's own words one edit away first.
+pub(crate) fn suggest_with_user(
+    dictionary: &Dictionary,
+    user: &UserDictionary,
+    word: &str,
+    options: &SuggestOptions,
+) -> Vec<String> {
+    let caser = &dictionary.caser;
+    if user.contains_with(word, caser) || dictionary.spell(word) {
+        return Vec::new();
+    }
+    let typed: Vec<char> = caser.lower(word).chars().collect();
+    let kind = caser.kind(word);
+    let mut out: Vec<String> = user
+        .words()
+        .filter(|w| {
+            let candidate: Vec<char> = caser.lower(w).chars().collect();
+            bounded_distance(&typed, &candidate, 1).is_some()
+        })
+        .map(|w| match kind {
+            CaseKind::Upper => caser.upper(w),
+            CaseKind::Title if w.chars().next().is_some_and(char::is_lowercase) => {
+                caser.capitalize_first(w)
+            }
+            _ => w.to_owned(),
+        })
+        .collect();
+    for suggestion in dictionary.suggest(word, options) {
+        if !out.contains(&suggestion) {
+            out.push(suggestion);
+        }
+    }
+    out.truncate(options.max_suggestions);
+    out
 }

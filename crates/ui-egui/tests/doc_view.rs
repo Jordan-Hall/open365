@@ -57,13 +57,15 @@ fn click(h: &mut Harness<'_, State>, pos: Pos2) {
         pressed: true,
         modifiers: Modifiers::NONE,
     });
-    h.run();
+    // One frame each: the blinking caret asks for repaints, and a press held across them is no click.
+    h.step();
     h.event(Event::PointerButton {
         pos,
         button: PointerButton::Primary,
         pressed: false,
         modifiers: Modifiers::NONE,
     });
+    h.step();
     h.run();
 }
 

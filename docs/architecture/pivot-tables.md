@@ -1,6 +1,6 @@
 # PivotTables (`crates/pivot`)
 
-Status: first slice. Measured against Excel 16.0 (build 20430, en-GB) with `tools/office/pivot-oracle.ps1`.
+Status: slices 1-5 plus refresh regeneration (slice 4 styles: built-in and custom table styles fitted, user `formats` open). Measured against Excel 16.0 (build 20430, en-GB) with `tools/office/pivot-oracle.ps1`.
 
 ## Model
 
@@ -33,10 +33,34 @@ sheet coordinates and the `numFmtId` to apply).
   `(All)`, `Total`, custom subtotal names `Sum`, `Max.` ...) come from `PivotStrings` (English
   defaults); stored captions (`rowHeaderCaption`, `grandTotalCaption`, data field names) win.
 
-`refresh_sheet(&mut Workbook, sheet, strings)` recomputes from the source range and writes
-values with `Workbook::set_cell_value`. `open365-xlsx` has no cell-style setter, so number
-formats are returned in `GridCell::num_fmt_id` but not applied, and the `location/@ref` of the
-pivot part is not rewritten when the output size changes.
+`refresh_sheet(&mut Workbook, sheet, strings)` recomputes from the source range, writes values
+(`Workbook::set_cell_value`) and number formats (`format_range`), then regenerates the pivot parts
+(`regen.rs`) and writes them with `Workbook::replace_part`: the pivot table (location, field
+`items`, page selections, `rowItems`/`colItems`), the cache definition (`sharedItems`, `recordCount`,
+`refreshedDate`, no `refreshOnLoad`) and the cache records. `Workbook::save` writes every other part
+byte-identical. A pivot the writer does not model (grouped fields, calculated items, a source that
+is not a worksheet range, a cache shared by several pivots) keeps its old cache and gets
+`refreshOnLoad="1"` so Excel rebuilds it (`tests/refresh.rs`).
+
+Measured rules (`tests/refresh_oracle.rs`: `pivot-refresh-{none,values,items,removed}` edited, refreshed by
+`refresh_sheet` and compared part by part with Excel's `after.xlsx`, ignoring `refreshedDate`, `cacheId`,
+`xr:uid`; 28/28 pivots, plus every cell against `pivot.json` and the stored-cache grid against the refreshed grid):
+
+* Excel shares items (`sharedItems count=..` with item elements) only for fields that were on an axis at
+  cache creation; other fields carry type flags and the value range, and their records hold values inline.
+* A refresh rebuilds the shared items in order of first appearance in the source rows. Text is merged
+  case-insensitively under the first spelling met, in every field (records and labels use that spelling).
+* An item that left the source stays at the end of the shared list as `u="1"` (and `m="1"` in the pivot field
+  items) for text and number fields whatever the sort type; a date item is dropped. Retained items of a sorted
+  field sit at their sorted position in the field items.
+* Field items keep the stored order of the items still present; new items follow in order of first appearance
+  (manual sort), else the field is sorted. `x` in `rowItems`/`colItems` is the position in the field items.
+* Flags: `containsSemiMixedTypes="0"` without text and blanks, `containsNonDate="0"` for date-only fields,
+  `containsString="0"`, `containsBlank`, `containsMixedTypes`, `containsNumber`, `containsInteger`,
+  `minValue/maxValue`; `maxDate` is the last date plus one day.
+* `rowItems`/`colItems`: `t` = default/blank/grand/function name, `r` = leading levels shared with the previous
+  line (subtotal and blank lines: their own level), `i` = data field index when above 0.
+  Not measured: retained items of a field sorted by a data field (placed last).
 
 ## Values field, Show Values As, grouping
 
@@ -59,6 +83,75 @@ pivot part is not rewritten when the output size changes.
   hours, minutes, seconds and numeric ranges. Group items are not regenerated on refresh: the
   stored start/end and labels are used.
 
+## Location, styles, layout forms (slice 4)
+
+* **Location** (`location.rs`): `PivotGrid::location` holds `ref`, `firstHeaderRow`,
+  `firstDataRow`, `firstDataCol`, `rowPageCount`, `colPageCount` as Excel writes them.
+  Measured rules: `ref` is the body without the page-field area; `firstDataRow` is the number of
+  header rows; `firstDataCol` the number of label columns; `firstHeaderRow` is 1 when there is a
+  column field, else 1 except 0 when several data fields sit on the columns; `rowPageCount` is the
+  number of page fields and `colPageCount` 1 when there are any. `PivotTable::set_location` writes
+  them into the part (page counts of 0 are removed); writing the stored values leaves the part
+  byte-identical. The layout forms (compact, outline, tabular, repeat labels, blank rows, subtotals
+  top/bottom) were already measured value by value in slices 1-3 (layouts, subtotals, values sets).
+* **Table styles** (`style.rs`): `builtin_styles.txt` is the definition of the 84 built-in
+  `PivotStyleLight/Medium/Dark` styles (28 elements each: font bold/italic/colour, fill, six
+  borders), read from Excel's `TableStyles` object model by `tools/office/make-pivot-styledefs.ps1`
+  (theme colours as OOXML theme index plus tint). `style_cells(table, grid, theme)` composes, per
+  cell of the pivot range, the elements that apply (whole table, row/column stripes, first/last
+  column, header row, total row, subtotal rows/columns, row subheadings, blank rows) in a fitted
+  priority order and resolves a border shared by two cells to the higher-priority element.
+  Fitted against `Range.DisplayFormat` of every cell (`tests/style.rs`). Element numbers follow
+  Excel's enumeration (RowSubheading1 is 23, BlankRow 19, ColumnSubheading1 20), not the order of
+  the ECMA names. Custom table styles are read by `style::CustomStyles` (`style/custom.rs`): `tableStyles/tableStyle/tableStyleElement` (type, `dxfId`, stripe `size`) and the `dxfs` they point to (font bold/italic/colour, solid fill `bgColor`, six borders with style thin/medium/thick/hair/dotted/dashed/double); `style_cells_with` looks them up before the built-in names. Rules found with the custom sets: `lastColumn` never formats the first header row; stripe `size` makes stripes of that many rows/columns; the page-field area takes the whole-table top and bottom borders.
+  Fitted rules (in-sample `pivot-styles`, 40/40): the header row beats every border; subtotal rows tie
+  with row subheadings (the lower cell wins); the total row loses to subtotal rows but beats subtotal
+  columns; tabular layouts apply subheading level k to label column k of every line of the group
+  (subtotal rows then cover only their own and later columns); `showRowHeaders` off drops row
+  subheadings; subtotal columns cover header rows from the second; column subheading k formats the
+  item cells of header row k+1; the first header cell covers the label columns of all header rows
+  but the last; page-field cells take the whole-table fill/font (not its outer borders) plus the
+  page label/value elements.
+  Second round (`styles2`, 62/63): the exclusion of label columns left of a subtotal line holds with
+  row headers off and for outline forms (`label_cols > 1`: a subtotal line or a non-leaf item of
+  level k covers columns from k); a blank row joins the group of column c only when the next line
+  stays inside that group (`LineInfo::shared_next`); the page-field area takes the whole-table
+  borders between its own cells (inside horizontals), not the outer ones. Value rule found
+  through the style set: when a group ends together with its parent and both have blank rows on,
+  Excel writes one blank row (`compute`), not one per level.
+
+## Calculated fields and GETPIVOTDATA (slice 5)
+
+* **Calculated fields** (`calc.rs`): `cacheField/@formula` with `databaseField="0"`. Excel
+  evaluates the formula over the **sums** of the fields it names, per output cell, so a total cell
+  is the formula over the summed fields (not the sum of the cells). The evaluator covers constants,
+  field names (quoted `'Per unit'`), `+ - * / ^ & % = <> < > <= >=`, and `IF IFERROR AND OR NOT
+  ABS SQRT INT ROUND ROUNDUP ROUNDDOWN POWER MOD SUM MAX MIN AVERAGE`; a division by zero is
+  `#DIV/0!`. A cell without records is empty. Measured: 6/6 calculated-field pivots.
+* **Calculated items** (`calcitems.rs`): Excel stores them in
+  `pivotCacheDefinition/calculatedItems` (`formula="Product[a]+Product[b]"`, a `pivotArea`
+  reference to the new shared item with `f="1"`); the item shows as a normal item. Its cell is the
+  formula over the aggregates of the named items under the cell's other constraints; a calculated
+  field on the same table is then evaluated over those item-level sums; any line that does not
+  constrain the field (grand totals, outer subtotals) includes the calculated item (Sum and Count add,
+  Max and Min compare). Excel refuses Average, StdDev and Var data fields while a table has
+  calculated items, and so does `compute`. Measured: 9/9 item pivots, 15/15 with the fields.
+  Excel reports a calculated-item cell as a formula (`=Apple+Banana`) that the file does not store.
+  Second round (`calc2`): a calculated-item line is evaluated per item of the axis fields the cell does not
+  constrain and the results combine with the data field's function (Sum/Count add, Max/Min compare), so the
+  grand-total column of `Apple/Banana` is the sum of the line's cells and of a Max item the maximum of its
+  cells, not the formula over the totals (`CalcItems::value` `split`).
+* **GETPIVOTDATA hook** (`getpivotdata.rs`): `open365-calc` does not depend on this crate, so the
+  hook is data only. calc builds a `PivotIndex` per pivot (`PivotIndex::build(&SheetPivot,
+  &PivotStrings)`), picks the one whose `contains(row, col)` holds for the `pivot_table` argument
+  and calls `get_pivot_data(&index, data_field, &[(field, Value)])`, returning the `GridValue` or
+  the error code (`#REF!`). Rules measured: the data field matches the caption (`Sum of Units`) or
+  the source field name, case-insensitively; field names are case-insensitive; the pairs are a set
+  (order does not matter, a repeated field with the same item is accepted); the pairs must equal
+  the field set of a displayed cell (subtotals and grand total included), otherwise `#REF!`; when
+  the field set is displayed and all items exist but the intersection has no value, the result is
+  0. The index is a snapshot of the stored-cache grid; rebuild it after a refresh.
+
 ## Evidence (oracle, en-GB)
 
 `cargo test -p open365-pivot` compares every non-empty cell of the pivots below (value; number
@@ -76,6 +169,17 @@ format and display text are in the reference JSON but not compared yet). Floors 
 | holdout-a | hold-out, random layouts | 14/14 |
 | holdout-b | hold-out, random layouts | 14/14 |
 | holdout-showas | hold-out, random Show Values As | 39/40 |
+| location (all sets above) | in-sample and hold-out | 238/238 |
+| calc (fields and items) | in-sample | 15/15 (items 9/9, stored and refreshed) |
+| calc2 (division, Count/Max data fields, inner-level items, fields beside items) | in-sample, second round | 24/24 pivots, 1136/1136 cells (stored and refreshed; 21/24 before fitting; Min data field not generated) |
+| getpivotdata | in-sample | 36/36 queries |
+| styles (`Range.DisplayFormat`) | in-sample | 40/40 pivots, 8485/8485 cells (was 21/40, 7608) |
+| styles2 (row headers off, blank rows over levels, several page fields, subtotals top) | in-sample, second round | 62/63 pivots, 15461/15485 cells (33/63 before fitting) |
+| holdout-styles | hold-out, random styles/flags/layouts | 38/48 pivots, 10736/11052 cells (31/48, 10664 before the second round; unchanged by the custom-style fixes; confirmation only, failures not inspected) |
+| holdout-calc (calculated items and fields) | hold-out, random formulas/layouts, written once | 38/40 pivots, 2145/2173 cells (stored and refreshed; 29/40 before calc2; confirmation only, failures not tuned on) |
+| customstyles (`styles.xml` tableStyles and dxfs) | in-sample, random element sets | 36/48 pivots, 9598/10288 cells (30/48 first run) |
+| holdout-customstyles | hold-out, fresh seed, written once | 27/48 pivots, 7483/7901 cells (confirmation only) |
+| refresh regeneration (`pivot-refresh-*`) | in-sample | 28/28 pivots part for part (none, values, items, removed) |
 
 The open hold-out case is `rankDescending` with the base field outermost over three row
 levels (the leaf ranks are not among the sibling items; the comparison set Excel uses is not
@@ -86,9 +190,20 @@ identified).
 * Group items are not regenerated on refresh (auto start/end, changed bounds); manual
   (discrete) groups and date parts with the 1904 date system are untested; the oracle has no
   time-of-day source data yet (hours/minutes/seconds are implemented but not measured).
-* Writing: number formats and styles of refreshed cells, `location/@ref` rewrite and a refreshed
-  cache (needs a cell-style setter in `open365-xlsx`).
-* Calculated fields and items, GETPIVOTDATA (needs a hook in `open365-calc`).
+* Writing: the function wiring of GETPIVOTDATA in `open365-calc`; regeneration for grouped fields,
+  calculated items and shared caches (they fall back to `refreshOnLoad`).
+* Styles: 10 hold-out pivots still differ (not inspected, to keep the set clean). Open in-sample:
+  `styles2` P63 (tabular, values on rows, row stripes: Excel draws the medium subheading bottom
+  border between every line of a group in the first label column; the same border is absent
+  without stripes, rule not identified; a per-line "own block" model fixed P63 but broke 8 other
+  pivots; not retried). User `formats` (pivot cell formats layered over the style: `formats/format/pivotArea`
+  with `dxfId`) and conditional formats are not read and have no generator. Custom styles: 12 in-sample
+  pivots still differ; seen: wholeTable borders on the second header row of compact tables with page fields
+  (P15/P20/P39), subtotal-row borders in compact layouts with two data fields (P1), border colour/weight
+  conflicts between subheading and subtotal elements of random styles (P22/P29).
+* Refresh regeneration is done for ungrouped single-cache pivots (see above). Open: groups, calculated items,
+  caches shared by several pivots, retained items of fields sorted by a data field, time-of-day sources.
+* Calculated items: 2 hold-out pivots still differ (a Max item over one field, a Count item with a product formula; not tuned on). The Min data field is not in the generated set.
 * Label and value filters, top-N, OLAP and data-model caches, `missingCaption`/`errorCaption`,
   `showAll` empty items.
 * Rank with the base field outermost over three or more row levels (see above).

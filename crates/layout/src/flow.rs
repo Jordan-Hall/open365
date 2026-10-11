@@ -1414,9 +1414,9 @@ impl<'a> Paginator<'a> {
         (left, top)
     }
 
-    /// The area text keeps out of around `table` at `(left, top)`.
-    fn table_float(table: &TableLayout, pos: &TablePos, left: f64, top: f64) -> Float {
-        let (w, h) = (table.outer_width(), table.height());
+    /// The area text keeps out of around the `h` points of `table` that stand at `(left, top)`.
+    fn table_float(table: &TableLayout, pos: &TablePos, left: f64, top: f64, h: f64) -> Float {
+        let w = table.outer_width();
         let [dl, dt, dr, db] = pos.dist;
         Float {
             x0: left - dl,
@@ -1452,18 +1452,66 @@ impl<'a> Paginator<'a> {
             _ => self.page.y + anchor.map_or(0.0, |a| first_gap(&self.page, a) + a.border_top()),
         };
         let (left, top) = self.table_spot(table, pos, anchor_top, &self.page.floats);
+        // A table that runs past the bottom margin breaks between rows (layout-tblp-bottom):
+        // the rows that fit stay, the rest start the next page at the top margin, and the
+        // anchor paragraph moves there with them (its text wraps beside the second part).
+        let bottom = self.page.bottom();
+        let fit = table
+            .rows
+            .iter()
+            .take_while(|r| top + r.top + r.height <= bottom + EPS)
+            .count();
+        let crossing = table.rows[..fit.min(table.rows.len())]
+            .iter()
+            .enumerate()
+            .any(|(r, row)| row.cells.iter().any(|c| r + c.row_span > fit));
+        let split = (1..table.rows.len()).contains(&fit)
+            && !crossing
+            && !self.trial
+            && table.height() - table.rows[fit].top <= self.page.bottom() - self.page.col_top;
+        let end = if split { fit } else { table.rows.len() };
+        self.emit_float_rows(table, pos, left, top, 0..end);
+        if split {
+            let section = self.page.cur;
+            self.next_column_or_page(false, section);
+            if self.overflow {
+                return;
+            }
+            let top = self.page.y;
+            self.emit_float_rows(table, pos, left, top, fit..table.rows.len());
+        }
+    }
+
+    /// Draws rows `rows` of a floating table with the first at `top`, and makes the text keep
+    /// out of them.
+    fn emit_float_rows(
+        &mut self,
+        table: &TableLayout,
+        pos: &TablePos,
+        left: f64,
+        top: f64,
+        rows: std::ops::Range<usize>,
+    ) {
         let before = self.page.cells.len();
         self.float_origin = Some(left + table.edge_l / 2.0);
         let mut active: Vec<ActiveSpan> = Vec::new();
-        for r in 0..table.rows.len() {
-            self.emit_row(table, r, top + table.rows[r].top, &mut active, false);
+        let (first, last) = (&table.rows[rows.start], &table.rows[rows.end - 1]);
+        // A part that continues the table on a later page starts with the table's top border again.
+        let lead = if rows.start > 0 {
+            table.rows[0].above
+        } else {
+            0.0
+        };
+        let (base, h) = (first.top - lead, last.top + last.height - first.top + lead);
+        for r in rows {
+            self.emit_row(table, r, top + table.rows[r].top - base, &mut active, false);
         }
         self.float_origin = None;
         // The cells do not make the column non-empty: the anchor paragraph is still its first.
         self.page.col_mark.1 += self.page.cells.len() - before;
         self.page
             .floats
-            .push(Self::table_float(table, pos, left, top));
+            .push(Self::table_float(table, pos, left, top, h));
     }
 
     /// Whether `item` leaves the flow: a floating table or a paragraph frame.
@@ -2099,7 +2147,7 @@ impl<'a> Paginator<'a> {
                         && let Some(pos) = self.floating(tl)
                     {
                         let (left, ttop) = self.table_spot(tl, &pos, top, &placed);
-                        let f = Self::table_float(tl, &pos, left, ttop);
+                        let f = Self::table_float(tl, &pos, left, ttop, tl.height());
                         placed.push(f.clone());
                         if f.y0 < y0 + used - 1e-6 {
                             ahead.push(f);

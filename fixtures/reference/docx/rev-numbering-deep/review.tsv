@@ -1,0 +1,161 @@
+rev	0	ParagraphProperty	Author A	2026-10-11T16:37:00Z	Item one.
+rev	1	ParagraphProperty	Author A	2026-10-11T16:37:00Z	Item two.
+rev	2	ParagraphProperty	Author A	2026-10-11T16:37:00Z	Item three.
+rev	3	ParagraphProperty	Author A	2026-10-11T16:37:00Z	Item four.
+rev	4	ParagraphProperty	Author A	2026-10-11T16:37:00Z	Item six.
+para	markup	0	Item one.	0	List Paragraph	3	B0I0U0S22x9
+para	markup	1	Item two.	0	List Paragraph	3	B0I0U0S22x9
+para	markup	2	Item three.	0	List Paragraph	3	B0I0U0S22x11
+para	markup	3	Item four.	0	List Paragraph	3	B0I0U0S22x10
+para	markup	4	Item five.	0	Normal	0	B0I0U0S22x10
+para	markup	5	Item six.	0	List Paragraph	2	B0I0U0S22x9
+para	final	0	Item one.	0	List Paragraph	3	B0I0U0S22x9
+para	final	1	Item two.	0	List Paragraph	3	B0I0U0S22x9
+para	final	2	Item three.	0	List Paragraph	3	B0I0U0S22x11
+para	final	3	Item four.	0	List Paragraph	3	B0I0U0S22x10
+para	final	4	Item five.	0	Normal	0	B0I0U0S22x10
+para	final	5	Item six.	0	List Paragraph	2	B0I0U0S22x9
+para	accept	0	Item one.	0	List Paragraph	3	B0I0U0S22x9
+para	accept	1	Item two.	0	List Paragraph	3	B0I0U0S22x9
+para	accept	2	Item three.	0	List Paragraph	3	B0I0U0S22x11
+para	accept	3	Item four.	0	List Paragraph	3	B0I0U0S22x10
+para	accept	4	Item five.	0	Normal	0	B0I0U0S22x10
+para	accept	5	Item six.	0	List Paragraph	2	B0I0U0S22x9
+para	reject	0	Item one.	0	Normal	0	B0I0U0S22x9
+para	reject	1	Item two.	0	Normal	0	B0I0U0S22x9
+para	reject	2	Item three.	0	Normal	0	B0I0U0S22x11
+para	reject	3	Item four.	0	Normal	0	B0I0U0S22x10
+para	reject	4	Item five.	0	Normal	0	B0I0U0S22x10
+para	reject	5	Item six.	0	Normal	0	B0I0U0S22x9
+para	accept1:0	0	Item one.	0	List Paragraph	3	B0I0U0S22x9
+para	accept1:0	1	Item two.	0	List Paragraph	3	B0I0U0S22x9
+para	accept1:0	2	Item three.	0	List Paragraph	3	B0I0U0S22x11
+para	accept1:0	3	Item four.	0	List Paragraph	3	B0I0U0S22x10
+para	accept1:0	4	Item five.	0	Normal	0	B0I0U0S22x10
+para	accept1:0	5	Item six.	0	List Paragraph	2	B0I0U0S22x9
+para	reject1:0	0	Item one.	0	Normal	0	B0I0U0S22x9
+para	reject1:0	1	Item two.	0	List Paragraph	3	B0I0U0S22x9
+para	reject1:0	2	Item three.	0	List Paragraph	3	B0I0U0S22x11
+para	reject1:0	3	Item four.	0	List Paragraph	3	B0I0U0S22x10
+para	reject1:0	4	Item five.	0	Normal	0	B0I0U0S22x10
+para	reject1:0	5	Item six.	0	List Paragraph	2	B0I0U0S22x9
+para	accept1:1	0	Item one.	0	List Paragraph	3	B0I0U0S22x9
+para	accept1:1	1	Item two.	0	List Paragraph	3	B0I0U0S22x9
+para	accept1:1	2	Item three.	0	List Paragraph	3	B0I0U0S22x11
+para	accept1:1	3	Item four.	0	List Paragraph	3	B0I0U0S22x10
+para	accept1:1	4	Item five.	0	Normal	0	B0I0U0S22x10
+para	accept1:1	5	Item six.	0	List Paragraph	2	B0I0U0S22x9
+para	reject1:1	0	Item one.	0	List Paragraph	3	B0I0U0S22x9
+para	reject1:1	1	Item two.	0	Normal	0	B0I0U0S22x9
+para	reject1:1	2	Item three.	0	List Paragraph	3	B0I0U0S22x11
+para	reject1:1	3	Item four.	0	List Paragraph	3	B0I0U0S22x10
+para	reject1:1	4	Item five.	0	Normal	0	B0I0U0S22x10
+para	reject1:1	5	Item six.	0	List Paragraph	2	B0I0U0S22x9
+para	accept1:2	0	Item one.	0	List Paragraph	3	B0I0U0S22x9
+para	accept1:2	1	Item two.	0	List Paragraph	3	B0I0U0S22x9
+para	accept1:2	2	Item three.	0	List Paragraph	3	B0I0U0S22x11
+para	accept1:2	3	Item four.	0	List Paragraph	3	B0I0U0S22x10
+para	accept1:2	4	Item five.	0	Normal	0	B0I0U0S22x10
+para	accept1:2	5	Item six.	0	List Paragraph	2	B0I0U0S22x9
+para	reject1:2	0	Item one.	0	List Paragraph	3	B0I0U0S22x9
+para	reject1:2	1	Item two.	0	List Paragraph	3	B0I0U0S22x9
+para	reject1:2	2	Item three.	0	Normal	0	B0I0U0S22x11
+para	reject1:2	3	Item four.	0	List Paragraph	3	B0I0U0S22x10
+para	reject1:2	4	Item five.	0	Normal	0	B0I0U0S22x10
+para	reject1:2	5	Item six.	0	List Paragraph	2	B0I0U0S22x9
+para	accept1:3	0	Item one.	0	List Paragraph	3	B0I0U0S22x9
+para	accept1:3	1	Item two.	0	List Paragraph	3	B0I0U0S22x9
+para	accept1:3	2	Item three.	0	List Paragraph	3	B0I0U0S22x11
+para	accept1:3	3	Item four.	0	List Paragraph	3	B0I0U0S22x10
+para	accept1:3	4	Item five.	0	Normal	0	B0I0U0S22x10
+para	accept1:3	5	Item six.	0	List Paragraph	2	B0I0U0S22x9
+para	reject1:3	0	Item one.	0	List Paragraph	3	B0I0U0S22x9
+para	reject1:3	1	Item two.	0	List Paragraph	3	B0I0U0S22x9
+para	reject1:3	2	Item three.	0	List Paragraph	3	B0I0U0S22x11
+para	reject1:3	3	Item four.	0	Normal	0	B0I0U0S22x10
+para	reject1:3	4	Item five.	0	Normal	0	B0I0U0S22x10
+para	reject1:3	5	Item six.	0	List Paragraph	2	B0I0U0S22x9
+para	accept1:4	0	Item one.	0	List Paragraph	3	B0I0U0S22x9
+para	accept1:4	1	Item two.	0	List Paragraph	3	B0I0U0S22x9
+para	accept1:4	2	Item three.	0	List Paragraph	3	B0I0U0S22x11
+para	accept1:4	3	Item four.	0	List Paragraph	3	B0I0U0S22x10
+para	accept1:4	4	Item five.	0	Normal	0	B0I0U0S22x10
+para	accept1:4	5	Item six.	0	List Paragraph	2	B0I0U0S22x9
+para	reject1:4	0	Item one.	0	List Paragraph	3	B0I0U0S22x9
+para	reject1:4	1	Item two.	0	List Paragraph	3	B0I0U0S22x9
+para	reject1:4	2	Item three.	0	List Paragraph	3	B0I0U0S22x11
+para	reject1:4	3	Item four.	0	List Paragraph	3	B0I0U0S22x10
+para	reject1:4	4	Item five.	0	Normal	0	B0I0U0S22x10
+para	reject1:4	5	Item six.	0	Normal	0	B0I0U0S22x9
+para	acceptp:0	0	Item one.	0	List Paragraph	3	B0I0U0S22x9
+para	acceptp:0	1	Item two.	0	List Paragraph	3	B0I0U0S22x9
+para	acceptp:0	2	Item three.	0	List Paragraph	3	B0I0U0S22x11
+para	acceptp:0	3	Item four.	0	List Paragraph	3	B0I0U0S22x10
+para	acceptp:0	4	Item five.	0	Normal	0	B0I0U0S22x10
+para	acceptp:0	5	Item six.	0	List Paragraph	2	B0I0U0S22x9
+para	rejectp:0	0	Item one.	0	Normal	0	B0I0U0S22x9
+para	rejectp:0	1	Item two.	0	List Paragraph	3	B0I0U0S22x9
+para	rejectp:0	2	Item three.	0	List Paragraph	3	B0I0U0S22x11
+para	rejectp:0	3	Item four.	0	List Paragraph	3	B0I0U0S22x10
+para	rejectp:0	4	Item five.	0	Normal	0	B0I0U0S22x10
+para	rejectp:0	5	Item six.	0	List Paragraph	2	B0I0U0S22x9
+para	acceptp:1	0	Item one.	0	List Paragraph	3	B0I0U0S22x9
+para	acceptp:1	1	Item two.	0	List Paragraph	3	B0I0U0S22x9
+para	acceptp:1	2	Item three.	0	List Paragraph	3	B0I0U0S22x11
+para	acceptp:1	3	Item four.	0	List Paragraph	3	B0I0U0S22x10
+para	acceptp:1	4	Item five.	0	Normal	0	B0I0U0S22x10
+para	acceptp:1	5	Item six.	0	List Paragraph	2	B0I0U0S22x9
+para	rejectp:1	0	Item one.	0	List Paragraph	3	B0I0U0S22x9
+para	rejectp:1	1	Item two.	0	Normal	0	B0I0U0S22x9
+para	rejectp:1	2	Item three.	0	List Paragraph	3	B0I0U0S22x11
+para	rejectp:1	3	Item four.	0	List Paragraph	3	B0I0U0S22x10
+para	rejectp:1	4	Item five.	0	Normal	0	B0I0U0S22x10
+para	rejectp:1	5	Item six.	0	List Paragraph	2	B0I0U0S22x9
+para	acceptp:2	0	Item one.	0	List Paragraph	3	B0I0U0S22x9
+para	acceptp:2	1	Item two.	0	List Paragraph	3	B0I0U0S22x9
+para	acceptp:2	2	Item three.	0	List Paragraph	3	B0I0U0S22x11
+para	acceptp:2	3	Item four.	0	List Paragraph	3	B0I0U0S22x10
+para	acceptp:2	4	Item five.	0	Normal	0	B0I0U0S22x10
+para	acceptp:2	5	Item six.	0	List Paragraph	2	B0I0U0S22x9
+para	rejectp:2	0	Item one.	0	List Paragraph	3	B0I0U0S22x9
+para	rejectp:2	1	Item two.	0	List Paragraph	3	B0I0U0S22x9
+para	rejectp:2	2	Item three.	0	Normal	0	B0I0U0S22x11
+para	rejectp:2	3	Item four.	0	List Paragraph	3	B0I0U0S22x10
+para	rejectp:2	4	Item five.	0	Normal	0	B0I0U0S22x10
+para	rejectp:2	5	Item six.	0	List Paragraph	2	B0I0U0S22x9
+para	acceptp:3	0	Item one.	0	List Paragraph	3	B0I0U0S22x9
+para	acceptp:3	1	Item two.	0	List Paragraph	3	B0I0U0S22x9
+para	acceptp:3	2	Item three.	0	List Paragraph	3	B0I0U0S22x11
+para	acceptp:3	3	Item four.	0	List Paragraph	3	B0I0U0S22x10
+para	acceptp:3	4	Item five.	0	Normal	0	B0I0U0S22x10
+para	acceptp:3	5	Item six.	0	List Paragraph	2	B0I0U0S22x9
+para	rejectp:3	0	Item one.	0	List Paragraph	3	B0I0U0S22x9
+para	rejectp:3	1	Item two.	0	List Paragraph	3	B0I0U0S22x9
+para	rejectp:3	2	Item three.	0	List Paragraph	3	B0I0U0S22x11
+para	rejectp:3	3	Item four.	0	Normal	0	B0I0U0S22x10
+para	rejectp:3	4	Item five.	0	Normal	0	B0I0U0S22x10
+para	rejectp:3	5	Item six.	0	List Paragraph	2	B0I0U0S22x9
+para	acceptp:4	0	Item one.	0	List Paragraph	3	B0I0U0S22x9
+para	acceptp:4	1	Item two.	0	List Paragraph	3	B0I0U0S22x9
+para	acceptp:4	2	Item three.	0	List Paragraph	3	B0I0U0S22x11
+para	acceptp:4	3	Item four.	0	List Paragraph	3	B0I0U0S22x10
+para	acceptp:4	4	Item five.	0	Normal	0	B0I0U0S22x10
+para	acceptp:4	5	Item six.	0	List Paragraph	2	B0I0U0S22x9
+para	rejectp:4	0	Item one.	0	List Paragraph	3	B0I0U0S22x9
+para	rejectp:4	1	Item two.	0	List Paragraph	3	B0I0U0S22x9
+para	rejectp:4	2	Item three.	0	List Paragraph	3	B0I0U0S22x11
+para	rejectp:4	3	Item four.	0	List Paragraph	3	B0I0U0S22x10
+para	rejectp:4	4	Item five.	0	Normal	0	B0I0U0S22x10
+para	rejectp:4	5	Item six.	0	List Paragraph	2	B0I0U0S22x9
+para	acceptp:5	0	Item one.	0	List Paragraph	3	B0I0U0S22x9
+para	acceptp:5	1	Item two.	0	List Paragraph	3	B0I0U0S22x9
+para	acceptp:5	2	Item three.	0	List Paragraph	3	B0I0U0S22x11
+para	acceptp:5	3	Item four.	0	List Paragraph	3	B0I0U0S22x10
+para	acceptp:5	4	Item five.	0	Normal	0	B0I0U0S22x10
+para	acceptp:5	5	Item six.	0	List Paragraph	2	B0I0U0S22x9
+para	rejectp:5	0	Item one.	0	List Paragraph	3	B0I0U0S22x9
+para	rejectp:5	1	Item two.	0	List Paragraph	3	B0I0U0S22x9
+para	rejectp:5	2	Item three.	0	List Paragraph	3	B0I0U0S22x11
+para	rejectp:5	3	Item four.	0	List Paragraph	3	B0I0U0S22x10
+para	rejectp:5	4	Item five.	0	Normal	0	B0I0U0S22x10
+para	rejectp:5	5	Item six.	0	Normal	0	B0I0U0S22x9

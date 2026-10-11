@@ -50,18 +50,32 @@ pub(super) fn frequency(ctx: &EvalContext<'_>, args: &[Arg]) -> Res<Value> {
         ]));
     }
     let mut counts = vec![0.0; bins.len() + 1];
-    let mut sorted: Vec<f64> = bins.clone();
-    sorted.sort_by(f64::total_cmp);
-    sorted.dedup();
+    // Distinct bin values in ascending order, each with the position of its first occurrence in `bins`
+    // (n log n: a binary search per data point instead of a scan of every bin).
+    let mut by_value: Vec<(f64, usize)> = bins.iter().copied().zip(0..).collect();
+    by_value.sort_by(|a, b| a.0.total_cmp(&b.0).then(a.1.cmp(&b.1)));
+    let mut sorted: Vec<f64> = Vec::new();
+    let mut slots: Vec<usize> = Vec::new();
+    for (v, i) in by_value {
+        match sorted.last() {
+            Some(last) if *last == v => {
+                if let Some(s) = slots.last_mut() {
+                    *s = (*s).min(i);
+                }
+            }
+            _ => {
+                sorted.push(v);
+                slots.push(i);
+            }
+        }
+    }
     for x in &data {
         // the first bin value that is >= x
-        match sorted.iter().position(|b| x <= b) {
-            Some(p) => {
-                let bin = sorted[p];
-                let slot = bins.iter().position(|b| *b == bin).unwrap_or(0);
-                counts[slot] += 1.0;
-            }
-            None => counts[bins.len()] += 1.0,
+        let p = sorted.partition_point(|b| b < x);
+        if p < sorted.len() {
+            counts[slots[p]] += 1.0;
+        } else {
+            counts[bins.len()] += 1.0;
         }
     }
     Ok(column(counts.into_iter().map(Value::Number).collect()))
@@ -75,11 +89,17 @@ pub(super) fn mode_mult(ctx: &EvalContext<'_>, args: &[Arg]) -> Res<Value> {
     for a in args {
         all.extend(numbers(ctx, a)?);
     }
+    // First-seen order of the distinct values, counted through a hash map (-0 and +0 are one value).
     let mut counts: Vec<(f64, usize)> = Vec::new();
+    let mut slot_of: std::collections::HashMap<u64, usize> = std::collections::HashMap::new();
     for x in &all {
-        match counts.iter_mut().find(|(v, _)| v == x) {
-            Some(c) => c.1 += 1,
-            None => counts.push((*x, 1)),
+        let key = if *x == 0.0 { 0 } else { x.to_bits() };
+        match slot_of.get(&key) {
+            Some(&s) => counts[s].1 += 1,
+            None => {
+                slot_of.insert(key, counts.len());
+                counts.push((*x, 1));
+            }
         }
     }
     let best = counts.iter().map(|c| c.1).max().unwrap_or(0);
@@ -389,6 +409,9 @@ fn read_xy(
 ) -> Res<(Vec<f64>, Vec<Vec<f64>>, bool)> {
     let gy = ctx.grid(y_arg).ok_or(ErrorKind::Value)?;
     let (yr, yc) = (gy.rows(), gy.cols());
+    if yr.saturating_mul(yc) > super::MAX_ARRAY_CELLS {
+        return Err(ErrorKind::Value);
+    }
     let y_is_row = yr == 1 && yc > 1;
     if yr > 1 && yc > 1 {
         return Err(ErrorKind::Ref);
@@ -409,6 +432,9 @@ fn read_xy(
         Some(xa) => {
             let gx = ctx.grid(xa).ok_or(ErrorKind::Value)?;
             let (xr, xc) = (gx.rows(), gx.cols());
+            if xr.saturating_mul(xc) > super::MAX_ARRAY_CELLS {
+                return Err(ErrorKind::Value);
+            }
             let by_cols = if y_is_row { false } else { xr == n };
             let by_rows = y_is_row && xc == n;
             if !by_cols && !by_rows {

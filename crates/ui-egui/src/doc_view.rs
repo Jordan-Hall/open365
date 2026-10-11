@@ -20,7 +20,7 @@ use egui::{
     UiBuilder, Vec2, accesskit, vec2,
 };
 use open365_commands::{Command, CommandError, Outcome, Target};
-use open365_docx::{Alignment, RunPropsPatch};
+use open365_docx::{Alignment, RunPropsPatch, TabAlign};
 use open365_layout::{
     BorderLine, BorderStyle, ClusterKind, IncrementalLayout, Layout, LayoutOptions, Line, ParaRole,
     PlacedGlyph,
@@ -39,14 +39,20 @@ use crate::parts;
 mod glyphs;
 #[path = "keys.rs"]
 mod keys;
+#[path = "ruler_view.rs"]
+mod ruler_view;
+
+pub use self::ruler_view::RulerColors;
 
 pub use open365_docx::DocPos;
 
 /// Gap between pages, in document points. Word at 100 % zoom: 18 px at 125 % scale = 14.4 dips = 10.8 pt
 /// (`fixtures/reference/ui/word-page.json`: first characters of pages 1 and 2 are 1421 px apart, a page is 1403.2 px).
 const PAGE_GAP_PT: f64 = 10.8;
-/// Space above the first page: 15 px at 125 % = 12 dips = 9 pt (page outline at y 243 under a canvas starting at 228).
-const PAGE_TOP_PT: f64 = 9.0;
+/// Space above the first page: 21 u (physical px at 125 %) = 16.8 points = 12.6 document points. Word's document area
+/// starts at y 222 (the shell's content top) and the first page outline is at y 243; with the ruler on the band
+/// (222..252) sits above the canvas and the outline is at 273, again 21 px under it (`word-page.json` firstChar).
+const PAGE_TOP_PT: f64 = 12.6;
 const SIDE_PAD: f32 = 16.0;
 /// Screen points per document point at 100% zoom (96 dpi).
 const POINT_SCALE: f32 = 96.0 / 72.0;
@@ -233,6 +239,16 @@ pub struct DocView {
     scroll_to_caret: bool,
     dragging: bool,
     want_focus: bool,
+    /// Keyboard focus as of the last frame.
+    focused: bool,
+    /// Caret width in points and the length of its shown (and hidden) half cycle in seconds (`None`: no blink).
+    caret_width: f32,
+    blink_half: Option<f64>,
+    /// Input time of the last keystroke, caret move or focus change: the blink cycle starts here.
+    blink_epoch: f64,
+    blink_sig: Option<(DocPos, DocPos, bool)>,
+    /// The caret was drawn in the last frame.
+    caret_shown: bool,
     doc_id: Id,
     /// Character formatting to apply to the next typed text (a toggle with no selection).
     pending: RunPropsPatch,
@@ -251,6 +267,8 @@ pub struct DocView {
     pub last_layout_ms: f32,
     /// Milliseconds spent building the visible pages' draw commands last frame.
     pub last_paint_ms: f32,
+    /// Rulers (View > Ruler): visibility, colours, the tab kind the corner selects, and a drag in progress.
+    ruler: ruler_view::RulerState,
 }
 
 impl Default for DocView {
@@ -288,6 +306,12 @@ impl DocView {
             scroll_to_caret: false,
             dragging: false,
             want_focus: true,
+            focused: false,
+            caret_width: 1.0,
+            blink_half: Some(0.53),
+            blink_epoch: 0.0,
+            blink_sig: None,
+            caret_shown: false,
             doc_id: Id::new("open365-doc-view"),
             pending: RunPropsPatch::default(),
             painted: Vec::new(),
@@ -298,7 +322,24 @@ impl DocView {
             last_frame_ms: 0.0,
             last_layout_ms: 0.0,
             last_paint_ms: 0.0,
+            ruler: ruler_view::RulerState::default(),
         }
+    }
+
+    /// Sets the caret like Windows does: width in points and the blink time in seconds (`None`: INFINITE, no blink).
+    pub fn set_caret_style(&mut self, width: f32, blink_secs: Option<f64>) {
+        self.caret_width = width.max(0.5);
+        self.blink_half = blink_secs;
+    }
+
+    /// The document holds the keyboard focus (as of the last frame).
+    pub fn is_focused(&self) -> bool {
+        self.focused
+    }
+
+    /// The caret was drawn in the last frame (focused, no selection, in the shown half of the blink cycle).
+    pub fn caret_shown(&self) -> bool {
+        self.caret_shown
     }
 
     /// Gives the document keyboard focus on the next frame (after a toolbar action).
@@ -1546,6 +1587,15 @@ impl DocView {
 
     /// Shows the view and handles its input. Returns true while another frame is wanted.
     pub fn show(&mut self, ui: &mut Ui, target: &mut Target) -> bool {
+        if self.ruler.on {
+            self.show_with_rulers(ui, target)
+        } else {
+            self.show_canvas(ui, target)
+        }
+    }
+
+    /// The scrolling canvas of pages (the whole document area when the rulers are off).
+    fn show_canvas(&mut self, ui: &mut Ui, target: &mut Target) -> bool {
         let started = Instant::now();
         let ctx = ui.ctx().clone();
         self.atlas.begin_frame();
@@ -1586,11 +1636,14 @@ impl DocView {
                 });
                 if std::mem::take(&mut self.want_focus) {
                     response.request_focus();
+                    // Focus takes effect next frame; make sure there is one.
+                    ctx.request_repaint();
                 }
                 self.view_h = f64::from(ui.clip_rect().height() / scale);
 
                 self.handle_pointer(&ctx, &response, canvas);
                 let focused = response.has_focus() || ui.memory(|m| m.has_focus(self.doc_id));
+                self.focused = focused;
                 // egui may run a frame as several passes with the same input events, so
                 // events are acted on in the first pass only.
                 if ctx.current_pass_index() == 0 {
@@ -1635,9 +1688,7 @@ impl DocView {
 
                 // Caret.
                 let caret_rect = self.caret_rect(canvas);
-                if focused && !self.has_selection() {
-                    painter.rect_filled(caret_rect, 0.0, self.auto_text);
-                }
+                self.paint_caret(&ctx, &painter, caret_rect, focused);
                 self.last_paint_ms = paint_started.elapsed().as_secs_f32() * 1000.0;
                 if self.scroll_to_caret {
                     self.scroll_to_caret = false;
@@ -1677,8 +1728,41 @@ impl DocView {
         let s = self.scale;
         Rect::from_min_size(
             Pos2::new(origin.x + x as f32 * s, origin.y + top as f32 * s),
-            vec2(1.5, (height as f32 * s).max(4.0)),
+            vec2(self.caret_width, (height as f32 * s).max(4.0)),
         )
+    }
+
+    /// Draws the caret in the shown half of the blink cycle. The cycle restarts on every keystroke, caret move, click and
+    /// focus change; the caret is hidden while the window is inactive. Repaints are requested for the next toggle only.
+    fn paint_caret(&mut self, ctx: &Context, painter: &egui::Painter, rect: Rect, focused: bool) {
+        let now = ctx.input(|i| i.time);
+        let active = focused && ctx.input(|i| i.focused);
+        let restart = ctx.input(|i| {
+            i.events.iter().any(|e| {
+                matches!(
+                    e,
+                    Event::Key { pressed: true, .. }
+                        | Event::Text(_)
+                        | Event::Ime(_)
+                        | Event::Paste(_)
+                        | Event::PointerButton { pressed: true, .. }
+                )
+            })
+        });
+        let sig = (self.caret, self.anchor, active);
+        if restart || self.blink_sig != Some(sig) {
+            self.blink_epoch = now;
+            self.blink_sig = Some(sig);
+        }
+        let (on, wake) = crate::caret::blink_phase(now - self.blink_epoch, self.blink_half);
+        let wanted = active && !self.has_selection();
+        self.caret_shown = wanted && on;
+        if self.caret_shown {
+            painter.rect_filled(rect, 0.0, self.auto_text);
+        }
+        if wanted && let Some(w) = wake {
+            ctx.request_repaint_after(std::time::Duration::from_secs_f64(w));
+        }
     }
 
     /// Screen position of a point in page coordinates (document points) as of the last frame.
@@ -1761,14 +1845,8 @@ impl DocView {
                             Rect::from_min_max(Pos2::ZERO, Pos2::new(1.0, 1.0)),
                             tint,
                         );
-                    } else {
-                        painter.rect_stroke(
-                            rect,
-                            0.0,
-                            Stroke::new(1.0, Color32::from_gray(160)),
-                            egui::StrokeKind::Inside,
-                        );
                     }
+                    // A picture that has not loaded draws nothing (no placeholder frame).
                 }
                 a11y::publish_image(
                     ui,
@@ -1986,27 +2064,8 @@ impl DocView {
         if !rect.intersects(clip) {
             return;
         }
-        // Corner marks at the text area, like Word's "show text boundaries" in miniature.
-        let mark = Stroke::new(1.0, Color32::from_gray(205));
-        let (l, t) = (
-            origin.x + (section.margin_left + section.gutter) as f32 * s,
-            origin.y + section.margin_top as f32 * s,
-        );
-        let (r, b) = (
-            origin.x + (section.page_width - section.margin_right) as f32 * s,
-            origin.y + (section.page_height - section.margin_bottom) as f32 * s,
-        );
-        let arm = 10.0 * s;
-        for (x, y, dx, dy) in [
-            (l, t, 1.0, 1.0),
-            (r, t, -1.0, 1.0),
-            (l, b, 1.0, -1.0),
-            (r, b, -1.0, -1.0),
-        ] {
-            painter.line_segment([Pos2::new(x, y), Pos2::new(x + dx * arm, y)], mark);
-            painter.line_segment([Pos2::new(x, y), Pos2::new(x, y + dy * arm)], mark);
-        }
-
+        // No crop marks or text boundaries: Word's defaults ("Show crop marks" and "Show text
+        // boundaries" in Options > Advanced) are both off.
         self.paint_cells(painter, origin, page, clip);
 
         let first_ri = self.index.page_first[page];
@@ -2520,13 +2579,13 @@ fn parse_hex_color(v: &str) -> Option<[u8; 3]> {
 mod page_geometry {
     use super::{PAGE_GAP_PT, PAGE_TOP_PT, POINT_SCALE};
 
-    /// Word at 100 % on the reference machine (125 % scale): the first page starts 15 px under the canvas top and
+    /// Word at 100 % on the reference machine (125 % scale): the first page starts 21 px under the canvas top and
     /// consecutive pages are 1421 px apart (A4 page 841.9 pt = 1403.2 px), within 1 px.
     #[test]
     fn page_top_and_pitch_match_word() {
         let px = |pt: f64| pt * f64::from(POINT_SCALE) * 1.25;
         assert!(
-            (px(PAGE_TOP_PT) - 15.0).abs() <= 1.0,
+            (px(PAGE_TOP_PT) - 21.0).abs() <= 1.0,
             "top {}",
             px(PAGE_TOP_PT)
         );

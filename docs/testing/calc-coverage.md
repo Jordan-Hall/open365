@@ -167,7 +167,63 @@ SUMX2PY2, SUMXMY2, IMABS, IMSQRT, IMPOWER, IMTAN, IMCOT, IMSEC, IMCSC, IMSECH, I
   that it divides by (`in`, `ft`, `ang`, `dyn`, `cal`, `BTU`, `us_acre`, ...); applying them by division reproduces 91% of 2,390 random conversions bit for bit; the rest of the random conversions were removed. Temperatures go through Celsius, the same unit or alias returns the
   argument unchanged, and prefixes on `K` are ignored by the converter in the corpus cases that remain.
 
-Still missing: `BESSELI/J/K/Y` (not started), `FORECAST.ETS.*`, `ODDF*`/`ODDL*`, `GETPIVOTDATA`, `RTD`, the cube and web functions. Not started: the `CHISQ.INV.RT` #NUM! boundary and `CHISQ.INV` with df above 1E10 (Follow-up 2).
+Still missing: `FORECAST.ETS.*`, `GETPIVOTDATA`, `RTD`, the cube and web functions. Not started: the `CHISQ.INV.RT` #NUM! boundary and `CHISQ.INV` with df above 1E10 (Follow-up 2).
+
+## Ninth batch (Bessel, odd-period bonds, resource caps): 8 functions
+
+Corpus 100,540 to 109,151 cases (groups `besseli`, `besselj`, `besselk`, `bessely`, `oddfprice`, `oddfyield`, `oddlprice`, `oddlyield` and their `.e` argument cases);
+known differences 7,799 to 10,878 (by category: ulp-noise 7,539, precision-loss 799, algorithm-unknown 2,061, domain-rule 478, nondeterministic 1); 98,273 cases pass (90.03%).
+Of the new entries: BESSEL* 379 (ulp-noise 148, precision-loss 96, algorithm-unknown 103, domain-rule 32), ODDF*/ODDL* 2,700 (precision-loss 586, algorithm-unknown 1,438, domain-rule 357, ulp-noise 319).
+Excel now has no missing function in Engineering (BESSEL*) and Financial (ODDF*/ODDL*); `FORECAST.ETS*` remain the only missing statistical functions.
+
+* `BESSELI/J/K/Y` (`bessel.rs`): Excel does not return the exact values. It evaluates the *Numerical Recipes* rational/polynomial approximations (accuracy about 1E-8): `bessi0/1`
+  (switch at 3.75), `bessk0/1` (switch at 2), `bessj0/1` and `bessy0/1` (switch at 8), `bessi`/`bessj` by Miller's downward recurrence (ACC 40, rescale at 1E10, start `2*(n+sqrt(40n))`), `bessk`/`bessy`
+  by the upward recurrence. Measured bit-identical on `BESSELI` (all orders, 2,419 of 2,456 values at n = 0..60; the rest 1 ulp from the `exp`), `BESSELK`, `BESSELY` (97%) and `BESSELJ` below 8.
+  The `bessj0` asymptotic series uses `-0.1098628267e-2` (digit transposition, found by regression) and `BESSELJ` for x >= 8 and n = 1 has an unidentified error (-8E-6 at x = 8, decaying like x^-6.5);
+  those cases are listed. Rules: a boolean is `#VALUE!` (also from a cell), the order is truncated, order < 0 before truncation or >= 2147483647 is `#NUM!`, `K`/`Y` need x > 0, any non-finite or
+  overflowing result is `#NUM!` (e.g. `BESSELI(1E-20,100)` overflows inside the recurrence, `BESSELY(1E-300,2)`), `BESSELJ` of 1E10 is `#NUM!` in Excel (cut-off between 1000 and 1E10 not located; Open365 returns a number: listed).
+  Order beyond 20 million recurrence steps is `#NUM!` in Open365 (Excel's behaviour for huge orders: see the `.e` cases).
+* `ODDFPRICE`, `ODDFYIELD`, `ODDLPRICE`, `ODDLYIELD` (`oddbond.rs`): published formulas generalised over the quasi-coupon periods of the odd period; reproduces Microsoft's example (113.597717) and about
+  40% of the generated cases to the last digits (`oddfprice` 766/1,398, `oddlprice` 938/1,374). Remaining differences are unanalysed: Excel's day counts for long odd periods and for bases 0 and 3
+  differ (up to 1E-2 in price). `ODDFYIELD` is solved by bisection to full precision, Excel stops earlier (precision-loss entries). Excel gives `#NUM!` for a zero rate in some `ODDFPRICE` calls
+  (`oddfprice.c0289`, `c0253`: rule not identified, listed as domain-rule). Argument counts are checked by the parser arity table.
+* `CHISQ.INV.RT` boundary (measured, not implemented): the largest accepted `-log10 p` is not a decade grid property; with `p = 10^-k`, k step 3, first failure at k = 19 (df 1), 22 (3), 28 (4), 37 (5),
+  46 (6), 55 (7), 64 (8), 73 (9), 82 (10), 91 (12), 106 (15), 136 (20), 166 (25), 199 (30), 274 (40); df = 2 and df >= 50 never fail up to 1E-307. Finer scans (step 0.25) show a ragged edge (for df 6 the last accepted
+  k is 43.5, for df 20 it is 133.75), so it is an iteration cap, not a threshold in p or in the quantile. `CHISQ.INV(p, df)` is `#NUM!` for `trunc(df) > 1E10` (already so in Open365). `CHISQ.INV.RT`
+  with `trunc(df) > 1E10` is erratic: 1.5E10 and 3E10 are `#NUM!`, 1E11 and larger return `df * 1.0002658235505755`-like values that hardly depend on p (a failed iteration); not modelled.
+* `FORECAST.ETS*`, exact `COMBIN`: not started in this pass.
+* Resource caps (robustness findings R-CALC-1..6): `functions::MAX_ARRAY_CELLS` (2^20) refuses an `MMULT` result or a `LINEST`/`TREND` operand beyond it with `#VALUE!` (Excel
+  computes `MMULT` of 100000 x 78 = 7.8 million cells, so the cap is stricter; for 100000 x 702 Excel answers without an error value), `eval.rs` refuses a broadcast array operation beyond the same size with `#VALUE!`,
+  `SUBSTITUTE` sizes its result before building it (`#VALUE!` past 32,767 characters, as Excel), `FREQUENCY`, `MODE.MULT` and `UNIQUE` are n log n (sort/hash) with identical results.
+
+## Honest accounting (policy, binding)
+
+A case is never dropped because Open365 cannot match Excel bit for bit. Every generated case stays in `fixtures/calc/conformance.json` with Excel's answer in
+`fixtures/reference/calc/conformance-results.json`; a mismatch is listed in `fixtures/calc/known-differences.toml` with a `reason`, a `category` and, for number
+pairs and complex text, a `max_ulp`. The conformance test fails when a listed case passes (the list only shrinks), when an unlisted case differs, and when a
+listed case gets further from Excel than its `max_ulp`. Categories: `ulp-noise` (distance of at most 1000 ulp for numbers, 100000 for a part of a complex text),
+`precision-loss` (relative difference up to 1e-9), `algorithm-unknown` (larger, or Excel's algorithm is not identified), `domain-rule` (error class, type or
+argument rule differs), `nondeterministic` (random in both).
+
+Restored in this pass: 1,988 cases that the eighth batch had removed (groups `combina` 303, `multinomial` 361, `convert` 742, `convpair` 240, `convpre` 94, `im*` 253,
+`impower` 31, and a handful in `convcat`, `convprobe`, `munit`, `randarray`, `mdeterm`), regenerated with the same generators and answered by the oracle (corpus
+98,552 to 100,540). Fixed while restoring: `MULTINOMIAL` takes blank cells as skipped and rejects booleans and non-numeric text in references as `#VALUE!` (a lone blank cell
+is `#VALUE!`, errors win over the negative check); `MUNIT` works up to 7326 and gives 0 from 7327 (Excel's limit, measured), memory permitting; `IM*` read a blank cell as 0 and
+`IMREAL` of a number returns it unchanged; `CONVERT` gives the number back for an identical unit name, refuses booleans (`#VALUE!`) and an omitted number (`#N/A`), applies a prefix on
+kelvin (`CONVERT(0,"C","kK")` is 0.27315) and converts `Rank` to `K` as `x*5/9`.
+
+Findings on the unresolved algorithms (Excel 16.0, own instance):
+
+* `COMBINA(n,k)` is `COMBIN(n+k-1,k)` in 612 of 612 measured values, so only Excel's `COMBIN` is unknown. `COMBIN(N,K)` is symmetric in `K` and `N-K` (the same error at both), exact for 56% of the 1,891 pairs
+  with `N <= 60` and off by up to 7 ulp otherwise (`COMBIN(9,3)` is 83.99999999999999, `COMBIN(12,6)` is 2 ulp low). Not matched: ascending or descending products with multiply-then-divide,
+  divide-then-multiply, ratio-first or reciprocal steps over `min(K, N-K)` terms (best 1,085 of 1,891 against 1,063 for the exact value), `FACT` quotients (220 of 612), `EXP` of `GAMMALN` sums (75 of 612),
+  or `exp` of the correctly rounded `ln` of the exact value.
+* `MULTINOMIAL(n)` with one argument is `1 + noise` (n = 4 to 170: -2 to +5000 units of 2^-53, saturating near -30 units for n = 13 to 28), so the numerator and the denominator come from different
+  routines. Not matched in 171 values: `FACT(n)/EXP(GAMMALN(n+1))` and its inverse, `EXP(LN(FACT) - GAMMALN)`, `GAMMA` quotients, log-sum loops with forward or backward subtraction, `lgamma` differences
+  (best 5 of 171). `MULTINOMIAL(n,0)` and `MULTINOMIAL(0,n)` equal `MULTINOMIAL(n)` exactly.
+* The `IM*` functions and `CONVERT` were not re-analysed; their residue is now listed with the ulp distance instead of being hidden.
+
+Not started in this pass (open): `BESSELI/J/K/Y`, the `CHISQ.INV.RT` `#NUM!` boundary and `CHISQ.INV` with df above 1E10, the locale-aware built-in number formats and Thai codes in `fmtlocale.rs`, `ODDF*`/`ODDL*`, `FORECAST.ETS*`.
 
 ## Missing by category
 
@@ -175,7 +231,7 @@ Still missing: `BESSELI/J/K/Y` (not started), `FORECAST.ETS.*`, `ODDF*`/`ODDL*`,
 
 **Statistical** (4): FORECAST.ETS, FORECAST.ETS.CONFINT, FORECAST.ETS.SEASONALITY, FORECAST.ETS.STAT
 
-**Financial** (4): ODDFPRICE, ODDFYIELD, ODDLPRICE, ODDLYIELD
+**Financial** (0): none
 
 **Date and time** (0): none
 
@@ -187,7 +243,7 @@ Still missing: `BESSELI/J/K/Y` (not started), `FORECAST.ETS.*`, `ODDF*`/`ODDL*`,
 
 **Information** (0): none
 
-**Engineering** (4): BESSELI, BESSELJ, BESSELK, BESSELY
+**Engineering** (0): none
 
 **Database** (0): none
 

@@ -133,6 +133,76 @@ struct KnownFile {
 struct Known {
     id: String,
     reason: String,
+    /// `ulp-noise` (both numbers, last digits only), `precision-loss`, `algorithm-unknown`, `domain-rule`
+    /// (error class, text or type differs) or `unreproduced` (Excel's evaluation order is not identified).
+    category: Option<String>,
+    /// Largest ulp distance between Excel's and Open365's number that this entry tolerates.
+    max_ulp: Option<u64>,
+}
+
+/// Distance in representable doubles between two finite numbers (0 when equal).
+fn ulp_distance(a: f64, b: f64) -> u64 {
+    fn ordered(x: f64) -> i128 {
+        let bits = x.to_bits();
+        if bits >> 63 == 1 {
+            -i128::from(bits & !(1 << 63))
+        } else {
+            i128::from(bits)
+        }
+    }
+    ordered(a)
+        .abs_diff(ordered(b))
+        .try_into()
+        .unwrap_or(u64::MAX)
+}
+
+/// `"1.5-2i"`, `"3i"`, `"-j"` or `"4"` as (real, imaginary, suffix).
+fn parse_complex_text(text: &str) -> Option<(f64, f64, Option<char>)> {
+    let t = text.trim();
+    let (body, suffix) = match t.chars().last()? {
+        c @ ('i' | 'j') => (&t[..t.len() - 1], Some(c)),
+        _ => (t, None),
+    };
+    let Some(suffix) = suffix else {
+        return body.parse().ok().map(|re| (re, 0.0, None));
+    };
+    // The imaginary part starts at the last sign that does not follow an exponent marker.
+    let bytes = body.as_bytes();
+    let split = (1..bytes.len())
+        .rev()
+        .find(|&i| matches!(bytes[i], b'+' | b'-') && bytes[i - 1] != b'E');
+    let (re_text, im_text) = match split {
+        Some(i) => (&body[..i], &body[i..]),
+        None => ("", body),
+    };
+    let re = if re_text.is_empty() {
+        0.0
+    } else {
+        re_text.parse().ok()?
+    };
+    let im = match im_text {
+        "" | "+" => 1.0,
+        "-" => -1.0,
+        other => other.parse().ok()?,
+    };
+    Some((re, im, Some(suffix)))
+}
+
+/// The ulp distance of a mismatch when both sides are finite numbers, or complex numbers written as text
+/// (the larger distance of the two parts).
+fn mismatch_ulps(expected: &Expected, outcome: &Outcome) -> Option<u64> {
+    match (expected.kind.as_str(), expected.value.as_ref(), outcome) {
+        ("number", Some(e), Outcome::Value(Value::Number(a))) => {
+            let e = e.as_f64()?;
+            (e.is_finite() && a.is_finite()).then(|| ulp_distance(e, *a))
+        }
+        ("text", Some(serde_json::Value::String(e)), Outcome::Value(Value::Text(a))) => {
+            let (x, y) = (parse_complex_text(e)?, parse_complex_text(a)?);
+            (x.2 == y.2 && [x.0, x.1, y.0, y.1].iter().all(|v| v.is_finite()))
+                .then(|| ulp_distance(x.0, y.0).max(ulp_distance(x.1, y.1)))
+        }
+        _ => None,
+    }
 }
 
 fn fixture(rel: &str) -> PathBuf {
@@ -338,16 +408,19 @@ fn matches_excel() {
         "Excel results without a corpus case: {}",
         orphans.join(", ")
     );
-    let known_ids: BTreeMap<&str, &str> = known
+    let known_ids: BTreeMap<&str, &Known> = known
         .difference
         .iter()
-        .map(|k| (k.id.as_str(), k.reason.as_str()))
+        .map(|k| (k.id.as_str(), k))
         .collect();
     assert_eq!(
         known_ids.len(),
         known.difference.len(),
         "duplicate ids in known-differences.toml"
     );
+    for (id, entry) in &known_ids {
+        assert!(!entry.reason.trim().is_empty(), "{id}: empty reason");
+    }
     for id in known_ids.keys() {
         assert!(
             corpus_ids.contains(id),
@@ -359,6 +432,9 @@ fn matches_excel() {
     let mut unexpected = Vec::new();
     let mut stale = Vec::new();
     let (mut pass, mut known_diff) = (0u32, 0u32);
+    let mut by_category: BTreeMap<String, (u32, u64)> = BTreeMap::new(); // entries, largest ulp distance
+    let mut over_budget = Vec::new();
+    let mut dump = String::new();
 
     for case in &corpus.cases {
         let expected = answers[case.id.as_str()];
@@ -398,13 +474,42 @@ fn matches_excel() {
                 pass += 1;
                 slot.0 += 1;
             }
-            (None, Some(_)) => {
-                stale.push(case.id.clone());
+            (None, Some(entry)) => {
+                // A nondeterministic case can match by chance; that is not a reason to drop it.
+                if entry.category.as_deref() == Some("nondeterministic") {
+                    pass += 1;
+                } else {
+                    stale.push(case.id.clone());
+                }
                 slot.0 += 1;
             }
-            (Some(_), Some(_)) => {
+            (Some(detail), Some(entry)) => {
                 known_diff += 1;
                 slot.1 += 1;
+                let ulps = outcome
+                    .as_ref()
+                    .ok()
+                    .and_then(|o| mismatch_ulps(expected, o));
+                let category = entry.category.as_deref().unwrap_or("uncategorised");
+                let tally = by_category.entry(category.to_owned()).or_default();
+                tally.0 += 1;
+                tally.1 = tally.1.max(ulps.unwrap_or(0));
+                if let (Some(limit), Some(ulps)) = (entry.max_ulp, ulps) {
+                    if ulps > limit {
+                        over_budget.push(format!("{}: {ulps} ulp, entry allows {limit}", case.id));
+                    }
+                } else if entry.max_ulp.is_some() && ulps.is_none() {
+                    over_budget.push(format!(
+                        "{}: max_ulp recorded but the mismatch is not a number pair",
+                        case.id
+                    ));
+                }
+                dump.push_str(&format!(
+                    "{}\t{}\t{}\n",
+                    case.id,
+                    ulps.map_or_else(|| "-".to_owned(), |u| u.to_string()),
+                    detail.replace('\n', " ")
+                ));
             }
             (Some(detail), None) => {
                 slot.2 += 1;
@@ -424,6 +529,13 @@ fn matches_excel() {
     for (group, (p, k, f)) in &per_group {
         println!("  {group:<16} {p:>5} {k:>5} {f:>5}");
     }
+    println!("known differences by category (entries, largest ulp distance):");
+    for (category, (entries, ulps)) in &by_category {
+        println!("  {category:<18} {entries:>5} {ulps:>12}");
+    }
+    if let Ok(path) = std::env::var("OPEN365_DUMP_KNOWN") {
+        fs::write(path, dump).expect("write known-difference dump");
+    }
     let total = corpus.cases.len();
     println!(
         "total {total}: {pass} pass, {known_diff} known differences, {} unexpected, pass rate {:.2}%",
@@ -431,6 +543,15 @@ fn matches_excel() {
         100.0 * f64::from(pass) / total as f64
     );
 
+    assert!(
+        over_budget.is_empty(),
+        "known differences got worse than their recorded max_ulp:
+  {}",
+        over_budget.join(
+            "
+  "
+        )
+    );
     assert!(
         stale.is_empty(),
         "these cases pass now; remove them from fixtures/calc/known-differences.toml:\n  {}",

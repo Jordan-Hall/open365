@@ -188,6 +188,29 @@ impl App {
         self
     }
 
+    /// Applies a command the way a host does for a toolbar action: the grid forgets its cached
+    /// geometry and, in a spreadsheet, re-fits the rows the command touched on the next frame
+    /// (wrapping, font and value changes, as Excel does for rows without a custom height).
+    ///
+    /// # Errors
+    /// The command failed or no document is open; the message is also the status line.
+    pub fn apply_command(&mut self, command: Command) -> Result<(), String> {
+        let Some(target) = &mut self.target else {
+            return Err("No document is open".to_owned());
+        };
+        self.grid.autofit_after(&command);
+        match target.apply(command) {
+            Ok(_) => {
+                self.grid.invalidate_layout();
+                Ok(())
+            }
+            Err(e) => {
+                self.status = e.to_string();
+                Err(self.status.clone())
+            }
+        }
+    }
+
     pub fn target(&self) -> Option<&Target> {
         self.target.as_ref()
     }
@@ -435,6 +458,23 @@ impl App {
                     format!(
                         "Height of {} set to {points:.2} pt",
                         rows_label(first, last)
+                    ),
+                ),
+                Resize::ColumnFit { sheet, col, width } => (
+                    Command::AutoFitColumns {
+                        sheet,
+                        columns: vec![(col, width)],
+                    },
+                    format!("Width of {} fitted to {width:.2}", columns_label(col, col)),
+                ),
+                Resize::RowFit { sheet, row, points } => (
+                    Command::AutoFitRows {
+                        sheet,
+                        rows: vec![(row, points)],
+                    },
+                    format!(
+                        "Height of {} fitted to {points:.2} pt",
+                        rows_label(row, row)
                     ),
                 ),
             };

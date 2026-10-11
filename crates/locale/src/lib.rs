@@ -11,6 +11,8 @@
 //! cost a fraction of a millisecond to a few milliseconds, so callers should cache the result per
 //! document or per sheet.
 
+mod builtin_numfmt;
+mod builtin_numfmt_nls;
 mod calendar;
 mod casing;
 mod currency;
@@ -19,6 +21,10 @@ mod lcid_table;
 mod numbers;
 pub mod office_overrides;
 
+pub use builtin_numfmt::{
+    builtin_number_format_in, builtin_number_format_lcids, nls_pattern_to_excel,
+    resolve_number_format_lcid,
+};
 pub use calendar::CalendarKind;
 pub use casing::{CollationStrength, Collator};
 pub use currency::CurrencyFormat;
