@@ -9,6 +9,7 @@ members = [
     "crates/calc",
     "crates/text",
     "crates/layout",
+    "crates/pdf",
     "crates/commands",
     "crates/mcp",
     "crates/ui-egui",
@@ -33,6 +34,7 @@ open365-xlsx = { path = "crates/xlsx" }
 open365-calc = { path = "crates/calc" }
 open365-text = { path = "crates/text" }
 open365-layout = { path = "crates/layout" }
+open365-pdf = { path = "crates/pdf" }
 open365-commands = { path = "crates/commands" }
 open365-mcp = { path = "crates/mcp" }
 open365-ui-egui = { path = "crates/ui-egui" }
@@ -40,6 +42,7 @@ open365-testkit = { path = "crates/testkit" }
 eframe = { version = "0.36", default-features = false, features = ["accesskit", "wgpu", "wayland", "x11"] }
 egui = { version = "0.36", default-features = false }
 egui_kittest = "0.36"
+flate2 = "1.1.10"
 fontdb = "0.24"
 image = { version = "0.25", default-features = false, features = ["png", "jpeg", "gif", "bmp"] }
 harfrust = "0.12"

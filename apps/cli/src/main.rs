@@ -1,6 +1,7 @@
 //! `open365` CLI: `docx|xlsx inspect`, `apply`, `roundtrip --check`, `mcp` and `inspect`.
 
 mod apply_cmd;
+mod export_pdf_cmd;
 mod inspect_cmd;
 mod mcp_cmd;
 
@@ -41,13 +42,24 @@ enum FormatCommand {
 }
 
 #[derive(Debug, Subcommand)]
+enum DocxCommand {
+    /// Print parts, relationships and content types.
+    Inspect(InspectArgs),
+    /// Lay the document out and write it as a tagged PDF 1.7 file.
+    ///
+    /// Fonts are the bundled ones (Calibri -> Carlito, Cambria -> Caladea) unless
+    /// --system-fonts is given. No author or date is written unless asked for.
+    ExportPdf(export_pdf_cmd::Args),
+}
+
+#[derive(Debug, Subcommand)]
 enum Command {
     /// Print the parts, content types and integrity issues of any OPC package.
     Inspect { file: PathBuf },
     /// DOCX commands.
     Docx {
         #[command(subcommand)]
-        command: FormatCommand,
+        command: DocxCommand,
     },
     /// XLSX commands.
     Xlsx {
@@ -197,7 +209,12 @@ fn format_inspect(kind: Kind, command: &FormatCommand) -> ExitCode {
 fn main() -> ExitCode {
     match Cli::parse().command {
         Command::Inspect { file } => finish(run_inspect(&file)),
-        Command::Docx { command } => format_inspect(Kind::Docx, &command),
+        Command::Docx { command } => match command {
+            DocxCommand::Inspect(a) => {
+                finish(inspect_cmd::run(Kind::Docx, &a.file, a.hidden, a.json))
+            }
+            DocxCommand::ExportPdf(args) => finish(export_pdf_cmd::run(&args)),
+        },
         Command::Xlsx { command } => format_inspect(Kind::Xlsx, &command),
         Command::Apply {
             commands,

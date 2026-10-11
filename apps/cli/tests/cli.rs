@@ -362,3 +362,39 @@ fn zip_of_bytes(entries: &[(&str, &[u8])]) -> Vec<u8> {
     }
     w.finish().expect("finish").into_inner()
 }
+
+#[test]
+fn docx_export_pdf_writes_a_tagged_pdf() {
+    let scratch = Scratch::new("export-pdf");
+    let out = scratch.path("out.pdf");
+    let o = run(&[
+        s("docx"),
+        s("export-pdf"),
+        &fixture("docx/styles-headings.docx"),
+        s("-o"),
+        &out,
+        s("--title"),
+        s("Headings"),
+        s("--language"),
+        s("en-GB"),
+    ]);
+    assert!(o.status.success(), "{}", stderr(&o));
+    assert!(stdout(&o).contains("pages"), "{}", stdout(&o));
+    let pdf = std::fs::read(&out).expect("pdf written");
+    let text = String::from_utf8_lossy(&pdf);
+    assert!(pdf.starts_with(b"%PDF-1.7"));
+    assert!(text.contains("/StructTreeRoot") && text.contains("/Marked true"));
+    assert!(text.contains("/FontFile2") && text.contains("/ToUnicode"));
+    assert!(text.contains("/Lang (en-GB)") && text.contains("/Title (Headings)"));
+    assert!(!text.contains("/Author"), "no author unless asked for");
+}
+
+#[test]
+fn docx_export_pdf_rejects_a_non_docx() {
+    let scratch = Scratch::new("export-pdf-bad");
+    let bad = scratch.write("bad.docx", "not a zip");
+    let out = scratch.path("out.pdf");
+    let o = run(&[s("docx"), s("export-pdf"), &bad, s("-o"), &out]);
+    assert!(!o.status.success());
+    assert!(!out.exists());
+}

@@ -2725,9 +2725,13 @@ version = "0.1.0"
 dependencies = [
  "clap",
  "open365-commands",
+ "open365-docx",
+ "open365-layout",
  "open365-mcp",
  "open365-opc",
+ "open365-pdf",
  "open365-testkit",
+ "open365-text",
  "serde_json",
  "zip",
 ]
@@ -2810,6 +2814,21 @@ version = "0.1.0"
 dependencies = [
  "quick-xml 0.42.0",
  "thiserror 2.0.21",
+ "zip",
+]
+
+[[package]]
+name = "open365-pdf"
+version = "0.1.0"
+dependencies = [
+ "flate2",
+ "image",
+ "open365-docx",
+ "open365-layout",
+ "open365-opc",
+ "open365-text",
+ "serde_json",
+ "skrifa",
  "zip",
 ]
 
