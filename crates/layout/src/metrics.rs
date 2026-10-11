@@ -25,6 +25,15 @@ impl LineMetricModel {
     }
 }
 
+/// What an inline picture does to a line: its height above the baseline (zero when there is
+/// none) and the ascent and height of the text on the line.
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct PictureLine {
+    pub height: f64,
+    pub text_asc: f64,
+    pub text_h: f64,
+}
+
 /// Line height and baseline offset (from the line top) for the natural `asc`/`desc` under
 /// a spacing rule.
 pub(crate) fn line_height(
@@ -32,14 +41,26 @@ pub(crate) fn line_height(
     desc: f64,
     rule: LineSpacing,
     _model: LineMetricModel,
+    pic: PictureLine,
 ) -> (f64, f64) {
     let single = asc + desc;
+    let taller = pic.height > pic.text_asc;
     match rule {
+        LineSpacing::Multiple(m) if taller => {
+            // Measured (layout-img-inline): a picture is not stretched by the multiple, only
+            // the text's own height is: the extra leading goes below the baseline.
+            (single + (f64::from(m) - 1.0) * pic.text_h, asc)
+        }
         LineSpacing::Multiple(m) => {
             // Extra leading goes below the baseline (measured: a 1.079 multiple leaves the
             // first baseline where single spacing puts it).
             let h = single * f64::from(m);
             (h, asc)
+        }
+        LineSpacing::Exactly(x) if taller => {
+            // Measured (layout-img-inline, one point): the baseline sits at 80 % of the line.
+            let h = f64::from(x);
+            (h, 0.8 * h)
         }
         LineSpacing::AtLeast(x) => {
             let h = single.max(f64::from(x));

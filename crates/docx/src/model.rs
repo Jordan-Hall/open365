@@ -86,6 +86,18 @@ pub enum RunContent {
     Raw(RawXml),
 }
 
+impl RunContent {
+    /// The inline or anchored picture this content is, when it is a `w:drawing`.
+    pub fn drawing(&self) -> Option<crate::drawing::Drawing> {
+        match self {
+            Self::Raw(RawXml::Element(e)) if e.head.is_w("drawing") => {
+                crate::drawing::Drawing::from_element(e)
+            }
+            _ => None,
+        }
+    }
+}
+
 /// `w:br`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Break {

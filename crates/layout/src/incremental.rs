@@ -347,6 +347,8 @@ impl IncrementalLayout {
                 let current = rest.first().map(|pg| Page {
                     lines: pg.lines[..ck.lines.min(pg.lines.len())].to_vec(),
                     cells: pg.cells[..ck.cells.min(pg.cells.len())].to_vec(),
+                    images: pg.images[..ck.images.min(pg.images.len())].to_vec(),
+                    floats: pg.floats[..ck.floats.min(pg.floats.len())].to_vec(),
                     note_slots: pg.note_slots[..ck.notes.min(pg.note_slots.len())].to_vec(),
                     notes: Vec::new(),
                     header: Vec::new(),
@@ -403,12 +405,23 @@ impl IncrementalLayout {
                         let d_page = out.pages.len() as isize - old_ck.pages_done as isize;
                         let mut moved_lines = old_page.lines.split_off(old_ck.lines);
                         let moved_cells = old_page.cells.split_off(old_ck.cells);
+                        let mut moved_images = old_page
+                            .images
+                            .split_off(old_ck.images.min(old_page.images.len()));
+                        let moved_floats = old_page
+                            .floats
+                            .split_off(old_ck.floats.min(old_page.floats.len()));
+                        for im in &mut moved_images {
+                            im.paragraph = im.paragraph.saturating_add_signed(d_para);
+                        }
                         let moved_notes = old_page
                             .note_slots
                             .split_off(old_ck.notes.min(old_page.note_slots.len()));
                         shift_lines(&mut moved_lines, d_para, d_story);
                         open.lines.extend(moved_lines);
                         open.cells.extend(moved_cells);
+                        open.images.extend(moved_images);
+                        open.floats.extend(moved_floats);
                         open.note_slots.extend(moved_notes);
                         open.notes = note_store.page_lines(
                             open.section_index,
@@ -418,6 +431,9 @@ impl IncrementalLayout {
                         );
                         for pg in &mut tail_pages {
                             shift_lines(&mut pg.lines, d_para, d_story);
+                            for im in &mut pg.images {
+                                im.paragraph = im.paragraph.saturating_add_signed(d_para);
+                            }
                             pg.number = pg.number.saturating_add_signed(d_page);
                         }
                         let out_pages_len = out.pages.len();

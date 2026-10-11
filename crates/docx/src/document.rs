@@ -297,6 +297,32 @@ impl Document {
         Ok(true)
     }
 
+    /// The image part the main part's relationship `rel_id` (`a:blip/@r:embed`) points at.
+    /// `None` for an unknown id, an external target or a missing part.
+    pub fn image_part(&self, rel_id: &str) -> Option<crate::drawing::ImagePart<'_>> {
+        let rels_part = self
+            .package
+            .part(rels_part_name(Some(&self.main_part)).as_str())?;
+        let rels = Relationships::parse(rels_part.data()).ok()?;
+        let rel = rels.get(rel_id)?;
+        if rel.target_mode != TargetMode::Internal {
+            return None;
+        }
+        let name = resolve_target(Some(&self.main_part), &rel.target).ok()?;
+        let part = self.package.part(name.as_str())?;
+        let content_type = self
+            .package
+            .part(CONTENT_TYPES_PART)
+            .and_then(|p| ContentTypes::parse(p.data()).ok())
+            .and_then(|ct| ct.content_type_of(&name).map(str::to_owned))
+            .unwrap_or_default();
+        Some(crate::drawing::ImagePart {
+            name: name.as_str().to_owned(),
+            content_type,
+            bytes: part.data(),
+        })
+    }
+
     /// Name of the main document part.
     pub fn main_part(&self) -> &PartName {
         &self.main_part

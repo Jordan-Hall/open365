@@ -5,11 +5,12 @@
 use std::sync::Arc;
 
 use crate::build::UnitLayout;
+use crate::float::{Float, Frame, dynamic_lines};
 use crate::furniture::{Furniture, NoteStore};
 use crate::para::{AtomClass, LineBox, ParaLayout};
 use crate::props::SectionProps;
 use crate::table::{CellLayout, FlowLine, RowLayout, TableLayout};
-use crate::{CellBox, GlyphRun, Line, NoteSlot, Page, PlacedGlyph, StoryKind};
+use crate::{CellBox, GlyphRun, ImagePlacement, Line, NoteSlot, Page, PlacedGlyph, StoryKind};
 
 /// What pagination needs besides the items: section geometry, header and footer sizes, notes.
 pub(crate) struct Env<'a> {
@@ -89,6 +90,10 @@ pub(crate) struct Checkpoint {
     /// Lines and cell boxes already on the current page.
     pub lines: usize,
     pub cells: usize,
+    pub images: usize,
+    pub floats: usize,
+    /// Fingerprint of the floats' rectangles, for convergence.
+    pub floats_sig: u64,
     pub y: f64,
     pub hard_start: bool,
     pub force_break: bool,
@@ -103,6 +108,8 @@ struct PageBuild {
     section_index: usize,
     lines: Vec<Line>,
     cells: Vec<CellBox>,
+    images: Vec<ImagePlacement>,
+    floats: Vec<Float>,
     first_in_section: bool,
     /// Top and bottom of the body area before footnotes take room.
     top: f64,
@@ -137,6 +144,8 @@ impl PageBuild {
             section_index,
             lines: Vec::new(),
             cells: Vec::new(),
+            images: Vec::new(),
+            floats: Vec::new(),
             first_in_section,
             top: frame.top,
             frame_bottom: frame.bottom,
@@ -200,6 +209,8 @@ impl PageBuild {
             section: self.section,
             lines: self.lines,
             cells: self.cells.into_iter().map(snap_cell).collect(),
+            images: self.images,
+            floats: self.floats,
             section_index: self.section_index,
             first_in_section: self.first_in_section,
             body_top: self.top,
@@ -249,12 +260,13 @@ struct NotesAt<'a> {
 /// references bring (and the separator, for the first) are placed.
 fn lines_fitting_notes(
     para: &ParaLayout,
-    from: usize,
+    lines: &[LineBox],
     y0: f64,
     n: &NotesAt<'_>,
 ) -> (usize, Option<(i64, usize)>) {
     let (mut y, mut nh, mut has, mut k) = (y0, n.height, n.count > 0, 0);
-    for l in &para.lines[from..] {
+    for l in lines {
+        y += l.lead;
         let mut add = 0.0;
         let mut any = false;
         let mut ids = Vec::new();
@@ -311,24 +323,23 @@ fn lines_fitting_notes(
 /// go. `at_top` means nothing is on the page yet, so no rule may push everything away.
 fn decide(
     para: &ParaLayout,
-    from: usize,
+    lines: &[LineBox],
+    first_segment: bool,
     y0: f64,
     bottom: f64,
     at_top: bool,
     notes: Option<&NotesAt<'_>>,
 ) -> Placement {
-    let lines = &para.lines[from..];
     let n = lines.len();
     let (raw, split) = match notes {
-        Some(nt) => lines_fitting_notes(para, from, y0, nt),
+        Some(nt) => lines_fitting_notes(para, lines, y0, nt),
         None => (
-            lines_fitting(lines.iter().map(|l| l.height), y0, bottom),
+            lines_fitting(lines.iter().map(|l| l.lead + l.height), y0, bottom),
             None,
         ),
     };
     let mut k = raw;
     if k < n {
-        let first_segment = from == 0;
         if para.flow.keep_lines && first_segment && k > 0 {
             k = 0;
         } else if para.flow.widow_control && n >= 2 {
@@ -390,7 +401,7 @@ fn can_start(
     }
     // Space between paragraphs is the larger of space after and space before.
     let y0 = y + prev_after.max(f64::from(para.props.space_before_pt));
-    let place = decide(para, 0, y0, bottom, false, None);
+    let place = decide(para, &para.lines, true, y0, bottom, false, None);
     if place.take == 0 {
         return false;
     }
@@ -548,6 +559,41 @@ pub(crate) fn build_line(
     }
 }
 
+/// The pictures that sit in the line `lb` of `para` (inline ones; floating pictures are placed
+/// by the paginator).
+pub(crate) fn line_images(
+    para: &ParaLayout,
+    lb: &LineBox,
+    origin_x: f64,
+    top: f64,
+    base: Base,
+) -> Vec<ImagePlacement> {
+    let baseline = snap_baseline(top + lb.baseline_off);
+    let mut out = Vec::new();
+    for (k, ai) in lb.atoms.clone().enumerate() {
+        let Some(o) = para.atoms[ai].object.and_then(|o| para.objects.get(o)) else {
+            continue;
+        };
+        if !o.inline() {
+            continue;
+        }
+        let (w, h) = o.drawing.size_pt();
+        let [el, et, _, _] = o.drawing.effect_extent_pt();
+        out.push(ImagePlacement {
+            x: origin_x + lb.xs[k] + el,
+            y: baseline - o.height + et,
+            width: w,
+            height: h,
+            embed: o.drawing.embed.clone(),
+            description: o.drawing.description.clone(),
+            paragraph: base.para + para.index,
+            anchored: false,
+            behind_text: false,
+        });
+    }
+    out
+}
+
 /// A cell that spans several rows and is still being drawn.
 struct ActiveSpan {
     start_row: usize,
@@ -643,8 +689,11 @@ impl Paginator<'_> {
     fn push_line(&mut self, ln: &FlowLine, origin: f64, top: f64) {
         let Some((unit, base)) = self.cur else { return };
         let para = &unit.arena[ln.para];
-        let line = build_line(para, &para.lines[ln.line], origin + ln.dx, top, base);
+        let lb = &para.lines[ln.line];
+        let line = build_line(para, lb, origin + ln.dx, top, base);
         self.page.lines.push(line);
+        let images = line_images(para, lb, origin + ln.dx, top, base);
+        self.page.images.extend(images);
     }
 
     /// Draws row `r` whole at `y`. `active` holds the vertically merged cells that cover it.
@@ -900,6 +949,9 @@ impl Checkpoint {
     fn same_future(&self, other: &Self) -> bool {
         self.lines == other.lines
             && self.cells == other.cells
+            && self.images == other.images
+            && self.floats == other.floats
+            && self.floats_sig == other.floats_sig
             && self.notes == other.notes
             && self.y == other.y
             && self.hard_start == other.hard_start
@@ -941,11 +993,23 @@ pub(crate) struct Paginated {
     pub converged: Option<usize>,
 }
 
+/// A fingerprint of the floats' rectangles.
+fn floats_sig(floats: &[Float]) -> u64 {
+    floats.iter().fold(0u64, |h, f| {
+        [f.x0, f.y0, f.x1, f.y1]
+            .iter()
+            .fold(h, |h, v| h.rotate_left(7) ^ v.to_bits())
+    })
+}
+
 fn checkpoint(pg: &Paginator<'_>, force_break: bool) -> Checkpoint {
     Checkpoint {
         pages_done: pg.done.len(),
         lines: pg.page.lines.len(),
         cells: pg.page.cells.len(),
+        images: pg.page.images.len(),
+        floats: pg.page.floats.len(),
+        floats_sig: floats_sig(&pg.page.floats),
         y: pg.page.y,
         hard_start: pg.page.hard_start,
         force_break,
@@ -978,6 +1042,8 @@ pub(crate) fn paginate<'a>(
                 section_index,
                 lines: r.page.lines,
                 cells: r.page.cells,
+                images: r.page.images,
+                floats: r.page.floats,
                 first_in_section: r.page.first_in_section,
                 top: r.page.body_top,
                 frame_bottom: r.page.body_bottom,
@@ -1075,10 +1141,11 @@ pub(crate) fn paginate<'a>(
 
         let contextual_same =
             |pg: &PageBuild| pg.prev_style.as_ref().is_some_and(|s| *s == para.style_id);
-        let mut from = 0usize;
-        let n = para.lines.len();
-        while from < n {
-            let first_segment = from == 0;
+        let has_anchor = para.objects.iter().any(|o| !o.inline());
+        let mut from_atom = 0usize;
+        let n_atoms = para.atoms.len();
+        while from_atom < n_atoms {
+            let first_segment = from_atom == 0;
             // Spacing above the first line of this paragraph.
             let gap = |pg: &PageBuild| -> f64 {
                 if !first_segment {
@@ -1105,6 +1172,21 @@ pub(crate) fn paginate<'a>(
             };
             let y0 = pg.page.y + gap(&pg.page);
             let at_top = !pg.page.has_content();
+            // Floating pictures change the lines: break them again around the pictures.
+            let around = has_anchor || pg.page.floats.iter().any(|f| f.y1 > y0 - EPS);
+            let dynamic = around.then(|| {
+                let frame = Frame {
+                    section: pg.page.section,
+                };
+                dynamic_lines(para, from_atom, y0, &pg.page.floats, &frame, base)
+            });
+            let lines: &[LineBox] = match &dynamic {
+                Some(d) => &d.lines,
+                None => {
+                    let from = para.lines.partition_point(|l| l.atoms.start < from_atom);
+                    &para.lines[from..]
+                }
+            };
             let notes_at = NotesAt {
                 env,
                 section: pg.page.section_index,
@@ -1113,14 +1195,22 @@ pub(crate) fn paginate<'a>(
                 height: pg.page.notes_h,
                 sep: pg.page.sep_h,
             };
-            let mut place = decide(para, from, y0, pg.page.bottom(), at_top, Some(&notes_at));
+            let mut place = decide(
+                para,
+                lines,
+                first_segment,
+                y0,
+                pg.page.bottom(),
+                at_top,
+                Some(&notes_at),
+            );
             if first_segment
-                && place.take == para.lines.len()
+                && place.take == lines.len()
                 && para.flow.keep_next
                 && !at_top
                 && p + 1 < items.len()
             {
-                let used: f64 = para.lines.iter().map(|l| l.height).sum();
+                let used: f64 = lines.iter().map(|l| l.lead + l.height).sum();
                 let ok = can_start(
                     items,
                     p + 1,
@@ -1133,7 +1223,7 @@ pub(crate) fn paginate<'a>(
                     // The last line cannot sit with its follower here: Word moves as few lines
                     // as it may (never leaving a lone line when widow control is on) and
                     // only moves the whole paragraph when it cannot be split.
-                    let n = para.lines.len();
+                    let n = lines.len();
                     let (min_head, min_tail) = if para.flow.widow_control {
                         (2, 2)
                     } else {
@@ -1157,11 +1247,14 @@ pub(crate) fn paginate<'a>(
             let mut placed = 0usize;
             let mut broke = false;
             let origin = pg.page.origin_x();
-            for lb in &para.lines[from..from + place.take] {
+            for lb in &lines[..place.take] {
+                y += lb.lead;
                 let mut line = build_line(para, lb, origin, y, base);
                 line.story = item.story;
+                let images = line_images(para, lb, origin, y, base);
                 y += lb.height;
                 pg.page.lines.push(line);
+                pg.page.images.extend(images);
                 for (a, id) in &para.foot_refs {
                     if lb.atoms.contains(a) {
                         match split {
@@ -1185,9 +1278,16 @@ pub(crate) fn paginate<'a>(
                     break;
                 }
             }
+            let end_atom = lines[placed - 1].atoms.end;
+            if let Some(d) = &dynamic {
+                for a in d.anchors.iter().filter(|a| a.atom < end_atom) {
+                    pg.page.images.push(a.image.clone());
+                    pg.page.floats.extend(a.float);
+                }
+            }
             pg.page.y = y;
-            from += placed;
-            if from < n {
+            from_atom = end_atom;
+            if from_atom < n_atoms {
                 pg.new_page(broke, section);
             } else if broke {
                 force_break = true;

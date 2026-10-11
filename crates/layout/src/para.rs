@@ -4,19 +4,23 @@ use std::collections::HashMap;
 use std::ops::Range;
 
 use open365_docx::{
-    Alignment, EffectiveParagraph, EffectiveRun, IndentOverride, Inline, Paragraph, ParagraphProps,
-    RawXml, Run, RunContent, RunLayoutProps, Styles, TableCellFormat,
+    Alignment, Drawing, EffectiveParagraph, EffectiveRun, IndentOverride, Inline, Paragraph,
+    ParagraphProps, RawXml, Run, RunContent, RunLayoutProps, Styles, TableCellFormat,
 };
 use open365_text::{
     BreakKind, FaceId, FontChain, FontLibrary, FontStyle, ShapeFeatures, break_opportunities,
     shape_run,
 };
 
-use crate::metrics::{LineMetricModel, line_height};
+use crate::metrics::{LineMetricModel, PictureLine, line_height};
 use crate::numbering::{LabelAlign, ListLabel, Suffix};
 use crate::props::{TabKind, TabLeader, TabStop};
 
 const EPS: f64 = 1e-6;
+
+/// The character that stands for a drawing in the paragraph text. Word counts a drawing as one
+/// character of the story.
+const OBJECT_CHAR: &str = "\u{fffc}";
 
 /// A justified line may squeeze its spaces by up to this fraction of their width to take one
 /// more word (Word 2013+ layout). Fitted to layout-align and layout-justify: 0.2 gives the best
@@ -54,6 +58,26 @@ pub(crate) enum AtomClass {
     LineBreak,
     PageBreak,
     Mark,
+    /// An inline picture (a box on the baseline) or the anchor of a floating one (zero width).
+    Object,
+}
+
+/// A drawing in a paragraph: its box in points, and how it sits in the text.
+#[derive(Debug, Clone)]
+pub(crate) struct ObjectBox {
+    pub drawing: Drawing,
+    /// Advance of an inline picture: its width plus the effect extent.
+    pub width: f64,
+    /// Height of an inline picture above the baseline: its height plus the effect extent.
+    pub height: f64,
+    /// Index of the object's atom.
+    pub atom: usize,
+}
+
+impl ObjectBox {
+    pub(crate) fn inline(&self) -> bool {
+        !self.drawing.anchored
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -65,6 +89,8 @@ pub(crate) struct Atom {
     pub glyphs: Range<usize>,
     pub class: AtomClass,
     pub ch: char,
+    /// Index into [`ParaLayout::objects`] for an [`AtomClass::Object`].
+    pub object: Option<usize>,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -90,10 +116,45 @@ pub(crate) struct LineBox {
     /// X of the last character's left edge.
     pub last_x: f64,
     pub atoms: Range<usize>,
+    /// Space the page flow leaves above the line to clear a picture. Zero when the paragraph
+    /// was laid out alone.
+    pub lead: f64,
     /// Atom x positions (text-area coordinates), parallel to `atoms`.
     pub xs: Vec<f64>,
     /// True when the line ends with a page break; the next line starts a page.
     pub page_break_after: bool,
+}
+
+/// What line breaking needs besides the atoms, so that a paragraph can be broken again when
+/// pictures change the room beside a line (see [`ParaLayout::builder`]).
+#[derive(Debug, Clone)]
+pub(crate) struct FillData {
+    pub text_width: f64,
+    /// Break opportunities: byte offset and kind, sorted.
+    pub opp: Vec<(usize, BreakKind)>,
+    /// Story offset (UTF-16 units) of every atom start, and one past the end.
+    pub story_of: Vec<usize>,
+    /// Where the text of the first line starts when a list label precedes it.
+    pub first_x: Option<f64>,
+    /// Style of the list label, which also sizes the first line.
+    pub label_style: Option<usize>,
+    pub default_tab: f64,
+    pub model: LineMetricModel,
+    /// Ascent and descent of every style.
+    pub metrics: Vec<(f64, f64)>,
+}
+
+impl ParaLayout {
+    /// A line breaker over this paragraph.
+    pub(crate) fn builder(&self) -> LineBuilder<'_> {
+        LineBuilder {
+            atoms: &self.atoms,
+            props: &self.props,
+            flow: &self.flow,
+            objects: &self.objects,
+            fd: &self.fill,
+        }
+    }
 }
 
 /// The list label of a numbered paragraph, drawn left of the first line.
@@ -120,6 +181,10 @@ pub(crate) struct ParaLayout {
     pub atoms: Vec<Atom>,
     pub glyphs: Vec<PlacedGlyphRaw>,
     pub styles: Vec<RunStyle>,
+    /// Pictures of the paragraph in text order.
+    pub objects: Vec<ObjectBox>,
+    /// Everything needed to break lines again at another width or position.
+    pub fill: FillData,
     pub story_end: usize,
     /// Footnote references: the atom of the mark and the footnote id.
     pub foot_refs: Vec<(usize, i64)>,
@@ -255,6 +320,10 @@ struct Collector<'a, 'b> {
     /// Note references: byte position of the mark, endnote or not, id.
     refs: Vec<(usize, bool, i64)>,
     separator: bool,
+    /// Drawings: byte position of the object character in `text` and the drawing.
+    objects: Vec<(usize, Drawing)>,
+    /// The next `push` starts a new span (after an object character).
+    split: bool,
 }
 
 #[derive(Default)]
@@ -275,10 +344,25 @@ impl Collector<'_, '_> {
         let start = self.text.len();
         self.text.push_str(s);
         let end = self.text.len();
+        let split = std::mem::take(&mut self.split);
         match self.spans.last_mut() {
-            Some((r, st)) if *st == style && r.end == start => r.end = end,
+            Some((r, st)) if *st == style && r.end == start && !split => r.end = end,
             _ => self.spans.push((start..end, style)),
         }
+    }
+
+    /// A drawing: one object character of its own span.
+    fn drawing(&mut self, e: &open365_docx::XmlElement, style: usize) {
+        if self.suppressed() {
+            return;
+        }
+        let Some(d) = Drawing::from_element(e) else {
+            return;
+        };
+        self.split = true;
+        self.objects.push((self.text.len(), d));
+        self.push(OBJECT_CHAR, style);
+        self.split = true;
     }
 
     fn hide(&mut self, units: usize) {
@@ -425,6 +509,9 @@ impl Collector<'_, '_> {
                         open365_docx::BreakKind::Column => self.push("\u{e}", style),
                     }
                 }
+                RunContent::Raw(RawXml::Element(e)) if e.head.is_w("drawing") => {
+                    self.drawing(e, style);
+                }
                 RunContent::Raw(RawXml::Element(e)) => self.raw(e, style),
                 RunContent::Raw(_) => {}
             }
@@ -521,6 +608,8 @@ pub(crate) fn layout_paragraph(
         fields: Vec::new(),
         refs: Vec::new(),
         separator: false,
+        objects: Vec::new(),
+        split: false,
     };
     col.inlines(&para.content);
 
@@ -561,15 +650,40 @@ pub(crate) fn layout_paragraph(
         hidden,
         refs,
         separator,
+        objects: raw_objects,
         ..
     } = col;
 
     // Shape every span, then group glyphs into atoms by cluster.
     let mut glyphs: Vec<PlacedGlyphRaw> = Vec::new();
     let mut atoms: Vec<Atom> = Vec::new();
+    let mut objects: Vec<ObjectBox> = Vec::new();
     for (range, style_idx) in &spans {
         let st = &styles[*style_idx];
         let seg = &text[range.clone()];
+        if seg == OBJECT_CHAR
+            && let Some((_, d)) = raw_objects.iter().find(|o| o.0 == range.start)
+        {
+            let (w, h) = d.size_pt();
+            let [el, et, er, eb] = d.effect_extent_pt();
+            let inline = !d.anchored;
+            objects.push(ObjectBox {
+                drawing: d.clone(),
+                width: if inline { w + el + er } else { 0.0 },
+                height: if inline { h + et + eb } else { 0.0 },
+                atom: atoms.len(),
+            });
+            atoms.push(Atom {
+                byte_start: range.start,
+                adv: objects.last().map_or(0.0, |o| o.width),
+                style: *style_idx,
+                glyphs: glyphs.len()..glyphs.len(),
+                class: AtomClass::Object,
+                ch: '\u{fffc}',
+                object: Some(objects.len() - 1),
+            });
+            continue;
+        }
         let shaped = shape_run(
             ctx.fonts,
             &st.chain,
@@ -620,6 +734,7 @@ pub(crate) fn layout_paragraph(
                 glyphs: gstart..glyphs.len(),
                 class,
                 ch,
+                object: None,
             });
             idx = j;
         }
@@ -672,17 +787,22 @@ pub(crate) fn layout_paragraph(
         let space = shape(" ").1;
         (l, ls, glyphs, width, space)
     });
-    let mut lb = LineBuilder {
-        ctx,
-        atoms: &atoms,
-        styles: &styles,
-        props: &props,
-        flow: &flow,
+    let metrics: Vec<(f64, f64)> = styles
+        .iter()
+        .map(|st| {
+            ctx.model
+                .ascent_descent(ctx.fonts.face(st.face).metrics(), st.size)
+        })
+        .collect();
+    let mut fd = FillData {
         text_width,
-        opp: &opp,
-        story_of: &story_of,
+        opp,
+        story_of,
         first_x: None,
         label_style,
+        default_tab: ctx.default_tab,
+        model: ctx.model,
+        metrics,
     };
     let mut label_layout = None;
     if let Some((l, ls, glyphs, width, space)) = label_shape {
@@ -693,18 +813,35 @@ pub(crate) fn layout_paragraph(
             LabelAlign::Right => at - width,
         };
         let end = x + width;
-        lb.first_x = Some(match l.suffix {
+        let first_x = match l.suffix {
             Suffix::Nothing => end,
             Suffix::Space => end + space,
-            Suffix::Tab => lb.next_stop(end).pos_twips as f64 / 20.0,
-        });
+            Suffix::Tab => {
+                let lb = LineBuilder {
+                    atoms: &atoms,
+                    props: &props,
+                    flow: &flow,
+                    objects: &objects,
+                    fd: &fd,
+                };
+                lb.next_stop(end).pos_twips as f64 / 20.0
+            }
+        };
+        fd.first_x = Some(first_x);
         label_layout = Some(LabelLayout {
             style: ls,
             glyphs,
             x,
         });
     }
-    let lines = lb.build();
+    let lines = LineBuilder {
+        atoms: &atoms,
+        props: &props,
+        flow: &flow,
+        objects: &objects,
+        fd: &fd,
+    }
+    .build();
 
     ParaLayout {
         index,
@@ -716,33 +853,29 @@ pub(crate) fn layout_paragraph(
         atoms,
         glyphs,
         styles,
+        objects,
+        fill: fd,
         story_end,
         foot_refs,
         separator,
     }
 }
 
-struct LineBuilder<'a> {
-    ctx: &'a Context<'a>,
+pub(crate) struct LineBuilder<'a> {
     atoms: &'a [Atom],
-    styles: &'a [RunStyle],
     props: &'a EffectiveParagraph,
     flow: &'a ParagraphProps,
-    text_width: f64,
-    opp: &'a [(usize, BreakKind)],
-    story_of: &'a [usize],
-    /// Where the text of the first line starts when a list label precedes it.
-    first_x: Option<f64>,
-    /// Style of the list label, which also sizes the first line.
-    label_style: Option<usize>,
+    objects: &'a [ObjectBox],
+    fd: &'a FillData,
 }
 
 impl LineBuilder<'_> {
     fn opportunity_at(&self, byte: usize) -> Option<BreakKind> {
-        self.opp
+        self.fd
+            .opp
             .binary_search_by_key(&byte, |o| o.0)
             .ok()
-            .map(|i| self.opp[i].1)
+            .map(|i| self.fd.opp[i].1)
     }
 
     fn build(&self) -> Vec<LineBox> {
@@ -765,6 +898,7 @@ impl LineBuilder<'_> {
                 left: 0.0,
                 last_x: 0.0,
                 atoms: 0..0,
+                lead: 0.0,
                 xs: Vec::new(),
                 page_break_after: false,
             });
@@ -794,7 +928,7 @@ impl LineBuilder<'_> {
             });
         }
         best.unwrap_or_else(|| {
-            let dt = self.ctx.default_tab.max(1.0);
+            let dt = self.fd.default_tab.max(1.0);
             let k = ((x + 0.01) / dt).floor() + 1.0;
             TabStop {
                 pos_twips: (k * dt * 20.0).round() as i32,
@@ -851,16 +985,23 @@ impl LineBuilder<'_> {
     }
 
     fn fill(&self, a0: usize, first: bool) -> LineBox {
+        self.fill_in(a0, first, (0.0, 0.0))
+    }
+
+    /// The line starting at atom `a0`, with `inset.0` taken from the left and `inset.1` from
+    /// the right of the text area (room a picture occupies).
+    pub(crate) fn fill_in(&self, a0: usize, first: bool, inset: (f64, f64)) -> LineBox {
         let n = self.atoms.len();
         let indent_left = f64::from(self.props.indent_left_pt);
         let indent_right = f64::from(self.props.indent_right_pt);
         let first_line = f64::from(self.props.first_line_pt);
-        let left_edge = match (first, self.first_x) {
-            (true, Some(x)) => x,
-            (true, None) => indent_left + first_line,
-            (false, _) => indent_left,
-        };
-        let right_limit = self.text_width - indent_right;
+        let left_edge = inset.0
+            + match (first, self.fd.first_x) {
+                (true, Some(x)) => x,
+                (true, None) => indent_left + first_line,
+                (false, _) => indent_left,
+            };
+        let right_limit = self.fd.text_width - indent_right - inset.1;
 
         let mut xs: Vec<f64> = Vec::new();
         let mut advs: Vec<f64> = Vec::new();
@@ -889,14 +1030,18 @@ impl LineBuilder<'_> {
             if a.class == AtomClass::Space {
                 space_sum += a.adv;
             }
-            if a.class == AtomClass::Text && i > a0 && x + adv > right_limit + squeeze + EPS {
+            let boxed = a.class == AtomClass::Text || (a.class == AtomClass::Object && adv > 0.0);
+            if boxed && i > a0 && x + adv > right_limit + squeeze + EPS {
                 end = cand.unwrap_or(i);
                 break;
             }
             xs.push(x);
             advs.push(adv);
             x += adv;
-            if matches!(a.class, AtomClass::Text | AtomClass::Tab) {
+            if matches!(
+                a.class,
+                AtomClass::Text | AtomClass::Tab | AtomClass::Object
+            ) {
                 vis_end_x = x;
             }
             i += 1;
@@ -946,7 +1091,10 @@ impl LineBuilder<'_> {
         let last_atom = end - 1;
         let mut vis_end = left_edge;
         for (k, a) in self.atoms[a0..end].iter().enumerate() {
-            if matches!(a.class, AtomClass::Text | AtomClass::Tab) {
+            if matches!(
+                a.class,
+                AtomClass::Text | AtomClass::Tab | AtomClass::Object
+            ) {
                 vis_end = xs[k] + advs[k];
             }
         }
@@ -1000,42 +1148,70 @@ impl LineBuilder<'_> {
         let mut seen: Vec<usize> = Vec::new();
         // The paragraph mark sizes its line only when nothing else is on it (measured with the
         // layout-marks probe: a 28 pt mark after 10 pt text leaves the line at 10 pt).
-        let only_mark = self.atoms[a0..end]
-            .iter()
-            .all(|a| a.class == AtomClass::Mark);
+        let only_mark = self.atoms[a0..end].iter().all(|a| {
+            a.class == AtomClass::Mark
+                || a.object
+                    .and_then(|o| self.objects.get(o))
+                    .is_some_and(|o| !o.inline())
+        });
         for a in &self.atoms[a0..end] {
             if a.class == AtomClass::Mark && !only_mark {
+                continue;
+            }
+            // A picture has no font: only its height counts (below), and the descent of the
+            // line comes from the text (measured: a line holding just a picture and the
+            // paragraph mark has no descent).
+            if a.class == AtomClass::Object {
                 continue;
             }
             if seen.contains(&a.style) {
                 continue;
             }
             seen.push(a.style);
-            let st = &self.styles[a.style];
-            let m = self.ctx.fonts.face(st.face).metrics();
-            let (ca, cd) = self.ctx.model.ascent_descent(m, st.size);
+            let (ca, cd) = self.fd.metrics[a.style];
             asc = asc.max(ca);
             desc = desc.max(cd);
         }
-        if first && let Some(ls) = self.label_style {
-            let st = &self.styles[ls];
-            let m = self.ctx.fonts.face(st.face).metrics();
+        // An inline picture stands on the baseline.
+        let text_asc = asc;
+        let text_h = asc + desc;
+        let mut pic = 0.0f64;
+        for a in &self.atoms[a0..end] {
+            if let Some(o) = a.object.and_then(|o| self.objects.get(o))
+                && o.inline()
+            {
+                pic = pic.max(o.height);
+            }
+        }
+        asc = asc.max(pic);
+        if first && let Some(ls) = self.fd.label_style {
             // Measured (layout-lists-suff): a 20 pt label raises the first baseline but its
             // descent does not deepen the line.
-            let (ca, _) = self.ctx.model.ascent_descent(m, st.size);
+            let (ca, _) = self.fd.metrics[ls];
             asc = asc.max(ca);
         }
-        let (height, baseline_off) = line_height(asc, desc, self.props.line, self.ctx.model);
+        let (height, baseline_off) = line_height(
+            asc,
+            desc,
+            self.props.line,
+            self.fd.model,
+            PictureLine {
+                height: pic,
+                text_asc,
+                text_h,
+            },
+        );
 
         let last_x = xs.last().copied().unwrap_or(left_edge);
         LineBox {
-            start: self.story_of[a0],
-            end: self.story_of[end],
+            start: self.fd.story_of[a0],
+            end: self.fd.story_of[end],
             height,
             baseline_off,
             left: xs.first().copied().unwrap_or(left_edge),
             last_x,
             atoms: a0..end,
+            lead: 0.0,
             xs,
             page_break_after,
         }

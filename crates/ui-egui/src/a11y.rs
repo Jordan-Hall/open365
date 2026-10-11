@@ -69,6 +69,19 @@ pub fn text_position(doc: Id, para: usize, line: usize, column: usize) -> access
     }
 }
 
+/// Publishes an image node over `rect` with the picture's alternative text.
+pub fn publish_image(parent_ui: &mut Ui, doc: Id, index: usize, rect: Rect, alt: Option<&str>) {
+    let id = doc.with(("image", index));
+    parent_ui.interact(rect, id, Sense::hover());
+    parent_ui.ctx().accesskit_node_builder(id, |b| {
+        b.set_role(accesskit::Role::Image);
+        b.set_bounds(to_ak_rect(rect));
+        if let Some(alt) = alt {
+            b.set_label(alt.to_owned());
+        }
+    });
+}
+
 /// Publishes a paragraph node with one `TextRun` per laid-out line (split into chunks of at
 /// most 255 characters). The last line carries a trailing newline so assistive technology sees the
 /// paragraph end. Returns the published runs.

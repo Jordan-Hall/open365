@@ -92,7 +92,7 @@ try {
       Write-Manifest $docxDir $name $feature $script:word $notes
       $script:created.Add("docx/$name")
     } catch {
-      $script:skipped.Add("docx/$name : $($_.Exception.Message)")
+      $script:skipped.Add("docx/$name : $($_.Exception.Message) @ $($_.InvocationInfo.PositionMessage -replace '\s+', ' ')")
       Remove-Item $path, (Join-Path $docxDir "$name.toml") -Force -ErrorAction SilentlyContinue
     } finally {
       if ($doc) { try { $doc.Close(0) } catch {}; Release $doc }
@@ -769,11 +769,112 @@ try {
     HF-FieldFooter 1 1 'Page ' '' 0
   }
 
+
+  # ---- Pictures: layout-img-* -------------------------------------------------------------------
+  # Solid-colour PNGs drawn here (no external images), inserted at an explicit size in points.
+  Add-Type -AssemblyName System.Drawing
+  $imgDir = Join-Path ([IO.Path]::GetTempPath()) ("o365_img_{0}" -f $PID)
+  New-Item -ItemType Directory -Force $imgDir | Out-Null
+  function New-Png($name, $pxW, $pxH, [int[]]$rgb) {
+    $path = Join-Path $script:imgDir "$name.png"
+    $bmp = New-Object System.Drawing.Bitmap $pxW, $pxH
+    $g = [System.Drawing.Graphics]::FromImage($bmp)
+    $g.Clear([System.Drawing.Color]::FromArgb($rgb[0], $rgb[1], $rgb[2]))
+    $pen = New-Object System.Drawing.Pen ([System.Drawing.Color]::White), 2
+    $g.DrawRectangle($pen, 1, 1, $pxW - 3, $pxH - 3); $g.DrawLine($pen, 0, 0, $pxW - 1, $pxH - 1)
+    $pen.Dispose(); $g.Dispose(); $bmp.Save($path, [System.Drawing.Imaging.ImageFormat]::Png); $bmp.Dispose()
+    $path
+  }
+  $PNG_RED = New-Png 'red' 64 32 @(200, 40, 40)
+  $PNG_BLUE = New-Png 'blue' 48 48 @(40, 70, 200)
+  $PNG_GREEN = New-Png 'green' 80 40 @(40, 160, 70)
+  # Inline picture of $w x $h points at the end of the document.
+  function Add-Inline($png, $w, $h, [scriptblock]$fmt = $null) {
+    $s = $script:word.Selection; [void]$s.EndKey(6)
+    $ils = $script:doc.InlineShapes.AddPicture($png, $false, $true, $s.Range)
+    $ils.LockAspectRatio = 0; $ils.Width = $w; $ils.Height = $h
+    if ($fmt) { & $fmt $ils }
+    [void]$s.EndKey(6)
+  }
+  function Type-Text($t) { $s = $script:word.Selection; [void]$s.EndKey(6); $s.TypeText($t) }
+  function End-Para() { $s = $script:word.Selection; [void]$s.EndKey(6); $s.TypeParagraph(); $s.ParagraphFormat.Reset(); $s.Font.Reset() }
+  function Last-Format() { $script:doc.Paragraphs.Item($script:doc.Paragraphs.Count).Format }
+  # Floating picture anchored in paragraph $pi (1-based): wrap = WdWrapType (0 square, 1 tight, 3 none/front, 4 top+bottom, 5 behind),
+  # $hrel/$vrel = WdRelativeHorizontal/VerticalPosition, $x/$y = offsets or WdShapePosition constants, $side = WdWrapSideType.
+  function Add-Float($pi, $png, $w, $h, $wrap, $hrel, $x, $vrel, $y, $dist = $null, $side = 0) {
+    # An inline picture converted to a shape anchors in exactly this paragraph (Shapes.AddPicture's Anchor argument did not).
+    $r = $script:doc.Paragraphs.Item($pi).Range; $r.Collapse(1)
+    $sh = $script:doc.InlineShapes.AddPicture($png, $false, $true, $r).ConvertToShape()
+    $sh.LockAspectRatio = 0; $sh.Width = $w; $sh.Height = $h
+    $sh.WrapFormat.Type = $wrap
+    if ($wrap -in 0, 1) { $sh.WrapFormat.Side = $side }
+    if ($dist) { $sh.WrapFormat.DistanceTop = $dist[0]; $sh.WrapFormat.DistanceBottom = $dist[1]; $sh.WrapFormat.DistanceLeft = $dist[2]; $sh.WrapFormat.DistanceRight = $dist[3] }
+    $sh.RelativeHorizontalPosition = $hrel; $sh.RelativeVerticalPosition = $vrel
+    $sh.Left = [single]$x; $sh.Top = [single]$y
+    $sh
+  }
+
+  L-Fixture 'layout-img-inline' 'layout-img-inline' 'inline pictures of several sizes: line height from the picture, wrapping, mixed font sizes, spacing rules, picture border' {
+    Init-Doc 6
+    Type-Text 'Text before '; Add-Inline $PNG_RED 20 10; Type-Text ' and after the small picture on one line, with enough further words that the paragraph needs a second and a third line to finish.'; End-Para
+    Add-Inline $PNG_BLUE 36 36; End-Para
+    Type-Text 'Tall: '; Add-Inline $PNG_BLUE 30 72; Type-Text ' tail text after a tall picture.'; End-Para
+    Add-Inline $PNG_GREEN 150 30; Type-Text ' wide picture then text that follows it on the same line and wraps onto the next line.'; End-Para
+    Type-Text 'Wrap test: some words that nearly fill the first line so the next picture '; Add-Inline $PNG_GREEN 120 40; Type-Text ' moves to the following line.'; End-Para
+    Type-Text 'Multiple 1.5 '; Add-Inline $PNG_BLUE 40 40; Type-Text ' with a second line of ordinary text after the picture to see the leading, and a third.'
+    $p = Last-Format; $p.LineSpacingRule = 5; $p.LineSpacing = 18; End-Para
+    Type-Text 'At least 20 '; Add-Inline $PNG_BLUE 40 40; Type-Text ' second line of ordinary text.'
+    $p = Last-Format; $p.LineSpacingRule = 3; $p.LineSpacing = 20; End-Para
+    Type-Text 'Exactly 30 '; Add-Inline $PNG_BLUE 40 40; Type-Text ' second line of ordinary text.'
+    $p = Last-Format; $p.LineSpacingRule = 4; $p.LineSpacing = 30; End-Para
+    Type-Text 'Bordered '; Add-Inline $PNG_GREEN 60 30 { param($i) $i.Line.Visible = -1; $i.Line.Weight = 6; $i.Line.ForeColor.RGB = 0 }; Type-Text ' picture with a 6 pt border.'; End-Para
+    Type-Text 'Centred: '; Add-Inline $PNG_RED 50 25; $p = Last-Format; $p.Alignment = 1; End-Para
+    Type-Text 'Two pictures '; Add-Inline $PNG_RED 24 12; Add-Inline $PNG_BLUE 24 36; Type-Text ' side by side.'; End-Para
+    # Last: the picture's run is 24 pt, which raises the line above what the 11 pt text and the picture alone give.
+    Type-Text 'Large run '; Add-Inline $PNG_RED 12 8 { param($i) $i.Range.Font.Size = 24 }; Type-Text ' small picture in a 24 pt run.'
+  }
+
+  $LONG1 = 'The harbour wall keeps the swell away from the moored boats, and the old lamps along the quay come on one by one as the light fades behind the hills. A few walkers stop to read the notice boards, and a dog sleeps in the doorway of the chandler.'
+  $LONG2 = 'Careful typesetting never relies on luck: every paragraph is measured, every break is chosen, and the space around an illustration is set by rules that can be written down. A reader notices only when those rules are broken, and then the page feels wrong.'
+
+  L-Fixture 'layout-img-tb' 'layout-img-tb' 'floating pictures with top and bottom wrapping: positions relative to paragraph, margin and page, with distances' {
+    Init-Doc 6
+    L-Para $LONG1; L-Para $LONG2; L-Para $LONG1; L-Para $LONG2; L-Para $LONG1; L-Para $LONG2; L-Para $LONG1; L-Para $LONG2
+    [void](Add-Float 2 $PNG_RED 100 50 4 0 -999998 2 0)
+    [void](Add-Float 4 $PNG_BLUE 80 80 4 0 -999995 2 20)
+    [void](Add-Float 6 $PNG_GREEN 160 40 4 0 -999996 2 40 @(14, 20, 0, 0))
+    [void](Add-Float 1 $PNG_RED 90 60 4 1 200 1 500)   # anchored in the first paragraph: Word also lets an anchor further down move earlier lines, which is not modelled
+  }
+
+  L-Fixture 'layout-img-square' 'layout-img-square' 'floating pictures with square wrapping: left, right and centre, distances, wrap sides, tight' {
+    Init-Doc 6
+    L-Para ($LONG1 + ' ' + $LONG2 + ' ' + $LONG1 + ' ' + $LONG2)
+    L-Para ($LONG2 + ' ' + $LONG1 + ' ' + $LONG2 + ' ' + $LONG1)
+    L-Para ($LONG1 + ' ' + $LONG2 + ' ' + $LONG1 + ' ' + $LONG2)
+    L-Para ($LONG2 + ' ' + $LONG1 + ' ' + $LONG2 + ' ' + $LONG1)
+    L-Para ($LONG1 + ' ' + $LONG2 + ' ' + $LONG1 + ' ' + $LONG2)
+    L-Para ($LONG2 + ' ' + $LONG1 + ' ' + $LONG2 + ' ' + $LONG1)
+    [void](Add-Float 1 $PNG_RED 100 60 0 0 -999998 2 0)
+    [void](Add-Float 2 $PNG_BLUE 90 90 0 0 -999996 2 0 @(0, 0, 10, 10))
+    [void](Add-Float 3 $PNG_GREEN 120 50 0 0 -999996 2 0 @(6, 6, 6, 6))
+    [void](Add-Float 4 $PNG_RED 80 70 0 0 -999998 2 12 @(0, 0, 18, 18) 2)
+    [void](Add-Float 5 $PNG_BLUE 100 60 1 0 -999998 2 0)
+    [void](Add-Float 6 $PNG_GREEN 100 60 0 0 -999998 2 0 @(0, 0, 0, 0) 3)
+  }
+
+  L-Fixture 'layout-img-none' 'layout-img-none' 'floating pictures in front of and behind text: no displacement' {
+    Init-Doc 6
+    L-Para $LONG1; L-Para $LONG2; L-Para $LONG1
+    [void](Add-Float 1 $PNG_RED 100 50 3 0 300 2 5)
+    [void](Add-Float 2 $PNG_BLUE 80 40 5 1 400 1 200)
+  }
+
 } finally {
   if ($word) {
     try { $word.UserName = $oldUser; $word.UserInitials = $oldInit; $word.Options.UseLocalUserInfo = $oldLocal } catch {}
     try { $word.Quit(0) } catch {}; Release $word
   }
+  if ($imgDir) { Remove-Item $imgDir -Recurse -Force -ErrorAction SilentlyContinue }
   [GC]::Collect(); [GC]::WaitForPendingFinalizers()
   foreach ($p in $wordPids) { Get-Process -Id $p -ErrorAction SilentlyContinue | Stop-Process -Force }
 }

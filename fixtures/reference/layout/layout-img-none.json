@@ -1,0 +1,23 @@
+{
+  "source": "fixtures/docx/layout-img-none.docx",
+  "oracle": "Microsoft Word 16.0 (16.0.20430), Print Layout, tools/office/word-layout-oracle.ps1",
+  "units": "points; page and top/left/baseline measured from the page top-left corner; start/end are UTF-16 offsets in the main story",
+  "precision": "top/left/lastX are screen-quantised (+-0.3 pt); baseline/inkLeft and cell rectangles come from the 600 dpi PDF and are exact",
+  "pageCount": 1,
+  "images": [
+    {"page": 1, "x": 400.0, "y": 200.0, "w": 80.0, "h": 40.0},
+    {"page": 1, "x": 372.0, "y": 77.0, "w": 100.0, "h": 50.0}
+  ],
+  "lines": [
+    {"page": 1, "start": 0, "end": 100, "top": 72.0, "left": 72.0, "lastX": 531.0, "baseline": 82.58, "inkLeft": 72.024, "text": "The harbour wall keeps the swell away from the moored boats, and the old lamps along the quay come "},
+    {"page": 1, "start": 100, "end": 207, "top": 85.2, "left": 72.0, "lastX": 537.6, "baseline": 96.02, "inkLeft": 72.024, "text": "on one by one as the light fades behind the hills. A few walkers stop to read the notice boards, and a dog "},
+    {"page": 1, "start": 207, "end": 246, "top": 99.0, "left": 72.0, "lastX": 241.8, "baseline": 109.46, "inkLeft": 72.024, "text": "sleeps in the doorway of the chandler.\u000d"},
+    {"page": 1, "start": 246, "end": 349, "top": 118.2, "left": 72.0, "lastX": 520.2, "baseline": 128.93, "inkLeft": 72.024, "text": "Careful typesetting never relies on luck: every paragraph is measured, every break is chosen, and the "},
+    {"page": 1, "start": 349, "end": 453, "top": 131.4, "left": 72.0, "lastX": 528.6, "baseline": 142.37, "inkLeft": 72.024, "text": "space around an illustration is set by rules that can be written down. A reader notices only when those "},
+    {"page": 1, "start": 453, "end": 502, "top": 145.2, "left": 72.0, "lastX": 288.0, "baseline": 155.81, "inkLeft": 72.024, "text": "rules are broken, and then the page feels wrong.\u000d"},
+    {"page": 1, "start": 502, "end": 601, "top": 164.4, "left": 72.0, "lastX": 531.0, "baseline": 175.25, "inkLeft": 72.024, "text": "The harbour wall keeps the swell away from the moored boats, and the old lamps along the quay come "},
+    {"page": 1, "start": 601, "end": 708, "top": 177.6, "left": 72.0, "lastX": 537.6, "baseline": 188.69, "inkLeft": 72.024, "text": "on one by one as the light fades behind the hills. A few walkers stop to read the notice boards, and a dog "},
+    {"page": 1, "start": 708, "end": 747, "top": 191.4, "left": 72.0, "lastX": 241.8, "baseline": 202.15, "inkLeft": 72.024, "text": "sleeps in the doorway of the chandler.\u000d"},
+    {"page": 1, "start": 747, "end": 748, "top": 210.6, "left": 72.0, "lastX": 72.0, "baseline": 221.59, "inkLeft": 72.024, "text": "\u000d"}
+  ]
+}

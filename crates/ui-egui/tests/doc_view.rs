@@ -381,3 +381,12 @@ fn three_hundred_pages_scroll_with_a_small_paint_budget() {
         "typed text reached the document"
     );
 }
+
+#[test]
+fn pictures_are_laid_out_and_published_as_image_nodes() {
+    let h = open("docx/inline-image.docx");
+    let layout = h.state().view.layout();
+    assert_eq!(layout.pages[0].images.len(), 1);
+    let images: Vec<_> = h.query_all_by_role(Role::Image).collect();
+    assert_eq!(images.len(), 1, "one image node");
+}

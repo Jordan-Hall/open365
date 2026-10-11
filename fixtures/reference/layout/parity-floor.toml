@@ -29,8 +29,8 @@ matched = 1
 total = 1
 
 [fixtures.inline-image]
-matched = 1
-total = 2
+matched = 3
+total = 3
 
 [fixtures.layout-align]
 matched = 5
@@ -67,6 +67,22 @@ total = 191
 [fixtures.layout-hf-sections]
 matched = 153
 total = 153
+
+[fixtures.layout-img-inline]
+matched = 26
+total = 28
+
+[fixtures.layout-img-none]
+matched = 12
+total = 12
+
+[fixtures.layout-img-square]
+matched = 76
+total = 76
+
+[fixtures.layout-img-tb]
+matched = 29
+total = 29
 
 [fixtures.layout-indents-spacing]
 matched = 88
@@ -185,8 +201,8 @@ matched = 1
 total = 1
 
 [system.inline-image]
-matched = 1
-total = 2
+matched = 3
+total = 3
 
 [system.layout-align]
 matched = 22
@@ -223,6 +239,22 @@ total = 191
 [system.layout-hf-sections]
 matched = 153
 total = 153
+
+[system.layout-img-inline]
+matched = 26
+total = 28
+
+[system.layout-img-none]
+matched = 12
+total = 12
+
+[system.layout-img-square]
+matched = 76
+total = 76
+
+[system.layout-img-tb]
+matched = 29
+total = 29
 
 [system.layout-indents-spacing]
 matched = 98

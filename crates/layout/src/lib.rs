@@ -13,10 +13,13 @@
 //! Tables are laid out with Word's column, row and page-splitting rules (`table.rs`,
 //! `flow.rs`). Headers, footers (`furniture.rs`), footnotes and endnotes are laid out as Word
 //! does; PAGE, NUMPAGES and SECTIONPAGES fields are recomputed in headers and footers, every
-//! other field keeps its cached result. Not supported yet (reported in [`Layout::notes`]):
-//! images, columns, right-to-left text and bidi are ignored.
+//! other field keeps its cached result. Inline pictures are boxes on the baseline that set the
+//! line height; floating pictures that wrap top and bottom or square displace text; both are
+//! reported in [`Page::images`]. Not supported yet (reported in [`Layout::notes`]): columns,
+//! right-to-left text, bidi, tight wrap polygons and pictures in headers, footers and notes.
 
 mod build;
+mod float;
 mod flow;
 mod furniture;
 mod incremental;
@@ -134,14 +137,15 @@ pub struct Line {
 }
 
 impl Line {
-    /// X of the first drawn glyph's origin, or of the line start when nothing is drawn. A note
-    /// reference mark is not counted: Word's PDF draws it as a row of its own.
+    /// X of the first drawn glyph's origin, or of the last character (the paragraph mark Word
+    /// draws) when the line has no glyph, as a line of pictures only. A note reference mark is
+    /// not counted: Word's PDF draws it as a row of its own.
     pub fn first_glyph_x(&self) -> f64 {
         self.runs
             .iter()
             .filter(|r| !r.superscript)
             .find_map(|r| r.glyphs.first())
-            .map_or(self.left, |g| g.x)
+            .map_or(self.last_x, |g| g.x)
     }
 }
 
@@ -164,6 +168,27 @@ pub struct NoteSlot {
     pub to: usize,
 }
 
+/// A picture on a page, in page coordinates (points, y down). The rectangle is the picture
+/// itself: Word's effect extent and wrapping distances are not included.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ImagePlacement {
+    pub x: f64,
+    pub y: f64,
+    pub width: f64,
+    pub height: f64,
+    /// Relationship id of the image part (`a:blip/@r:embed`); resolve it with
+    /// `Document::image_part`.
+    pub embed: Option<String>,
+    /// Alternative text (`wp:docPr/@descr`).
+    pub description: Option<String>,
+    /// Document-order index of the paragraph the picture belongs to.
+    pub paragraph: usize,
+    /// True for a floating (anchored) picture, false for one in the line of text.
+    pub anchored: bool,
+    /// A floating picture drawn behind the text.
+    pub behind_text: bool,
+}
+
 /// One page of the main story.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Page {
@@ -173,6 +198,10 @@ pub struct Page {
     pub lines: Vec<Line>,
     /// Table cell rectangles on this page, in drawing order.
     pub cells: Vec<CellBox>,
+    /// Pictures on this page, in drawing order.
+    pub images: Vec<ImagePlacement>,
+    /// The areas floating pictures keep text out of (see `float.rs`).
+    pub(crate) floats: Vec<float::Float>,
     /// Index of the page's section.
     pub section_index: usize,
     /// Whether this is the first page of its section (`titlePg` pages).

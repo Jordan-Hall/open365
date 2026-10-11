@@ -1,0 +1,5 @@
+feature = "layout-img-none"
+made_with = "Microsoft Word 16.0.20430 (Windows)"
+author = "project member"
+expect_dropped = []
+notes = "floating pictures in front of and behind text: no displacement"

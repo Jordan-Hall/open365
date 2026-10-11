@@ -36,6 +36,8 @@ HOW (fast path; ~0.4 s for a 7-line page, ~0.05 s per additional page, no per-ch
      unconsumed text starts with it, which gives every cell line the same `start` key as a body line; fixtures use
      unique tokens per cell. A row that matches no unconsumed text but occurs in a paragraph is a repeated header row
      ("repeat": true). Lines in cells carry "cell": true. Rectangles carry the 0.024 pt PDF origin offset as glyphs do.
+  6. Pictures. Word's PDF draws each picture with `w 0 0 h x y cm /ImageN Do`; the rectangles are written as "images"
+     (page, x, y (top), w, h in points, page top-left origin, same 0.024 pt x offset as glyphs).
   Slower alternatives rejected: per-character Range.Information (thousands of COM calls), and
   Selection.HomeKey/EndKey/MoveDown stepping (3-4 calls per line plus selection side effects).
 #>
@@ -145,7 +147,8 @@ function Read-PdfPages([string]$pdf) {
   }
   $pagesObj = $objs.Keys | Where-Object { $objs[$_] -match '/Type\s*/Pages' } | Select-Object -First 1
   $kids = @([regex]::Matches([regex]::Match($objs[$pagesObj], '/Kids\s*\[(.*?)\]', 'Singleline').Groups[1].Value, '(\d+) 0 R') | ForEach-Object { [int]$_.Groups[1].Value })
-  $rx = '(?<rx>[\d.\-]+) (?<ry>[\d.\-]+) (?<rw>[\d.\-]+) (?<rh>[\d.\-]+) re\r?\nW\* n|/(?<fn>F\d+) (?<fs>[\d.]+) Tf|1 0 0 1 (?<tx>[\d.\-]+) (?<ty>[\d.\-]+) Tm|\[(?<tj>[^\]]*)\] TJ'
+  $rx = '(?<rx>[\d.\-]+) (?<ry>[\d.\-]+) (?<rw>[\d.\-]+) (?<rh>[\d.\-]+) re\r?\nW\* n|/(?<fn>F\d+) (?<fs>[\d.]+) Tf|1 0 0 1 (?<tx>[\d.\-]+) (?<ty>[\d.\-]+) Tm|\[(?<tj>[^\]]*)\] TJ|(?<iw>[\d.\-]+) 0 0 (?<ih>[\d.\-]+) (?<ix>[\d.\-]+) (?<iy>[\d.\-]+) cm?
+/(?<im>\w+) Do'
   $pages = New-Object System.Collections.Generic.List[object]
   foreach ($po in $kids) {
     $pd = $objs[$po]
@@ -159,6 +162,7 @@ function Read-PdfPages([string]$pdf) {
     else { foreach ($r in [regex]::Matches($cm.Groups[1].Value, '(\d+) 0 R')) { $content += $streams[[int]$r.Groups[1].Value] } }
     $cells = New-Object System.Collections.Generic.List[object]
     $rows = New-Object System.Collections.Generic.List[object]
+    $images = New-Object System.Collections.Generic.List[object]
     $clip = -1; $font = $null; $fsize = ''; $tx = 0.0; $ty = 0.0
     $byKey = @{}
     foreach ($m in [regex]::Matches($content, $rx)) {
@@ -171,6 +175,11 @@ function Read-PdfPages([string]$pdf) {
           for ($i = 0; $i -lt $cells.Count; $i++) { $c = $cells[$i]; if ([math]::Abs($c.x - $x) -lt 0.0005 -and [math]::Abs($c.w - $w) -lt 0.0005 -and [math]::Abs($c.top - $top) -lt 0.0005 -and [math]::Abs($c.h - $h) -lt 0.0005) { $clip = $i; break } }
           if ($clip -lt 0) { $cells.Add(@{ x = $x; top = $top; w = $w; h = $h }); $clip = $cells.Count - 1 }
         }
+      } elseif ($m.Groups['iw'].Success) {
+        # A picture: `w 0 0 h x y cm /ImageN Do` (PDF user space, y up). x/y/w/h in points from the page top-left.
+        $iw = [double]::Parse($m.Groups['iw'].Value, $inv); $ih = [double]::Parse($m.Groups['ih'].Value, $inv)
+        $ix = [double]::Parse($m.Groups['ix'].Value, $inv); $iy = [double]::Parse($m.Groups['iy'].Value, $inv)
+        $images.Add(@{ x = $ix; y = $ph - $iy - $ih; w = $iw; h = $ih })
       } elseif ($m.Groups['fn'].Success) { $font = $m.Groups['fn'].Value; $fsize = $m.Groups['fs'].Value }
       elseif ($m.Groups['tx'].Success) { $tx = [double]::Parse($m.Groups['tx'].Value, $inv); $ty = [double]::Parse($m.Groups['ty'].Value, $inv) }
       elseif ($m.Groups['tj'].Success) {
@@ -189,7 +198,7 @@ function Read-PdfPages([string]$pdf) {
       }
     }
     foreach ($r in $rows) { $r['text'] = (($r.parts | Sort-Object { $_.x } | ForEach-Object { $_.text }) -join '').Trim() }
-    $pages.Add(@{ pw = $pw; ph = $ph; rows = $rows; cells = $cells })
+    $pages.Add(@{ pw = $pw; ph = $ph; rows = $rows; cells = $cells; images = $images })
   }
   , $pages
 }
@@ -283,12 +292,15 @@ function Ref-Layout($f) {
     foreach ($l in $lines) { $l['baseline'] = $null; $l['inkLeft'] = $null }
     $warn = @()
     $cellRects = New-Object System.Collections.Generic.List[object]
+    $imageRects = New-Object System.Collections.Generic.List[object]
     if ($pdfPages) {
       if ($pdfPages.Count -ne $pcount) { $warn += "PDF has $($pdfPages.Count) text pages, Word layout has $pcount" }
       for ($pi = 1; $pi -le [math]::Min($pcount, $pdfPages.Count); $pi++) {
         $pg = $pdfPages[$pi - 1]
+        # A clip around a picture (within its border) is the picture, not a cell.
         # A clip that reaches the page edge is the page clipping a cell that runs off the page: not a cell box.
-        foreach ($c in $pg.cells) { if ($c.x + $c.w -ge $pg.pw - 0.01) { continue }; $cellRects.Add([ordered]@{ page = $pi; x = $c.x; y = $c.top; w = $c.w; h = $c.h }) }
+        foreach ($im in $pg.images) { $imageRects.Add([ordered]@{ page = $pi; x = $im.x; y = $im.y; w = $im.w; h = $im.h }) }
+        foreach ($c in $pg.cells) { if ($c.x + $c.w -ge $pg.pw - 0.01) { continue }; if (@($pg.images | Where-Object { $c.x -ge $_.x - 8 -and $c.x + $c.w -le $_.x + $_.w + 8 -and $c.top -ge $_.y - 8 -and $c.top + $c.h -le $_.y + $_.h + 8 }).Count -gt 0) { continue }; $cellRects.Add([ordered]@{ page = $pi; x = $c.x; y = $c.top; w = $c.w; h = $c.h }) }
         if (-not $byPage.ContainsKey($pi)) { continue }
         $inked = $byPage[$pi].ToArray()   # every line, even an empty paragraph, prints a space glyph for its mark
         if (@($inked | Where-Object { $_.Contains('story') }).Count -gt 0) {
@@ -362,6 +374,16 @@ function Ref-Layout($f) {
       }
       [void]$sb.Append("  ],`n")
     }
+    if ($imageRects.Count -gt 0) {
+      [void]$sb.Append('  "images": [' + "`n")
+      for ($i = 0; $i -lt $imageRects.Count; $i++) {
+        $c = $imageRects[$i]
+        $row = '    {"page": ' + $c.page + ', "x": ' + (Num $c.x) + ', "y": ' + (Num $c.y) + ', "w": ' + (Num $c.w) + ', "h": ' + (Num $c.h) + '}'
+        if ($i -lt $imageRects.Count - 1) { $row += ',' }
+        [void]$sb.Append($row + "`n")
+      }
+      [void]$sb.Append("  ],`n")
+    }
     [void]$sb.Append('  "lines": [' + "`n")
     for ($i = 0; $i -lt $lines.Count; $i++) {
       $l = $lines[$i]
@@ -376,7 +398,7 @@ function Ref-Layout($f) {
     [void]$sb.Append("  ]`n}`n")
     $jsonPath = if ($perDocDirs) { New-Item -ItemType Directory -Force (Join-Path $outDir $name) | Out-Null; Join-Path $outDir "$name\layout.json" } else { Join-Path $outDir "$name.json" }
     [IO.File]::WriteAllText($jsonPath, $sb.ToString().Replace("`r`n", "`n"), (New-Object Text.UTF8Encoding $false))
-    $produced.Add("layout/$name ($($lines.Count) lines, $($cellRects.Count) cells, $pcount pages)")
+    $produced.Add("layout/$name ($($lines.Count) lines, $($cellRects.Count) cells, $($imageRects.Count) images, $pcount pages)")
     foreach ($m in $warn) { Write-Output "WARN $name : $m" }
   } finally {
     if ($doc) { try { $doc.Close(0) } catch {}; Release $doc }

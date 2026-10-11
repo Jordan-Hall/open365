@@ -1,0 +1,5 @@
+feature = "layout-img-tb"
+made_with = "Microsoft Word 16.0.20430 (Windows)"
+author = "project member"
+expect_dropped = []
+notes = "floating pictures with top and bottom wrapping: positions relative to paragraph, margin and page, with distances"

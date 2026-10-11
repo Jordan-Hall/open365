@@ -9,6 +9,7 @@
 //! Character offsets are Unicode scalar values.
 
 mod document;
+mod drawing;
 mod edit;
 mod error;
 mod layout_props;
@@ -26,6 +27,10 @@ mod xml;
 mod xmlq;
 
 pub use document::{Document, DocumentKind, DroppedItem, HygieneAction};
+pub use drawing::{
+    Align, Drawing, EMU_PER_POINT, HorizontalRelativeFrom, ImagePart, Position,
+    VerticalRelativeFrom, WrapSide, WrapType,
+};
 pub use error::DocxError;
 pub use layout_props::{
     Ligatures, ParagraphMark, ParagraphProps, RunLayoutProps, TabKind, TabLeader, TabStop,

@@ -11,7 +11,7 @@
 //! positions. All edits go through [`Target::apply`]; the view keeps only the caret, the
 //! selection and the layout.
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::time::Instant;
 
 use egui::output::IMEOutput;
@@ -212,6 +212,9 @@ pub struct DocView {
     pending: RunPropsPatch,
     /// Paragraphs whose lines were painted last frame.
     painted: Vec<usize>,
+    /// Decoded pictures by relationship id (`None`: undecodable), valid for one revision.
+    pictures: HashMap<String, Option<Picture>>,
+    pictures_rev: Option<u64>,
     /// Message for the status bar, taken by the application each frame.
     pub status: Option<String>,
     /// Milliseconds spent on the last frame (layout, input, paint, accessibility).
@@ -256,6 +259,8 @@ impl DocView {
             doc_id: Id::new("open365-doc-view"),
             pending: RunPropsPatch::default(),
             painted: Vec::new(),
+            pictures: HashMap::new(),
+            pictures_rev: None,
             status: None,
             last_frame_ms: 0.0,
             last_layout_ms: 0.0,
@@ -1507,6 +1512,9 @@ impl DocView {
                     for page in first..=last.max(first) {
                         self.paint_page(&ctx, &painter, canvas, page, clip, fill);
                     }
+                    for page in first..=last.max(first) {
+                        self.paint_pictures(ui, &painter, target, canvas, page, clip);
+                    }
                 }
 
                 // Caret.
@@ -1574,6 +1582,74 @@ impl DocView {
     /// The position nearest to a screen point as of the last frame.
     pub fn position_at(&self, screen: Pos2) -> DocPos {
         self.hit_test(self.canvas, screen)
+    }
+
+    /// Draws the pictures of `page` at their layout positions and publishes an image node for
+    /// each. Pictures that cannot be decoded are left blank (a grey frame).
+    fn paint_pictures(
+        &mut self,
+        ui: &mut Ui,
+        painter: &egui::Painter,
+        target: &Target,
+        canvas: Rect,
+        page: usize,
+        clip: Rect,
+    ) {
+        let rev = target.revision();
+        if self.pictures_rev != Some(rev) {
+            self.pictures.clear();
+            self.pictures_rev = Some(rev);
+        }
+        let origin = self.page_origin(canvas, page);
+        let s = self.scale;
+        let images = self.engine.layout().pages[page].images.clone();
+        for (i, im) in images.iter().enumerate() {
+            let rect = Rect::from_min_size(
+                origin + vec2(im.x as f32, im.y as f32) * s,
+                vec2(im.width as f32, im.height as f32) * s,
+            );
+            if !rect.intersects(clip) {
+                continue;
+            }
+            if let Some(key) = &im.embed {
+                if !self.pictures.contains_key(key) {
+                    let tex = target
+                        .docx()
+                        .and_then(|d| d.image_part(key))
+                        .and_then(|p| decode_picture(p.bytes))
+                        .map(|img| {
+                            Picture(ui.ctx().load_texture(
+                                format!("pic-{key}"),
+                                img,
+                                Default::default(),
+                            ))
+                        });
+                    self.pictures.insert(key.clone(), tex);
+                }
+                if let Some(Some(tex)) = self.pictures.get(key) {
+                    painter.image(
+                        tex.0.id(),
+                        rect,
+                        Rect::from_min_max(Pos2::ZERO, Pos2::new(1.0, 1.0)),
+                        Color32::WHITE,
+                    );
+                } else {
+                    painter.rect_stroke(
+                        rect,
+                        0.0,
+                        Stroke::new(1.0, Color32::from_gray(160)),
+                        egui::StrokeKind::Inside,
+                    );
+                }
+            }
+            a11y::publish_image(
+                ui,
+                self.doc_id,
+                page * 4096 + i,
+                rect,
+                im.description.as_deref(),
+            );
+        }
     }
 
     fn paint_page(
@@ -2007,4 +2083,40 @@ fn list_label_text(label: &str) -> String {
             }
         })
         .collect()
+}
+
+/// A decoded picture on the GPU.
+struct Picture(egui::TextureHandle);
+
+impl std::fmt::Debug for Picture {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("Picture")
+    }
+}
+
+/// Largest picture side decoded, in pixels, and the most memory a decode may take.
+const MAX_PICTURE_SIDE: u32 = 8192;
+const MAX_PICTURE_BYTES: u64 = 256 * 1024 * 1024;
+const MAX_PICTURE_INPUT: usize = 64 * 1024 * 1024;
+
+/// Decodes a PNG, JPEG, GIF or BMP picture from untrusted bytes. Oversized or malformed input
+/// gives `None`; nothing here panics.
+fn decode_picture(bytes: &[u8]) -> Option<egui::ColorImage> {
+    if bytes.len() > MAX_PICTURE_INPUT {
+        return None;
+    }
+    let mut reader = image::ImageReader::new(std::io::Cursor::new(bytes))
+        .with_guessed_format()
+        .ok()?;
+    let mut limits = image::Limits::default();
+    limits.max_image_width = Some(MAX_PICTURE_SIDE);
+    limits.max_image_height = Some(MAX_PICTURE_SIDE);
+    limits.max_alloc = Some(MAX_PICTURE_BYTES);
+    reader.limits(limits);
+    let rgba = reader.decode().ok()?.to_rgba8();
+    let size = [rgba.width() as usize, rgba.height() as usize];
+    Some(egui::ColorImage::from_rgba_unmultiplied(
+        size,
+        rgba.as_raw(),
+    ))
 }

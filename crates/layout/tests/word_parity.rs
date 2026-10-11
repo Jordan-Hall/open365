@@ -39,6 +39,9 @@ const TOLERANCE: f64 = 0.5;
 const CELL_TOLERANCE_X: f64 = 0.25;
 /// Vertical edges follow the 0.24 pt grid the engine models, so only the PDF's rounding is left.
 const CELL_TOLERANCE_Y: f64 = 0.05;
+/// Pictures: Word places them on its device grid and the PDF rounds the numbers; a picture must
+/// land within this of Word's, edge by edge.
+const IMAGE_TOLERANCE: f64 = 0.6;
 /// Word's PDF places glyph origins 0.024 pt (1/3000 in) right of the layout position.
 const PDF_SCALE: f64 = 1.0003;
 const PDF_X_OFFSET: f64 = 0.024;
@@ -72,9 +75,18 @@ struct RefCell {
 }
 
 fn load_cells(path: &Path) -> Vec<RefCell> {
+    load_rects(path, "cells")
+}
+
+/// Picture rectangles Word drew (PDF image matrix), page coordinates.
+fn load_images(path: &Path) -> Vec<RefCell> {
+    load_rects(path, "images")
+}
+
+fn load_rects(path: &Path, key: &str) -> Vec<RefCell> {
     let text = fs::read_to_string(path).expect("read reference json");
     let v: Value = serde_json::from_str(&text).expect("parse reference json");
-    v["cells"]
+    v[key]
         .as_array()
         .map(|cells| {
             cells
@@ -139,6 +151,7 @@ fn score(name: &str, detail: bool, mode: Mode, fonts: &FontLibrary) -> Result<Sc
     let ref_path = root.join(format!("fixtures/reference/layout/{name}.json"));
     let reference = load_reference(&ref_path);
     let ref_cells = load_cells(&ref_path);
+    let ref_images = load_images(&ref_path);
     let bytes = fs::read(root.join(format!("fixtures/docx/{name}.docx"))).expect("read docx");
     let doc = Document::open(&bytes, &Limits::default()).expect("open docx");
     let layout = layout_document(&doc, fonts, LayoutOptions::default());
@@ -165,7 +178,7 @@ fn score(name: &str, detail: bool, mode: Mode, fonts: &FontLibrary) -> Result<Sc
             .push((p, l));
     }
     let mut s = Score {
-        total: reference.len() + ref_cells.len(),
+        total: reference.len() + ref_cells.len() + ref_images.len(),
         ..Score::default()
     };
     let mut report = String::new();
@@ -279,6 +292,51 @@ fn score(name: &str, detail: bool, mode: Mode, fonts: &FontLibrary) -> Result<Sc
                 c.y,
                 c.w,
                 c.h,
+                near.map_or("-".to_owned(), |b| format!(
+                    "x {:.2} y {:.2} w {:.2} h {:.2}",
+                    b.x, b.y, b.width, b.height
+                )),
+            );
+        }
+    }
+    // Pictures: each reference rectangle needs an unused engine picture that agrees.
+    let mut used_images: Vec<(usize, usize)> = Vec::new();
+    for im in &ref_images {
+        let page = layout.pages.iter().find(|p| p.number as u64 == im.page);
+        let hit = page.and_then(|p| {
+            p.images.iter().enumerate().find(|(i, b)| {
+                !used_images.contains(&(p.number, *i))
+                    && (b.x - im.x).abs() <= IMAGE_TOLERANCE
+                    && (b.y - im.y).abs() <= IMAGE_TOLERANCE
+                    && (b.width - im.w).abs() <= IMAGE_TOLERANCE
+                    && (b.height - im.h).abs() <= IMAGE_TOLERANCE
+            })
+        });
+        if let (Some(p), Some((i, _))) = (page, hit) {
+            used_images.push((p.number, i));
+            s.matched += 1;
+        }
+        if detail {
+            let near = page.and_then(|p| {
+                p.images.iter().min_by(|a, b| {
+                    let d = |q: &open365_layout::ImagePlacement| {
+                        (q.x - im.x).abs()
+                            + (q.y - im.y).abs()
+                            + (q.width - im.w).abs()
+                            + (q.height - im.h).abs()
+                    };
+                    d(a).total_cmp(&d(b))
+                })
+            });
+            let _ = writeln!(
+                report,
+                "{} image p{} x {:>7.2} y {:>7.2} w {:>7.2} h {:>7.2}   engine {}",
+                if hit.is_some() { "ok  " } else { "FAIL" },
+                im.page,
+                im.x,
+                im.y,
+                im.w,
+                im.h,
                 near.map_or("-".to_owned(), |b| format!(
                     "x {:.2} y {:.2} w {:.2} h {:.2}",
                     b.x, b.y, b.width, b.height
