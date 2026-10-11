@@ -33,11 +33,13 @@ use open365_text::{FontLibrary, FontMatch};
 use serde_json::Value;
 
 const TOLERANCE: f64 = 0.5;
-/// Table cell rectangles are compared much tighter than text: the PDF writes five significant
-/// digits and Word snaps edges to its 600 dpi device grid (0.12 pt), so 0.1 pt is one device pixel
-/// less the rounding of the numbers.
-const CELL_TOLERANCE_X: f64 = 0.25;
-/// Vertical edges follow the 0.24 pt grid the engine models, so only the PDF's rounding is left.
+/// Table cell rectangles are compared much tighter than text. Word snaps every cell edge to
+/// its 0.24 pt grid (the engine does the same), so what is left is the rounding of the PDF's
+/// numbers and the scale error of `PDF_SCALE_X`.
+const CELL_TOLERANCE_X: f64 = 0.05;
+/// Horizontal PDF scale of cell edges: Word's 600 dpi device pixel is 0.120048 pt in the PDF
+/// (edges at 600 px = 72.024, 4500 px = 540.21), 1.0004 times the nominal 0.12 pt.
+const PDF_SCALE_X: f64 = 1.0004;
 const CELL_TOLERANCE_Y: f64 = 0.05;
 /// Pictures: Word places them on its device grid and the PDF rounds the numbers; a picture must
 /// land within this of Word's, edge by edge.
@@ -259,9 +261,9 @@ fn score(name: &str, detail: bool, mode: Mode, fonts: &FontLibrary) -> Result<Sc
             })
             .find(|(pn, i, b)| {
                 !used.contains(&(*pn, *i))
-                    && (b.x - c.x / PDF_SCALE).abs() <= CELL_TOLERANCE_X
+                    && (b.x - c.x / PDF_SCALE_X).abs() <= CELL_TOLERANCE_X
                     && (b.y - c.y / PDF_SCALE).abs() <= CELL_TOLERANCE_Y
-                    && (b.width - c.w / PDF_SCALE).abs() <= CELL_TOLERANCE_X
+                    && (b.width - c.w / PDF_SCALE_X).abs() <= CELL_TOLERANCE_X
                     && (b.height - c.h / PDF_SCALE).abs() <= CELL_TOLERANCE_Y
             });
         if let Some((pn, i, _)) = hit {

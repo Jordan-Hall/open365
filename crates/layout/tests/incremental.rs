@@ -186,12 +186,17 @@ fn one_keystroke_in_a_355_page_document_relayouts_in_under_16_ms() {
         inc.stats()
     );
     check_equal(&inc, &doc, &fonts, "after typing");
-    // Debug builds are an order of magnitude slower; the budget is for release.
-    let budget = if cfg!(debug_assertions) { 400.0 } else { 16.0 };
-    assert!(
-        median < budget && worst < budget * 2.0,
-        "keystroke relayout median {median:.2} ms, worst {worst:.2} ms over {budget} ms"
-    );
+    // The timing budget is for release builds: debug timings are an order of magnitude slower
+    // and flaky under load, so debug builds only check the structure above and print the times.
+    // OPEN365_TIMING_ASSERT=1 forces the check in a debug build.
+    let enforce = !cfg!(debug_assertions) || std::env::var_os("OPEN365_TIMING_ASSERT").is_some();
+    if enforce {
+        let budget = if cfg!(debug_assertions) { 400.0 } else { 16.0 };
+        assert!(
+            median < budget && worst < budget * 2.0,
+            "keystroke relayout median {median:.2} ms, worst {worst:.2} ms over {budget} ms"
+        );
+    }
 }
 
 #[test]

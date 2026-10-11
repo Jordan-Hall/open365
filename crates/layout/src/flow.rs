@@ -455,14 +455,18 @@ fn snap_baseline(y: f64) -> f64 {
     ((y - 1e-6) / BASELINE_GRID).ceil() * BASELINE_GRID
 }
 
-/// A cell rectangle as Word draws it: the top and bottom edges lie on the same 0.24 pt grid as
-/// baselines, each rounded to the nearest line (measured over 120-row probe tables: the row
-/// boundaries are `round(exact_y / 0.24) * 0.24`, so rows alternate 13.44 and 13.20 pt for a
-/// 13.43 pt line). Left and right edges are not snapped (columns are exact twips).
+/// A cell rectangle as Word draws it: every edge lies on the same 0.24 pt grid as baselines, each
+/// rounded to the nearest line, halves up (measured over 120-row probe tables and 500 cell
+/// edges of the `layout-table-*` fixtures: the row boundaries are `round(exact_y / 0.24) * 0.24`,
+/// so rows alternate 13.44 and 13.20 pt for a 13.43 pt line; the column edges `round(exact_x /
+/// 0.24) * 0.24` in page coordinates, so equal twip widths come out 199.92 / 200.4 pt).
 fn snap_cell(c: CellBox) -> CellBox {
-    let top = (c.y / BASELINE_GRID).round() * BASELINE_GRID;
-    let bottom = ((c.y + c.height) / BASELINE_GRID).round() * BASELINE_GRID;
+    let snap = |v: f64| ((v / BASELINE_GRID) + 1e-9).round() * BASELINE_GRID;
+    let (left, right) = (snap(c.x), snap(c.x + c.width));
+    let (top, bottom) = (snap(c.y), snap(c.y + c.height));
     CellBox {
+        x: left,
+        width: right - left,
         y: top,
         height: bottom - top,
         ..c
@@ -680,6 +684,29 @@ struct ActiveSpan {
     box_idx: Option<usize>,
 }
 
+/// One source of lines for a row that is split: one of its cells, or a vertically merged cell
+/// from above that ends in it.
+struct RowPart<'t> {
+    cell: &'t CellLayout,
+    /// First line of the cell that belongs to the row.
+    first: usize,
+    /// Offset of the cell's content box below the row's top, for the first fragment.
+    lead: f64,
+    /// Index into the active spans for a merged cell.
+    span: Option<usize>,
+}
+
+impl RowPart<'_> {
+    /// Offset of line 0 of the cell below the fragment top when the fragment starts at line `at`.
+    fn lead_at(&self, at: usize) -> f64 {
+        if at <= self.first {
+            self.lead
+        } else {
+            self.cell.pad.top - self.cell.lines.get(at).map_or(0.0, |l| l.dy)
+        }
+    }
+}
+
 struct Paginator<'a> {
     env: &'a Env<'a>,
     done: Vec<Page>,
@@ -841,95 +868,146 @@ impl Paginator<'_> {
         active.retain(|s| s.end_row > r);
     }
 
-    /// Whether row `r` may be split across pages: free of merges, not exact, not `cantSplit`.
+    /// Whether row `r` may be split across pages: not exact, not `cantSplit`, no merge starting in
+    /// it, and every merged cell above it ends in it (the extra height such a cell needs is the
+    /// row's, so Word splits the row there; measured on `layout-table-pages`).
     fn splittable(table: &TableLayout, r: usize, active: &[ActiveSpan]) -> bool {
         let row = &table.rows[r];
         !row.cant_split
             && !row.exact
-            && row.cells.iter().all(|c| c.row_span == 1)
-            && !active.iter().any(|s| s.start_row < r && r <= s.end_row)
+            && row.cells.iter().all(|c| c.row_span <= 1)
+            && active
+                .iter()
+                .filter(|s| s.start_row < r && r <= s.end_row)
+                .all(|s| s.end_row == r)
     }
 
-    /// Takes as many lines of every cell of row `r` as fit in `avail`, starting at `resume`.
+    /// The cells whose lines make up row `r` when it is split: its own and the merged cells that
+    /// end in it.
+    fn row_parts<'t>(table: &'t TableLayout, r: usize, active: &[ActiveSpan]) -> Vec<RowPart<'t>> {
+        let row = &table.rows[r];
+        let mut parts: Vec<RowPart<'t>> = row
+            .cells
+            .iter()
+            .filter(|c| c.row_span == 1)
+            .map(|cell| RowPart {
+                cell,
+                first: 0,
+                lead: cell.pad.top,
+                span: None,
+            })
+            .collect();
+        for (i, s) in active.iter().enumerate() {
+            if s.start_row < r && r <= s.end_row {
+                let cell = &table.rows[s.start_row].cells[s.cell];
+                let first = cell
+                    .lines
+                    .iter()
+                    .position(|l| cell.content_top + l.dy >= row.top - EPS)
+                    .unwrap_or(cell.lines.len());
+                parts.push(RowPart {
+                    cell,
+                    first,
+                    lead: cell.content_top - row.top,
+                    span: Some(i),
+                });
+            }
+        }
+        parts
+    }
+
+    /// Takes as many lines of every part of a row as fit in `avail`, starting at `resume`.
     /// Returns the new cursors, the fragment height and whether the row is finished.
     fn split_fragment(
-        table: &TableLayout,
-        r: usize,
+        parts: &[RowPart<'_>],
         resume: &[usize],
         avail: f64,
     ) -> (Vec<usize>, f64, bool) {
-        let row = &table.rows[r];
         let mut next = resume.to_vec();
         let mut height = 0.0f64;
         let mut finished = true;
-        for (ci, cell) in row.cells.iter().enumerate() {
-            let start = resume[ci];
+        for (pi, part) in parts.iter().enumerate() {
+            let (cell, start) = (part.cell, resume[pi]);
             if start >= cell.lines.len() {
                 continue;
             }
-            let base = if start == 0 {
-                0.0
-            } else {
-                cell.lines[start].dy
-            };
+            let lead = part.lead_at(start);
             let mut k = start;
             let mut used = 0.0;
             while k < cell.lines.len() {
                 let ln = &cell.lines[k];
-                let bottom = ln.dy + ln.height - base;
-                if cell.pad.top + bottom + cell.pad.bottom > avail + EPS {
+                let bottom = lead + ln.dy + ln.height;
+                if bottom + cell.pad.bottom > avail + EPS {
                     break;
                 }
                 used = bottom;
                 k += 1;
             }
             if k == cell.lines.len() {
-                used = used.max(cell.content_h - base);
-                if cell.pad.top + used + cell.pad.bottom > avail + EPS {
+                used = used.max(lead + cell.content_h);
+                if used + cell.pad.bottom > avail + EPS {
                     // The trailing space does not fit: leave the last line for the next page.
                     k = cell.lines.len().saturating_sub(1).max(start);
-                    used = cell.lines[k.saturating_sub(1).max(start)].dy - base;
+                    used = if k > start {
+                        let last = &cell.lines[k - 1];
+                        lead + last.dy + last.height
+                    } else {
+                        0.0
+                    };
                 }
             }
             if k < cell.lines.len() {
                 finished = false;
             }
-            next[ci] = k;
+            next[pi] = k;
             if k > start {
-                height = height.max(cell.pad.top + used + cell.pad.bottom);
+                height = height.max(used + cell.pad.bottom);
             }
         }
         (next, height, finished)
     }
 
+    /// Draws the lines `from..to` of every part of a row at `y`. After a page break only the
+    /// parts with lines left get a box (Word draws no empty cell on a continuation page).
+    #[allow(clippy::too_many_arguments)]
     fn emit_fragment(
         &mut self,
         table: &TableLayout,
-        r: usize,
+        parts: &[RowPart<'_>],
+        active: &mut [ActiveSpan],
         y: f64,
         from: &[usize],
         to: &[usize],
         height: f64,
+        resumed: bool,
     ) {
-        let row = &table.rows[r];
         let origin = self.page.origin_x() + table.x;
-        for (ci, cell) in row.cells.iter().enumerate() {
-            self.page.cells.push(cell_box(
-                origin + cell.x + cell.inset_l,
-                y,
-                cell.w - cell.inset_l - cell.inset_r,
-                height,
-                cell.meta,
-                self.cur.map_or(0, |c| c.1.table),
-            ));
-            let base = if from[ci] == 0 {
-                0.0
-            } else {
-                cell.lines.get(from[ci]).map_or(0.0, |l| l.dy)
-            };
-            for ln in &cell.lines[from[ci].min(cell.lines.len())..to[ci].min(cell.lines.len())] {
-                let top = y + cell.pad.top + (ln.dy - base);
-                self.push_line(ln, origin + cell.pad.left + cell.x, top);
+        for (pi, part) in parts.iter().enumerate() {
+            let cell = part.cell;
+            let n = cell.lines.len();
+            if !resumed || from[pi] < n {
+                let table_id = self.cur.map_or(0, |c| c.1.table);
+                let existing = part.span.and_then(|i| active[i].box_idx);
+                if let Some(i) = existing {
+                    let b = &mut self.page.cells[i];
+                    b.height = y + height - b.y;
+                } else {
+                    self.page.cells.push(cell_box(
+                        origin + cell.x + cell.inset_l,
+                        y,
+                        cell.w - cell.inset_l - cell.inset_r,
+                        height,
+                        cell.meta,
+                        table_id,
+                    ));
+                    if let Some(i) = part.span {
+                        active[i].box_idx = Some(self.page.cells.len() - 1);
+                    }
+                }
+            }
+            let lead = part.lead_at(from[pi]);
+            for ln in &cell.lines[from[pi].min(n)..to[pi].min(n)] {
+                self.push_line(ln, origin + cell.pad.left + cell.x, y + lead + ln.dy);
             }
         }
     }
@@ -945,12 +1023,14 @@ impl Paginator<'_> {
             let avail = self.page.bottom() - y;
             let at_top = !self.page.has_content();
             if let Some(cursors) = resume.clone() {
-                let (to, h, finished) = Self::split_fragment(table, r, &cursors, avail);
+                let parts = Self::row_parts(table, r, &active);
+                let (to, h, finished) = Self::split_fragment(&parts, &cursors, avail);
                 if h > 0.0 || finished {
-                    self.emit_fragment(table, r, y, &cursors, &to, h);
+                    self.emit_fragment(table, &parts, &mut active, y, &cursors, &to, h, true);
                     y += h;
                     if finished {
                         resume = None;
+                        active.retain(|s| s.end_row > r);
                         r += 1;
                         continue;
                     }
@@ -967,12 +1047,14 @@ impl Paginator<'_> {
                 continue;
             }
             if Self::splittable(table, r, &active) {
-                let zero = vec![0usize; row.cells.len()];
-                let (to, h, finished) = Self::split_fragment(table, r, &zero, avail);
+                let parts = Self::row_parts(table, r, &active);
+                let zero: Vec<usize> = parts.iter().map(|p| p.first).collect();
+                let (to, h, finished) = Self::split_fragment(&parts, &zero, avail);
                 if h > 0.0 || (at_top && finished) {
-                    self.emit_fragment(table, r, y, &zero, &to, h);
+                    self.emit_fragment(table, &parts, &mut active, y, &zero, &to, h, false);
                     y += h;
                     if finished {
+                        active.retain(|s| s.end_row > r);
                         r += 1;
                         continue;
                     }
@@ -983,13 +1065,12 @@ impl Paginator<'_> {
                 }
                 if at_top {
                     // Not even one line fits on an empty page: take one anyway.
-                    let to: Vec<usize> = row
-                        .cells
+                    let to: Vec<usize> = parts
                         .iter()
-                        .map(|c| usize::from(!c.lines.is_empty()))
+                        .map(|p| (p.first + 1).min(p.cell.lines.len()).max(p.first))
                         .collect();
                     let h = row.height.min(avail.max(1.0));
-                    self.emit_fragment(table, r, y, &zero, &to, h);
+                    self.emit_fragment(table, &parts, &mut active, y, &zero, &to, h, false);
                     y += h;
                     resume = Some(to);
                     self.page.y = y;

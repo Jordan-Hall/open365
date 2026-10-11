@@ -133,7 +133,7 @@ matched = 132
 total = 136
 
 [fixtures.layout-table-pages]
-matched = 1168
+matched = 1208
 total = 1208
 
 [fixtures.layout-table-rows]
@@ -309,7 +309,7 @@ matched = 132
 total = 136
 
 [system.layout-table-pages]
-matched = 1168
+matched = 1208
 total = 1208
 
 [system.layout-table-rows]

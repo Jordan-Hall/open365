@@ -89,8 +89,10 @@ $word = $null; $wordPids = @()
 function Get-Word {
   if ($null -eq $script:word) {
     $script:word = New-Object -ComObject Word.Application
-    $script:word.Visible = $false; $script:word.DisplayAlerts = 0
     $script:wordPids = @(Get-Pids 'WINWORD' | Where-Object { $_ -notin $script:wordBefore })
+    if ($script:wordPids.Count -eq 0) { throw 'COM attached to a Word instance this script did not start; refusing to touch it' }
+    $script:word.Visible = $false; $script:word.DisplayAlerts = 0
+    $script:word.AutomationSecurity = 3  # msoAutomationSecurityForceDisable: macros never run
   }
   $script:word
 }
@@ -216,16 +218,16 @@ function Story-Rank($l) {
 }
 
 # Paragraphs inside tables (nested ones included), by story start, with their text without the end mark.
-function Walk-Table($t, $out, $seen) {
+function Walk-Table($t, $out, $seen, $tab) {
   foreach ($cell in $t.Range.Cells) {
     foreach ($p in $cell.Range.Paragraphs) {
       $rg = $p.Range; $s = [int]$rg.Start
       if ($seen.ContainsKey($s)) { continue }
       $seen[$s] = 1
-      $out.Add(@{ start = $s; text = (([string]$rg.Text) -replace '[\r\a]+$', ''); used = 0; lines = 0 })
+      $out.Add(@{ start = $s; text = (([string]$rg.Text) -replace '[\r\a]+$', ''); used = 0; lines = 0; tab = $tab })
     }
   }
-  foreach ($n in $t.Tables) { Walk-Table $n $out $seen }
+  foreach ($n in $t.Tables) { Walk-Table $n $out $seen $tab }
 }
 
 function Ref-Layout($f) {
@@ -335,19 +337,37 @@ function Ref-Layout($f) {
       # Table text: each drawn row is matched to the paragraph (and offset) whose unconsumed text starts with it.
       if ($hasTables) {
         $tp = New-Object System.Collections.Generic.List[object]; $seen = @{}
-        foreach ($t in $doc.Tables) { Walk-Table $t $tp $seen }
+        $active = -1
+        $tabId = 0; foreach ($t in $doc.Tables) { Walk-Table $t $tp $seen $tabId; $tabId++ }
         for ($pi = 1; $pi -le [math]::Min($pcount, $pdfPages.Count); $pi++) {
           foreach ($row in @($pdfPages[$pi - 1].rows | Where-Object { $_.clip -ge 0 })) {
             $t = $row.text; $hit = $null; $off = 0
-            foreach ($p in $tp) {
-              $rem = $p.text.Substring($p.used); $trim = $rem.TrimStart()
-              if ($t -eq '') { if ($trim -eq '' -and $p.lines -eq 0) { $hit = $p; $off = $p.used; break } }
-              elseif ($trim.StartsWith($t, [StringComparison]::Ordinal)) { $hit = $p; $off = $p.used + ($rem.Length - $trim.Length); break }
-            }
             $repeat = $false
+            # Cell texts are not unique across tables (every table has an R1C1w1), so a drawn row is matched
+            # inside the table being drawn first: its next unconsumed text, else (while the table still has
+            # unconsumed text) a repeated header row. Only then does the next table start.
+            $activeLeft = $false
+            if ($active -ge 0) { foreach ($p in $tp) { if ($p.tab -eq $active -and $p.text.Substring($p.used).Trim() -ne '') { $activeLeft = $true; break } } }
+            foreach ($pass in 1, 2) {
+              if ($hit) { break }
+              foreach ($p in $tp) {
+                if ($pass -eq 1 -and $activeLeft -and $p.tab -ne $active) { continue }
+                $rem = $p.text.Substring($p.used); $trim = $rem.TrimStart()
+                if ($t -eq '') { if ($trim -eq '' -and $p.lines -eq 0) { $hit = $p; $off = $p.used; break } }
+                elseif ($trim.StartsWith($t, [StringComparison]::Ordinal)) { $hit = $p; $off = $p.used + ($rem.Length - $trim.Length); break }
+              }
+              if ($pass -eq 1 -and -not $hit -and $activeLeft) {
+                foreach ($p in $tp) {
+                  if ($p.tab -ne $active -or $p.lines -eq 0 -or $t -eq '') { continue }
+                  $ix = $p.text.IndexOf($t, [StringComparison]::Ordinal)
+                  if ($ix -ge 0) { $hit = $p; $off = $ix; $repeat = $true; break }
+                }
+              }
+            }
             if (-not $hit) {
               foreach ($p in $tp) { $ix = if ($t -eq '') { -1 } else { $p.text.IndexOf($t, [StringComparison]::Ordinal) }; if ($ix -ge 0) { $hit = $p; $off = $ix; $repeat = $true; break } }
             }
+            if ($hit -and -not $repeat) { $active = $hit.tab }
             if (-not $hit) { $warn += "page ${pi}: table row '$t' matches no paragraph"; continue }
             if (-not $repeat) { $hit.used = $off + $t.Length; $hit.lines++ }
             $st = $hit.start + $off
