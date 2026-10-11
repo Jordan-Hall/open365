@@ -61,23 +61,23 @@ matched = 41
 total = 69
 
 [fixtures.layout-float-collide]
-matched = 13
+matched = 68
 total = 68
 
 [fixtures.layout-float-collide-compat14]
-matched = 14
+matched = 53
 total = 53
 
 [fixtures.layout-float-collide-tb]
-matched = 31
+matched = 38
 total = 38
 
 [fixtures.layout-float-dist]
-matched = 1
+matched = 77
 total = 78
 
 [fixtures.layout-float-dist-mixed]
-matched = 1
+matched = 75
 total = 75
 
 [fixtures.layout-float-incell]
@@ -105,7 +105,7 @@ matched = 50
 total = 50
 
 [fixtures.layout-float-posv-line]
-matched = 4
+matched = 22
 total = 24
 
 [fixtures.layout-float-wrap-behind-front]
@@ -117,15 +117,15 @@ matched = 46
 total = 46
 
 [fixtures.layout-float-wrap-square]
-matched = 28
+matched = 43
 total = 43
 
 [fixtures.layout-float-wrap-tight]
-matched = 25
+matched = 68
 total = 68
 
 [fixtures.layout-float-wrap-topbottom]
-matched = 21
+matched = 36
 total = 36
 
 [fixtures.layout-fn-basic]
@@ -281,7 +281,7 @@ matched = 22
 total = 22
 
 [fixtures.layout-txbx-wrap]
-matched = 21
+matched = 65
 total = 66
 
 [fixtures.layout-wrap]

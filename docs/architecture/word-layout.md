@@ -57,7 +57,24 @@ even if the extra spacing below it does not (`layout-face-multiple`, Arial 10 pt
 ## Pictures (`float.rs`, `flow.rs`)
 
 Inline and floating placements match `layout-img-inline`, `layout-img-none`, `layout-img-square` and
-`layout-img-tb` to the picture tolerance. Wrap distances and anchor positions have no dedicated probe yet.
+`layout-img-tb` to the picture tolerance. The rules of `docs/research/word-float-placement.md` are implemented in `float.rs`:
+
+- Each wrapping float excludes `[x - distL, x + w + distR)` over `[y - distT, y + h + distB)`. A line band loses those spans
+  (`wrapText` left, right, both, largest); every free span that holds the next word becomes its own line on the same row.
+  When no span fits, the row goes below the floats. Top-and-bottom floats push whole lines below them.
+- Tight and through wraps follow the `wp:wrapPolygon` read from the raw anchor: the extent is the union of the polygon over
+  the line band (`layout-float-wrap-tight`, 68 of 68).
+- A float in the next paragraph is placed from that paragraph's top as laid out without it (kept in `anchor_top`), and its
+  zone pushes the last lines of the paragraph above. Only when all lines still fit on the page.
+- `allowOverlap="0"`: a later float moves right until its left edge meets the right edge of the earlier one it covers.
+- Character-relative x is the left edge of the character before the anchor; line-relative y is the top of that line. Such
+  floats are placed after their line and never move it.
+- Right and bottom alignment subtract the `effectExtent` on that side.
+- Shapes in `mc:AlternateContent` without text are kept as anchors (one character, wrapping); header/footer ones are not
+  emitted as images.
+
+Open: columns (`layout-float-poscol`), `layoutInCell` and floats in table cells (`layout-float-incell*`), clamping at the
+bottom margin (`layout-float-anchor-bottom`, `-anchor-nextpage`), the lookahead after an incremental restart.
 
 ## Content controls (`w:sdt`; `para.rs`, `incremental.rs`, `crates/docx/src/flatten.rs`)
 
@@ -77,7 +94,7 @@ Inline and floating placements match `layout-img-inline`, `layout-img-none`, `la
 | `wrap="none"`: lines never wrap; the clip rectangle is `lIns + widest line + rIns` wide. | `layout-txbx-basic` (Zeta) |
 | The clip rectangle Word draws is the shape inset by half the outline width (`a:ln/@w`) all round and by `tIns`/`bIns` vertically; `spAutoFit` does not resize the shape on open (Epsilon keeps its 30 pt clip while its third line falls outside). | `layout-txbx-basic` clip rectangles |
 
-Not matched: body text wrapping around square-wrapped boxes (`layout-txbx-wrap`, 21 of 66: the lines beside a box are placed below it, and the baselines of that page are unpaired in the reference); the box text is not clipped in the PDF or the desktop view.
+Body text wraps around square and top-and-bottom boxes through the same float code as pictures (`layout-txbx-wrap`, 65 of 66). The box text is not clipped in the PDF or the desktop view.
 
 ## Not matched yet
 

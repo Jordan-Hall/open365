@@ -111,9 +111,12 @@ fn place(
         if let Some(sp) = section {
             let frame = FloatFrame { section: *sp };
             for o in pl.objects.iter().filter(|o| !o.inline()) {
-                let mut im = float::place(&o.drawing, o.atom, &frame, y, 0, None).image;
+                let mut im = float::place(&o.drawing, o.atom, &frame, y, 0, None, None, None).image;
                 im.source = source.clone();
-                images.push((lines.len(), im));
+                // A shape without a picture or text has nothing to draw here.
+                if im.embed.is_some() || im.text_box.is_some() {
+                    images.push((lines.len(), im));
+                }
             }
         }
         for lb in &pl.lines {

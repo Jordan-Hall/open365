@@ -250,6 +250,7 @@ pub(crate) enum AtomClass {
 #[derive(Debug, Clone)]
 pub(crate) struct ObjectBox {
     pub drawing: Drawing,
+    pub flags: crate::float::AnchorFlags,
     /// Advance of an inline picture: its width plus the effect extent.
     pub width: f64,
     /// Height of an inline picture above the baseline: its height plus the effect extent.
@@ -528,7 +529,7 @@ struct Collector<'a, 'b> {
     refs: Vec<(usize, bool, i64)>,
     separator: bool,
     /// Drawings: byte position of the object character in `text` and the drawing.
-    objects: Vec<(usize, Drawing)>,
+    objects: Vec<(usize, Drawing, crate::float::AnchorFlags)>,
     /// The next `push` starts a new span (after an object character).
     split: bool,
 }
@@ -566,15 +567,16 @@ impl Collector<'_, '_> {
         let Some(d) = Drawing::from_element(e) else {
             return;
         };
-        self.add_drawing(d, style);
+        let flags = crate::float::AnchorFlags::read(e);
+        self.add_drawing(d, flags, style);
     }
 
-    fn add_drawing(&mut self, d: Drawing, style: usize) {
+    fn add_drawing(&mut self, d: Drawing, flags: crate::float::AnchorFlags, style: usize) {
         if self.suppressed() {
             return;
         }
         self.split = true;
-        self.objects.push((self.text.len(), d));
+        self.objects.push((self.text.len(), d, flags));
         self.push(OBJECT_CHAR, style);
         self.split = true;
     }
@@ -684,9 +686,10 @@ impl Collector<'_, '_> {
         } else if h.is_w("separator") || h.is_w("continuationSeparator") {
             self.separator = true;
             self.hide(1);
-        } else if let Some(d) = Drawing::from_alternate_content(e) {
+        } else if let Some(d) = crate::float::alternate_drawing(e) {
             // A text box: the choice holds the `w:drawing`, the fallback a VML copy.
-            self.add_drawing(d, style);
+            let flags = crate::float::AnchorFlags::read(e);
+            self.add_drawing(d, flags, style);
         }
     }
 
@@ -889,13 +892,14 @@ pub(crate) fn layout_paragraph(
     for (range, style_idx) in &spans {
         let seg = &text[range.clone()];
         if seg == OBJECT_CHAR
-            && let Some((_, d)) = raw_objects.iter().find(|o| o.0 == range.start)
+            && let Some((_, d, flags)) = raw_objects.iter().find(|o| o.0 == range.start)
         {
             let (w, h) = d.size_pt();
             let [el, et, er, eb] = d.effect_extent_pt();
             let inline = !d.anchored;
             objects.push(ObjectBox {
                 drawing: d.clone(),
+                flags: flags.clone(),
                 width: if inline { w + el + er } else { 0.0 },
                 height: if inline { h + et + eb } else { 0.0 },
                 atom: atoms.len(),

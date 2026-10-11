@@ -5,7 +5,7 @@
 use std::sync::Arc;
 
 use crate::build::UnitLayout;
-use crate::float::{Float, Frame, dynamic_lines};
+use crate::float::{Float, Frame, ahead_floats, dynamic_lines};
 use crate::furniture::{Furniture, NoteStore};
 use crate::para::{AtomClass, LineBox, ParaLayout};
 use crate::props::SectionProps;
@@ -126,6 +126,8 @@ pub(crate) struct Checkpoint {
     pub section_index: usize,
     /// Footnotes on the current page.
     pub notes: usize,
+    /// Page and top of the next paragraph as laid out before its floats pushed this one.
+    pub anchor_top: Option<(usize, f64)>,
 }
 
 struct PageBuild {
@@ -152,6 +154,9 @@ struct PageBuild {
     prev_contextual: bool,
     /// How this page began, which decides whether space before survives at its top.
     hard_start: bool,
+    /// Page number and top of the next paragraph before the floats it anchors pushed the
+    /// paragraph above it; Word places those floats from this top.
+    anchor_top: Option<(usize, f64)>,
 }
 
 impl PageBuild {
@@ -183,6 +188,7 @@ impl PageBuild {
             prev_style: None,
             prev_contextual: false,
             hard_start,
+            anchor_top: None,
         }
     }
 
@@ -1133,6 +1139,7 @@ impl Checkpoint {
             && self.notes == other.notes
             && self.y == other.y
             && self.hard_start == other.hard_start
+            && self.anchor_top == other.anchor_top
             && self.force_break == other.force_break
             && self.section_index == other.section_index
             && (self.pages_done > 0) == (other.pages_done > 0)
@@ -1193,6 +1200,7 @@ fn checkpoint(pg: &Paginator<'_>, force_break: bool) -> Checkpoint {
         force_break,
         section_index: pg.page.section_index,
         notes: pg.page.slots.len(),
+        anchor_top: pg.page.anchor_top,
     }
 }
 
@@ -1236,6 +1244,7 @@ pub(crate) fn paginate<'a>(
                 prev_style: carry.style,
                 prev_contextual: carry.contextual,
                 hard_start: r.checkpoint.hard_start,
+                anchor_top: r.checkpoint.anchor_top,
             };
             let pg = Paginator {
                 env,
@@ -1312,6 +1321,7 @@ pub(crate) fn paginate<'a>(
                 0.0
             };
             pg.cur = Some((item.unit.as_ref(), base));
+            pg.page.anchor_top = None;
             pg.place_table(table, gap);
             pg.page.pending_after = 0.0;
             pg.page.prev_style = None;
@@ -1370,13 +1380,68 @@ pub(crate) fn paginate<'a>(
             };
             let y0 = pg.page.y + gap(&pg.page) + border_above;
             // Floating pictures change the lines: break them again around the pictures.
-            let around = has_anchor || pg.page.floats.iter().any(|f| f.y1 > y0 - EPS);
-            let dynamic = around.then(|| {
-                let frame = Frame {
-                    section: pg.page.section,
-                };
-                dynamic_lines(para, from_atom, y0, &pg.page.floats, &frame, base)
+            // A continuation that starts inside a line of the plain layout (the lines above broke
+            // around a picture) must be broken again too.
+            let mid_line = from_atom > 0 && !para.lines.iter().any(|l| l.atoms.start == from_atom);
+            let around = has_anchor || mid_line || pg.page.floats.iter().any(|f| f.y1 > y0 - EPS);
+            let frame = Frame {
+                section: pg.page.section,
+            };
+            let anchor_top = if first_segment {
+                pg.page
+                    .anchor_top
+                    .filter(|(page, _)| *page == pg.page.number)
+                    .map(|(_, top)| top)
+            } else {
+                None
+            };
+            let mut dynamic = around.then(|| {
+                dynamic_lines(
+                    para,
+                    from_atom,
+                    y0,
+                    anchor_top,
+                    &pg.page.floats,
+                    &frame,
+                    base,
+                )
             });
+            // Floats of the next paragraph reach back over the lines of this one: Word places
+            // them from the next paragraph's top as laid out without them, then pushes the
+            // lines above (word-float-placement.md, rule 3).
+            let mut next_top = None;
+            if let Some(next) = items.get(p + 1).and_then(FlowItem::para)
+                && next.objects.iter().any(|o| !o.inline())
+                && !next.flow.page_break_before
+                && items[p + 1].section() == section
+            {
+                let lines: &[LineBox] = match &dynamic {
+                    Some(d) => &d.lines,
+                    None => {
+                        let from = para.lines.partition_point(|l| l.atoms.start < from_atom);
+                        &para.lines[from..]
+                    }
+                };
+                let used: f64 = lines.iter().map(|l| l.lead + l.height).sum();
+                let top = y0
+                    + used
+                    + f64::from(para.props.space_after_pt)
+                        .max(f64::from(next.props.space_before_pt));
+                let ahead = ahead_floats(next, &frame, top, y0 + used);
+                if !ahead.is_empty() {
+                    let mut all = pg.page.floats.clone();
+                    all.extend(ahead);
+                    let alt = dynamic_lines(para, from_atom, y0, anchor_top, &all, &frame, base);
+                    let fit = |ls: &[LineBox]| {
+                        decide(para, ls, first_segment, y0, pg.page.bottom(), at_top, None).take
+                            == ls.len()
+                    };
+                    if fit(lines) && fit(&alt.lines) {
+                        next_top = Some(top);
+                        dynamic = Some(alt);
+                    }
+                }
+            }
             let lines: &[LineBox] = match &dynamic {
                 Some(d) => &d.lines,
                 None => {
@@ -1480,13 +1545,16 @@ pub(crate) fn paginate<'a>(
             if let Some(d) = &dynamic {
                 for a in d.anchors.iter().filter(|a| a.atom < end_atom) {
                     pg.page.images.push(a.image.clone());
-                    pg.page.floats.extend(a.float);
+                    pg.page.floats.extend(a.float.clone());
                 }
             }
             if end_atom >= n_atoms && !joined_next {
                 y += para.border_bottom();
             }
             pg.page.y = y;
+            pg.page.anchor_top = next_top
+                .filter(|_| end_atom >= n_atoms)
+                .map(|top| (pg.page.number, top));
             from_atom = end_atom;
             if from_atom < n_atoms {
                 pg.new_page(broke, section);
