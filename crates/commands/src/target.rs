@@ -2,7 +2,7 @@ use std::path::{Path, PathBuf};
 
 use open365_docx::{DocPos, Document, Snapshot};
 use open365_opc::Limits;
-use open365_xlsx::{ColumnsSnapshot, RowHeightsSnapshot, Workbook};
+use open365_xlsx::{ColumnsSnapshot, FormatSnapshot, RowHeightsSnapshot, Workbook};
 
 use crate::command::{CellRef, Command, CommandLog, EffectClass, Outcome};
 use crate::error::CommandError;
@@ -46,6 +46,10 @@ enum Inverse {
         sheet: usize,
         before: ColumnsSnapshot,
     },
+    /// Undo by putting the previous worksheet and style sheet back (a formatting action).
+    Format(Box<FormatSnapshot>),
+    /// A formatting action that changed nothing.
+    Nothing,
     /// Undo by putting the previous row heights back.
     RowHeights {
         sheet: usize,
@@ -308,6 +312,14 @@ impl Target {
                 x.workbook.restore_row_heights(*sheet, before)?;
                 Vec::new()
             }
+            Inverse::Format(before) => {
+                let Content::Xlsx(x) = &mut self.content else {
+                    return Err(CommandError::NotUndoable);
+                };
+                x.workbook.restore_format((**before).clone())?;
+                Vec::new()
+            }
+            Inverse::Nothing => Vec::new(),
         };
         if let Some(entry) = self.undo.pop() {
             self.state = entry.state_before;
@@ -503,6 +515,13 @@ impl Target {
                         sheet: *sheet,
                         before,
                     },
+                    Vec::new(),
+                ))
+            }
+            (Content::Xlsx(x), command) if crate::format::is_format_command(command) => {
+                let before = crate::format::run(&mut x.workbook, command)?;
+                Ok((
+                    before.map_or(Inverse::Nothing, |b| Inverse::Format(Box::new(b))),
                     Vec::new(),
                 ))
             }

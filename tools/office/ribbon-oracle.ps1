@@ -31,12 +31,26 @@ param(
   [ValidateSet('Word', 'Excel', 'Both')][string]$App = 'Both',
   # Also record the ribbon at these window widths (physical px) into <app>-responsive.json (group reduction).
   [string]$ResponsiveWidths = '',
+  # Also record the title row, tab row, status bar (and for Excel the formula strip / sheet tabs) at these window
+  # widths into <app>-chrome-responsive.json (which items hide, how tabs compress, which status items drop out).
+  [string]$ChromeWidths = '',
+  # Do not rewrite <app>-ribbon.json (the main record goes to -ShotDir instead); use with -ChromeWidths.
+  [switch]$ChromeOnly,
+  # Milliseconds to wait after each resize before reading the chrome (-ChromeWidths).
+  [int]$ChromeSettleMs = 700,
+  # -ChromeWidths also accepts ranges: 1900..425:25 (from..to:step).
   [string]$ShotDir = (Join-Path ([IO.Path]::GetTempPath()) 'open365-ribbon-shots'),
   [int]$WindowWidth = 1600,
   [int]$WindowHeight = 1000
 )
 $ErrorActionPreference = 'Stop'
 $ResponsiveList = @($ResponsiveWidths -split ',' | Where-Object { $_ } | ForEach-Object { [int]$_ })
+$ChromeList = @($ChromeWidths -split ',' | Where-Object { $_ } | ForEach-Object {
+    if ($_ -match '^(\d+)\.\.(\d+):(\d+)$') {
+      $a = [int]$Matches[1]; $b = [int]$Matches[2]; $st = [int]$Matches[3]
+      if ($a -ge $b) { for ($x = $a; $x -ge $b; $x -= $st) { $x } } else { for ($x = $a; $x -le $b; $x += $st) { $x } }
+    } else { [int]$_ }
+  })
 $root = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 $outDir = Join-Path $root 'fixtures/reference/ui'
 New-Item -ItemType Directory -Force -Path $outDir | Out-Null
@@ -178,8 +192,11 @@ function Scan-Runs([string]$path, [int]$x0, [int]$y0, [int]$dx, [int]$dy, [int]$
 
 function Invoke-Oracle([string]$Which) {
   $exe = if ($Which -eq 'Word') { 'WINWORD' } else { 'EXCEL' }
+  # Office processes that were already running: if COM hands us one of them we abort (never touch them).
+  $preIds = @(Get-Process -Name $exe -ErrorAction SilentlyContinue | ForEach-Object { $_.Id })
   $office = New-Object -ComObject "$Which.Application"
   $procId = [uint32]0
+  $mine = $false
   $script:RibbonWasCollapsed = $false
   try {
     $office.Visible = $true
@@ -188,6 +205,8 @@ function Invoke-Oracle([string]$Which) {
     if ($Which -eq 'Word') { [void]$office.Documents.Add(); $h = $office.ActiveWindow.Hwnd } else { [void]$office.Workbooks.Add(); $h = $office.Hwnd }
     $hwnd = [IntPtr][int64]$h
     [void][Native.Ui]::GetWindowThreadProcessId($hwnd, [ref]$procId)
+    if ($preIds -contains [int]$procId) { throw "COM attached to an Office process that was already running (pid $procId); aborting without touching it" }
+    $mine = $true
     # Default window size/position as Office created it (before we resize), and the minimum size it accepts.
     $wrect = New-Object Native.Ui+RECT
     [void][Native.Ui]::GetWindowRect($hwnd, [ref]$wrect)
@@ -367,6 +386,78 @@ function Invoke-Oracle([string]$Which) {
       [IO.File]::WriteAllText((Join-Path $outDir ("{0}-responsive.json" -f $Which.ToLower())), $rj, (New-Object Text.UTF8Encoding($false)))
     }
 
+    # Chrome at other window widths: the title row, tab row, status bar and (Excel) formula strip / sheet tabs, one
+    # compact record per width: window (outer w, h), pane origin, then [name, id, x, y, w, h, offscreen] with x/y
+    # relative to the ribbon pane's top-left corner (so the 9 px invisible resize frame does not matter).
+    if ($ChromeList.Count -gt 0) {
+      $homeTab = $tabItems | Where-Object { $_.Current.AutomationId -eq 'TabHome' } | Select-Object -First 1
+      try { $homeTab.GetCurrentPattern([Windows.Automation.SelectionItemPattern]::Pattern).Select() } catch {}
+      $statusEl = (Find-All $win { param($e) $e.Current.ControlType -eq [Windows.Automation.ControlType]::StatusBar } 14) | Select-Object -First 1
+      $extraEls = @()
+      if ($Which -eq 'Excel') {
+        foreach ($cls in @('ComboBox', 'ExcelBookTabControl')) {
+          $e1 = (Find-All $win { param($e) $e.Current.ClassName -eq $cls } 14) | Select-Object -First 1
+          if ($e1) { $extraEls += $e1 }
+        }
+        $e1 = (Find-All $win { param($e) $e.Current.AutomationId -eq 'FormulaBar' } 14) | Select-Object -First 1
+        if ($e1) { $extraEls += $e1 }
+      }
+      function Add-Rec($list, $el, [int]$px, [int]$py) {
+        $c = $el.Current; $r = $c.BoundingRectangle
+        if ([double]::IsInfinity($r.X) -or $r.IsEmpty) { $rect = @(0, 0, 0, 0) } else { $rect = @([int]($r.X - $px), [int]($r.Y - $py), [int]$r.Width, [int]$r.Height) }
+        $nm = Scrub-Text $c.Name
+        if ($c.AutomationId -in 'MeControlWidget', 'PersonaPicture') { $nm = '<user>' }
+        [void]$list.Add(@($nm, $c.AutomationId, $rect[0], $rect[1], $rect[2], $rect[3], [int][bool]$c.IsOffscreen))
+      }
+      $cw = New-Object System.Collections.ArrayList
+      foreach ($rw in $ChromeList) {
+        [void][Native.Ui]::SetWindowPos($hwnd, [IntPtr]::Zero, 0, 0, $rw, $WindowHeight, 0x14)
+        Start-Sleep -Milliseconds $ChromeSettleMs
+        $pr = $ribbonPane.Current.BoundingRectangle
+        $px = [int]$pr.X; $py = [int]$pr.Y
+        $top = New-Object System.Collections.ArrayList
+        $ch1 = $walker.GetFirstChild($ribbonPane)
+        while ($ch1) {
+          $c1 = $ch1.Current
+          if ($c1.Name -ne 'Lower Ribbon') {
+            if ($c1.ClassName -eq 'NetUIPanViewer' -and $c1.ControlType -eq [Windows.Automation.ControlType]::Tab) {
+              Add-Rec $top $ch1 $px $py
+              $t1 = $walker.GetFirstChild($ch1)
+              while ($t1) { Add-Rec $top $t1 $px $py; $t1 = $walker.GetNextSibling($t1) }
+            } elseif ($c1.ClassName -in 'NetUIElement', 'NetUIOfficeCaption', 'NetUISearchBoxAnchor') {
+              Add-Rec $top $ch1 $px $py
+              if ($c1.ClassName -eq 'NetUIElement') {
+                $t1 = $walker.GetFirstChild($ch1)
+                while ($t1) { Add-Rec $top $t1 $px $py; $t1 = $walker.GetNextSibling($t1) }
+              }
+            } else { Add-Rec $top $ch1 $px $py }
+          }
+          $ch1 = $walker.GetNextSibling($ch1)
+        }
+        $stat = New-Object System.Collections.ArrayList
+        if ($statusEl) {
+          Add-Rec $stat $statusEl $px $py
+          $t1 = $walker.GetFirstChild($statusEl)
+          while ($t1) { Add-Rec $stat $t1 $px $py; $t1 = $walker.GetNextSibling($t1) }
+        }
+        $extra = New-Object System.Collections.ArrayList
+        foreach ($e1 in $extraEls) {
+          Add-Rec $extra $e1 $px $py
+          if ($e1.Current.ClassName -eq 'ExcelBookTabControl') {
+            $t1 = $walker.GetFirstChild($e1)
+            while ($t1) { Add-Rec $extra $t1 $px $py; $t1 = $walker.GetNextSibling($t1) }
+          }
+        }
+        $gr = New-Object Native.Ui+RECT
+        [void][Native.Ui]::GetWindowRect($hwnd, [ref]$gr)
+        [void]$cw.Add([ordered]@{ w = $rw; win = @(($gr.Right - $gr.Left), ($gr.Bottom - $gr.Top)); pane = @($px, $py, [int]$pr.Width, [int]$pr.Height); top = $top.ToArray(); status = $stat.ToArray(); extra = $extra.ToArray() })
+      }
+      [void][Native.Ui]::SetWindowPos($hwnd, [IntPtr]::Zero, 0, 0, $WindowWidth, $WindowHeight, 0x14)
+      $cj = [ordered]@{ schema = 2; app = $Which; measuredScale = $scale; note = 'w = requested outer window width in physical px (client = win[0] - 18). Records are [name, id, x, y, w, h, offscreen] with x, y relative to the ribbon pane origin.'; widths = $cw.ToArray() } | ConvertTo-Json -Depth 8 -Compress
+      foreach ($t in $script:Scrub) { if ($t) { $cj = $cj.Replace($t, '<user>') } }
+      [IO.File]::WriteAllText((Join-Path $outDir ("{0}-chrome-responsive.json" -f $Which.ToLower())), $cj, (New-Object Text.UTF8Encoding($false)))
+    }
+
     # Backstage: open the File tab, record the navigation list and layout, then go back.
     try {
       $fileTab = (Find-All $ribbonPane { param($e) $e.Current.AutomationId -eq 'FileTabButton' } 6) | Select-Object -First 1
@@ -384,19 +475,21 @@ function Invoke-Oracle([string]$Which) {
       }
     } catch { $result.backstageError = $_.Exception.Message }
 
-    $path = Join-Path $outDir ("{0}-ribbon.json" -f $Which.ToLower())
+    $path = Join-Path $(if ($ChromeOnly) { $ShotDir } else { $outDir }) ("{0}-ribbon.json" -f $Which.ToLower())
     $json = $result | ConvertTo-Json -Depth 40 -Compress
     foreach ($t in $script:Scrub) { if ($t) { $json = $json.Replace($t, '<user>') } }
     [IO.File]::WriteAllText($path, $json, (New-Object Text.UTF8Encoding($false)))
     Write-Host ("{0}: wrote {1} ({2} tabs, {3} bytes, dpi {4}, pid {5})" -f $Which, $path, $tabs.Count, $json.Length, $dpi, $procId)
   } finally {
-    try { if ($script:RibbonWasCollapsed) { $office.CommandBars.ExecuteMso('MinimizeRibbon') } } catch {}
-    try { foreach ($d in @($office.Documents)) { $d.Saved = $true } } catch {}
-    try { foreach ($w in @($office.Workbooks)) { $w.Saved = $true } } catch {}
-    try { $office.Quit() } catch {}
+    try { if ($mine -and $script:RibbonWasCollapsed) { $office.CommandBars.ExecuteMso('MinimizeRibbon') } } catch {}
+    if ($mine) {
+      try { foreach ($d in @($office.Documents)) { $d.Saved = $true } } catch {}
+      try { foreach ($w in @($office.Workbooks)) { $w.Saved = $true } } catch {}
+    }
+    if ($mine) { try { $office.Quit() } catch {} }
     try { [void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($office) } catch {}
     [GC]::Collect(); [GC]::WaitForPendingFinalizers()
-    if ($procId -gt 0) {
+    if ($mine -and $procId -gt 0) {
       $deadline = (Get-Date).AddSeconds(10)
       while ((Get-Date) -lt $deadline -and (Get-Process -Id $procId -ErrorAction SilentlyContinue)) { Start-Sleep -Milliseconds 250 }
       $p = Get-Process -Id $procId -ErrorAction SilentlyContinue

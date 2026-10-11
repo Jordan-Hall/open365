@@ -41,4 +41,6 @@ pub enum CommandError {
     Paste(String),
     #[error("invalid command log: {0}")]
     Log(String),
+    #[error("cell format: {0}")]
+    Format(String),
 }

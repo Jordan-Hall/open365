@@ -1,0 +1,5 @@
+feature = "layout-frame"
+made_with = "Microsoft Word 16.0.20430 (Windows)"
+author = "project member"
+expect_dropped = []
+notes = "a floating table positioned from the margins (60 pt from the left margin, 100 pt below the top margin), anchored in paragraph 2, with 4/4/12/12 pt distances"

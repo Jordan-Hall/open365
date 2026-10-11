@@ -5,15 +5,18 @@
 use std::sync::Arc;
 
 use crate::build::UnitLayout;
-use crate::float::{Float, Frame, ahead_floats, dynamic_lines};
+use crate::float::{Float, FloatKind, Frame, ahead_floats, dynamic_lines};
 use crate::furniture::{Furniture, NoteStore};
 use crate::para::{AtomClass, LineBox, ParaLayout};
 use crate::props::{SectionCols, SectionProps, SectionStart};
-use crate::table::{CellLayout, CellMeta, FlowLine, RowLayout, TableLayout};
+use crate::table::{
+    CellLayout, CellMeta, FlowLine, PosAnchor, PosSpec, RowLayout, TableLayout, TablePos,
+};
 use crate::{
     CellBox, Cluster, ClusterKind, GlyphRun, ImagePlacement, ImageSource, Line, NoteSlot, Page,
     PlacedGlyph, StoryKind,
 };
+use open365_docx::WrapSide;
 
 fn cell_box(x: f64, y: f64, width: f64, height: f64, meta: CellMeta, table_base: usize) -> CellBox {
     CellBox {
@@ -527,8 +530,13 @@ fn snap_baseline(y: f64) -> f64 {
 /// edges of the `layout-table-*` fixtures: the row boundaries are `round(exact_y / 0.24) * 0.24`,
 /// so rows alternate 13.44 and 13.20 pt for a 13.43 pt line; the column edges `round(exact_x /
 /// 0.24) * 0.24` in page coordinates, so equal twip widths come out 199.92 / 200.4 pt).
+/// An edge on that grid.
+pub(crate) fn snap_edge(v: f64) -> f64 {
+    ((v / BASELINE_GRID) + 1e-9).round() * BASELINE_GRID
+}
+
 fn snap_cell(c: CellBox) -> CellBox {
-    let snap = |v: f64| ((v / BASELINE_GRID) + 1e-9).round() * BASELINE_GRID;
+    let snap = snap_edge;
     let (left, right) = (snap(c.x), snap(c.x + c.width));
     let (top, bottom) = (snap(c.y), snap(c.y + c.height));
     // Word snaps the clip rectangle (the box inset by the padding), not the padding: a 2 pt
@@ -802,6 +810,34 @@ struct Paginator<'a> {
     /// a new page.
     trial: bool,
     overflow: bool,
+    /// Page x of the grid's left line while a floating table is being drawn.
+    float_origin: Option<f64>,
+}
+
+/// Spacing above the first line of `para` when it follows what is on `pg`.
+fn first_gap(pg: &PageBuild, para: &ParaLayout) -> f64 {
+    if para.section_mark {
+        return 0.0;
+    }
+    let contextual_same = pg.prev_style.as_ref().is_some_and(|s| *s == para.style_id);
+    let mut after = pg.pending_after;
+    let mut before = f64::from(para.props.space_before_pt);
+    if contextual_same {
+        if pg.prev_contextual {
+            after = 0.0;
+        }
+        if para.flow.contextual_spacing {
+            before = 0.0;
+        }
+    }
+    if !pg.has_content() {
+        after = 0.0;
+        if !pg.hard_start && pg.number > 1 {
+            before = 0.0;
+        }
+    }
+    // Word does not add space after and space before; the larger one separates.
+    after.max(before)
 }
 
 /// How many columns the section has (one for a section without columns).
@@ -819,7 +855,14 @@ impl<'a> Paginator<'a> {
             region: None,
             trial: false,
             overflow: false,
+            float_origin: None,
         }
+    }
+
+    /// Page x of the left grid line of `table`.
+    fn table_origin(&self, table: &TableLayout) -> f64 {
+        self.float_origin
+            .unwrap_or_else(|| self.page.origin_x() + table.x)
     }
 
     /// Sets the current column of the current section.
@@ -932,7 +975,7 @@ impl<'a> Paginator<'a> {
     /// Emits the lines of `cell` that start within `[row.top, row.top + row.height)` of the
     /// table, with the row drawn at page offset `y`.
     fn emit_cell_lines(&mut self, table: &TableLayout, cell: &CellLayout, row: &RowLayout, y: f64) {
-        let origin = self.page.origin_x() + table.x + cell.x + cell.pad.left;
+        let origin = self.table_origin(table) + cell.x + cell.pad.left;
         let (lo, hi) = (row.top - EPS, row.top + row.height - EPS);
         for ln in &cell.lines {
             let abs = cell.content_top + ln.dy;
@@ -978,7 +1021,7 @@ impl<'a> Paginator<'a> {
         repeated: bool,
     ) {
         let row = &table.rows[r];
-        let origin = self.page.origin_x() + table.x;
+        let origin = self.table_origin(table);
         // Merged cells from above continue (new box when the page changed).
         for s in active.iter_mut() {
             if s.start_row < r && r <= s.end_row {
@@ -1261,6 +1304,115 @@ impl<'a> Paginator<'a> {
     }
 
     /// Starts a new page inside a table, repeating the header rows when row `r` is a body row.
+    /// The position of `table` when it leaves the flow. A table with no room for text beside
+    /// it (as wide as the column with its distances) stays in the flow: its anchor paragraph
+    /// goes below it either way, and the corpus' full-width layout tables match that way
+    /// (`7e53ee0d`: 16 lines in the flow, 9 floating).
+    fn floating(&self, table: &TableLayout) -> Option<TablePos> {
+        table.pos.filter(|p| {
+            p.y_spec != Some(PosSpec::Inline)
+                && table.outer_width() + p.dist[0] + p.dist[2] < self.page.col_w - 1.0
+        })
+    }
+
+    /// Where a table with `w:tblpPr` goes: its outer left edge and its top, for an anchor
+    /// paragraph whose top is `anchor_top`, clear of the earlier tables in `floats`.
+    fn table_spot(
+        &self,
+        table: &TableLayout,
+        pos: &TablePos,
+        anchor_top: f64,
+        floats: &[Float],
+    ) -> (f64, f64) {
+        let g = self.page.geom;
+        let (w, h) = (table.outer_width(), table.height());
+        let along = |spec: Option<PosSpec>, base: (f64, f64), off: f64, size: f64| match spec {
+            Some(PosSpec::Start) => base.0,
+            Some(PosSpec::Center) => base.0 + (base.1 - base.0 - size) / 2.0,
+            Some(PosSpec::End) => base.1 - size,
+            _ => base.0 + off,
+        };
+        let hbase = match pos.horz {
+            PosAnchor::Text => self.page.col_span(),
+            PosAnchor::Margin => (g.margin_left + g.gutter, g.page_width - g.margin_right),
+            PosAnchor::Page => (0.0, g.page_width),
+        };
+        let vbase = match pos.vert {
+            PosAnchor::Text => (anchor_top, anchor_top),
+            PosAnchor::Margin => (g.margin_top, g.page_height - g.margin_bottom),
+            PosAnchor::Page => (0.0, g.page_height),
+        };
+        let mut left = along(pos.x_spec, hbase, pos.x, w);
+        let top = along(pos.y_spec, vbase, pos.y, h);
+        // `tblOverlap="never"`: a table that covers an earlier one moves right until its text
+        // area meets the earlier one's (layout-tblp-never: 9 pt either side).
+        for _ in 0..8 {
+            let hit = floats.iter().find(|f| {
+                f.table
+                    && f.rect[1] < top + h - EPS
+                    && f.rect[3] > top + EPS
+                    && f.x0 < left + w - EPS
+                    && f.x1 > left + EPS
+            });
+            match hit {
+                Some(f) if !pos.overlap || f.no_overlap => left = f.x1 + pos.dist[0],
+                _ => break,
+            }
+        }
+        (left, top)
+    }
+
+    /// The area text keeps out of around `table` at `(left, top)`.
+    fn table_float(table: &TableLayout, pos: &TablePos, left: f64, top: f64) -> Float {
+        let (w, h) = (table.outer_width(), table.height());
+        let [dl, dt, dr, db] = pos.dist;
+        Float {
+            x0: left - dl,
+            y0: top - dt,
+            x1: left + w + dr,
+            y1: top + h + db,
+            kind: FloatKind::Square,
+            side: WrapSide::BothSides,
+            rect: [left, top, left + w, top + h],
+            outline: None,
+            table: true,
+            no_overlap: !pos.overlap,
+        }
+    }
+
+    /// Draws a table with `w:tblpPr` where its position says and makes the text of the
+    /// following paragraphs wrap around it. The table leaves the flow: the cursor stays, and
+    /// the next paragraph (its anchor) starts where it would have without the table.
+    fn place_float_table(
+        &mut self,
+        items: &'a [FlowItem],
+        p: usize,
+        table: &TableLayout,
+        pos: &TablePos,
+    ) {
+        let anchor = items[p + 1..]
+            .iter()
+            .find(|i| i.table().is_none_or(|t| self.floating(t).is_none()))
+            .and_then(FlowItem::para);
+        let anchor_top = match self.page.anchor_top {
+            Some((page, top)) if page == self.page.number => top,
+            _ => self.page.y + anchor.map_or(0.0, |a| first_gap(&self.page, a) + a.border_top()),
+        };
+        let (left, top) = self.table_spot(table, pos, anchor_top, &self.page.floats);
+        let before = self.page.cells.len();
+        self.float_origin = Some(left + table.edge_l / 2.0);
+        let mut active: Vec<ActiveSpan> = Vec::new();
+        for r in 0..table.rows.len() {
+            self.emit_row(table, r, top + table.rows[r].top, &mut active, false);
+        }
+        self.float_origin = None;
+        // The cells do not make the column non-empty: the anchor paragraph is still its first.
+        self.page.col_mark.1 += self.page.cells.len() - before;
+        self.page
+            .floats
+            .push(Self::table_float(table, pos, left, top));
+    }
+
     fn break_in_table(
         &mut self,
         table: &TableLayout,
@@ -1548,6 +1700,12 @@ impl<'a> Paginator<'a> {
         let (para, table) = (item.para(), item.table());
 
         if let Some(table) = table {
+            if let Some(pos) = self.floating(table) {
+                self.cur = Some((item.unit.as_ref(), base));
+                self.snapshot(p, 0);
+                self.place_float_table(items, p, table, &pos);
+                return;
+            }
             let gap = if self.page.has_content() {
                 self.page.pending_after
             } else {
@@ -1564,8 +1722,6 @@ impl<'a> Paginator<'a> {
         }
         let Some(para) = para else { return };
 
-        let contextual_same =
-            |pg: &PageBuild| pg.prev_style.as_ref().is_some_and(|s| *s == para.style_id);
         let has_anchor = para.objects.iter().any(|o| !o.inline());
         let mut from_atom = from_atom0;
         let n_atoms = para.atoms.len();
@@ -1577,27 +1733,11 @@ impl<'a> Paginator<'a> {
             let first_segment = from_atom == 0;
             // Spacing above the first line of this paragraph.
             let gap = |pg: &PageBuild| -> f64 {
-                if !first_segment || para.section_mark {
-                    return 0.0;
+                if first_segment {
+                    first_gap(pg, para)
+                } else {
+                    0.0
                 }
-                let mut after = pg.pending_after;
-                let mut before = f64::from(para.props.space_before_pt);
-                if contextual_same(pg) {
-                    if pg.prev_contextual {
-                        after = 0.0;
-                    }
-                    if para.flow.contextual_spacing {
-                        before = 0.0;
-                    }
-                }
-                if !pg.has_content() {
-                    after = 0.0;
-                    if !pg.hard_start && pg.number > 1 {
-                        before = 0.0;
-                    }
-                }
-                // Word does not add space after and space before; the larger one separates.
-                after.max(before)
             };
             let at_top = !self.page.has_content();
             // Paragraph borders (layout-pbdr-*): a group of paragraphs with identical borders has
@@ -1654,10 +1794,20 @@ impl<'a> Paginator<'a> {
             // them from the next paragraph's top as laid out without them, then pushes the
             // lines above (word-float-placement.md, rule 3).
             let mut next_top = None;
-            if let Some(next) = items.get(p + 1).and_then(FlowItem::para)
-                && next.objects.iter().any(|o| !o.inline())
+            // Floating tables in front of the next paragraph, and that paragraph.
+            let mut q = p + 1;
+            while items
+                .get(q)
+                .is_some_and(|i| i.table().is_some_and(|t| self.floating(t).is_some()))
+                && items[q].section() == section
+            {
+                q += 1;
+            }
+            let tables = p + 1..q;
+            if let Some(next) = items.get(q).and_then(FlowItem::para)
+                && (next.objects.iter().any(|o| !o.inline()) || !tables.is_empty())
                 && !next.flow.page_break_before
-                && items[p + 1].section() == section
+                && items[q].section() == section
             {
                 let lines: &[LineBox] = match &dynamic {
                     Some(d) => &d.lines,
@@ -1671,7 +1821,20 @@ impl<'a> Paginator<'a> {
                     + used
                     + f64::from(para.props.space_after_pt)
                         .max(f64::from(next.props.space_before_pt));
-                let ahead = ahead_floats(next, &frame, top, y0 + used);
+                let mut ahead = ahead_floats(next, &frame, top, y0 + used);
+                let mut placed: Vec<Float> = self.page.floats.clone();
+                for t in tables {
+                    if let Some(tl) = items[t].table()
+                        && let Some(pos) = self.floating(tl)
+                    {
+                        let (left, ttop) = self.table_spot(tl, &pos, top, &placed);
+                        let f = Self::table_float(tl, &pos, left, ttop);
+                        placed.push(f.clone());
+                        if f.y0 < y0 + used - 1e-6 {
+                            ahead.push(f);
+                        }
+                    }
+                }
                 if !ahead.is_empty() {
                     let mut all = self.page.floats.clone();
                     all.extend(ahead);

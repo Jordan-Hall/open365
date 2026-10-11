@@ -1,0 +1,5 @@
+feature = "layout-frame"
+made_with = "Microsoft Word 16.0.20430 (Windows)"
+author = "project member"
+expect_dropped = []
+notes = "floating tables positioned by keyword: left and vertically centred in the margins (paragraph 3), right and at the bottom of the margins (paragraph 12 of the text), over two pages of text"

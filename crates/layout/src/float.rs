@@ -36,6 +36,10 @@ pub(crate) struct Float {
     pub rect: [f64; 4],
     /// Outline a tight or through wrap follows, in page coordinates, with the wrap distances.
     pub outline: Option<Arc<Outline>>,
+    /// The area of a floating table (`w:tblpPr`), whose rectangle Word also reports as a clip.
+    pub table: bool,
+    /// A floating table with `tblOverlap="never"`: later tables keep out of it too.
+    pub no_overlap: bool,
 }
 
 /// The wrap polygon of a tight or through wrap.
@@ -362,6 +366,8 @@ pub(crate) fn place(
             side: d.wrap_side,
             rect: [x, y, x + w, y + h],
             outline: outline.map(Arc::new),
+            table: false,
+            no_overlap: false,
         }),
         image: ImagePlacement {
             x,

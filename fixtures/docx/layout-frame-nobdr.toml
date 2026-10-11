@@ -1,0 +1,5 @@
+feature = "layout-frame"
+made_with = "Microsoft Word 16.0.20430 (Windows)"
+author = "project member"
+expect_dropped = []
+notes = "borderless frames: 150 pt wide at the column left in paragraph 3 (distance 9, vertical 6), 120 pt at the right margin in paragraph 9, and an automatic width frame with short text in paragraph 12"

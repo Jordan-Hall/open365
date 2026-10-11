@@ -181,6 +181,10 @@ pub struct Workbook {
     date1904: bool,
     sst: Option<(PartName, SharedStrings)>,
     styles: Styles,
+    /// The styles part, when the package has one.
+    styles_part: Option<PartName>,
+    /// A formatting action changed the style sheet: saving drops what no cell uses any more.
+    styles_dirty: bool,
     workbook_dirty: bool,
     sst_dirty: bool,
     hygiene_done: bool,
@@ -189,6 +193,8 @@ pub struct Workbook {
     kind: WorkbookKind,
 }
 
+mod cellformat;
+pub use cellformat::{BorderSpec, FormatSnapshot};
 mod structure;
 
 fn is_true(v: &str) -> bool {
@@ -249,7 +255,8 @@ impl Workbook {
             }
             None => None,
         };
-        let mut styles = match internal_part("/styles")? {
+        let styles_part = internal_part("/styles")?;
+        let mut styles = match &styles_part {
             Some(name) => {
                 let data = package.part(name.as_str()).map(|p| p.data());
                 Styles::parse(data.unwrap_or_default())?
@@ -397,6 +404,8 @@ impl Workbook {
             date1904,
             sst,
             styles,
+            styles_part,
+            styles_dirty: false,
             workbook_dirty: false,
             sst_dirty: false,
             hygiene_done: false,
@@ -566,7 +575,10 @@ impl Workbook {
 
     /// True when anything changed since opening or the last save.
     pub fn is_dirty(&self) -> bool {
-        self.workbook_dirty || self.sst_dirty || self.sheets.iter().any(|s| s.dirty)
+        self.workbook_dirty
+            || self.sst_dirty
+            || self.styles_dirty
+            || self.sheets.iter().any(|s| s.dirty)
     }
 
     // ---- editing -------------------------------------------------------------------
@@ -1137,6 +1149,27 @@ impl Workbook {
         {
             self.package.set_part(name.clone(), sst.serialize());
             self.sst_dirty = false;
+        }
+        if self.styles_dirty
+            && let Some(part) = self.styles_part.clone()
+        {
+            // Like Excel, write only the formats something uses. The live model keeps its
+            // numbering (undo snapshots depend on it), so this works on copies.
+            let used = self.used_style_indexes();
+            let mut styles = self.styles.clone();
+            let remap = styles.compact(&used)?;
+            if let Some(bytes) = styles.serialize() {
+                self.package.set_part(part, bytes);
+            }
+            if remap.iter().enumerate().any(|(i, n)| *n != i as u32) {
+                for entry in &self.sheets {
+                    if let Some(ws) = &entry.data {
+                        let mut ws = ws.clone();
+                        ws.remap_styles(&remap);
+                        self.package.set_part(entry.part.clone(), ws.to_bytes());
+                    }
+                }
+            }
         }
         Ok(self.package.write()?)
     }

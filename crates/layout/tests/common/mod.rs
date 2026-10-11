@@ -301,8 +301,23 @@ pub fn score_doc(
                     && (b.height - b.pad_top - b.pad_bottom - c.h / PDF_SCALE).abs()
                         <= CELL_TOLERANCE_Y
             });
+        // Word also reports the area around a floating table as a clip rectangle.
+        let zone = hit.is_none()
+            && layout
+                .pages
+                .iter()
+                .filter(|p| p.number as u64 == c.page)
+                .flat_map(|p| p.table_wrap_zones())
+                .any(|[x0, y0, x1, y1]| {
+                    (x0 - c.x / PDF_SCALE_X).abs() <= CELL_TOLERANCE_X
+                        && (y0 - c.y / PDF_SCALE).abs() <= CELL_TOLERANCE_Y
+                        && (x1 - x0 - c.w / PDF_SCALE_X).abs() <= CELL_TOLERANCE_X
+                        && (y1 - y0 - c.h / PDF_SCALE).abs() <= CELL_TOLERANCE_Y
+                });
         if let Some((pn, i, _)) = hit {
             used.push((pn, i));
+            s.matched += 1;
+        } else if zone {
             s.matched += 1;
         }
         if detail {
@@ -323,7 +338,11 @@ pub fn score_doc(
             let _ = writeln!(
                 report,
                 "{} cell p{} x {:>7.2} y {:>7.2} w {:>7.2} h {:>7.2}   engine {}",
-                if hit.is_some() { "ok  " } else { "FAIL" },
+                if hit.is_some() || zone {
+                    "ok  "
+                } else {
+                    "FAIL"
+                },
                 c.page,
                 c.x - PDF_X_OFFSET,
                 c.y,

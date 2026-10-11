@@ -51,17 +51,51 @@ pub fn builtin_number_format(id: u32) -> Option<&'static str> {
     })
 }
 
+/// The number-format lookup, the per-xf `numFmtId` list and the resolved format tables of a
+/// `styleSheet` tree.
+fn derive_tables(root: &XmlElement) -> (HashMap<u32, String>, Vec<u32>, FormatTables) {
+    let mut num_fmts = HashMap::new();
+    if let Some(fmts) = root.child_main("numFmts") {
+        for fmt in fmts.elements().filter(|e| e.head.is_main("numFmt")) {
+            if let (Some(id), Some(code)) = (
+                fmt.head
+                    .attr("numFmtId")
+                    .and_then(|v| v.trim().parse().ok()),
+                fmt.head.attr("formatCode"),
+            ) {
+                num_fmts.entry(id).or_insert_with(|| code.to_owned());
+            }
+        }
+    }
+    let xf_num_fmt = root
+        .child_main("cellXfs")
+        .map(|xfs| {
+            xfs.elements()
+                .filter(|e| e.head.is_main("xf"))
+                .map(|xf| {
+                    xf.head
+                        .attr("numFmtId")
+                        .and_then(|v| v.trim().parse().ok())
+                        .unwrap_or(0)
+                })
+                .collect()
+        })
+        .unwrap_or_default();
+    let tables = FormatTables::parse(root);
+    (num_fmts, xf_num_fmt, tables)
+}
+
 /// The style sheet: the raw tree plus the number-format lookup tables.
 #[derive(Debug, Clone, Default)]
 pub struct Styles {
-    parsed: Option<(String, XmlElement, String)>,
-    num_fmts: HashMap<u32, String>,
+    pub(crate) parsed: Option<(String, XmlElement, String)>,
+    pub(crate) num_fmts: HashMap<u32, String>,
     /// `numFmtId` of each `cellXfs/xf`, by style index.
-    xf_num_fmt: Vec<u32>,
-    tables: FormatTables,
-    theme: Theme,
+    pub(crate) xf_num_fmt: Vec<u32>,
+    pub(crate) tables: FormatTables,
+    pub(crate) theme: Theme,
     /// `dxfs/dxf` entries, by `dxfId`.
-    dxfs: Vec<Dxf>,
+    pub(crate) dxfs: Vec<Dxf>,
 }
 
 impl Styles {
@@ -72,35 +106,7 @@ impl Styles {
                 "styles part is not a styleSheet".to_owned(),
             ));
         }
-        let mut num_fmts = HashMap::new();
-        if let Some(fmts) = parsed.root.child_main("numFmts") {
-            for fmt in fmts.elements().filter(|e| e.head.is_main("numFmt")) {
-                if let (Some(id), Some(code)) = (
-                    fmt.head
-                        .attr("numFmtId")
-                        .and_then(|v| v.trim().parse().ok()),
-                    fmt.head.attr("formatCode"),
-                ) {
-                    num_fmts.entry(id).or_insert_with(|| code.to_owned());
-                }
-            }
-        }
-        let xf_num_fmt = parsed
-            .root
-            .child_main("cellXfs")
-            .map(|xfs| {
-                xfs.elements()
-                    .filter(|e| e.head.is_main("xf"))
-                    .map(|xf| {
-                        xf.head
-                            .attr("numFmtId")
-                            .and_then(|v| v.trim().parse().ok())
-                            .unwrap_or(0)
-                    })
-                    .collect()
-            })
-            .unwrap_or_default();
-        let tables = FormatTables::parse(&parsed.root);
+        let (num_fmts, xf_num_fmt, tables) = derive_tables(&parsed.root);
         let lookup = |id: u32| {
             num_fmts
                 .get(&id)
@@ -125,6 +131,16 @@ impl Styles {
             theme: Theme::default(),
             dxfs,
         })
+    }
+
+    /// Recomputes the lookup tables after the tree was edited.
+    pub(crate) fn reindex(&mut self) {
+        if let Some((_, root, _)) = &self.parsed {
+            let (num_fmts, xf_num_fmt, tables) = derive_tables(root);
+            self.num_fmts = num_fmts;
+            self.xf_num_fmt = xf_num_fmt;
+            self.tables = tables;
+        }
     }
 
     /// Number of `cellXfs` entries.

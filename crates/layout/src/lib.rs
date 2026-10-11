@@ -391,6 +391,22 @@ pub struct Page {
     pub rules: Vec<Rule>,
 }
 
+impl Page {
+    /// The rectangles (`[x, y, right, bottom]`) around floating tables: the table grown by its
+    /// left and right text distances (not the top and bottom ones, measured). Word reports each
+    /// as one more clip rectangle.
+    pub fn table_wrap_zones(&self) -> Vec<[f64; 4]> {
+        self.floats
+            .iter()
+            .filter(|f| f.table)
+            .map(|f| {
+                let s = flow::snap_edge;
+                [s(f.x0), s(f.rect[1]), s(f.x1), s(f.rect[3])]
+            })
+            .collect()
+    }
+}
+
 /// The edge of a paragraph's border box a [`Rule`] belongs to.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RuleSide {

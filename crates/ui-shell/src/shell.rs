@@ -863,7 +863,12 @@ impl Shell {
                 Align2::LEFT_CENTER,
                 format!("{name}  -  {}", self.app_name()),
                 FontId::proportional(size::TITLE),
-                t.text,
+                // An inactive window's title is dimmed, as Office's is.
+                if ctx.input(|i| i.focused) {
+                    t.text
+                } else {
+                    t.text_dim
+                },
             );
             if self.options.custom_frame {
                 let drag = ui.interact(r, Id::new("title-drag"), Sense::click_and_drag());
@@ -964,6 +969,17 @@ impl Shell {
                 FontId::proportional(size::TAB),
                 t.text,
             );
+            if sel {
+                // Office draws the selected tab semibold; a second pass half a pixel to the right
+                // thickens the regular face without a second font file.
+                painter.text(
+                    r.center() + vec2(0.5 / ppp, 0.0),
+                    Align2::CENTER_CENTER,
+                    &self.spec.tabs[i].label,
+                    FontId::proportional(size::TAB),
+                    t.text,
+                );
+            }
             if sel {
                 let y = r.bottom() - 3.5;
                 let inset = 11.0 / REF_SCALE;
@@ -1255,24 +1271,28 @@ impl Shell {
                     r.min + vec2(4.0, 4.0),
                     pos2(r.right() - 26.0, r.bottom() - 4.0),
                 );
-                let n = tiles.len().clamp(1, 3);
-                let tw = inner.width() / n as f32;
-                for (i, (vid, label)) in tiles.iter().take(3).enumerate() {
-                    let tr = Rect::from_min_size(
-                        inner.min + vec2(i as f32 * tw, 0.0),
-                        vec2(tw - 4.0, inner.height()),
+                // Cells are 135 x 70 u from (3, 6) u inside the control; the white tile sits 5 u inside
+                // its cell, and the current or hovered cell gets a 1 u light ring over a lifted fill.
+                let n = tiles.len().min(((c.w - 38) / 135).max(1) as usize);
+                let _ = inner;
+                for (i, (vid, label)) in tiles.iter().take(n).enumerate() {
+                    let cell = Rect::from_min_size(
+                        r.min + vec2((3.0 + 135.0 * i as f32) * k, 6.0 * k),
+                        vec2(135.0 * k, 70.0 * k),
                     );
-                    let resp = ui.interact(tr, Id::new(("tile", &c.id, vid)), Sense::click());
+                    let tr = cell.shrink(5.0 * k);
+                    let resp = ui.interact(cell, Id::new(("tile", &c.id, vid)), Sense::click());
                     let on = *vid == cur;
-                    painter.rect_filled(tr, 2.0, Color32::WHITE);
                     if on || resp.hovered() {
+                        painter.rect_filled(cell, 0.0, t.gallery_cell);
                         painter.rect_stroke(
-                            tr,
-                            2.0,
-                            Stroke::new(2.0, t.accent),
+                            cell,
+                            0.0,
+                            Stroke::new(1.0 / ppp.max(1.0), t.gallery_ring),
                             StrokeKind::Inside,
                         );
                     }
+                    painter.rect_filled(tr, 0.0, Color32::WHITE);
                     painter.text(
                         tr.center(),
                         Align2::CENTER_CENTER,
@@ -1703,7 +1723,7 @@ impl Shell {
                 );
             }
             let ar = Rect::from_center_size(pos2(r.right() - 11.0, r.center().y), vec2(10.0, 10.0));
-            self.icon(ui, painter, "chevron-down", ar, t.text_dim);
+            self.icon(ui, painter, "chevron-down", ar, t.icon);
         }
         if let Some(g) = lay.grip {
             let r = rect_of(origin, ppp, g);
@@ -1727,7 +1747,7 @@ impl Shell {
             ];
             for (icon, id, cx) in items {
                 let c = pos2(r.left() + cx * u, r.center().y);
-                let ir = Rect::from_center_size(c, vec2(14.0, 14.0));
+                let ir = Rect::from_center_size(c, vec2(22.0, 22.0));
                 let st = host.state(id);
                 let hit = Rect::from_center_size(c, vec2(24.0 * u * 1.25, r.height()));
                 let resp = ui.interact(
@@ -1742,13 +1762,21 @@ impl Shell {
                 if st.enabled {
                     self.button_bg(painter, hit, &resp, false);
                 }
-                self.icon(ui, painter, icon, ir, t.ink(st.enabled));
+                // Office draws Cancel and Enter dim while no edit is running, and "fx" bright.
+                let ink = if icon == "math-function" {
+                    t.icon
+                } else if st.enabled {
+                    t.text
+                } else {
+                    t.icon_off
+                };
+                self.icon(ui, painter, icon, ir, ink);
                 if resp.clicked() {
                     *run = Some((id.to_owned(), None));
                 }
             }
             let ar = Rect::from_center_size(pos2(r.right() - 7.0, r.center().y), vec2(10.0, 10.0));
-            self.icon(ui, painter, "chevron-down", ar, t.text_disabled);
+            self.icon(ui, painter, "chevron-down", ar, t.icon);
         }
         if let Some(f) = lay.formula_field {
             let r = rect_of(origin, ppp, f);

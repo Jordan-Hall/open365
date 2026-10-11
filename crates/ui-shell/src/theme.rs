@@ -71,6 +71,12 @@ pub struct Theme {
     pub tab_active_text: Color32,
     pub scroll_track: Color32,
     pub scroll_thumb: Color32,
+    /// Bright dropdown/function icons (formula strip) and dim idle icons (Cancel, Enter).
+    pub icon: Color32,
+    pub icon_off: Color32,
+    /// Gallery cell lift and ring of the current or hovered cell.
+    pub gallery_cell: Color32,
+    pub gallery_ring: Color32,
 }
 
 impl Mode {
@@ -153,6 +159,10 @@ impl Theme {
                 tab_active_text: Color32::from_rgb(0x24, 0x24, 0x24),
                 scroll_track: Color32::from_rgb(0x14, 0x14, 0x14),
                 scroll_thumb: Color32::from_rgb(0x99, 0x99, 0x99),
+                icon: Color32::from_rgb(0xd4, 0xd4, 0xd4),
+                icon_off: Color32::from_rgb(0x83, 0x83, 0x83),
+                gallery_cell: Color32::from_rgb(0x38, 0x38, 0x38),
+                gallery_ring: Color32::from_rgb(0xad, 0xad, 0xad),
             },
             Mode::Light => Self {
                 mode,
@@ -200,6 +210,10 @@ impl Theme {
                 tab_active_text: Color32::from_rgb(0x24, 0x24, 0x24),
                 scroll_track: Color32::from_rgb(0xf5, 0xf5, 0xf5),
                 scroll_thumb: Color32::from_rgb(0xc2, 0xc2, 0xc2),
+                icon: Color32::from_rgb(0x42, 0x42, 0x42),
+                icon_off: Color32::from_rgb(0x8a, 0x8a, 0x8a),
+                gallery_cell: Color32::from_rgb(0xf0, 0xf0, 0xf0),
+                gallery_ring: Color32::from_rgb(0x8a, 0x8a, 0x8a),
             },
         }
     }
@@ -214,6 +228,9 @@ impl Theme {
         v.panel_fill = self.canvas;
         v.window_fill = self.card;
         v.extreme_bg_color = self.field;
+        // Text inside egui widgets (Name Box, formula field) is the chrome's text colour, not egui's grey.
+        v.widgets.noninteractive.fg_stroke.color = self.text;
+        v.widgets.inactive.fg_stroke.color = self.text;
         v.selection.stroke.color = self.accent;
         v
     }

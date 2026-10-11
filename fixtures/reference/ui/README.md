@@ -10,3 +10,7 @@ scrubbed. Screenshots are never stored here (they contain Microsoft artwork).
 `word-responsive.json` and `excel-responsive.json` record the ribbon of every tab at window widths 1900..500 px (step 50)
 at the same scale. `tools/gen_spec.py` derives the per-group states and shrink steps from them;
 `crates/ui-shell/tests/responsive.rs` compares the layout with every recorded width.
+
+`word-chrome-responsive.json` and `excel-chrome-responsive.json` record the title row, tab row and status bar (Excel: also
+Name Box, formula bar, sheet tab control) at window widths swept by `ribbon-oracle.ps1 -ChromeWidths`; see
+`docs/architecture/app-shell.md` (narrow-window measurement). No test consumes them yet.

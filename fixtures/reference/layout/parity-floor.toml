@@ -236,9 +236,17 @@ total = 92
 matched = 5
 total = 38
 
+[fixtures.layout-frame-bdr]
+matched = 4
+total = 42
+
 [fixtures.layout-frame-dropcap]
 matched = 1
 total = 17
+
+[fixtures.layout-frame-nobdr]
+matched = 3
+total = 43
 
 [fixtures.layout-frame-page]
 matched = 2
@@ -388,17 +396,41 @@ total = 217
 matched = 9
 total = 18
 
+[fixtures.layout-tblp-allow]
+matched = 50
+total = 50
+
 [fixtures.layout-tblp-basic]
-matched = 12
+matched = 35
 total = 35
 
+[fixtures.layout-tblp-bottom]
+matched = 62
+total = 97
+
+[fixtures.layout-tblp-margin]
+matched = 40
+total = 41
+
+[fixtures.layout-tblp-never]
+matched = 50
+total = 50
+
 [fixtures.layout-tblp-page]
-matched = 2
+matched = 60
 total = 60
 
 [fixtures.layout-tblp-right]
-matched = 4
+matched = 34
 total = 35
+
+[fixtures.layout-tblp-right2]
+matched = 35
+total = 35
+
+[fixtures.layout-tblp-yspec]
+matched = 80
+total = 80
 
 [fixtures.layout-trh-asym]
 matched = 66
@@ -692,9 +724,17 @@ total = 92
 matched = 5
 total = 38
 
+[system.layout-frame-bdr]
+matched = 4
+total = 42
+
 [system.layout-frame-dropcap]
 matched = 1
 total = 17
+
+[system.layout-frame-nobdr]
+matched = 3
+total = 43
 
 [system.layout-frame-page]
 matched = 2
@@ -852,17 +892,41 @@ total = 217
 matched = 17
 total = 18
 
+[system.layout-tblp-allow]
+matched = 50
+total = 50
+
 [system.layout-tblp-basic]
-matched = 12
+matched = 35
 total = 35
 
+[system.layout-tblp-bottom]
+matched = 62
+total = 97
+
+[system.layout-tblp-margin]
+matched = 40
+total = 41
+
+[system.layout-tblp-never]
+matched = 50
+total = 50
+
 [system.layout-tblp-page]
-matched = 2
+matched = 60
 total = 60
 
 [system.layout-tblp-right]
-matched = 4
+matched = 34
 total = 35
+
+[system.layout-tblp-right2]
+matched = 35
+total = 35
+
+[system.layout-tblp-yspec]
+matched = 80
+total = 80
 
 [system.layout-trh-asym]
 matched = 66

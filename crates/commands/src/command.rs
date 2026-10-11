@@ -4,6 +4,7 @@ use open365_docx::{Alignment, DocPos, RunPropsPatch};
 use serde::{Deserialize, Serialize};
 
 use crate::CommandError;
+use crate::format::{BorderChange, CellFormatChange, RangeRef};
 
 /// What a command does to the world outside the in-memory document. A permission layer
 /// (ADR-002) decides on this class before the command runs.
@@ -216,6 +217,42 @@ pub enum Command {
         first: u32,
         last: u32,
     },
+    /// Sets font, fill, alignment, number format or protection on a range (Excel's Home tab
+    /// buttons and Format Cells dialog). Whole rows or columns are formatted as rows or columns.
+    FormatCells {
+        sheet: usize,
+        range: RangeRef,
+        change: Box<CellFormatChange>,
+    },
+    /// The border menu: outline, inside lines, single edges and diagonals of a range.
+    SetBorders {
+        sheet: usize,
+        range: RangeRef,
+        borders: Box<BorderChange>,
+    },
+    /// Applies a named cell style (`Good`, `Heading 1`, `Percent`, `Comma`, `Currency`, ...).
+    ApplyCellStyle {
+        sheet: usize,
+        range: RangeRef,
+        style: String,
+    },
+    /// Clear Formats: back to the Normal style.
+    ClearFormats {
+        sheet: usize,
+        range: RangeRef,
+    },
+    /// Format Painter: copies the formats of `from` onto `to`, tiling the source.
+    CopyFormat {
+        sheet: usize,
+        from: RangeRef,
+        to: RangeRef,
+    },
+    /// Increase (`delta` > 0) or Decrease Decimal. Nothing changes for text or a blank General cell.
+    ChangeDecimals {
+        sheet: usize,
+        range: RangeRef,
+        delta: i32,
+    },
     Save {
         path: PathBuf,
     },
@@ -277,6 +314,12 @@ impl Command {
             Self::UnhideColumns { .. } => "unhide_columns",
             Self::HideRows { .. } => "hide_rows",
             Self::UnhideRows { .. } => "unhide_rows",
+            Self::FormatCells { .. } => "format_cells",
+            Self::SetBorders { .. } => "set_borders",
+            Self::ApplyCellStyle { .. } => "apply_cell_style",
+            Self::ClearFormats { .. } => "clear_formats",
+            Self::CopyFormat { .. } => "copy_format",
+            Self::ChangeDecimals { .. } => "change_decimals",
             Self::Save { .. } => "save",
             Self::ExportPdf { .. } => "export_pdf",
         }

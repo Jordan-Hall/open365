@@ -1,0 +1,812 @@
+{
+  "name": "col-fill-range",
+  "excel": "16.0",
+  "error": null,
+  "counts": {
+    "fonts": 1,
+    "fills": 3,
+    "borders": 1,
+    "cellXfs": 2,
+    "cellStyleXfs": 1,
+    "cellStyles": 1,
+    "numFmts": 0
+  },
+  "tables": {
+    "fonts": [
+      "<font><sz val=\"11\"/><color theme=\"1\"/><name val=\"Aptos Narrow\"/><family val=\"2\"/><scheme val=\"minor\"/></font>"
+    ],
+    "fills": [
+      "<fill><patternFill patternType=\"none\"/></fill>",
+      "<fill><patternFill patternType=\"gray125\"/></fill>",
+      "<fill><patternFill patternType=\"solid\"><fgColor rgb=\"FFFFFF00\"/><bgColor indexed=\"64\"/></patternFill></fill>"
+    ],
+    "borders": [
+      "<border><left/><right/><top/><bottom/><diagonal/></border>"
+    ],
+    "cellXfs": [
+      "<xf numFmtId=\"0\" fontId=\"0\" fillId=\"0\" borderId=\"0\" xfId=\"0\"/>",
+      "<xf numFmtId=\"0\" fontId=\"0\" fillId=\"2\" borderId=\"0\" xfId=\"0\" applyFill=\"1\"/>"
+    ],
+    "cellStyleXfs": [
+      "<xf numFmtId=\"0\" fontId=\"0\" fillId=\"0\" borderId=\"0\"/>"
+    ],
+    "cellStyles": [
+      "<cellStyle name=\"Normal\" xfId=\"0\" builtinId=\"0\"/>"
+    ],
+    "numFmts": []
+  },
+  "cols": "<cols><col min=\"2\" max=\"4\" width=\"8.88671875\" style=\"1\"/></cols>",
+  "styledRows": [],
+  "cells": {
+    "A1": {
+      "canon": {
+        "font": "<font><sz val=\"11\"/><color theme=\"1\"/><name val=\"Aptos Narrow\"/><family val=\"2\"/><scheme val=\"minor\"/></font>",
+        "fill": "<fill><patternFill patternType=\"none\"/></fill>",
+        "border": "<border><left/><right/><top/><bottom/><diagonal/></border>",
+        "numFmt": "id:0",
+        "style": "builtin:0",
+        "xf": "<xf />"
+      },
+      "com": {
+        "font": {
+          "name": "Aptos Narrow",
+          "size": 11.0,
+          "bold": false,
+          "italic": false,
+          "underline": -4142,
+          "strike": false,
+          "color": 0.0
+        },
+        "interior": {
+          "pattern": -4142,
+          "color": 16777215.0,
+          "patternColor": 0
+        },
+        "borders": {
+          "left": {
+            "lineStyle": -4142,
+            "weight": 2,
+            "color": 0.0
+          },
+          "right": {
+            "lineStyle": -4142,
+            "weight": 2,
+            "color": 0.0
+          },
+          "top": {
+            "lineStyle": -4142,
+            "weight": 2,
+            "color": 0.0
+          },
+          "bottom": {
+            "lineStyle": -4142,
+            "weight": 2,
+            "color": 0.0
+          },
+          "diagonalDown": {
+            "lineStyle": -4142,
+            "weight": 2,
+            "color": 0.0
+          },
+          "diagonalUp": {
+            "lineStyle": -4142,
+            "weight": 2,
+            "color": 0.0
+          }
+        },
+        "align": {
+          "horizontal": 1,
+          "vertical": -4107,
+          "wrap": false,
+          "indent": 0,
+          "orientation": -4128,
+          "shrink": false
+        },
+        "numberFormat": "General",
+        "locked": true,
+        "formulaHidden": false,
+        "styleName": "Normal"
+      }
+    },
+    "B1": {
+      "canon": {
+        "font": "<font><sz val=\"11\"/><color theme=\"1\"/><name val=\"Aptos Narrow\"/><family val=\"2\"/><scheme val=\"minor\"/></font>",
+        "fill": "<fill><patternFill patternType=\"solid\"><fgColor rgb=\"FFFFFF00\"/><bgColor indexed=\"64\"/></patternFill></fill>",
+        "border": "<border><left/><right/><top/><bottom/><diagonal/></border>",
+        "numFmt": "id:0",
+        "style": "builtin:0",
+        "xf": "<xf applyFill=\"1\"/>"
+      },
+      "com": {
+        "font": {
+          "name": "Aptos Narrow",
+          "size": 11.0,
+          "bold": false,
+          "italic": false,
+          "underline": -4142,
+          "strike": false,
+          "color": 0.0
+        },
+        "interior": {
+          "pattern": 1,
+          "color": 65535.0,
+          "patternColor": 0
+        },
+        "borders": {
+          "left": {
+            "lineStyle": -4142,
+            "weight": 2,
+            "color": 0.0
+          },
+          "right": {
+            "lineStyle": -4142,
+            "weight": 2,
+            "color": 0.0
+          },
+          "top": {
+            "lineStyle": -4142,
+            "weight": 2,
+            "color": 0.0
+          },
+          "bottom": {
+            "lineStyle": -4142,
+            "weight": 2,
+            "color": 0.0
+          },
+          "diagonalDown": {
+            "lineStyle": -4142,
+            "weight": 2,
+            "color": 0.0
+          },
+          "diagonalUp": {
+            "lineStyle": -4142,
+            "weight": 2,
+            "color": 0.0
+          }
+        },
+        "align": {
+          "horizontal": 1,
+          "vertical": -4107,
+          "wrap": false,
+          "indent": 0,
+          "orientation": -4128,
+          "shrink": false
+        },
+        "numberFormat": "General",
+        "locked": true,
+        "formulaHidden": false,
+        "styleName": "Normal"
+      }
+    },
+    "C1": {
+      "canon": {
+        "font": "<font><sz val=\"11\"/><color theme=\"1\"/><name val=\"Aptos Narrow\"/><family val=\"2\"/><scheme val=\"minor\"/></font>",
+        "fill": "<fill><patternFill patternType=\"solid\"><fgColor rgb=\"FFFFFF00\"/><bgColor indexed=\"64\"/></patternFill></fill>",
+        "border": "<border><left/><right/><top/><bottom/><diagonal/></border>",
+        "numFmt": "id:0",
+        "style": "builtin:0",
+        "xf": "<xf applyFill=\"1\"/>"
+      },
+      "com": {
+        "font": {
+          "name": "Aptos Narrow",
+          "size": 11.0,
+          "bold": false,
+          "italic": false,
+          "underline": -4142,
+          "strike": false,
+          "color": 0.0
+        },
+        "interior": {
+          "pattern": 1,
+          "color": 65535.0,
+          "patternColor": 0
+        },
+        "borders": {
+          "left": {
+            "lineStyle": -4142,
+            "weight": 2,
+            "color": 0.0
+          },
+          "right": {
+            "lineStyle": -4142,
+            "weight": 2,
+            "color": 0.0
+          },
+          "top": {
+            "lineStyle": -4142,
+            "weight": 2,
+            "color": 0.0
+          },
+          "bottom": {
+            "lineStyle": -4142,
+            "weight": 2,
+            "color": 0.0
+          },
+          "diagonalDown": {
+            "lineStyle": -4142,
+            "weight": 2,
+            "color": 0.0
+          },
+          "diagonalUp": {
+            "lineStyle": -4142,
+            "weight": 2,
+            "color": 0.0
+          }
+        },
+        "align": {
+          "horizontal": 1,
+          "vertical": -4107,
+          "wrap": false,
+          "indent": 0,
+          "orientation": -4128,
+          "shrink": false
+        },
+        "numberFormat": "General",
+        "locked": true,
+        "formulaHidden": false,
+        "styleName": "Normal"
+      }
+    },
+    "D1": {
+      "canon": {
+        "font": "<font><sz val=\"11\"/><color theme=\"1\"/><name val=\"Aptos Narrow\"/><family val=\"2\"/><scheme val=\"minor\"/></font>",
+        "fill": "<fill><patternFill patternType=\"solid\"><fgColor rgb=\"FFFFFF00\"/><bgColor indexed=\"64\"/></patternFill></fill>",
+        "border": "<border><left/><right/><top/><bottom/><diagonal/></border>",
+        "numFmt": "id:0",
+        "style": "builtin:0",
+        "xf": "<xf applyFill=\"1\"/>"
+      },
+      "com": {
+        "font": {
+          "name": "Aptos Narrow",
+          "size": 11.0,
+          "bold": false,
+          "italic": false,
+          "underline": -4142,
+          "strike": false,
+          "color": 0.0
+        },
+        "interior": {
+          "pattern": 1,
+          "color": 65535.0,
+          "patternColor": 0
+        },
+        "borders": {
+          "left": {
+            "lineStyle": -4142,
+            "weight": 2,
+            "color": 0.0
+          },
+          "right": {
+            "lineStyle": -4142,
+            "weight": 2,
+            "color": 0.0
+          },
+          "top": {
+            "lineStyle": -4142,
+            "weight": 2,
+            "color": 0.0
+          },
+          "bottom": {
+            "lineStyle": -4142,
+            "weight": 2,
+            "color": 0.0
+          },
+          "diagonalDown": {
+            "lineStyle": -4142,
+            "weight": 2,
+            "color": 0.0
+          },
+          "diagonalUp": {
+            "lineStyle": -4142,
+            "weight": 2,
+            "color": 0.0
+          }
+        },
+        "align": {
+          "horizontal": 1,
+          "vertical": -4107,
+          "wrap": false,
+          "indent": 0,
+          "orientation": -4128,
+          "shrink": false
+        },
+        "numberFormat": "General",
+        "locked": true,
+        "formulaHidden": false,
+        "styleName": "Normal"
+      }
+    },
+    "E1": {
+      "canon": {
+        "font": "<font><sz val=\"11\"/><color theme=\"1\"/><name val=\"Aptos Narrow\"/><family val=\"2\"/><scheme val=\"minor\"/></font>",
+        "fill": "<fill><patternFill patternType=\"none\"/></fill>",
+        "border": "<border><left/><right/><top/><bottom/><diagonal/></border>",
+        "numFmt": "id:0",
+        "style": "builtin:0",
+        "xf": "<xf />"
+      },
+      "com": {
+        "font": {
+          "name": "Aptos Narrow",
+          "size": 11.0,
+          "bold": false,
+          "italic": false,
+          "underline": -4142,
+          "strike": false,
+          "color": 0.0
+        },
+        "interior": {
+          "pattern": -4142,
+          "color": 16777215.0,
+          "patternColor": 0
+        },
+        "borders": {
+          "left": {
+            "lineStyle": -4142,
+            "weight": 2,
+            "color": 0.0
+          },
+          "right": {
+            "lineStyle": -4142,
+            "weight": 2,
+            "color": 0.0
+          },
+          "top": {
+            "lineStyle": -4142,
+            "weight": 2,
+            "color": 0.0
+          },
+          "bottom": {
+            "lineStyle": -4142,
+            "weight": 2,
+            "color": 0.0
+          },
+          "diagonalDown": {
+            "lineStyle": -4142,
+            "weight": 2,
+            "color": 0.0
+          },
+          "diagonalUp": {
+            "lineStyle": -4142,
+            "weight": 2,
+            "color": 0.0
+          }
+        },
+        "align": {
+          "horizontal": 1,
+          "vertical": -4107,
+          "wrap": false,
+          "indent": 0,
+          "orientation": -4128,
+          "shrink": false
+        },
+        "numberFormat": "General",
+        "locked": true,
+        "formulaHidden": false,
+        "styleName": "Normal"
+      }
+    },
+    "A2": {
+      "canon": {
+        "font": "<font><sz val=\"11\"/><color theme=\"1\"/><name val=\"Aptos Narrow\"/><family val=\"2\"/><scheme val=\"minor\"/></font>",
+        "fill": "<fill><patternFill patternType=\"none\"/></fill>",
+        "border": "<border><left/><right/><top/><bottom/><diagonal/></border>",
+        "numFmt": "id:0",
+        "style": "builtin:0",
+        "xf": "<xf />"
+      },
+      "com": {
+        "font": {
+          "name": "Aptos Narrow",
+          "size": 11.0,
+          "bold": false,
+          "italic": false,
+          "underline": -4142,
+          "strike": false,
+          "color": 0.0
+        },
+        "interior": {
+          "pattern": -4142,
+          "color": 16777215.0,
+          "patternColor": 0
+        },
+        "borders": {
+          "left": {
+            "lineStyle": -4142,
+            "weight": 2,
+            "color": 0.0
+          },
+          "right": {
+            "lineStyle": -4142,
+            "weight": 2,
+            "color": 0.0
+          },
+          "top": {
+            "lineStyle": -4142,
+            "weight": 2,
+            "color": 0.0
+          },
+          "bottom": {
+            "lineStyle": -4142,
+            "weight": 2,
+            "color": 0.0
+          },
+          "diagonalDown": {
+            "lineStyle": -4142,
+            "weight": 2,
+            "color": 0.0
+          },
+          "diagonalUp": {
+            "lineStyle": -4142,
+            "weight": 2,
+            "color": 0.0
+          }
+        },
+        "align": {
+          "horizontal": 1,
+          "vertical": -4107,
+          "wrap": false,
+          "indent": 0,
+          "orientation": -4128,
+          "shrink": false
+        },
+        "numberFormat": "General",
+        "locked": true,
+        "formulaHidden": false,
+        "styleName": "Normal"
+      }
+    },
+    "B2": {
+      "canon": {
+        "font": "<font><sz val=\"11\"/><color theme=\"1\"/><name val=\"Aptos Narrow\"/><family val=\"2\"/><scheme val=\"minor\"/></font>",
+        "fill": "<fill><patternFill patternType=\"solid\"><fgColor rgb=\"FFFFFF00\"/><bgColor indexed=\"64\"/></patternFill></fill>",
+        "border": "<border><left/><right/><top/><bottom/><diagonal/></border>",
+        "numFmt": "id:0",
+        "style": "builtin:0",
+        "xf": "<xf applyFill=\"1\"/>"
+      },
+      "com": {
+        "font": {
+          "name": "Aptos Narrow",
+          "size": 11.0,
+          "bold": false,
+          "italic": false,
+          "underline": -4142,
+          "strike": false,
+          "color": 0.0
+        },
+        "interior": {
+          "pattern": 1,
+          "color": 65535.0,
+          "patternColor": 0
+        },
+        "borders": {
+          "left": {
+            "lineStyle": -4142,
+            "weight": 2,
+            "color": 0.0
+          },
+          "right": {
+            "lineStyle": -4142,
+            "weight": 2,
+            "color": 0.0
+          },
+          "top": {
+            "lineStyle": -4142,
+            "weight": 2,
+            "color": 0.0
+          },
+          "bottom": {
+            "lineStyle": -4142,
+            "weight": 2,
+            "color": 0.0
+          },
+          "diagonalDown": {
+            "lineStyle": -4142,
+            "weight": 2,
+            "color": 0.0
+          },
+          "diagonalUp": {
+            "lineStyle": -4142,
+            "weight": 2,
+            "color": 0.0
+          }
+        },
+        "align": {
+          "horizontal": 1,
+          "vertical": -4107,
+          "wrap": false,
+          "indent": 0,
+          "orientation": -4128,
+          "shrink": false
+        },
+        "numberFormat": "General",
+        "locked": true,
+        "formulaHidden": false,
+        "styleName": "Normal"
+      }
+    },
+    "C2": {
+      "canon": {
+        "font": "<font><sz val=\"11\"/><color theme=\"1\"/><name val=\"Aptos Narrow\"/><family val=\"2\"/><scheme val=\"minor\"/></font>",
+        "fill": "<fill><patternFill patternType=\"solid\"><fgColor rgb=\"FFFFFF00\"/><bgColor indexed=\"64\"/></patternFill></fill>",
+        "border": "<border><left/><right/><top/><bottom/><diagonal/></border>",
+        "numFmt": "id:0",
+        "style": "builtin:0",
+        "xf": "<xf applyFill=\"1\"/>"
+      },
+      "com": {
+        "font": {
+          "name": "Aptos Narrow",
+          "size": 11.0,
+          "bold": false,
+          "italic": false,
+          "underline": -4142,
+          "strike": false,
+          "color": 0.0
+        },
+        "interior": {
+          "pattern": 1,
+          "color": 65535.0,
+          "patternColor": 0
+        },
+        "borders": {
+          "left": {
+            "lineStyle": -4142,
+            "weight": 2,
+            "color": 0.0
+          },
+          "right": {
+            "lineStyle": -4142,
+            "weight": 2,
+            "color": 0.0
+          },
+          "top": {
+            "lineStyle": -4142,
+            "weight": 2,
+            "color": 0.0
+          },
+          "bottom": {
+            "lineStyle": -4142,
+            "weight": 2,
+            "color": 0.0
+          },
+          "diagonalDown": {
+            "lineStyle": -4142,
+            "weight": 2,
+            "color": 0.0
+          },
+          "diagonalUp": {
+            "lineStyle": -4142,
+            "weight": 2,
+            "color": 0.0
+          }
+        },
+        "align": {
+          "horizontal": 1,
+          "vertical": -4107,
+          "wrap": false,
+          "indent": 0,
+          "orientation": -4128,
+          "shrink": false
+        },
+        "numberFormat": "General",
+        "locked": true,
+        "formulaHidden": false,
+        "styleName": "Normal"
+      }
+    },
+    "D2": {
+      "canon": {
+        "font": "<font><sz val=\"11\"/><color theme=\"1\"/><name val=\"Aptos Narrow\"/><family val=\"2\"/><scheme val=\"minor\"/></font>",
+        "fill": "<fill><patternFill patternType=\"solid\"><fgColor rgb=\"FFFFFF00\"/><bgColor indexed=\"64\"/></patternFill></fill>",
+        "border": "<border><left/><right/><top/><bottom/><diagonal/></border>",
+        "numFmt": "id:0",
+        "style": "builtin:0",
+        "xf": "<xf applyFill=\"1\"/>"
+      },
+      "com": {
+        "font": {
+          "name": "Aptos Narrow",
+          "size": 11.0,
+          "bold": false,
+          "italic": false,
+          "underline": -4142,
+          "strike": false,
+          "color": 0.0
+        },
+        "interior": {
+          "pattern": 1,
+          "color": 65535.0,
+          "patternColor": 0
+        },
+        "borders": {
+          "left": {
+            "lineStyle": -4142,
+            "weight": 2,
+            "color": 0.0
+          },
+          "right": {
+            "lineStyle": -4142,
+            "weight": 2,
+            "color": 0.0
+          },
+          "top": {
+            "lineStyle": -4142,
+            "weight": 2,
+            "color": 0.0
+          },
+          "bottom": {
+            "lineStyle": -4142,
+            "weight": 2,
+            "color": 0.0
+          },
+          "diagonalDown": {
+            "lineStyle": -4142,
+            "weight": 2,
+            "color": 0.0
+          },
+          "diagonalUp": {
+            "lineStyle": -4142,
+            "weight": 2,
+            "color": 0.0
+          }
+        },
+        "align": {
+          "horizontal": 1,
+          "vertical": -4107,
+          "wrap": false,
+          "indent": 0,
+          "orientation": -4128,
+          "shrink": false
+        },
+        "numberFormat": "General",
+        "locked": true,
+        "formulaHidden": false,
+        "styleName": "Normal"
+      }
+    },
+    "E2": {
+      "canon": {
+        "font": "<font><sz val=\"11\"/><color theme=\"1\"/><name val=\"Aptos Narrow\"/><family val=\"2\"/><scheme val=\"minor\"/></font>",
+        "fill": "<fill><patternFill patternType=\"none\"/></fill>",
+        "border": "<border><left/><right/><top/><bottom/><diagonal/></border>",
+        "numFmt": "id:0",
+        "style": "builtin:0",
+        "xf": "<xf />"
+      },
+      "com": {
+        "font": {
+          "name": "Aptos Narrow",
+          "size": 11.0,
+          "bold": false,
+          "italic": false,
+          "underline": -4142,
+          "strike": false,
+          "color": 0.0
+        },
+        "interior": {
+          "pattern": -4142,
+          "color": 16777215.0,
+          "patternColor": 0
+        },
+        "borders": {
+          "left": {
+            "lineStyle": -4142,
+            "weight": 2,
+            "color": 0.0
+          },
+          "right": {
+            "lineStyle": -4142,
+            "weight": 2,
+            "color": 0.0
+          },
+          "top": {
+            "lineStyle": -4142,
+            "weight": 2,
+            "color": 0.0
+          },
+          "bottom": {
+            "lineStyle": -4142,
+            "weight": 2,
+            "color": 0.0
+          },
+          "diagonalDown": {
+            "lineStyle": -4142,
+            "weight": 2,
+            "color": 0.0
+          },
+          "diagonalUp": {
+            "lineStyle": -4142,
+            "weight": 2,
+            "color": 0.0
+          }
+        },
+        "align": {
+          "horizontal": 1,
+          "vertical": -4107,
+          "wrap": false,
+          "indent": 0,
+          "orientation": -4128,
+          "shrink": false
+        },
+        "numberFormat": "General",
+        "locked": true,
+        "formulaHidden": false,
+        "styleName": "Normal"
+      }
+    },
+    "C700": {
+      "canon": {
+        "font": "<font><sz val=\"11\"/><color theme=\"1\"/><name val=\"Aptos Narrow\"/><family val=\"2\"/><scheme val=\"minor\"/></font>",
+        "fill": "<fill><patternFill patternType=\"solid\"><fgColor rgb=\"FFFFFF00\"/><bgColor indexed=\"64\"/></patternFill></fill>",
+        "border": "<border><left/><right/><top/><bottom/><diagonal/></border>",
+        "numFmt": "id:0",
+        "style": "builtin:0",
+        "xf": "<xf applyFill=\"1\"/>"
+      },
+      "com": {
+        "font": {
+          "name": "Aptos Narrow",
+          "size": 11.0,
+          "bold": false,
+          "italic": false,
+          "underline": -4142,
+          "strike": false,
+          "color": 0.0
+        },
+        "interior": {
+          "pattern": 1,
+          "color": 65535.0,
+          "patternColor": 0
+        },
+        "borders": {
+          "left": {
+            "lineStyle": -4142,
+            "weight": 2,
+            "color": 0.0
+          },
+          "right": {
+            "lineStyle": -4142,
+            "weight": 2,
+            "color": 0.0
+          },
+          "top": {
+            "lineStyle": -4142,
+            "weight": 2,
+            "color": 0.0
+          },
+          "bottom": {
+            "lineStyle": -4142,
+            "weight": 2,
+            "color": 0.0
+          },
+          "diagonalDown": {
+            "lineStyle": -4142,
+            "weight": 2,
+            "color": 0.0
+          },
+          "diagonalUp": {
+            "lineStyle": -4142,
+            "weight": 2,
+            "color": 0.0
+          }
+        },
+        "align": {
+          "horizontal": 1,
+          "vertical": -4107,
+          "wrap": false,
+          "indent": 0,
+          "orientation": -4128,
+          "shrink": false
+        },
+        "numberFormat": "General",
+        "locked": true,
+        "formulaHidden": false,
+        "styleName": "Normal"
+      }
+    }
+  }
+}

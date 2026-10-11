@@ -10,13 +10,13 @@ use crate::value::{ErrorKind, Value};
 
 pub(super) fn takes_arrays(name: &str, index: usize) -> bool {
     match name.to_ascii_uppercase().as_str() {
-        "Z.TEST" | "ZTEST" => index == 0,
+        // Z.TEST and PERCENTRANK take a range but, unlike the others, do not evaluate an expression over it as an
+        // array: `Z.TEST(A1:A5*2,4)` is #VALUE! in Excel.
         "T.TEST" | "TTEST" | "F.TEST" | "FTEST" | "CHISQ.TEST" | "CHITEST" => index <= 1,
         "PROB" => index <= 2,
         "FREQUENCY" | "MODE.MULT" => true,
         "LINEST" | "LOGEST" => index <= 1,
         "TREND" | "GROWTH" => index <= 2,
-        "PERCENTRANK" | "PERCENTRANK.INC" | "PERCENTRANK.EXC" => index == 0,
         _ => false,
     }
 }
@@ -60,19 +60,22 @@ pub(super) fn z_test(ctx: &EvalContext<'_>, args: &[Arg]) -> Res<Value> {
     if x.is_empty() {
         return Err(ErrorKind::NA);
     }
-    let n = x.len() as f64;
-    let sigma = match sigma {
-        Some(s) => s,
-        None => {
-            if x.len() < 2 {
-                return Err(ErrorKind::DivZero);
-            }
-            var(&x)?.sqrt()
-        }
-    };
-    if sigma == 0.0 {
+    // One value cannot give a z statistic, even with a known sigma (`Z.TEST({5},2,1)` is #DIV/0!).
+    if x.len() < 2 {
         return Err(ErrorKind::DivZero);
     }
+    let n = x.len() as f64;
+    let sigma = match sigma {
+        Some(s) if s <= 0.0 => return Err(NUM),
+        Some(s) => s,
+        None => {
+            let sd = var(&x)?.sqrt();
+            if sd == 0.0 {
+                return Err(ErrorKind::DivZero);
+            }
+            sd
+        }
+    };
     let z = (mean(&x) - mu) / (sigma / n.sqrt());
     number(dd::norm_cdf(Dd::from(z)).1.to_f64())
 }
@@ -184,31 +187,36 @@ pub(super) fn chisq_test(ctx: &EvalContext<'_>, args: &[Arg]) -> Res<Value> {
         return Err(ErrorKind::Value);
     };
     let (rows, cols) = (ga.rows(), ga.cols());
-    if rows != gb.rows() || cols != gb.cols() {
+    // Only the number of cells has to agree; the two arrays are paired in row-major order
+    // (`CHISQ.TEST({1,2,3},{1;2;3})` is 1) and the degrees of freedom come from the shape of the first.
+    if rows * cols != gb.rows() * gb.cols() {
         return Err(ErrorKind::NA);
     }
+    let pairs = (0..rows * cols).map(|i| {
+        (
+            ga.get(i / cols, i % cols),
+            gb.get(i / gb.cols(), i % gb.cols()),
+        )
+    });
     let mut chi = 0.0;
     let mut count = 0;
-    for r in 0..rows {
-        for c in 0..cols {
-            let (a, e) = (ga.get(r, c), gb.get(r, c));
-            if let Value::Error(x) = a {
-                return Err(x);
-            }
-            if let Value::Error(x) = e {
-                return Err(x);
-            }
-            if let (Value::Number(a), Value::Number(e)) = (a, e) {
-                if e == 0.0 {
-                    return Err(ErrorKind::DivZero);
-                }
-                chi += (a - e) * (a - e) / e;
-                count += 1;
-            }
+    for (a, e) in pairs {
+        if let Value::Error(x) = a {
+            return Err(x);
         }
-    }
-    if count < 2 {
-        return Err(ErrorKind::DivZero);
+        if let Value::Error(x) = e {
+            return Err(x);
+        }
+        if let (Value::Number(a), Value::Number(e)) = (a, e) {
+            if e == 0.0 {
+                return Err(ErrorKind::DivZero);
+            }
+            if e < 0.0 {
+                return Err(NUM);
+            }
+            chi += (a - e) * (a - e) / e;
+            count += 1;
+        }
     }
     let df = if rows == 1 {
         cols as f64 - 1.0
@@ -218,7 +226,13 @@ pub(super) fn chisq_test(ctx: &EvalContext<'_>, args: &[Arg]) -> Res<Value> {
         (rows as f64 - 1.0) * (cols as f64 - 1.0)
     };
     if df < 1.0 {
+        return Err(ErrorKind::NA);
+    }
+    if count == 0 {
         return Err(ErrorKind::DivZero);
+    }
+    if !chi.is_finite() {
+        return Err(NUM);
     }
     let (_, q) = dd::gamma_pq(Dd::from(df / 2.0), Dd::from(chi / 2.0)).ok_or(NUM)?;
     number(q.to_f64())

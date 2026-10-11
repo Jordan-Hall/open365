@@ -113,18 +113,19 @@ notes = `"$notes`"
   # A floating table of 2 rows x 2 cells at the start of paragraph $pi (all dimensions in points).
   function TblFloat($pi, $o) {
     $r = $script:doc.Paragraphs.Item($pi).Range; $r.Collapse(1)
-    $t = $script:doc.Tables.Add($r, 2, 2)
+    $nr = if ($o.rows) { $o.rows } else { 2 }
+    $t = $script:doc.Tables.Add($r, $nr, 2)
     $t.Borders.Enable = -1
     $t.AllowAutoFit = $false
     $t.Columns.Item(1).Width = [single]$o.cw; $t.Columns.Item(2).Width = [single]$o.cw
     $t.TopPadding = 0; $t.BottomPadding = 0
-    for ($i = 1; $i -le 2; $i++) { for ($j = 1; $j -le 2; $j++) { $t.Cell($i, $j).Range.Text = "$($o.tag)r$($i)c$($j)" } }
+    for ($i = 1; $i -le $nr; $i++) { for ($j = 1; $j -le 2; $j++) { $t.Cell($i, $j).Range.Text = "$($o.tag)r$($i)c$($j)" } }
     $rw = $t.Rows
     $rw.WrapAroundText = -1
     $rw.RelativeHorizontalPosition = $o.hrel; $rw.HorizontalPosition = [single]$o.x
     $rw.RelativeVerticalPosition = $o.vrel; $rw.VerticalPosition = [single]$o.y
     if ($o.dist) { $rw.DistanceTop = $o.dist[0]; $rw.DistanceBottom = $o.dist[1]; $rw.DistanceLeft = $o.dist[2]; $rw.DistanceRight = $o.dist[3] }
-    $rw.AllowOverlap = 0
+    $rw.AllowOverlap = $(if ($o.overlap) { -1 } else { 0 })
     $t
   }
   # A frame around paragraph $pi.
@@ -137,6 +138,14 @@ notes = `"$notes`"
     $f.RelativeHorizontalPosition = $o.hrel; $f.HorizontalPosition = [single]$o.x
     $f.RelativeVerticalPosition = $o.vrel; $f.VerticalPosition = [single]$o.y
     if ($o.dist) { $f.HorizontalDistanceFromText = [single]$o.dist[0]; $f.VerticalDistanceFromText = [single]$o.dist[1] }
+    if ($o.nobdr) { $f.Range.ParagraphFormat.Borders.Enable = 0 }
+    if ($o.bdr) {
+      $b = $f.Range.ParagraphFormat.Borders
+      $b.OutsideLineStyle = 1; $b.OutsideLineWidth = [int]$o.bdr[0]
+      $b.DistanceFromTop = [single]$o.bdr[1]; $b.DistanceFromBottom = [single]$o.bdr[1]
+      $b.DistanceFromLeft = [single]$o.bdr[1]; $b.DistanceFromRight = [single]$o.bdr[1]
+    }
+    if ($o.auto) { $f.WidthRule = 0 }
     $f
   }
 
@@ -164,6 +173,45 @@ notes = `"$notes`"
     Body 14
     [void](FR 2 @{ w = 140; x = 100; hrel = 1; y = 250; vrel = 1; h = 60; hrule = 2; dist = @(9, 4) })
     [void](FR 8 @{ w = 130; x = -999995; hrel = 2; y = 30; vrel = 2; dist = @(9, 0) })
+  }
+  C-Fixture 'layout-tblp-margin' 'a floating table positioned from the margins (60 pt from the left margin, 100 pt below the top margin), anchored in paragraph 2, with 4/4/12/12 pt distances' {
+    Body 14
+    [void](TblFloat 2 @{ tag = 'te'; cw = 100; x = 60; hrel = 0; y = 100; vrel = 0; dist = @(4, 4, 12, 12) })
+  }
+  C-Fixture 'layout-tblp-yspec' 'floating tables positioned by keyword: left and vertically centred in the margins (paragraph 3), right and at the bottom of the margins (paragraph 12 of the text), over two pages of text' {
+    Body 30
+    [void](TblFloat 3 @{ tag = 'tf'; cw = 100; x = -999998; hrel = 0; y = -999995; vrel = 0; dist = @(0, 0, 9, 9) })
+    [void](TblFloat 18 @{ tag = 'tg'; cw = 100; x = -999996; hrel = 0; y = -999993; vrel = 0; dist = @(0, 0, 9, 9) })
+  }
+  C-Fixture 'layout-tblp-never' 'two floating tables anchored in paragraphs 3 and 4 (the table of the first one adds 6 paragraphs to the numbering) that would overlap, overlap not allowed' {
+    Body 14
+    [void](TblFloat 3 @{ tag = 'th'; cw = 100; x = 0; hrel = 2; y = 0; vrel = 2; dist = @(0, 0, 9, 9) })
+    [void](TblFloat 10 @{ tag = 'ti'; cw = 100; x = 30; hrel = 2; y = -30; vrel = 2; dist = @(0, 0, 9, 9) })
+  }
+  C-Fixture 'layout-tblp-allow' 'two floating tables anchored in paragraphs 3 and 4 (the table of the first one adds 6 paragraphs to the numbering) that overlap, overlap allowed' {
+    Body 14
+    [void](TblFloat 3 @{ tag = 'tj'; cw = 100; x = 0; hrel = 2; y = 0; vrel = 2; dist = @(0, 0, 9, 9) })
+    [void](TblFloat 10 @{ tag = 'tk'; cw = 100; x = 30; hrel = 2; y = -30; vrel = 2; dist = @(0, 0, 9, 9); overlap = $true })
+  }
+  C-Fixture 'layout-tblp-right2' 'a table on the right margin with 7 pt on its left and 15 pt on its right, 5 pt above and below' {
+    Body 12
+    [void](TblFloat 3 @{ tag = 'tl'; cw = 100; x = -999996; hrel = 0; y = 0; vrel = 2; dist = @(5, 5, 7, 15) })
+  }
+  C-Fixture 'layout-tblp-bottom' 'a ten row floating table anchored near the bottom of page one: whether it moves up, stays or goes to the next page' {
+    Body 26
+    [void](TblFloat 22 @{ tag = 'tm'; cw = 100; x = 0; hrel = 2; y = 0; vrel = 2; dist = @(0, 0, 9, 9); rows = 10 })
+  }
+  C-Fixture 'layout-frame-nobdr' 'borderless frames: 150 pt wide at the column left in paragraph 3 (distance 9, vertical 6), 120 pt at the right margin in paragraph 9, and an automatic width frame with short text in paragraph 12' {
+    Body 16
+    [void](FR 3 @{ w = 150; x = 0; hrel = 2; y = 0; vrel = 2; dist = @(9, 6); nobdr = $true })
+    [void](FR 9 @{ w = 120; x = -999996; hrel = 0; y = 0; vrel = 2; dist = @(14, 0); nobdr = $true })
+    $r = $doc.Paragraphs.Item(12).Range; $r.InsertBefore('Note ')
+    [void](FR 12 @{ w = 60; x = 0; hrel = 2; y = 0; vrel = 2; dist = @(9, 0); nobdr = $true; auto = $true })
+  }
+  C-Fixture 'layout-frame-bdr' 'bordered frames, 1.5 pt border 4 pt from the text: 150 pt wide at the column left in paragraph 3 (distance 9, vertical 5) and 120 pt at the right margin in paragraph 9' {
+    Body 16
+    [void](FR 3 @{ w = 150; x = 0; hrel = 2; y = 0; vrel = 2; dist = @(9, 5); bdr = @(12, 4) })
+    [void](FR 9 @{ w = 120; x = -999996; hrel = 0; y = 0; vrel = 2; dist = @(14, 0); bdr = @(12, 4) })
   }
   C-Fixture 'layout-frame-dropcap' 'three paragraphs of body text, the first letter of the first and the third as a dropped capital over 3 and 2 lines' {
     Body 6

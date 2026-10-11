@@ -1,0 +1,5 @@
+feature = "layout-frame"
+made_with = "Microsoft Word 16.0.20430 (Windows)"
+author = "project member"
+expect_dropped = []
+notes = "two floating tables anchored in paragraphs 3 and 4 (the table of the first one adds 6 paragraphs to the numbering) that overlap, overlap allowed"

@@ -155,10 +155,108 @@ pub(crate) struct RowLayout {
     pub cells: Vec<CellLayout>,
 }
 
+/// What a floating table's position is measured from (`w:horzAnchor`, `w:vertAnchor`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum PosAnchor {
+    /// The column (horizontal) or the anchor paragraph's top (vertical).
+    Text,
+    Margin,
+    Page,
+}
+
+/// `w:tblpXSpec` and `w:tblpYSpec`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum PosSpec {
+    Start,
+    Center,
+    End,
+    /// Vertical only: `inline` keeps the table in the flow.
+    Inline,
+}
+
+/// A table out of the flow (`w:tblpPr`), positions in points.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub(crate) struct TablePos {
+    pub horz: PosAnchor,
+    pub vert: PosAnchor,
+    pub x: f64,
+    pub y: f64,
+    pub x_spec: Option<PosSpec>,
+    pub y_spec: Option<PosSpec>,
+    /// Text distances: left, top, right, bottom.
+    pub dist: [f64; 4],
+    /// `w:tblOverlap` is not `never`.
+    pub overlap: bool,
+}
+
+impl TablePos {
+    /// Reads `w:tblPr/w:tblpPr` of `table`.
+    pub(crate) fn read(table: &Table) -> Option<Self> {
+        use open365_docx::{RawXml, TableChild};
+        let pr = table.children.iter().find_map(|c| match c {
+            TableChild::Raw(RawXml::Element(e)) if e.head.is_w("tblPr") => Some(e),
+            _ => None,
+        })?;
+        let el = |name: &str| {
+            pr.children
+                .iter()
+                .filter_map(RawXml::as_element)
+                .find(|e| e.head.is_w(name))
+        };
+        let p = el("tblpPr")?;
+        let twips = |name: &str| {
+            p.head
+                .attr_w(name)
+                .and_then(|v| v.trim().parse::<i64>().ok())
+        };
+        let pt = |name: &str| twips(name).map_or(0.0, |t| t as f64 / 20.0);
+        // Word writes a position one twip too large (0 as 1, 60 pt as 1201, ...) and reads it
+        // back without that twip: odd values lose it (layout-tblp-basic, layout-tblp-margin).
+        let pos = |name: &str| twips(name).map_or(0.0, |t| (t - (t & 1)) as f64 / 20.0);
+        // Word omits the default: `horzAnchor` text, `vertAnchor` margin (layout-tblp-margin).
+        let anchor = |name: &str, default: PosAnchor| match p.head.attr_w(name) {
+            Some("margin") => PosAnchor::Margin,
+            Some("page") => PosAnchor::Page,
+            Some("text") => PosAnchor::Text,
+            _ => default,
+        };
+        let spec = |name: &str| {
+            p.head.attr_w(name).and_then(|v| match v {
+                "left" | "inside" | "top" => Some(PosSpec::Start),
+                "center" => Some(PosSpec::Center),
+                "right" | "outside" | "bottom" => Some(PosSpec::End),
+                "inline" => Some(PosSpec::Inline),
+                _ => None,
+            })
+        };
+        Some(Self {
+            horz: anchor("horzAnchor", PosAnchor::Text),
+            vert: anchor("vertAnchor", PosAnchor::Margin),
+            x: pos("tblpX"),
+            y: pos("tblpY"),
+            x_spec: spec("tblpXSpec"),
+            y_spec: spec("tblpYSpec"),
+            dist: [
+                pt("leftFromText"),
+                pt("topFromText"),
+                pt("rightFromText"),
+                pt("bottomFromText"),
+            ],
+            overlap: el("tblOverlap").and_then(|e| e.head.attr_w("val")) != Some("never"),
+        })
+    }
+}
+
 #[derive(Debug)]
 pub(crate) struct TableLayout {
     /// Left edge relative to the text area.
     pub x: f64,
+    /// Sum of the grid columns, and the widths of the borders on the left and right grid lines.
+    pub width: f64,
+    pub edge_l: f64,
+    pub edge_r: f64,
+    /// `w:tblpPr`: the table floats.
+    pub pos: Option<TablePos>,
     pub rows: Vec<RowLayout>,
     /// Leading rows marked `w:tblHeader`.
     pub header_rows: usize,
@@ -167,6 +265,11 @@ pub(crate) struct TableLayout {
 impl TableLayout {
     pub(crate) fn height(&self) -> f64 {
         self.rows.last().map_or(0.0, |r| r.top + r.height)
+    }
+
+    /// Width of the table including its outer borders.
+    pub(crate) fn outer_width(&self) -> f64 {
+        self.width + (self.edge_l + self.edge_r) / 2.0
     }
 }
 
@@ -652,6 +755,10 @@ pub(crate) fn layout_table(b: &mut Builder<'_>, table: &Table, avail: f64) -> Ta
     let header_rows = rows.iter().take_while(|r| r.is_header).count();
     TableLayout {
         x,
+        width,
+        edge_l: vlines[0],
+        edge_r: vlines[last_line],
+        pos: TablePos::read(table),
         rows,
         header_rows,
     }

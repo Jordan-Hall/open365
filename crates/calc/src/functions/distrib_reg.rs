@@ -33,9 +33,21 @@ fn column(values: Vec<Value>) -> Value {
 pub(super) fn frequency(ctx: &EvalContext<'_>, args: &[Arg]) -> Res<Value> {
     arity(args, 2, 2)?;
     let data = numbers(ctx, &args[0])?;
-    let bins = numbers(ctx, &args[1])?;
+    // Non-numeric bins are dropped, errors included (`FREQUENCY(x, {3,#N/A,8})` has two bins); an error in
+    // the data fills every element.
+    let bins: Vec<f64> = ctx
+        .cells(&args[1])
+        .filter_map(|v| match v {
+            Value::Number(n) => Some(n),
+            _ => None,
+        })
+        .collect();
     if bins.is_empty() {
-        return Ok(column(vec![Value::Number(data.len() as f64)]));
+        // Without a bin Excel still returns two elements: nothing at or below the (absent) bin and every value above.
+        return Ok(column(vec![
+            Value::Number(0.0),
+            Value::Number(data.len() as f64),
+        ]));
     }
     let mut counts = vec![0.0; bins.len() + 1];
     let mut sorted: Vec<f64> = bins.clone();
@@ -105,28 +117,32 @@ pub(super) fn prob(ctx: &EvalContext<'_>, args: &[Arg]) -> Res<Value> {
         if let Value::Error(e) = p {
             return Err(*e);
         }
+        // A blank probability, like a zero one, drops the pair whatever the value is; a text or boolean
+        // probability, or a non-number value beside a non-zero probability, is #NUM!. A probability is not
+        // range-checked (`-0.1` is accepted); only their sum is.
         let p = match p {
+            Value::Empty => continue,
             Value::Number(p) => *p,
-            _ => return Err(ErrorKind::Value),
+            _ => return Err(NUM),
         };
-        if p <= 0.0 || p > 1.0 {
-            return Err(NUM);
+        if p == 0.0 {
+            continue;
         }
-        total += p;
-        let x = match x {
-            Value::Number(x) => *x,
-            _ => return Err(ErrorKind::Value),
+        let Value::Number(x) = x else {
+            return Err(NUM);
         };
+        total += p;
         let inside = if hi.is_some() {
-            x >= lo && x <= upper
+            *x >= lo && *x <= upper
         } else {
-            x == lo
+            *x == lo
         };
         if inside {
             sum += p;
         }
     }
-    if (total - 1.0).abs() > 1e-9 {
+    // Measured on the double sum: 1 - 4.4E-16 up to 1 + 4.9E-15 is accepted, beyond that #NUM!.
+    if total < 1.0 - 4.5e-16 || total > 1.0 + 5.0e-15 {
         return Err(NUM);
     }
     number(sum)
@@ -153,6 +169,10 @@ fn percentrank(ctx: &EvalContext<'_>, args: &[Arg], exclusive: bool) -> Res<Valu
     if x < a[0] || x > a[n - 1] {
         return Err(ErrorKind::NA);
     }
+    if n == 1 {
+        // A single value ranks 1 in both variants (`PERCENTRANK.EXC({5},5)` is 1, not 1/2).
+        return number(1.0);
+    }
     let k = a.iter().rposition(|v| *v <= x).unwrap_or(0);
     let k = if a[k] == x {
         a.iter().position(|v| *v == x).unwrap_or(k)
@@ -172,7 +192,23 @@ fn percentrank(ctx: &EvalContext<'_>, args: &[Arg], exclusive: bool) -> Res<Valu
         pos / denom
     };
     let scale = 10f64.powf(sig.min(15.0));
-    number((rank * scale).floor() / scale)
+    // Truncate after rounding to 15 significant digits: `PERCENTRANK(.1:.5, 0.15)` computes 0.12499999999999997
+    // and Excel returns 0.125.
+    number(round15(rank * scale).floor() / scale)
+}
+
+/// `x` rounded to 15 significant digits.
+fn round15(x: f64) -> f64 {
+    if x == 0.0 || !x.is_finite() {
+        return x;
+    }
+    let digits = 14 - x.abs().log10().floor() as i32;
+    let m = 10f64.powi(digits.abs());
+    if digits >= 0 {
+        (x * m).round() / m
+    } else {
+        (x / m).round() * m
+    }
 }
 
 pub(super) fn percentrank_inc(ctx: &EvalContext<'_>, args: &[Arg]) -> Res<Value> {
@@ -200,13 +236,42 @@ struct Fit {
 
 /// Least squares by Householder QR on the columns `x1..xk` followed by the constant column.
 fn least_squares(y: &[f64], xs: &[Vec<f64>], constant: bool) -> Fit {
+    // Full-rank data keeps the natural column order (the last digits then agree with Excel more often); when a
+    // column turns out redundant the fit is redone in Excel's pivoting order.
+    let fit = least_squares_in(y, xs, constant, false);
+    if fit.dropped.iter().any(|d| *d) {
+        least_squares_in(y, xs, constant, true)
+    } else {
+        fit
+    }
+}
+
+fn least_squares_in(y: &[f64], xs: &[Vec<f64>], constant: bool, excel_order: bool) -> Fit {
     let n = y.len();
     let k = xs.len();
     let p = k + usize::from(constant);
-    let mut cols: Vec<Vec<f64>> = xs.to_vec();
-    if constant {
-        cols.push(vec![1.0; n]);
+    // Excel pivots in the order constant, last x column, ..., first x column: of two collinear columns the earlier
+    // one is dropped (its coefficient reads 0), and a column that is constant is dropped in favour of the intercept.
+    // `order[j]` is the coefficient slot (x1..xk, then the constant) of the j-th column processed.
+    let mut order: Vec<usize> = Vec::with_capacity(p);
+    if excel_order {
+        if constant {
+            order.push(k);
+        }
+        order.extend((0..k).rev());
+    } else {
+        order.extend(0..p);
     }
+    let cols: Vec<Vec<f64>> = order
+        .iter()
+        .map(|&slot| {
+            if slot == k {
+                vec![1.0; n]
+            } else {
+                xs[slot].clone()
+            }
+        })
+        .collect();
     let norms: Vec<f64> = cols
         .iter()
         .map(|c| c.iter().map(|v| v * v).sum::<f64>().sqrt())
@@ -297,10 +362,17 @@ fn least_squares(y: &[f64], xs: &[Vec<f64>], constant: bool) -> Fit {
     } else {
         y.iter().map(|v| v * v).sum()
     };
+    // back to the coefficient slots
+    let (mut coef_s, mut dropped_s, mut se_s) = (vec![0.0; p], vec![true; p], vec![0.0; p]);
+    for (j, &slot) in order.iter().enumerate() {
+        coef_s[slot] = coef[j];
+        dropped_s[slot] = dropped[j];
+        se_s[slot] = se[j];
+    }
     Fit {
-        coef,
-        dropped,
-        se,
+        coef: coef_s,
+        dropped: dropped_s,
+        se: se_s,
         ssreg: sst - ssresid,
         ssresid,
         df,
@@ -326,7 +398,7 @@ fn read_xy(
         for c in 0..yc {
             match gy.get(r, c) {
                 Value::Number(v) => y.push(v),
-                Value::Error(e) => return Err(e),
+                // an error cell is #VALUE! here, not the error itself
                 _ => return Err(ErrorKind::Value),
             }
         }
@@ -350,7 +422,6 @@ fn read_xy(
                     let cell = if by_cols { gx.get(i, v) } else { gx.get(v, i) };
                     match cell {
                         Value::Number(t) => col.push(t),
-                        Value::Error(e) => return Err(e),
                         _ => return Err(ErrorKind::Value),
                     }
                 }
@@ -421,13 +492,19 @@ fn regression(ctx: &EvalContext<'_>, args: &[Arg], log: bool) -> Res<Value> {
         } else {
             0.0
         };
-        let r2 = fit.ssreg / (fit.ssreg + fit.ssresid);
+        // A perfect fit (or one point per parameter) has r2 = 1, a standard error of 0 and no F statistic (#NUM!).
+        let total = fit.ssreg + fit.ssresid;
+        let r2 = if total > 0.0 { fit.ssreg / total } else { 1.0 };
         let mut r3 = vec![Value::Number(r2), Value::Number(sey)];
         let mut r4 = vec![Value::Number(f64::NAN), Value::Number(fit.df)];
         let mut r5 = vec![Value::Number(fit.ssreg), Value::Number(fit.ssresid)];
         let kk = (fit.n as f64 - fit.df - f64::from(u8::from(fit.constant))).max(0.0);
         let f = (fit.ssreg / kk) / (fit.ssresid / fit.df);
-        r4[0] = Value::Number(f);
+        r4[0] = if f.is_finite() {
+            Value::Number(f)
+        } else {
+            Value::Error(NUM)
+        };
         while r3.len() < width {
             r3.push(blank.clone());
             r4.push(blank.clone());
@@ -483,7 +560,6 @@ fn trend_like(ctx: &EvalContext<'_>, args: &[Arg], log: bool) -> Res<Value> {
                 for (j, slot) in row.iter_mut().enumerate() {
                     *slot = match g.get(i, j) {
                         Value::Number(v) => v,
-                        Value::Error(e) => return Err(e),
                         _ => return Err(ErrorKind::Value),
                     };
                 }

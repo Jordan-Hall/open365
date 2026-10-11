@@ -27,6 +27,15 @@ pub struct SpanStyle {
     pub strike: bool,
     /// `RRGGBB`; `None` is automatic (black).
     pub color: Option<[u8; 3]>,
+    /// The font comes from the document's theme (body or headings), not a literal name.
+    pub theme_font: Option<ThemeFont>,
+}
+
+/// Which theme font slot a run's font is.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ThemeFont {
+    Body,
+    Headings,
 }
 
 impl Default for SpanStyle {
@@ -39,6 +48,7 @@ impl Default for SpanStyle {
             underline: false,
             strike: false,
             color: None,
+            theme_font: None,
         }
     }
 }
@@ -46,6 +56,17 @@ impl Default for SpanStyle {
 impl SpanStyle {
     pub fn size_pt(&self) -> f32 {
         self.size_half_points as f32 / 2.0
+    }
+
+    /// What the Font box shows: the theme font's own name with its slot, as Office does
+    /// (`Calibri (Body)`), else the literal name. Rendering substitutes metric-compatible fonts
+    /// separately; this never shows the substitute.
+    pub fn font_label(&self) -> String {
+        match self.theme_font {
+            Some(ThemeFont::Body) => format!("{} (Body)", self.font),
+            Some(ThemeFont::Headings) => format!("{} (Headings)", self.font),
+            None => self.font.to_string(),
+        }
     }
 }
 
@@ -131,7 +152,23 @@ impl ParaModel {
 fn span_style(p: &Paragraph, run: &open365_docx::Run, styles: Option<&Styles>) -> SpanStyle {
     if let Some(styles) = styles {
         let e = styles.effective_run_props(p, run);
+        let literal = run
+            .props
+            .fonts()
+            .and_then(|f| f.head.attr_w("ascii"))
+            .is_some();
+        let theme = styles.theme_fonts();
+        let theme_font = if literal {
+            None
+        } else if e.font == theme.minor {
+            Some(ThemeFont::Body)
+        } else if e.font == theme.major {
+            Some(ThemeFont::Headings)
+        } else {
+            None
+        };
         return SpanStyle {
+            theme_font,
             font: Arc::from(e.font.as_str()),
             size_half_points: e.size_half_points,
             bold: e.bold,
@@ -143,6 +180,7 @@ fn span_style(p: &Paragraph, run: &open365_docx::Run, styles: Option<&Styles>) -
     }
     let props = &run.props;
     SpanStyle {
+        theme_font: None,
         font: props
             .fonts()
             .and_then(|f| f.head.attr_w("ascii"))

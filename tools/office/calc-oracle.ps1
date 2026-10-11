@@ -120,25 +120,34 @@ function Stop-Excel {
   $script:xlPid = 0
 }
 
-# Watchdog: a timer that kills ONLY the Excel process this script started (same pid check as Stop-Excel) when the
-# batch exceeds its timeout, so a hung Excel (for example a 1E+300 shape parameter) cannot block the run forever.
-$script:watchdog = $null
+# Watchdog: a .NET timer that kills ONLY the Excel process this script started (same pid and name check as
+# Stop-Excel) when the batch exceeds its timeout, so a hung Excel (for example a 1E+300 shape parameter) cannot
+# block the run forever. It is compiled C#: a PowerShell Register-ObjectEvent action cannot run while the main
+# thread is blocked inside a COM call, which is exactly when the watchdog is needed.
+if (-not ('CalcOracleWatchdog' -as [type])) {
+  Add-Type -TypeDefinition @'
+public static class CalcOracleWatchdog {
+  static System.Threading.Timer timer;
+  public static void Start(int pid, int seconds) {
+    Stop();
+    timer = new System.Threading.Timer(delegate(object state) {
+      try {
+        var p = System.Diagnostics.Process.GetProcessById(pid);
+        if (p.ProcessName == "EXCEL") { p.Kill(); }
+      } catch (System.Exception) { }
+    }, null, seconds * 1000, System.Threading.Timeout.Infinite);
+  }
+  public static void Stop() {
+    if (timer != null) { timer.Dispose(); timer = null; }
+  }
+}
+'@
+}
 function Start-Watchdog([int]$seconds) {
-  Stop-Watchdog
-  $t = New-Object System.Timers.Timer ($seconds * 1000)
-  $t.AutoReset = $false
-  [void](Register-ObjectEvent -InputObject $t -EventName Elapsed -SourceIdentifier 'calc-oracle-watchdog' -MessageData $script:xlPid -Action {
-    $p = Get-Process -Id $Event.MessageData -ErrorAction SilentlyContinue
-    if ($p -and $p.ProcessName -eq 'EXCEL') { Stop-Process -Id $Event.MessageData -Force -ErrorAction SilentlyContinue }
-  })
-  $t.Start()
-  $script:watchdog = $t
+  [CalcOracleWatchdog]::Start([int]$script:xlPid, $seconds)
 }
 function Stop-Watchdog {
-  if ($script:watchdog) { try { $script:watchdog.Stop(); $script:watchdog.Dispose() } catch {} }
-  $script:watchdog = $null
-  Unregister-Event -SourceIdentifier 'calc-oracle-watchdog' -ErrorAction SilentlyContinue
-  Remove-Job -Name 'calc-oracle-watchdog' -Force -ErrorAction SilentlyContinue
+  [CalcOracleWatchdog]::Stop()
 }
 
 function Restart-Excel {

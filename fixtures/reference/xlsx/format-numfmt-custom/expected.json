@@ -1,0 +1,613 @@
+{
+  "name": "numfmt-custom",
+  "excel": "16.0",
+  "error": null,
+  "counts": {
+    "fonts": 1,
+    "fills": 2,
+    "borders": 1,
+    "cellXfs": 7,
+    "cellStyleXfs": 1,
+    "cellStyles": 1,
+    "numFmts": 6
+  },
+  "tables": {
+    "fonts": [
+      "<font><sz val=\"11\"/><color theme=\"1\"/><name val=\"Aptos Narrow\"/><family val=\"2\"/><scheme val=\"minor\"/></font>"
+    ],
+    "fills": [
+      "<fill><patternFill patternType=\"none\"/></fill>",
+      "<fill><patternFill patternType=\"gray125\"/></fill>"
+    ],
+    "borders": [
+      "<border><left/><right/><top/><bottom/><diagonal/></border>"
+    ],
+    "cellXfs": [
+      "<xf numFmtId=\"0\" fontId=\"0\" fillId=\"0\" borderId=\"0\" xfId=\"0\"/>",
+      "<xf numFmtId=\"164\" fontId=\"0\" fillId=\"0\" borderId=\"0\" xfId=\"0\" applyNumberFormat=\"1\"/>",
+      "<xf numFmtId=\"165\" fontId=\"0\" fillId=\"0\" borderId=\"0\" xfId=\"0\" applyNumberFormat=\"1\"/>",
+      "<xf numFmtId=\"166\" fontId=\"0\" fillId=\"0\" borderId=\"0\" xfId=\"0\" applyNumberFormat=\"1\"/>",
+      "<xf numFmtId=\"167\" fontId=\"0\" fillId=\"0\" borderId=\"0\" xfId=\"0\" applyNumberFormat=\"1\"/>",
+      "<xf numFmtId=\"168\" fontId=\"0\" fillId=\"0\" borderId=\"0\" xfId=\"0\" applyNumberFormat=\"1\"/>",
+      "<xf numFmtId=\"169\" fontId=\"0\" fillId=\"0\" borderId=\"0\" xfId=\"0\" applyNumberFormat=\"1\"/>"
+    ],
+    "cellStyleXfs": [
+      "<xf numFmtId=\"0\" fontId=\"0\" fillId=\"0\" borderId=\"0\"/>"
+    ],
+    "cellStyles": [
+      "<cellStyle name=\"Normal\" xfId=\"0\" builtinId=\"0\"/>"
+    ],
+    "numFmts": [
+      "<numFmt numFmtId=\"164\" formatCode=\"0.000\"/>",
+      "<numFmt numFmtId=\"165\" formatCode=\"yyyy\\-mm\\-dd\"/>",
+      "<numFmt numFmtId=\"166\" formatCode=\"&quot;x&quot;0\"/>",
+      "<numFmt numFmtId=\"167\" formatCode=\"0.0%\"/>",
+      "<numFmt numFmtId=\"168\" formatCode=\"[$-409]dddd\"/>",
+      "<numFmt numFmtId=\"169\" formatCode=\"0.0000E+00\"/>"
+    ]
+  },
+  "cols": "",
+  "styledRows": [],
+  "cells": {
+    "A1": {
+      "canon": {
+        "font": "<font><sz val=\"11\"/><color theme=\"1\"/><name val=\"Aptos Narrow\"/><family val=\"2\"/><scheme val=\"minor\"/></font>",
+        "fill": "<fill><patternFill patternType=\"none\"/></fill>",
+        "border": "<border><left/><right/><top/><bottom/><diagonal/></border>",
+        "numFmt": "custom:0.000",
+        "style": "builtin:0",
+        "xf": "<xf applyNumberFormat=\"1\"/>"
+      },
+      "com": {
+        "font": {
+          "name": "Aptos Narrow",
+          "size": 11.0,
+          "bold": false,
+          "italic": false,
+          "underline": -4142,
+          "strike": false,
+          "color": 0.0
+        },
+        "interior": {
+          "pattern": -4142,
+          "color": 16777215.0,
+          "patternColor": 0
+        },
+        "borders": {
+          "left": {
+            "lineStyle": -4142,
+            "weight": 2,
+            "color": 0.0
+          },
+          "right": {
+            "lineStyle": -4142,
+            "weight": 2,
+            "color": 0.0
+          },
+          "top": {
+            "lineStyle": -4142,
+            "weight": 2,
+            "color": 0.0
+          },
+          "bottom": {
+            "lineStyle": -4142,
+            "weight": 2,
+            "color": 0.0
+          },
+          "diagonalDown": {
+            "lineStyle": -4142,
+            "weight": 2,
+            "color": 0.0
+          },
+          "diagonalUp": {
+            "lineStyle": -4142,
+            "weight": 2,
+            "color": 0.0
+          }
+        },
+        "align": {
+          "horizontal": 1,
+          "vertical": -4107,
+          "wrap": false,
+          "indent": 0,
+          "orientation": -4128,
+          "shrink": false
+        },
+        "numberFormat": "0.000",
+        "locked": true,
+        "formulaHidden": false,
+        "styleName": "Normal"
+      }
+    },
+    "A2": {
+      "canon": {
+        "font": "<font><sz val=\"11\"/><color theme=\"1\"/><name val=\"Aptos Narrow\"/><family val=\"2\"/><scheme val=\"minor\"/></font>",
+        "fill": "<fill><patternFill patternType=\"none\"/></fill>",
+        "border": "<border><left/><right/><top/><bottom/><diagonal/></border>",
+        "numFmt": "custom:yyyy\\-mm\\-dd",
+        "style": "builtin:0",
+        "xf": "<xf applyNumberFormat=\"1\"/>"
+      },
+      "com": {
+        "font": {
+          "name": "Aptos Narrow",
+          "size": 11.0,
+          "bold": false,
+          "italic": false,
+          "underline": -4142,
+          "strike": false,
+          "color": 0.0
+        },
+        "interior": {
+          "pattern": -4142,
+          "color": 16777215.0,
+          "patternColor": 0
+        },
+        "borders": {
+          "left": {
+            "lineStyle": -4142,
+            "weight": 2,
+            "color": 0.0
+          },
+          "right": {
+            "lineStyle": -4142,
+            "weight": 2,
+            "color": 0.0
+          },
+          "top": {
+            "lineStyle": -4142,
+            "weight": 2,
+            "color": 0.0
+          },
+          "bottom": {
+            "lineStyle": -4142,
+            "weight": 2,
+            "color": 0.0
+          },
+          "diagonalDown": {
+            "lineStyle": -4142,
+            "weight": 2,
+            "color": 0.0
+          },
+          "diagonalUp": {
+            "lineStyle": -4142,
+            "weight": 2,
+            "color": 0.0
+          }
+        },
+        "align": {
+          "horizontal": 1,
+          "vertical": -4107,
+          "wrap": false,
+          "indent": 0,
+          "orientation": -4128,
+          "shrink": false
+        },
+        "numberFormat": "yyyy-mm-dd",
+        "locked": true,
+        "formulaHidden": false,
+        "styleName": "Normal"
+      }
+    },
+    "A3": {
+      "canon": {
+        "font": "<font><sz val=\"11\"/><color theme=\"1\"/><name val=\"Aptos Narrow\"/><family val=\"2\"/><scheme val=\"minor\"/></font>",
+        "fill": "<fill><patternFill patternType=\"none\"/></fill>",
+        "border": "<border><left/><right/><top/><bottom/><diagonal/></border>",
+        "numFmt": "custom:&quot;x&quot;0",
+        "style": "builtin:0",
+        "xf": "<xf applyNumberFormat=\"1\"/>"
+      },
+      "com": {
+        "font": {
+          "name": "Aptos Narrow",
+          "size": 11.0,
+          "bold": false,
+          "italic": false,
+          "underline": -4142,
+          "strike": false,
+          "color": 0.0
+        },
+        "interior": {
+          "pattern": -4142,
+          "color": 16777215.0,
+          "patternColor": 0
+        },
+        "borders": {
+          "left": {
+            "lineStyle": -4142,
+            "weight": 2,
+            "color": 0.0
+          },
+          "right": {
+            "lineStyle": -4142,
+            "weight": 2,
+            "color": 0.0
+          },
+          "top": {
+            "lineStyle": -4142,
+            "weight": 2,
+            "color": 0.0
+          },
+          "bottom": {
+            "lineStyle": -4142,
+            "weight": 2,
+            "color": 0.0
+          },
+          "diagonalDown": {
+            "lineStyle": -4142,
+            "weight": 2,
+            "color": 0.0
+          },
+          "diagonalUp": {
+            "lineStyle": -4142,
+            "weight": 2,
+            "color": 0.0
+          }
+        },
+        "align": {
+          "horizontal": 1,
+          "vertical": -4107,
+          "wrap": false,
+          "indent": 0,
+          "orientation": -4128,
+          "shrink": false
+        },
+        "numberFormat": "\"x\"0",
+        "locked": true,
+        "formulaHidden": false,
+        "styleName": "Normal"
+      }
+    },
+    "A4": {
+      "canon": {
+        "font": "<font><sz val=\"11\"/><color theme=\"1\"/><name val=\"Aptos Narrow\"/><family val=\"2\"/><scheme val=\"minor\"/></font>",
+        "fill": "<fill><patternFill patternType=\"none\"/></fill>",
+        "border": "<border><left/><right/><top/><bottom/><diagonal/></border>",
+        "numFmt": "custom:0.0%",
+        "style": "builtin:0",
+        "xf": "<xf applyNumberFormat=\"1\"/>"
+      },
+      "com": {
+        "font": {
+          "name": "Aptos Narrow",
+          "size": 11.0,
+          "bold": false,
+          "italic": false,
+          "underline": -4142,
+          "strike": false,
+          "color": 0.0
+        },
+        "interior": {
+          "pattern": -4142,
+          "color": 16777215.0,
+          "patternColor": 0
+        },
+        "borders": {
+          "left": {
+            "lineStyle": -4142,
+            "weight": 2,
+            "color": 0.0
+          },
+          "right": {
+            "lineStyle": -4142,
+            "weight": 2,
+            "color": 0.0
+          },
+          "top": {
+            "lineStyle": -4142,
+            "weight": 2,
+            "color": 0.0
+          },
+          "bottom": {
+            "lineStyle": -4142,
+            "weight": 2,
+            "color": 0.0
+          },
+          "diagonalDown": {
+            "lineStyle": -4142,
+            "weight": 2,
+            "color": 0.0
+          },
+          "diagonalUp": {
+            "lineStyle": -4142,
+            "weight": 2,
+            "color": 0.0
+          }
+        },
+        "align": {
+          "horizontal": 1,
+          "vertical": -4107,
+          "wrap": false,
+          "indent": 0,
+          "orientation": -4128,
+          "shrink": false
+        },
+        "numberFormat": "0.0%",
+        "locked": true,
+        "formulaHidden": false,
+        "styleName": "Normal"
+      }
+    },
+    "A5": {
+      "canon": {
+        "font": "<font><sz val=\"11\"/><color theme=\"1\"/><name val=\"Aptos Narrow\"/><family val=\"2\"/><scheme val=\"minor\"/></font>",
+        "fill": "<fill><patternFill patternType=\"none\"/></fill>",
+        "border": "<border><left/><right/><top/><bottom/><diagonal/></border>",
+        "numFmt": "custom:[$-409]dddd",
+        "style": "builtin:0",
+        "xf": "<xf applyNumberFormat=\"1\"/>"
+      },
+      "com": {
+        "font": {
+          "name": "Aptos Narrow",
+          "size": 11.0,
+          "bold": false,
+          "italic": false,
+          "underline": -4142,
+          "strike": false,
+          "color": 0.0
+        },
+        "interior": {
+          "pattern": -4142,
+          "color": 16777215.0,
+          "patternColor": 0
+        },
+        "borders": {
+          "left": {
+            "lineStyle": -4142,
+            "weight": 2,
+            "color": 0.0
+          },
+          "right": {
+            "lineStyle": -4142,
+            "weight": 2,
+            "color": 0.0
+          },
+          "top": {
+            "lineStyle": -4142,
+            "weight": 2,
+            "color": 0.0
+          },
+          "bottom": {
+            "lineStyle": -4142,
+            "weight": 2,
+            "color": 0.0
+          },
+          "diagonalDown": {
+            "lineStyle": -4142,
+            "weight": 2,
+            "color": 0.0
+          },
+          "diagonalUp": {
+            "lineStyle": -4142,
+            "weight": 2,
+            "color": 0.0
+          }
+        },
+        "align": {
+          "horizontal": 1,
+          "vertical": -4107,
+          "wrap": false,
+          "indent": 0,
+          "orientation": -4128,
+          "shrink": false
+        },
+        "numberFormat": "[$-409]dddd",
+        "locked": true,
+        "formulaHidden": false,
+        "styleName": "Normal"
+      }
+    },
+    "A6": {
+      "canon": {
+        "font": "<font><sz val=\"11\"/><color theme=\"1\"/><name val=\"Aptos Narrow\"/><family val=\"2\"/><scheme val=\"minor\"/></font>",
+        "fill": "<fill><patternFill patternType=\"none\"/></fill>",
+        "border": "<border><left/><right/><top/><bottom/><diagonal/></border>",
+        "numFmt": "custom:0.0000E+00",
+        "style": "builtin:0",
+        "xf": "<xf applyNumberFormat=\"1\"/>"
+      },
+      "com": {
+        "font": {
+          "name": "Aptos Narrow",
+          "size": 11.0,
+          "bold": false,
+          "italic": false,
+          "underline": -4142,
+          "strike": false,
+          "color": 0.0
+        },
+        "interior": {
+          "pattern": -4142,
+          "color": 16777215.0,
+          "patternColor": 0
+        },
+        "borders": {
+          "left": {
+            "lineStyle": -4142,
+            "weight": 2,
+            "color": 0.0
+          },
+          "right": {
+            "lineStyle": -4142,
+            "weight": 2,
+            "color": 0.0
+          },
+          "top": {
+            "lineStyle": -4142,
+            "weight": 2,
+            "color": 0.0
+          },
+          "bottom": {
+            "lineStyle": -4142,
+            "weight": 2,
+            "color": 0.0
+          },
+          "diagonalDown": {
+            "lineStyle": -4142,
+            "weight": 2,
+            "color": 0.0
+          },
+          "diagonalUp": {
+            "lineStyle": -4142,
+            "weight": 2,
+            "color": 0.0
+          }
+        },
+        "align": {
+          "horizontal": 1,
+          "vertical": -4107,
+          "wrap": false,
+          "indent": 0,
+          "orientation": -4128,
+          "shrink": false
+        },
+        "numberFormat": "0.0000E+00",
+        "locked": true,
+        "formulaHidden": false,
+        "styleName": "Normal"
+      }
+    },
+    "A7": {
+      "canon": {
+        "font": "<font><sz val=\"11\"/><color theme=\"1\"/><name val=\"Aptos Narrow\"/><family val=\"2\"/><scheme val=\"minor\"/></font>",
+        "fill": "<fill><patternFill patternType=\"none\"/></fill>",
+        "border": "<border><left/><right/><top/><bottom/><diagonal/></border>",
+        "numFmt": "id:0",
+        "style": "builtin:0",
+        "xf": "<xf />"
+      },
+      "com": {
+        "font": {
+          "name": "Aptos Narrow",
+          "size": 11.0,
+          "bold": false,
+          "italic": false,
+          "underline": -4142,
+          "strike": false,
+          "color": 0.0
+        },
+        "interior": {
+          "pattern": -4142,
+          "color": 16777215.0,
+          "patternColor": 0
+        },
+        "borders": {
+          "left": {
+            "lineStyle": -4142,
+            "weight": 2,
+            "color": 0.0
+          },
+          "right": {
+            "lineStyle": -4142,
+            "weight": 2,
+            "color": 0.0
+          },
+          "top": {
+            "lineStyle": -4142,
+            "weight": 2,
+            "color": 0.0
+          },
+          "bottom": {
+            "lineStyle": -4142,
+            "weight": 2,
+            "color": 0.0
+          },
+          "diagonalDown": {
+            "lineStyle": -4142,
+            "weight": 2,
+            "color": 0.0
+          },
+          "diagonalUp": {
+            "lineStyle": -4142,
+            "weight": 2,
+            "color": 0.0
+          }
+        },
+        "align": {
+          "horizontal": 1,
+          "vertical": -4107,
+          "wrap": false,
+          "indent": 0,
+          "orientation": -4128,
+          "shrink": false
+        },
+        "numberFormat": "General",
+        "locked": true,
+        "formulaHidden": false,
+        "styleName": "Normal"
+      }
+    },
+    "A8": {
+      "canon": {
+        "font": "<font><sz val=\"11\"/><color theme=\"1\"/><name val=\"Aptos Narrow\"/><family val=\"2\"/><scheme val=\"minor\"/></font>",
+        "fill": "<fill><patternFill patternType=\"none\"/></fill>",
+        "border": "<border><left/><right/><top/><bottom/><diagonal/></border>",
+        "numFmt": "id:0",
+        "style": "builtin:0",
+        "xf": "<xf />"
+      },
+      "com": {
+        "font": {
+          "name": "Aptos Narrow",
+          "size": 11.0,
+          "bold": false,
+          "italic": false,
+          "underline": -4142,
+          "strike": false,
+          "color": 0.0
+        },
+        "interior": {
+          "pattern": -4142,
+          "color": 16777215.0,
+          "patternColor": 0
+        },
+        "borders": {
+          "left": {
+            "lineStyle": -4142,
+            "weight": 2,
+            "color": 0.0
+          },
+          "right": {
+            "lineStyle": -4142,
+            "weight": 2,
+            "color": 0.0
+          },
+          "top": {
+            "lineStyle": -4142,
+            "weight": 2,
+            "color": 0.0
+          },
+          "bottom": {
+            "lineStyle": -4142,
+            "weight": 2,
+            "color": 0.0
+          },
+          "diagonalDown": {
+            "lineStyle": -4142,
+            "weight": 2,
+            "color": 0.0
+          },
+          "diagonalUp": {
+            "lineStyle": -4142,
+            "weight": 2,
+            "color": 0.0
+          }
+        },
+        "align": {
+          "horizontal": 1,
+          "vertical": -4107,
+          "wrap": false,
+          "indent": 0,
+          "orientation": -4128,
+          "shrink": false
+        },
+        "numberFormat": "General",
+        "locked": true,
+        "formulaHidden": false,
+        "styleName": "Normal"
+      }
+    }
+  }
+}

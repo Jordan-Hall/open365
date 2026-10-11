@@ -1,0 +1,2870 @@
+{
+ "scenarios": [
+  {
+   "name": "font-bold",
+   "ops": [
+    {
+     "op": "font",
+     "range": "A1:B2",
+     "bold": true
+    }
+   ]
+  },
+  {
+   "name": "font-bold-unbold",
+   "ops": [
+    {
+     "op": "font",
+     "range": "A1:B2",
+     "bold": true
+    },
+    {
+     "op": "font",
+     "range": "A1",
+     "bold": false
+    }
+   ]
+  },
+  {
+   "name": "font-bold-reuse",
+   "ops": [
+    {
+     "op": "font",
+     "range": "A1",
+     "bold": true
+    },
+    {
+     "op": "font",
+     "range": "C3",
+     "bold": true
+    },
+    {
+     "op": "font",
+     "range": "E5",
+     "bold": true
+    }
+   ]
+  },
+  {
+   "name": "font-bold-italic",
+   "ops": [
+    {
+     "op": "font",
+     "range": "A1:B2",
+     "bold": true
+    },
+    {
+     "op": "font",
+     "range": "A1:B2",
+     "italic": true
+    }
+   ]
+  },
+  {
+   "name": "font-italic-merge",
+   "ops": [
+    {
+     "op": "font",
+     "range": "A1:B2",
+     "bold": true
+    },
+    {
+     "op": "font",
+     "range": "B2:C3",
+     "italic": true
+    }
+   ]
+  },
+  {
+   "name": "font-default-noop",
+   "ops": [
+    {
+     "op": "font",
+     "range": "A1:B2",
+     "bold": false
+    },
+    {
+     "op": "font",
+     "range": "A1",
+     "size": 11
+    },
+    {
+     "op": "font",
+     "range": "A2",
+     "name": "Calibri"
+    }
+   ]
+  },
+  {
+   "name": "font-underline-single",
+   "ops": [
+    {
+     "op": "font",
+     "range": "A1:B2",
+     "underline": "single"
+    }
+   ]
+  },
+  {
+   "name": "font-underline-double",
+   "ops": [
+    {
+     "op": "font",
+     "range": "A1:B2",
+     "underline": "double"
+    }
+   ]
+  },
+  {
+   "name": "font-underline-sa",
+   "ops": [
+    {
+     "op": "font",
+     "range": "A1:B2",
+     "underline": "singleAccounting"
+    }
+   ]
+  },
+  {
+   "name": "font-underline-da",
+   "ops": [
+    {
+     "op": "font",
+     "range": "A1:B2",
+     "underline": "doubleAccounting"
+    }
+   ]
+  },
+  {
+   "name": "font-underline-none",
+   "ops": [
+    {
+     "op": "font",
+     "range": "A1",
+     "underline": "single"
+    },
+    {
+     "op": "font",
+     "range": "A1",
+     "underline": "none"
+    }
+   ]
+  },
+  {
+   "name": "font-strike",
+   "ops": [
+    {
+     "op": "font",
+     "range": "A1:B2",
+     "strike": true
+    }
+   ]
+  },
+  {
+   "name": "font-name-arial",
+   "ops": [
+    {
+     "op": "font",
+     "range": "A1:B2",
+     "name": "Arial"
+    }
+   ]
+  },
+  {
+   "name": "font-name-then-bold",
+   "ops": [
+    {
+     "op": "font",
+     "range": "A1",
+     "name": "Arial"
+    },
+    {
+     "op": "font",
+     "range": "A1",
+     "bold": true
+    }
+   ]
+  },
+  {
+   "name": "font-size-14",
+   "ops": [
+    {
+     "op": "font",
+     "range": "A1:B2",
+     "size": 14
+    }
+   ]
+  },
+  {
+   "name": "font-size-fraction",
+   "ops": [
+    {
+     "op": "font",
+     "range": "A1",
+     "size": 9.5
+    },
+    {
+     "op": "font",
+     "range": "A2",
+     "size": 72
+    },
+    {
+     "op": "font",
+     "range": "A3",
+     "size": 1
+    }
+   ]
+  },
+  {
+   "name": "font-size-then-name",
+   "ops": [
+    {
+     "op": "font",
+     "range": "A1",
+     "size": 16
+    },
+    {
+     "op": "font",
+     "range": "A1",
+     "name": "Times New Roman"
+    }
+   ]
+  },
+  {
+   "name": "font-color-rgb",
+   "ops": [
+    {
+     "op": "font",
+     "range": "A1:B2",
+     "color": {
+      "rgb": "FF0000"
+     }
+    }
+   ]
+  },
+  {
+   "name": "font-color-theme",
+   "ops": [
+    {
+     "op": "font",
+     "range": "A1",
+     "color": {
+      "theme": 5,
+      "tint": 0
+     }
+    },
+    {
+     "op": "font",
+     "range": "A2",
+     "color": {
+      "theme": 4,
+      "tint": 0.3999786370433668
+     }
+    },
+    {
+     "op": "font",
+     "range": "A3",
+     "color": {
+      "theme": 2,
+      "tint": -0.249977111117893
+     }
+    },
+    {
+     "op": "font",
+     "range": "A4",
+     "color": {
+      "theme": 3,
+      "tint": -0.499984740745262
+     }
+    }
+   ]
+  },
+  {
+   "name": "font-color-auto",
+   "ops": [
+    {
+     "op": "font",
+     "range": "A1",
+     "color": {
+      "rgb": "00FF00"
+     }
+    },
+    {
+     "op": "font",
+     "range": "A1",
+     "color": {
+      "auto": true
+     }
+    }
+   ]
+  },
+  {
+   "name": "font-color-black-rgb",
+   "ops": [
+    {
+     "op": "font",
+     "range": "A1",
+     "color": {
+      "rgb": "000000"
+     }
+    }
+   ]
+  },
+  {
+   "name": "font-many",
+   "ops": [
+    {
+     "op": "font",
+     "range": "A1",
+     "size": 10
+    },
+    {
+     "op": "font",
+     "range": "A2",
+     "size": 12
+    },
+    {
+     "op": "font",
+     "range": "A3",
+     "size": 14
+    },
+    {
+     "op": "font",
+     "range": "A4",
+     "bold": true
+    },
+    {
+     "op": "font",
+     "range": "A5",
+     "bold": true,
+     "size": 14
+    }
+   ]
+  },
+  {
+   "name": "fill-solid-rgb",
+   "ops": [
+    {
+     "op": "fill",
+     "range": "A1:B2",
+     "pattern": "solid",
+     "fg": {
+      "rgb": "FFFF00"
+     }
+    }
+   ]
+  },
+  {
+   "name": "fill-solid-theme",
+   "ops": [
+    {
+     "op": "fill",
+     "range": "A1",
+     "pattern": "solid",
+     "fg": {
+      "theme": 4,
+      "tint": 0.7999816888943144
+     }
+    },
+    {
+     "op": "fill",
+     "range": "A2",
+     "pattern": "solid",
+     "fg": {
+      "theme": 7,
+      "tint": 0
+     }
+    },
+    {
+     "op": "fill",
+     "range": "A3",
+     "pattern": "solid",
+     "fg": {
+      "theme": 2,
+      "tint": -0.1499984740745262
+     }
+    }
+   ]
+  },
+  {
+   "name": "fill-solid-reuse",
+   "ops": [
+    {
+     "op": "fill",
+     "range": "A1",
+     "pattern": "solid",
+     "fg": {
+      "rgb": "FFFF00"
+     }
+    },
+    {
+     "op": "fill",
+     "range": "C3",
+     "pattern": "solid",
+     "fg": {
+      "rgb": "FFFF00"
+     }
+    },
+    {
+     "op": "fill",
+     "range": "E5",
+     "pattern": "solid",
+     "fg": {
+      "rgb": "00FF00"
+     }
+    }
+   ]
+  },
+  {
+   "name": "fill-none-after-solid",
+   "ops": [
+    {
+     "op": "fill",
+     "range": "A1:B2",
+     "pattern": "solid",
+     "fg": {
+      "rgb": "FFFF00"
+     }
+    },
+    {
+     "op": "fill",
+     "range": "A1",
+     "pattern": "none"
+    }
+   ]
+  },
+  {
+   "name": "fill-none-default",
+   "ops": [
+    {
+     "op": "fill",
+     "range": "A1",
+     "pattern": "none"
+    }
+   ]
+  },
+  {
+   "name": "fill-all-patterns",
+   "ops": [
+    {
+     "op": "fill",
+     "range": "A1",
+     "pattern": "mediumGray",
+     "fg": {
+      "rgb": "FF0000"
+     },
+     "bg": {
+      "rgb": "FFFF00"
+     }
+    },
+    {
+     "op": "fill",
+     "range": "A2",
+     "pattern": "darkGray",
+     "fg": {
+      "rgb": "FF0000"
+     },
+     "bg": {
+      "rgb": "FFFF00"
+     }
+    },
+    {
+     "op": "fill",
+     "range": "A3",
+     "pattern": "lightGray",
+     "fg": {
+      "rgb": "FF0000"
+     },
+     "bg": {
+      "rgb": "FFFF00"
+     }
+    },
+    {
+     "op": "fill",
+     "range": "A4",
+     "pattern": "darkHorizontal",
+     "fg": {
+      "rgb": "FF0000"
+     },
+     "bg": {
+      "rgb": "FFFF00"
+     }
+    },
+    {
+     "op": "fill",
+     "range": "A5",
+     "pattern": "darkVertical",
+     "fg": {
+      "rgb": "FF0000"
+     },
+     "bg": {
+      "rgb": "FFFF00"
+     }
+    },
+    {
+     "op": "fill",
+     "range": "A6",
+     "pattern": "darkDown",
+     "fg": {
+      "rgb": "FF0000"
+     },
+     "bg": {
+      "rgb": "FFFF00"
+     }
+    },
+    {
+     "op": "fill",
+     "range": "A7",
+     "pattern": "darkUp",
+     "fg": {
+      "rgb": "FF0000"
+     },
+     "bg": {
+      "rgb": "FFFF00"
+     }
+    },
+    {
+     "op": "fill",
+     "range": "A8",
+     "pattern": "darkGrid",
+     "fg": {
+      "rgb": "FF0000"
+     },
+     "bg": {
+      "rgb": "FFFF00"
+     }
+    },
+    {
+     "op": "fill",
+     "range": "A9",
+     "pattern": "darkTrellis",
+     "fg": {
+      "rgb": "FF0000"
+     },
+     "bg": {
+      "rgb": "FFFF00"
+     }
+    },
+    {
+     "op": "fill",
+     "range": "A10",
+     "pattern": "lightHorizontal",
+     "fg": {
+      "rgb": "FF0000"
+     },
+     "bg": {
+      "rgb": "FFFF00"
+     }
+    },
+    {
+     "op": "fill",
+     "range": "A11",
+     "pattern": "lightVertical",
+     "fg": {
+      "rgb": "FF0000"
+     },
+     "bg": {
+      "rgb": "FFFF00"
+     }
+    },
+    {
+     "op": "fill",
+     "range": "A12",
+     "pattern": "lightDown",
+     "fg": {
+      "rgb": "FF0000"
+     },
+     "bg": {
+      "rgb": "FFFF00"
+     }
+    },
+    {
+     "op": "fill",
+     "range": "A13",
+     "pattern": "lightUp",
+     "fg": {
+      "rgb": "FF0000"
+     },
+     "bg": {
+      "rgb": "FFFF00"
+     }
+    },
+    {
+     "op": "fill",
+     "range": "A14",
+     "pattern": "lightGrid",
+     "fg": {
+      "rgb": "FF0000"
+     },
+     "bg": {
+      "rgb": "FFFF00"
+     }
+    },
+    {
+     "op": "fill",
+     "range": "A15",
+     "pattern": "lightTrellis",
+     "fg": {
+      "rgb": "FF0000"
+     },
+     "bg": {
+      "rgb": "FFFF00"
+     }
+    },
+    {
+     "op": "fill",
+     "range": "A16",
+     "pattern": "gray125",
+     "fg": {
+      "rgb": "FF0000"
+     },
+     "bg": {
+      "rgb": "FFFF00"
+     }
+    },
+    {
+     "op": "fill",
+     "range": "A17",
+     "pattern": "gray0625",
+     "fg": {
+      "rgb": "FF0000"
+     },
+     "bg": {
+      "rgb": "FFFF00"
+     }
+    }
+   ],
+   "probe": "A1:A18"
+  },
+  {
+   "name": "fill-pattern-theme",
+   "ops": [
+    {
+     "op": "fill",
+     "range": "A1",
+     "pattern": "darkGrid",
+     "fg": {
+      "theme": 5,
+      "tint": 0
+     },
+     "bg": {
+      "theme": 7,
+      "tint": 0.5
+     }
+    }
+   ]
+  },
+  {
+   "name": "fill-pattern-fg-only",
+   "ops": [
+    {
+     "op": "fill",
+     "range": "A1",
+     "pattern": "lightUp",
+     "fg": {
+      "rgb": "0000FF"
+     }
+    }
+   ]
+  },
+  {
+   "name": "fill-solid-then-pattern",
+   "ops": [
+    {
+     "op": "fill",
+     "range": "A1",
+     "pattern": "solid",
+     "fg": {
+      "rgb": "FFFF00"
+     }
+    },
+    {
+     "op": "fill",
+     "range": "A1",
+     "pattern": "lightGrid",
+     "fg": {
+      "rgb": "FF0000"
+     },
+     "bg": {
+      "rgb": "00FF00"
+     }
+    }
+   ]
+  },
+  {
+   "name": "border-outline-thin",
+   "ops": [
+    {
+     "op": "border",
+     "range": "B2:D4",
+     "sides": [
+      "outline"
+     ],
+     "style": "thin"
+    }
+   ],
+   "probe": "A1:E5"
+  },
+  {
+   "name": "border-all-thin",
+   "ops": [
+    {
+     "op": "border",
+     "range": "B2:D4",
+     "sides": [
+      "all"
+     ],
+     "style": "thin"
+    }
+   ],
+   "probe": "A1:E5"
+  },
+  {
+   "name": "border-inside",
+   "ops": [
+    {
+     "op": "border",
+     "range": "B2:D4",
+     "sides": [
+      "insideHorizontal",
+      "insideVertical"
+     ],
+     "style": "thin"
+    }
+   ],
+   "probe": "A1:E5"
+  },
+  {
+   "name": "border-right-single",
+   "ops": [
+    {
+     "op": "border",
+     "range": "B2",
+     "sides": [
+      "right"
+     ],
+     "style": "thin"
+    }
+   ],
+   "probe": "A1:C3"
+  },
+  {
+   "name": "border-bottom-single",
+   "ops": [
+    {
+     "op": "border",
+     "range": "B2",
+     "sides": [
+      "bottom"
+     ],
+     "style": "medium",
+     "color": {
+      "rgb": "FF0000"
+     }
+    }
+   ],
+   "probe": "A1:C3"
+  },
+  {
+   "name": "border-top-left-edge",
+   "ops": [
+    {
+     "op": "border",
+     "range": "A1",
+     "sides": [
+      "top",
+      "left"
+     ],
+     "style": "thin"
+    }
+   ],
+   "probe": "A1:B2"
+  },
+  {
+   "name": "border-styles",
+   "ops": [
+    {
+     "op": "border",
+     "range": "A1",
+     "sides": [
+      "left",
+      "right",
+      "top",
+      "bottom"
+     ],
+     "style": "thin"
+    },
+    {
+     "op": "border",
+     "range": "A3",
+     "sides": [
+      "left",
+      "right",
+      "top",
+      "bottom"
+     ],
+     "style": "medium"
+    },
+    {
+     "op": "border",
+     "range": "A5",
+     "sides": [
+      "left",
+      "right",
+      "top",
+      "bottom"
+     ],
+     "style": "dashed"
+    },
+    {
+     "op": "border",
+     "range": "A7",
+     "sides": [
+      "left",
+      "right",
+      "top",
+      "bottom"
+     ],
+     "style": "dotted"
+    },
+    {
+     "op": "border",
+     "range": "A9",
+     "sides": [
+      "left",
+      "right",
+      "top",
+      "bottom"
+     ],
+     "style": "thick"
+    },
+    {
+     "op": "border",
+     "range": "A11",
+     "sides": [
+      "left",
+      "right",
+      "top",
+      "bottom"
+     ],
+     "style": "double"
+    },
+    {
+     "op": "border",
+     "range": "A13",
+     "sides": [
+      "left",
+      "right",
+      "top",
+      "bottom"
+     ],
+     "style": "hair"
+    },
+    {
+     "op": "border",
+     "range": "A15",
+     "sides": [
+      "left",
+      "right",
+      "top",
+      "bottom"
+     ],
+     "style": "mediumDashed"
+    },
+    {
+     "op": "border",
+     "range": "A17",
+     "sides": [
+      "left",
+      "right",
+      "top",
+      "bottom"
+     ],
+     "style": "dashDot"
+    },
+    {
+     "op": "border",
+     "range": "A19",
+     "sides": [
+      "left",
+      "right",
+      "top",
+      "bottom"
+     ],
+     "style": "mediumDashDot"
+    },
+    {
+     "op": "border",
+     "range": "A21",
+     "sides": [
+      "left",
+      "right",
+      "top",
+      "bottom"
+     ],
+     "style": "dashDotDot"
+    },
+    {
+     "op": "border",
+     "range": "A23",
+     "sides": [
+      "left",
+      "right",
+      "top",
+      "bottom"
+     ],
+     "style": "mediumDashDotDot"
+    },
+    {
+     "op": "border",
+     "range": "A25",
+     "sides": [
+      "left",
+      "right",
+      "top",
+      "bottom"
+     ],
+     "style": "slantDashDot"
+    }
+   ],
+   "probe": "A1:B26"
+  },
+  {
+   "name": "border-diag-down",
+   "ops": [
+    {
+     "op": "border",
+     "range": "B2",
+     "sides": [
+      "diagonalDown"
+     ],
+     "style": "thin",
+     "color": {
+      "rgb": "0000FF"
+     }
+    }
+   ],
+   "probe": "A1:C3"
+  },
+  {
+   "name": "border-diag-up",
+   "ops": [
+    {
+     "op": "border",
+     "range": "B2",
+     "sides": [
+      "diagonalUp"
+     ],
+     "style": "medium"
+    }
+   ],
+   "probe": "A1:C3"
+  },
+  {
+   "name": "border-diag-both",
+   "ops": [
+    {
+     "op": "border",
+     "range": "B2",
+     "sides": [
+      "diagonalDown",
+      "diagonalUp"
+     ],
+     "style": "thin"
+    }
+   ],
+   "probe": "A1:C3"
+  },
+  {
+   "name": "border-color-theme",
+   "ops": [
+    {
+     "op": "border",
+     "range": "B2:C3",
+     "sides": [
+      "outline"
+     ],
+     "style": "thick",
+     "color": {
+      "theme": 5,
+      "tint": 0.3999786370433668
+     }
+    }
+   ],
+   "probe": "A1:D4"
+  },
+  {
+   "name": "border-then-none",
+   "ops": [
+    {
+     "op": "border",
+     "range": "B2:D4",
+     "sides": [
+      "outline"
+     ],
+     "style": "thin"
+    },
+    {
+     "op": "border",
+     "range": "B2:D4",
+     "sides": [
+      "outline"
+     ],
+     "style": "none"
+    }
+   ],
+   "probe": "A1:E5"
+  },
+  {
+   "name": "border-then-none-one",
+   "ops": [
+    {
+     "op": "border",
+     "range": "B2:D4",
+     "sides": [
+      "all"
+     ],
+     "style": "thin"
+    },
+    {
+     "op": "border",
+     "range": "C3",
+     "sides": [
+      "right"
+     ],
+     "style": "none"
+    }
+   ],
+   "probe": "A1:E5"
+  },
+  {
+   "name": "border-restyle",
+   "ops": [
+    {
+     "op": "border",
+     "range": "B2",
+     "sides": [
+      "bottom"
+     ],
+     "style": "thin"
+    },
+    {
+     "op": "border",
+     "range": "B2",
+     "sides": [
+      "bottom"
+     ],
+     "style": "thick"
+    }
+   ],
+   "probe": "A1:C3"
+  },
+  {
+   "name": "border-with-fill",
+   "ops": [
+    {
+     "op": "fill",
+     "range": "B2",
+     "pattern": "solid",
+     "fg": {
+      "rgb": "FFFF00"
+     }
+    },
+    {
+     "op": "border",
+     "range": "B2",
+     "sides": [
+      "outline"
+     ],
+     "style": "thin"
+    }
+   ],
+   "probe": "A1:C3"
+  },
+  {
+   "name": "align-horizontal",
+   "ops": [
+    {
+     "op": "align",
+     "range": "A1",
+     "horizontal": "general"
+    },
+    {
+     "op": "align",
+     "range": "A2",
+     "horizontal": "left"
+    },
+    {
+     "op": "align",
+     "range": "A3",
+     "horizontal": "center"
+    },
+    {
+     "op": "align",
+     "range": "A4",
+     "horizontal": "right"
+    },
+    {
+     "op": "align",
+     "range": "A5",
+     "horizontal": "fill"
+    },
+    {
+     "op": "align",
+     "range": "A6",
+     "horizontal": "justify"
+    },
+    {
+     "op": "align",
+     "range": "A7",
+     "horizontal": "centerContinuous"
+    },
+    {
+     "op": "align",
+     "range": "A8",
+     "horizontal": "distributed"
+    }
+   ],
+   "probe": "A1:A9"
+  },
+  {
+   "name": "align-vertical",
+   "ops": [
+    {
+     "op": "align",
+     "range": "A1",
+     "vertical": "top"
+    },
+    {
+     "op": "align",
+     "range": "A2",
+     "vertical": "center"
+    },
+    {
+     "op": "align",
+     "range": "A3",
+     "vertical": "bottom"
+    },
+    {
+     "op": "align",
+     "range": "A4",
+     "vertical": "justify"
+    },
+    {
+     "op": "align",
+     "range": "A5",
+     "vertical": "distributed"
+    }
+   ],
+   "probe": "A1:A6"
+  },
+  {
+   "name": "align-wrap",
+   "ops": [
+    {
+     "op": "align",
+     "range": "A1:B2",
+     "wrap": true
+    }
+   ]
+  },
+  {
+   "name": "align-wrap-off",
+   "ops": [
+    {
+     "op": "align",
+     "range": "A1",
+     "wrap": true
+    },
+    {
+     "op": "align",
+     "range": "A1",
+     "wrap": false
+    }
+   ]
+  },
+  {
+   "name": "align-indent",
+   "ops": [
+    {
+     "op": "align",
+     "range": "A1",
+     "indent": 2
+    },
+    {
+     "op": "align",
+     "range": "A2",
+     "horizontal": "right",
+     "indent": 3
+    },
+    {
+     "op": "align",
+     "range": "A3",
+     "horizontal": "center",
+     "indent": 1
+    },
+    {
+     "op": "align",
+     "range": "A4",
+     "horizontal": "left",
+     "indent": 0
+    }
+   ]
+  },
+  {
+   "name": "align-rotation",
+   "ops": [
+    {
+     "op": "align",
+     "range": "A1",
+     "rotation": 45
+    },
+    {
+     "op": "align",
+     "range": "A2",
+     "rotation": 90
+    },
+    {
+     "op": "align",
+     "range": "A3",
+     "rotation": -45
+    },
+    {
+     "op": "align",
+     "range": "A4",
+     "rotation": -90
+    },
+    {
+     "op": "align",
+     "range": "A5",
+     "rotation": "vertical"
+    },
+    {
+     "op": "align",
+     "range": "A6",
+     "rotation": 0
+    }
+   ],
+   "probe": "A1:A7"
+  },
+  {
+   "name": "align-shrink",
+   "ops": [
+    {
+     "op": "align",
+     "range": "A1",
+     "shrink": true
+    },
+    {
+     "op": "align",
+     "range": "A2",
+     "wrap": true
+    },
+    {
+     "op": "align",
+     "range": "A2",
+     "shrink": true
+    },
+    {
+     "op": "align",
+     "range": "A3",
+     "shrink": true
+    },
+    {
+     "op": "align",
+     "range": "A3",
+     "wrap": true
+    }
+   ]
+  },
+  {
+   "name": "align-combined",
+   "ops": [
+    {
+     "op": "align",
+     "range": "A1",
+     "horizontal": "center"
+    },
+    {
+     "op": "align",
+     "range": "A1",
+     "vertical": "center"
+    },
+    {
+     "op": "align",
+     "range": "A1",
+     "wrap": true
+    }
+   ]
+  },
+  {
+   "name": "align-center-reset",
+   "ops": [
+    {
+     "op": "align",
+     "range": "A1",
+     "horizontal": "center"
+    },
+    {
+     "op": "align",
+     "range": "A1",
+     "horizontal": "general"
+    }
+   ]
+  },
+  {
+   "name": "numfmt-builtin",
+   "ops": [
+    {
+     "op": "numfmt",
+     "range": "A1",
+     "code": "0"
+    },
+    {
+     "op": "numfmt",
+     "range": "A2",
+     "code": "0.00"
+    },
+    {
+     "op": "numfmt",
+     "range": "A3",
+     "code": "#,##0"
+    },
+    {
+     "op": "numfmt",
+     "range": "A4",
+     "code": "#,##0.00"
+    },
+    {
+     "op": "numfmt",
+     "range": "A5",
+     "code": "0%"
+    },
+    {
+     "op": "numfmt",
+     "range": "A6",
+     "code": "0.00%"
+    },
+    {
+     "op": "numfmt",
+     "range": "A7",
+     "code": "0.00E+00"
+    },
+    {
+     "op": "numfmt",
+     "range": "A8",
+     "code": "# ?/?"
+    },
+    {
+     "op": "numfmt",
+     "range": "A9",
+     "code": "# ??/??"
+    },
+    {
+     "op": "numfmt",
+     "range": "A10",
+     "code": "mm:ss"
+    },
+    {
+     "op": "numfmt",
+     "range": "A11",
+     "code": "[h]:mm:ss"
+    },
+    {
+     "op": "numfmt",
+     "range": "A12",
+     "code": "##0.0E+0"
+    },
+    {
+     "op": "numfmt",
+     "range": "A13",
+     "code": "@"
+    },
+    {
+     "op": "numfmt",
+     "range": "A14",
+     "code": "General"
+    }
+   ],
+   "probe": "A1:A15"
+  },
+  {
+   "name": "numfmt-escape",
+   "ops": [
+    {
+     "op": "numfmt",
+     "range": "A1",
+     "code": "000-00-0000"
+    },
+    {
+     "op": "numfmt",
+     "range": "A2",
+     "code": "-0.00"
+    },
+    {
+     "op": "numfmt",
+     "range": "A3",
+     "code": "0.00-"
+    },
+    {
+     "op": "numfmt",
+     "range": "A4",
+     "code": "dd-mm-yyyy"
+    },
+    {
+     "op": "numfmt",
+     "range": "A5",
+     "code": "dd.mm.yyyy"
+    },
+    {
+     "op": "numfmt",
+     "range": "A6",
+     "code": "hh:mm:ss.000"
+    },
+    {
+     "op": "numfmt",
+     "range": "A7",
+     "code": "0 \"units\""
+    },
+    {
+     "op": "numfmt",
+     "range": "A8",
+     "code": "0.0,,\"M\""
+    },
+    {
+     "op": "numfmt",
+     "range": "A9",
+     "code": "(000) 000-0000"
+    },
+    {
+     "op": "numfmt",
+     "range": "A10",
+     "code": "d mmm yyyy"
+    },
+    {
+     "op": "numfmt",
+     "range": "A11",
+     "code": "0.00 %"
+    },
+    {
+     "op": "numfmt",
+     "range": "A12",
+     "code": "0_);(0)"
+    },
+    {
+     "op": "numfmt",
+     "range": "A13",
+     "code": "yyyy/mm/dd"
+    }
+   ],
+   "probe": "A1:A14"
+  },
+  {
+   "name": "numfmt-custom",
+   "ops": [
+    {
+     "op": "numfmt",
+     "range": "A1",
+     "code": "0.000"
+    },
+    {
+     "op": "numfmt",
+     "range": "A2",
+     "code": "yyyy-mm-dd"
+    },
+    {
+     "op": "numfmt",
+     "range": "A3",
+     "code": "\"x\"0"
+    },
+    {
+     "op": "numfmt",
+     "range": "A4",
+     "code": "0.0%"
+    },
+    {
+     "op": "numfmt",
+     "range": "A5",
+     "code": "[$-409]dddd"
+    },
+    {
+     "op": "numfmt",
+     "range": "A6",
+     "code": "0.0000E+00"
+    }
+   ],
+   "probe": "A1:A8"
+  },
+  {
+   "name": "numfmt-custom-reuse",
+   "ops": [
+    {
+     "op": "numfmt",
+     "range": "A1",
+     "code": "0.000"
+    },
+    {
+     "op": "numfmt",
+     "range": "B2",
+     "code": "0.000"
+    },
+    {
+     "op": "numfmt",
+     "range": "C3",
+     "code": "0.0000"
+    },
+    {
+     "op": "numfmt",
+     "range": "D4",
+     "code": "0.000"
+    }
+   ]
+  },
+  {
+   "name": "numfmt-reset",
+   "ops": [
+    {
+     "op": "numfmt",
+     "range": "A1",
+     "code": "0.000"
+    },
+    {
+     "op": "numfmt",
+     "range": "A1",
+     "code": "General"
+    }
+   ]
+  },
+  {
+   "name": "numfmt-custom-plus-font",
+   "ops": [
+    {
+     "op": "numfmt",
+     "range": "A1",
+     "code": "0.000"
+    },
+    {
+     "op": "font",
+     "range": "A1",
+     "bold": true
+    }
+   ]
+  },
+  {
+   "name": "decimals-general",
+   "ops": [
+    {
+     "op": "value",
+     "range": "A1",
+     "value": 1.5
+    },
+    {
+     "op": "value",
+     "range": "A2",
+     "value": 100
+    },
+    {
+     "op": "value",
+     "range": "A3",
+     "value": 3.14159265358979
+    },
+    {
+     "op": "value",
+     "range": "A4",
+     "value": 0.1
+    },
+    {
+     "op": "decimals",
+     "range": "A1",
+     "delta": 1
+    },
+    {
+     "op": "decimals",
+     "range": "A2",
+     "delta": 1
+    },
+    {
+     "op": "decimals",
+     "range": "A3",
+     "delta": 1
+    },
+    {
+     "op": "decimals",
+     "range": "A4",
+     "delta": -1
+    },
+    {
+     "op": "decimals",
+     "range": "A5",
+     "delta": 1
+    }
+   ],
+   "probe": "A1:A6"
+  },
+  {
+   "name": "decimals-formats",
+   "ops": [
+    {
+     "op": "numfmt",
+     "range": "A1",
+     "code": "0.00"
+    },
+    {
+     "op": "numfmt",
+     "range": "A2",
+     "code": "0"
+    },
+    {
+     "op": "numfmt",
+     "range": "A3",
+     "code": "#,##0.00"
+    },
+    {
+     "op": "numfmt",
+     "range": "A4",
+     "code": "0%"
+    },
+    {
+     "op": "numfmt",
+     "range": "A5",
+     "code": "0.00%"
+    },
+    {
+     "op": "numfmt",
+     "range": "A6",
+     "code": "0.0E+00"
+    },
+    {
+     "op": "numfmt",
+     "range": "A7",
+     "code": "0.000"
+    },
+    {
+     "op": "numfmt",
+     "range": "A8",
+     "code": "#,##0"
+    },
+    {
+     "op": "decimals",
+     "range": "A1",
+     "delta": -1
+    },
+    {
+     "op": "decimals",
+     "range": "A2",
+     "delta": -1
+    },
+    {
+     "op": "decimals",
+     "range": "A3",
+     "delta": -1
+    },
+    {
+     "op": "decimals",
+     "range": "A4",
+     "delta": 1
+    },
+    {
+     "op": "decimals",
+     "range": "A5",
+     "delta": -1
+    },
+    {
+     "op": "decimals",
+     "range": "A6",
+     "delta": 1
+    },
+    {
+     "op": "decimals",
+     "range": "A7",
+     "delta": 1
+    },
+    {
+     "op": "decimals",
+     "range": "A8",
+     "delta": 1
+    }
+   ],
+   "probe": "A1:A9"
+  },
+  {
+   "name": "decimals-twice",
+   "ops": [
+    {
+     "op": "value",
+     "range": "A1",
+     "value": 2
+    },
+    {
+     "op": "decimals",
+     "range": "A1",
+     "delta": 1
+    },
+    {
+     "op": "decimals",
+     "range": "A1",
+     "delta": 1
+    },
+    {
+     "op": "decimals",
+     "range": "A1",
+     "delta": -1
+    }
+   ]
+  },
+  {
+   "name": "decimals-range",
+   "ops": [
+    {
+     "op": "value",
+     "range": "A1",
+     "value": 1
+    },
+    {
+     "op": "value",
+     "range": "A2",
+     "value": 1.25
+    },
+    {
+     "op": "decimals",
+     "range": "A1:A2",
+     "delta": 1
+    }
+   ]
+  },
+  {
+   "name": "percent-style",
+   "ops": [
+    {
+     "op": "percent",
+     "range": "A1:B2"
+    }
+   ]
+  },
+  {
+   "name": "comma-style",
+   "ops": [
+    {
+     "op": "comma",
+     "range": "A1:B2"
+    }
+   ]
+  },
+  {
+   "name": "accounting-button",
+   "ops": [
+    {
+     "op": "accounting",
+     "range": "A1:B2"
+    }
+   ]
+  },
+  {
+   "name": "percent-then-decimals",
+   "ops": [
+    {
+     "op": "percent",
+     "range": "A1"
+    },
+    {
+     "op": "decimals",
+     "range": "A1",
+     "delta": 1
+    }
+   ]
+  },
+  {
+   "name": "protect-unlocked",
+   "ops": [
+    {
+     "op": "protect",
+     "range": "A1:B2",
+     "locked": false
+    }
+   ]
+  },
+  {
+   "name": "protect-hidden",
+   "ops": [
+    {
+     "op": "protect",
+     "range": "A1:B2",
+     "hidden": true
+    }
+   ]
+  },
+  {
+   "name": "protect-both",
+   "ops": [
+    {
+     "op": "protect",
+     "range": "A1",
+     "locked": false
+    },
+    {
+     "op": "protect",
+     "range": "A1",
+     "hidden": true
+    }
+   ]
+  },
+  {
+   "name": "protect-relock",
+   "ops": [
+    {
+     "op": "protect",
+     "range": "A1",
+     "locked": false
+    },
+    {
+     "op": "protect",
+     "range": "A1",
+     "locked": true
+    }
+   ]
+  },
+  {
+   "name": "style-all-builtin",
+   "ops": [
+    {
+     "op": "style",
+     "range": "A1",
+     "name": "Normal"
+    },
+    {
+     "op": "style",
+     "range": "A2",
+     "name": "Bad"
+    },
+    {
+     "op": "style",
+     "range": "A3",
+     "name": "Good"
+    },
+    {
+     "op": "style",
+     "range": "A4",
+     "name": "Neutral"
+    },
+    {
+     "op": "style",
+     "range": "A5",
+     "name": "Calculation"
+    },
+    {
+     "op": "style",
+     "range": "A6",
+     "name": "Check Cell"
+    },
+    {
+     "op": "style",
+     "range": "A7",
+     "name": "Explanatory Text"
+    },
+    {
+     "op": "style",
+     "range": "A8",
+     "name": "Input"
+    },
+    {
+     "op": "style",
+     "range": "A9",
+     "name": "Linked Cell"
+    },
+    {
+     "op": "style",
+     "range": "A10",
+     "name": "Note"
+    },
+    {
+     "op": "style",
+     "range": "A11",
+     "name": "Output"
+    },
+    {
+     "op": "style",
+     "range": "A12",
+     "name": "Warning Text"
+    },
+    {
+     "op": "style",
+     "range": "A13",
+     "name": "Heading 1"
+    },
+    {
+     "op": "style",
+     "range": "A14",
+     "name": "Heading 2"
+    },
+    {
+     "op": "style",
+     "range": "A15",
+     "name": "Heading 3"
+    },
+    {
+     "op": "style",
+     "range": "A16",
+     "name": "Heading 4"
+    },
+    {
+     "op": "style",
+     "range": "A17",
+     "name": "Title"
+    },
+    {
+     "op": "style",
+     "range": "A18",
+     "name": "Total"
+    },
+    {
+     "op": "style",
+     "range": "A19",
+     "name": "Accent1"
+    },
+    {
+     "op": "style",
+     "range": "A20",
+     "name": "Accent2"
+    },
+    {
+     "op": "style",
+     "range": "A21",
+     "name": "Accent3"
+    },
+    {
+     "op": "style",
+     "range": "A22",
+     "name": "Accent4"
+    },
+    {
+     "op": "style",
+     "range": "A23",
+     "name": "Accent5"
+    },
+    {
+     "op": "style",
+     "range": "A24",
+     "name": "Accent6"
+    },
+    {
+     "op": "style",
+     "range": "A25",
+     "name": "20% - Accent1"
+    },
+    {
+     "op": "style",
+     "range": "A26",
+     "name": "20% - Accent2"
+    },
+    {
+     "op": "style",
+     "range": "A27",
+     "name": "20% - Accent3"
+    },
+    {
+     "op": "style",
+     "range": "A28",
+     "name": "20% - Accent4"
+    },
+    {
+     "op": "style",
+     "range": "A29",
+     "name": "20% - Accent5"
+    },
+    {
+     "op": "style",
+     "range": "A30",
+     "name": "20% - Accent6"
+    },
+    {
+     "op": "style",
+     "range": "A31",
+     "name": "40% - Accent1"
+    },
+    {
+     "op": "style",
+     "range": "A32",
+     "name": "40% - Accent2"
+    },
+    {
+     "op": "style",
+     "range": "A33",
+     "name": "40% - Accent3"
+    },
+    {
+     "op": "style",
+     "range": "A34",
+     "name": "40% - Accent4"
+    },
+    {
+     "op": "style",
+     "range": "A35",
+     "name": "40% - Accent5"
+    },
+    {
+     "op": "style",
+     "range": "A36",
+     "name": "40% - Accent6"
+    },
+    {
+     "op": "style",
+     "range": "A37",
+     "name": "60% - Accent1"
+    },
+    {
+     "op": "style",
+     "range": "A38",
+     "name": "60% - Accent2"
+    },
+    {
+     "op": "style",
+     "range": "A39",
+     "name": "60% - Accent3"
+    },
+    {
+     "op": "style",
+     "range": "A40",
+     "name": "60% - Accent4"
+    },
+    {
+     "op": "style",
+     "range": "A41",
+     "name": "60% - Accent5"
+    },
+    {
+     "op": "style",
+     "range": "A42",
+     "name": "60% - Accent6"
+    },
+    {
+     "op": "style",
+     "range": "A43",
+     "name": "Comma"
+    },
+    {
+     "op": "style",
+     "range": "A44",
+     "name": "Comma [0]"
+    },
+    {
+     "op": "style",
+     "range": "A45",
+     "name": "Currency"
+    },
+    {
+     "op": "style",
+     "range": "A46",
+     "name": "Currency [0]"
+    },
+    {
+     "op": "style",
+     "range": "A47",
+     "name": "Percent"
+    }
+   ],
+   "probe": "A1:A48"
+  },
+  {
+   "name": "style-good",
+   "ops": [
+    {
+     "op": "style",
+     "range": "A1:B2",
+     "name": "Good"
+    }
+   ]
+  },
+  {
+   "name": "style-heading1",
+   "ops": [
+    {
+     "op": "style",
+     "range": "A1",
+     "name": "Heading 1"
+    }
+   ]
+  },
+  {
+   "name": "style-over-format",
+   "ops": [
+    {
+     "op": "font",
+     "range": "A1",
+     "bold": true
+    },
+    {
+     "op": "fill",
+     "range": "A1",
+     "pattern": "solid",
+     "fg": {
+      "rgb": "FF0000"
+     }
+    },
+    {
+     "op": "style",
+     "range": "A1",
+     "name": "Good"
+    }
+   ]
+  },
+  {
+   "name": "style-then-bold",
+   "ops": [
+    {
+     "op": "style",
+     "range": "A1",
+     "name": "Good"
+    },
+    {
+     "op": "font",
+     "range": "A1",
+     "bold": true
+    }
+   ]
+  },
+  {
+   "name": "style-then-normal",
+   "ops": [
+    {
+     "op": "style",
+     "range": "A1",
+     "name": "Good"
+    },
+    {
+     "op": "style",
+     "range": "A1",
+     "name": "Normal"
+    }
+   ]
+  },
+  {
+   "name": "style-normal-after-format",
+   "ops": [
+    {
+     "op": "font",
+     "range": "A1",
+     "bold": true
+    },
+    {
+     "op": "numfmt",
+     "range": "A1",
+     "code": "0.00"
+    },
+    {
+     "op": "style",
+     "range": "A1",
+     "name": "Normal"
+    }
+   ]
+  },
+  {
+   "name": "style-then-fill",
+   "ops": [
+    {
+     "op": "style",
+     "range": "A1",
+     "name": "Heading 2"
+    },
+    {
+     "op": "fill",
+     "range": "A1",
+     "pattern": "solid",
+     "fg": {
+      "rgb": "FFFF00"
+     }
+    }
+   ]
+  },
+  {
+   "name": "style-then-numfmt",
+   "ops": [
+    {
+     "op": "style",
+     "range": "A1",
+     "name": "Percent"
+    },
+    {
+     "op": "numfmt",
+     "range": "A1",
+     "code": "0.000%"
+    }
+   ]
+  },
+  {
+   "name": "clear-formats",
+   "ops": [
+    {
+     "op": "font",
+     "range": "A1:B2",
+     "bold": true
+    },
+    {
+     "op": "fill",
+     "range": "A1:B2",
+     "pattern": "solid",
+     "fg": {
+      "rgb": "FF0000"
+     }
+    },
+    {
+     "op": "clear_formats",
+     "range": "A1"
+    }
+   ]
+  },
+  {
+   "name": "clear-formats-all",
+   "ops": [
+    {
+     "op": "font",
+     "range": "A1:B2",
+     "bold": true
+    },
+    {
+     "op": "border",
+     "range": "A1:B2",
+     "sides": [
+      "all"
+     ],
+     "style": "thin"
+    },
+    {
+     "op": "numfmt",
+     "range": "A1:B2",
+     "code": "0.00"
+    },
+    {
+     "op": "clear_formats",
+     "range": "A1:B2"
+    }
+   ],
+   "probe": "A1:C3"
+  },
+  {
+   "name": "clear-formats-style",
+   "ops": [
+    {
+     "op": "style",
+     "range": "A1",
+     "name": "Good"
+    },
+    {
+     "op": "clear_formats",
+     "range": "A1"
+    }
+   ]
+  },
+  {
+   "name": "clear-formats-border-neighbour",
+   "ops": [
+    {
+     "op": "border",
+     "range": "B2",
+     "sides": [
+      "right"
+     ],
+     "style": "thin"
+    },
+    {
+     "op": "clear_formats",
+     "range": "B2"
+    }
+   ],
+   "probe": "A1:C3"
+  },
+  {
+   "name": "clear-formats-value",
+   "ops": [
+    {
+     "op": "value",
+     "range": "A1",
+     "value": 5
+    },
+    {
+     "op": "font",
+     "range": "A1",
+     "bold": true
+    },
+    {
+     "op": "clear_formats",
+     "range": "A1"
+    }
+   ]
+  },
+  {
+   "name": "clear-formats-blank",
+   "ops": [
+    {
+     "op": "clear_formats",
+     "range": "A1:C3"
+    }
+   ]
+  },
+  {
+   "name": "painter-single",
+   "ops": [
+    {
+     "op": "font",
+     "range": "A1",
+     "bold": true
+    },
+    {
+     "op": "fill",
+     "range": "A1",
+     "pattern": "solid",
+     "fg": {
+      "rgb": "FFFF00"
+     }
+    },
+    {
+     "op": "painter",
+     "from": "A1",
+     "to": "C3:D4"
+    }
+   ],
+   "probe": "A1:E5"
+  },
+  {
+   "name": "painter-tile",
+   "ops": [
+    {
+     "op": "font",
+     "range": "A1",
+     "bold": true
+    },
+    {
+     "op": "font",
+     "range": "B1",
+     "italic": true
+    },
+    {
+     "op": "font",
+     "range": "A2",
+     "size": 14
+    },
+    {
+     "op": "painter",
+     "from": "A1:B2",
+     "to": "C3:F6"
+    }
+   ],
+   "probe": "A1:G7"
+  },
+  {
+   "name": "painter-border",
+   "ops": [
+    {
+     "op": "border",
+     "range": "A1:B2",
+     "sides": [
+      "outline"
+     ],
+     "style": "thin"
+    },
+    {
+     "op": "painter",
+     "from": "A1:B2",
+     "to": "D4:E5"
+    }
+   ],
+   "probe": "A1:F6"
+  },
+  {
+   "name": "painter-over-existing",
+   "ops": [
+    {
+     "op": "font",
+     "range": "A1",
+     "bold": true
+    },
+    {
+     "op": "font",
+     "range": "C1",
+     "italic": true
+    },
+    {
+     "op": "fill",
+     "range": "C1",
+     "pattern": "solid",
+     "fg": {
+      "rgb": "00FF00"
+     }
+    },
+    {
+     "op": "painter",
+     "from": "A1",
+     "to": "C1"
+    }
+   ]
+  },
+  {
+   "name": "painter-from-blank",
+   "ops": [
+    {
+     "op": "font",
+     "range": "C1",
+     "bold": true
+    },
+    {
+     "op": "painter",
+     "from": "A1",
+     "to": "C1"
+    }
+   ]
+  },
+  {
+   "name": "col-bold",
+   "ops": [
+    {
+     "op": "font",
+     "range": "C:C",
+     "bold": true
+    }
+   ],
+   "probe": "B1:D3,C500"
+  },
+  {
+   "name": "col-fill-range",
+   "ops": [
+    {
+     "op": "fill",
+     "range": "B:D",
+     "pattern": "solid",
+     "fg": {
+      "rgb": "FFFF00"
+     }
+    }
+   ],
+   "probe": "A1:E2,C700"
+  },
+  {
+   "name": "row-fill",
+   "ops": [
+    {
+     "op": "fill",
+     "range": "2:2",
+     "pattern": "solid",
+     "fg": {
+      "rgb": "FFFF00"
+     }
+    }
+   ],
+   "probe": "A1:F3,Z2"
+  },
+  {
+   "name": "rows-multi",
+   "ops": [
+    {
+     "op": "font",
+     "range": "2:4",
+     "italic": true
+    }
+   ],
+   "probe": "A1:C5,Z3"
+  },
+  {
+   "name": "col-existing-cells",
+   "ops": [
+    {
+     "op": "value",
+     "range": "C2",
+     "value": 1
+    },
+    {
+     "op": "font",
+     "range": "C2",
+     "italic": true
+    },
+    {
+     "op": "value",
+     "range": "C3",
+     "value": 2
+    },
+    {
+     "op": "font",
+     "range": "C:C",
+     "bold": true
+    }
+   ],
+   "probe": "C1:C4"
+  },
+  {
+   "name": "col-then-write",
+   "ops": [
+    {
+     "op": "font",
+     "range": "C:C",
+     "bold": true
+    },
+    {
+     "op": "value",
+     "range": "C5",
+     "value": 7
+    },
+    {
+     "op": "value",
+     "range": "D5",
+     "value": 8
+    }
+   ],
+   "probe": "C4:D6"
+  },
+  {
+   "name": "row-then-write",
+   "ops": [
+    {
+     "op": "font",
+     "range": "3:3",
+     "bold": true
+    },
+    {
+     "op": "value",
+     "range": "E3",
+     "value": 7
+    }
+   ],
+   "probe": "D3:F3"
+  },
+  {
+   "name": "col-width-then-bold",
+   "ops": [
+    {
+     "op": "col_width",
+     "range": "C:C",
+     "width": 20
+    },
+    {
+     "op": "font",
+     "range": "C:C",
+     "bold": true
+    }
+   ],
+   "probe": "C1:C2"
+  },
+  {
+   "name": "col-bold-then-width",
+   "ops": [
+    {
+     "op": "font",
+     "range": "C:C",
+     "bold": true
+    },
+    {
+     "op": "col_width",
+     "range": "C:C",
+     "width": 20
+    }
+   ],
+   "probe": "C1:C2"
+  },
+  {
+   "name": "row-height-then-bold",
+   "ops": [
+    {
+     "op": "row_height",
+     "range": "3:3",
+     "points": 30
+    },
+    {
+     "op": "font",
+     "range": "3:3",
+     "bold": true
+    }
+   ],
+   "probe": "A3:B3"
+  },
+  {
+   "name": "row-col-intersect",
+   "ops": [
+    {
+     "op": "font",
+     "range": "3:3",
+     "bold": true
+    },
+    {
+     "op": "font",
+     "range": "C:C",
+     "italic": true
+    }
+   ],
+   "probe": "B2:D4,C500,Z3"
+  },
+  {
+   "name": "col-row-intersect",
+   "ops": [
+    {
+     "op": "font",
+     "range": "C:C",
+     "italic": true
+    },
+    {
+     "op": "font",
+     "range": "3:3",
+     "bold": true
+    }
+   ],
+   "probe": "B2:D4,C500,Z3"
+  },
+  {
+   "name": "col-clear-middle",
+   "ops": [
+    {
+     "op": "font",
+     "range": "B:D",
+     "bold": true
+    },
+    {
+     "op": "clear_formats",
+     "range": "C:C"
+    }
+   ],
+   "probe": "A1:E2,C700"
+  },
+  {
+   "name": "col-partial-clear",
+   "ops": [
+    {
+     "op": "font",
+     "range": "B:D",
+     "bold": true
+    },
+    {
+     "op": "clear_formats",
+     "range": "C1:C3"
+    }
+   ],
+   "probe": "B1:D4,C700"
+  },
+  {
+   "name": "sheet-all-font",
+   "ops": [
+    {
+     "op": "font",
+     "range": "A:XFD",
+     "name": "Arial"
+    }
+   ],
+   "probe": "A1:C2,Z50"
+  },
+  {
+   "name": "sheet-all-clear",
+   "ops": [
+    {
+     "op": "font",
+     "range": "A:XFD",
+     "bold": true
+    },
+    {
+     "op": "clear_formats",
+     "range": "A:XFD"
+    }
+   ],
+   "probe": "A1:C2"
+  },
+  {
+   "name": "col-style-good",
+   "ops": [
+    {
+     "op": "style",
+     "range": "C:C",
+     "name": "Good"
+    }
+   ],
+   "probe": "B1:D2"
+  },
+  {
+   "name": "col-numfmt",
+   "ops": [
+    {
+     "op": "numfmt",
+     "range": "C:C",
+     "code": "0.00"
+    },
+    {
+     "op": "value",
+     "range": "C3",
+     "value": 5
+    }
+   ],
+   "probe": "C1:C4"
+  },
+  {
+   "name": "col-border-outline",
+   "ops": [
+    {
+     "op": "border",
+     "range": "B:C",
+     "sides": [
+      "outline"
+     ],
+     "style": "thin"
+    }
+   ],
+   "probe": "A1:D2,B500"
+  },
+  {
+   "name": "row-border-bottom",
+   "ops": [
+    {
+     "op": "border",
+     "range": "2:2",
+     "sides": [
+      "bottom"
+     ],
+     "style": "thin"
+    }
+   ],
+   "probe": "A1:B3"
+  },
+  {
+   "name": "col-existing-border",
+   "ops": [
+    {
+     "op": "border",
+     "range": "C2",
+     "sides": [
+      "all"
+     ],
+     "style": "thin"
+    },
+    {
+     "op": "font",
+     "range": "C:C",
+     "bold": true
+    }
+   ],
+   "probe": "B1:D3"
+  },
+  {
+   "name": "col-painter",
+   "ops": [
+    {
+     "op": "font",
+     "range": "A:A",
+     "bold": true
+    },
+    {
+     "op": "painter",
+     "from": "A1",
+     "to": "C1:D1"
+    }
+   ],
+   "probe": "B1:E2"
+  },
+  {
+   "name": "dedup-xf-order",
+   "ops": [
+    {
+     "op": "font",
+     "range": "A1",
+     "bold": true
+    },
+    {
+     "op": "font",
+     "range": "A2",
+     "italic": true
+    },
+    {
+     "op": "font",
+     "range": "A3",
+     "bold": true
+    },
+    {
+     "op": "font",
+     "range": "A4",
+     "italic": true
+    },
+    {
+     "op": "font",
+     "range": "A1",
+     "italic": true
+    },
+    {
+     "op": "font",
+     "range": "A2",
+     "bold": true
+    }
+   ],
+   "probe": "A1:A5"
+  },
+  {
+   "name": "dedup-revert",
+   "ops": [
+    {
+     "op": "font",
+     "range": "A1",
+     "size": 20
+    },
+    {
+     "op": "font",
+     "range": "A1",
+     "size": 11
+    },
+    {
+     "op": "font",
+     "range": "A2",
+     "bold": true
+    },
+    {
+     "op": "font",
+     "range": "A2",
+     "bold": false
+    },
+    {
+     "op": "fill",
+     "range": "A3",
+     "pattern": "solid",
+     "fg": {
+      "rgb": "FF0000"
+     }
+    },
+    {
+     "op": "fill",
+     "range": "A3",
+     "pattern": "none"
+    }
+   ]
+  },
+  {
+   "name": "dedup-clear-pruned",
+   "ops": [
+    {
+     "op": "font",
+     "range": "A1",
+     "size": 20
+    },
+    {
+     "op": "font",
+     "range": "A2",
+     "size": 22
+    },
+    {
+     "op": "clear_formats",
+     "range": "A1:A2"
+    }
+   ]
+  },
+  {
+   "name": "dedup-border-identical",
+   "ops": [
+    {
+     "op": "border",
+     "range": "A1",
+     "sides": [
+      "outline"
+     ],
+     "style": "thin"
+    },
+    {
+     "op": "border",
+     "range": "C3",
+     "sides": [
+      "outline"
+     ],
+     "style": "thin"
+    }
+   ],
+   "probe": "A1:D4"
+  }
+ ]
+}

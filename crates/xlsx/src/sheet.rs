@@ -16,6 +16,7 @@ use crate::xml::{
     write_attrs, write_head, xml_err,
 };
 
+pub(crate) mod cellformat;
 mod filter;
 mod resize;
 mod sort;
@@ -1535,6 +1536,8 @@ impl Worksheet {
 
     /// The cell at `(row, col)`, created blank (with its row) when missing.
     pub(crate) fn cell_slot(&mut self, row: u32, col: u32) -> &mut Cell {
+        // A new cell starts with the style of its row, else of its column.
+        let inherited = self.inherited_style(row, col);
         let ri = match self.find_row(row) {
             Ok(i) => i,
             Err(i) => {
@@ -1555,7 +1558,9 @@ impl Worksheet {
         let ci = match self.rows[ri].cells.binary_search_by_key(&col, |c| c.col) {
             Ok(i) => i,
             Err(i) => {
-                self.rows[ri].cells.insert(i, Cell::empty(col));
+                let mut cell = Cell::empty(col);
+                cell.style = inherited;
+                self.rows[ri].cells.insert(i, cell);
                 // `spans` is an optimisation hint; drop it when the new cell is outside it.
                 let head = &mut self.rows[ri].head;
                 if let Some(spans) = head.attr("spans")

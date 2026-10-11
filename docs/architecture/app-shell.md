@@ -89,3 +89,29 @@ minimal (no templates, no Account/Options/Share), most tabs are present but disa
 - Open: tab row, title row and status bar at narrow widths; scroll buttons when even the narrowest state does not fit
   (Office scrolls the ribbon below about 650 px); widths between recorded points; group icons for collapsed buttons
   are chosen by us (`GROUP_ICONS`), not measured.
+
+## Update 2026-10-11 (narrow-window measurement, visual fixes)
+- Oracle: `tools/office/ribbon-oracle.ps1 -ChromeWidths 1900..407:1 [-ChromeOnly] [-ChromeSettleMs 700]` records the title
+  row (QAT children, title, search, user widget, caption buttons), tab row (tabs, Comments/Editing/Share, display
+  options), status bar items and, for Excel, Name Box / formula bar / sheet tab control at each outer window width into
+  `fixtures/reference/ui/<app>-chrome-responsive.json` (schema 2: `[name, id, x, y, w, h, offscreen]`, pane-relative,
+  client width = outer width - 18). The script now aborts when COM hands it an Office process that was already running
+  and only touches its own process in `finally`.
+- Word findings at 125 % (25 px sweep, client width `cw`): the user widget and caption buttons are right-anchored
+  (`me.x = cw - 243`); the search box is `min(460, floor(0.27 * cw))` wide, centred on `cw / 2 + 10` until the title
+  reaches its 178 u minimum, then pinned at x = 517; below about `cw = 1037` it becomes a 58 u button anchored 10 u left of
+  the user widget. Comments / Editing / Share collapse to icon forms (30 / 44 / 39 u) at `cw` 1007 / 1057 / 1107 and
+  below. The Quick Access Toolbar drops items at `cw` ~707 (250 u), ~682 (202), ~632 (167), ~582 (35). The tab strip ends 7 u before
+  Comments; tabs shrink together (equal cut, then the longest tabs are capped to a common width, remainder to the last tabs)
+  from `cw` ~ 925 to 632, where every tab is 44 u wide and the strip stops compressing (Comments/Editing/Share stay
+  at x 484/524/578). Status items leave in the order Accessibility, Text Predictions, Language, Coauthoring, Word
+  count, Page, then Zoom % / zoom controls, as the right group (Focus .. Zoom %) pushes in; the right group stays anchored.
+- NOT implemented yet: the layout still places the tab row, title row and status bar at full width. The measured rules
+  above and the 1 px sweep fixtures are the input for that work (see Open).
+- Visual fixes: Font box shows the document's theme font (`Calibri (Body)`; the blank document now uses theme fonts,
+  `SpanStyle::font_label`), Name Box / formula text uses the chrome text colour (egui widget colours set in
+  `Theme::visuals`), formula strip icons sized and coloured as measured (Cancel/Enter dim 0x83, fx and chevrons 0xd4),
+  selected tab drawn semibold (second pass 0.5 px right), Styles gallery cells are 135 x 70 u with a 1 u ring 0xad and 0x38
+  lift on the current/hovered cell, an unfocused window dims its title.
+- Screenshot comparison (threshold 24, 1582 x 991, `OPEN365_SHOT`): Writer 5.22 % -> 5.17 %, Sheets 10.45 % (unchanged;
+  its Font box is not wired to the active cell, so it shows the placeholder where Excel shows the cell font).

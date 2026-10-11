@@ -83,6 +83,29 @@ at an end point is #NUM! for exponent <= 1 and 0 above, `GAMMA.DIST` density at 
 Excel's EXP and LN are correctly rounded; BINOM.DIST is `exp` of a sum of logarithms (`exp(log(p))` reproduces `BINOM.DIST(1,1,0.01,FALSE)` =
 0.010000000000000004) but the log-binomial-coefficient term is not identified. T tail below `df + t^2 == df` returns the t=0 value.
 
+Follow-up 2 (edge rules measured against Excel; known differences 6108 to 5971, 381 `edge.*` cases added, `tools/office/calc-oracle.ps1` watchdog fixed):
+
+* `HYPGEOM.DIST`/`HYPGEOMDIST`: any argument below 0 before truncation or at or above 2147483647 is #NUM!; after truncation `n > N` or `M > N` is #NUM!;
+  `N = 0` is allowed; outside the support Excel answers instead of #NUM!: `s < max(0, n-(N-M))` gives 0, `s > min(n, M)` gives 0 (pdf) or 1 (cdf).
+* `NEGBINOM.DIST`/`NEGBINOMDIST`: p = 0 or p = 1 is #NUM!, a failure count below 0 before truncation is #NUM!, r below 1 is #NUM!, and the pdf with f >= 1 and r >= 1E+16 is #NUM! (r = 9E+15 gives 0).
+* `BINOM.INV`/`CRITBINOM`: p and alpha must be strictly inside (0, 1); n below 0 before truncation or >= 2147483647 is #NUM!.
+  A tie between alpha and the cdf is resolved upwards at some points (n = 1, alpha = 0.5 gives 1; n = 5 gives 3) that look like rounding in Excel's own cdf; not reproduced (6 cases remain).
+* `BINOM.DIST.RANGE`: p = 1 and p = 0 are allowed, n >= 2147483647 is #NUM!, negative counts are refused before truncation.
+* `Z.TEST`: one value is always #DIV/0! (even with sigma), sigma <= 0 is #NUM!, no numbers is #N/A; the first argument is not array-evaluated (`Z.TEST(A1:A5*2,4)` is #VALUE!, same for `PERCENTRANK`).
+* `CHISQ.TEST`: the two arrays need the same number of cells (paired in row-major order), the degrees of freedom come from the first array's shape, a 1x1 array is #N/A,
+  expected 0 is #DIV/0!, negative expected is #NUM!, non-numeric pairs are skipped, no numeric pair is #DIV/0!.
+* `PROB`: probabilities are not range-checked; a blank probability or a zero one drops the pair; a text/boolean probability, or a non-number value beside a non-zero probability, is #NUM!;
+  the sum (as a double) must lie in [1 - 4.5E-16, 1 + 5E-15] or the result is #NUM!.
+* `FREQUENCY`: text and error bins are dropped; an error in the data fills every element; with no numeric bin the result is {0; count}.
+* `PERCENTRANK(.INC/.EXC)`: a single value ranks 1 in both; the rank is rounded to 15 significant digits before truncation to the significance.
+* `LINEST`/`LOGEST`/`TREND`/`GROWTH`: an error cell in any argument is #VALUE!; when a column is redundant Excel pivots in the order constant, last x column, ..., first x column
+  (the earlier of two collinear columns reads 0, a constant column reads 0 beside the intercept, one point gives slope 0 and intercept y); r2 is 1 when the fit is exact and F is #NUM! when the residual sum is 0.
+  Open365 keeps the natural order for full-rank data (it matches Excel's last digits more often) and uses Excel's order only after a column was found redundant.
+
+Still open: `CHISQ.INV.RT` is #NUM! for small p depending on df (largest accepted -log10 p for df 1, 3, 4, 6, 10, 20, 30: 12, 18, 24, 42, 78, 132, 198; df 2 and df >= 60 never fail in the grid p = 1E-6k) and
+`CHISQ.INV` / `CHISQ.INV.RT` accept df beyond 1E10; the T.INV stopping tolerance; the NEGBINOM.DIST cdf #NUM! region for p >= 0.9 with f = 1E+100; `HYPGEOM.DIST(500,1000,5000,10000,TRUE)`;
+centred least squares (Excel's exact zeros for constant y and its 1E-11 better accuracy for `linest.big`); the NORM.S.DIST tail algorithm (not started).
+
 Not done: reproducing Excel's own approximation of the normal CDF/quantile (the largest single source of residue), the multi-variable
 `LINEST` pivoting rules for collinear columns, `FORECAST.ETS.*`, and per-case analysis of the large differences.
 

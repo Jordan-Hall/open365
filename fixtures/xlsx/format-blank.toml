@@ -1,0 +1,5 @@
+feature = "format-blank"
+made_with = "Microsoft Excel 16.0 (Windows)"
+author = "project member"
+expect_dropped = []
+notes = "empty one-sheet workbook: the starting point of every cell-formatting oracle scenario"

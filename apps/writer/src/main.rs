@@ -684,7 +684,7 @@ impl ShellHost for Host<'_> {
     fn value(&self, id: &str) -> Option<String> {
         match id {
             "home.font.font" if self.s.target.is_some() => {
-                Some(self.s.doc.caret_format().font.to_string())
+                Some(self.s.doc.caret_format().font_label())
             }
             "home.font.font-size" if self.s.target.is_some() => {
                 let h = self.s.doc.caret_format().size_half_points;
@@ -847,6 +847,15 @@ mod tests {
     fn theme_follows_the_system_mode() {
         let shell = Shell::new(AppKind::Writer, Mode::system());
         assert_eq!(shell.theme.mode, Mode::system());
+    }
+
+    /// The Font box names the theme font as Office does, never the metric-compatible substitute.
+    #[test]
+    fn font_box_shows_theme_font_not_substitute() {
+        let mut s = State::new();
+        s.new_blank();
+        let label = s.doc.caret_format().font_label();
+        assert!(!label.contains("Carlito"), "{label}");
     }
 
     #[test]

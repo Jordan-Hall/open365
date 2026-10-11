@@ -1305,6 +1305,7 @@ impl DocView {
         }
         if let Some(v) = &self.pending.font {
             style.font = std::sync::Arc::from(v.as_str());
+            style.theme_font = None;
         }
         if let Some(v) = &self.pending.color {
             style.color = parse_hex_color(v);

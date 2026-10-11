@@ -16,6 +16,7 @@ mod conditional;
 mod error;
 mod eval;
 mod find;
+mod format;
 mod pdf;
 mod structure;
 mod target;
@@ -33,6 +34,10 @@ pub use eval::{
 pub use find::{
     DocMatch, FindError, FindOptions, FindScope, LookIn, PlannedEdit, XlsxFind, cell_display_text,
     cell_source_text, excel_matches, next_match, xlsx_find_all, xlsx_replace_plan,
+};
+pub use format::{
+    AlignmentChange, BorderChange, CellFormatChange, ColorSpec, FillChange, FontChange, HAlign,
+    LineSpec, NumberFormatSpec, RangeRef, RotationSpec, UnderlineKind, VAlign,
 };
 pub use open365_docx::{Alignment, DocPos, RunPropsPatch};
 pub use open365_pdf::PdfMetadata;

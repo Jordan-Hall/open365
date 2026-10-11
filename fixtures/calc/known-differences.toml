@@ -109,26 +109,6 @@ reason = "Variance/standard deviation of values whose squares cancel: Excel's ac
 # (crates/calc/src/numfmt/mod.rs, `glyph_units`); the negative section `_(* (#,##0)` ends in `)` instead of a
 # padding space and Open365 fills one space too few (probed: Excel 170 characters, Open365 169).
 [[difference]]
-id = "numfmt.pad.052"
-reason = "Fill width of the negative accounting section is one space short; parenthesis glyph widths are not exact."
-
-[[difference]]
-id = "numfmt.builtin.164"
-reason = "Same as numfmt.pad.052."
-
-[[difference]]
-id = "numfmt.builtin.171"
-reason = "Same as numfmt.pad.052."
-
-[[difference]]
-id = "numfmt.builtin.178"
-reason = "Same as numfmt.pad.052."
-
-[[difference]]
-id = "numfmt.builtin.185"
-reason = "Same as numfmt.pad.052."
-
-[[difference]]
 id = "text.fmt_bool"
 reason = "TEXT(1,TRUE): the format text is `TRUE`; Excel's TEXT refuses it (#VALUE!, an uppercase `E` is not a format letter) while Open365's format parser reads `E` as the era year."
 
@@ -17482,22 +17462,6 @@ id = "binom_dist_range.missing"
 reason = "Excel's result is 2 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel 0.20507812500000006, Open365 0.205078125)"
 
 [[difference]]
-id = "binom_dist_range.e0_big"
-reason = "Excel and Open365 disagree on the domain or limit behaviour of this case (Excel error \"#NUM!\", Open365 number 0.0); not analysed further"
-
-[[difference]]
-id = "binom_dist_range.e1_bool"
-reason = "Excel and Open365 disagree on the domain or limit behaviour of this case (Excel number 0, Open365 error #NUM!); not analysed further"
-
-[[difference]]
-id = "binom_dist_range.e1_cellbool"
-reason = "Excel and Open365 disagree on the domain or limit behaviour of this case (Excel number 0, Open365 error #NUM!); not analysed further"
-
-[[difference]]
-id = "binom_dist_range.e1_one"
-reason = "Excel and Open365 disagree on the domain or limit behaviour of this case (Excel number 0, Open365 error #NUM!); not analysed further"
-
-[[difference]]
 id = "binom_dist_range.e2_blank"
 reason = "Excel's result is 1 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel 0.9452381184, Open365 0.9452381183999999)"
 
@@ -17534,62 +17498,6 @@ id = "binom_inv.r72"
 reason = "Large difference (Excel 3, Open365 2.0) in an extreme-parameter or boundary region; Excel's series/iteration limits differ and the case was not analysed further"
 
 [[difference]]
-id = "binom_inv.a0"
-reason = "Excel and Open365 disagree on the domain or limit behaviour of this case (Excel error \"#NUM!\", Open365 number 0.0); not analysed further"
-
-[[difference]]
-id = "binom_inv.a1"
-reason = "Excel and Open365 disagree on the domain or limit behaviour of this case (Excel error \"#NUM!\", Open365 number 10.0); not analysed further"
-
-[[difference]]
-id = "binom_inv.p0"
-reason = "Excel and Open365 disagree on the domain or limit behaviour of this case (Excel error \"#NUM!\", Open365 number 0.0); not analysed further"
-
-[[difference]]
-id = "binom_inv.p1"
-reason = "Excel and Open365 disagree on the domain or limit behaviour of this case (Excel error \"#NUM!\", Open365 number 10.0); not analysed further"
-
-[[difference]]
-id = "binom_inv.e1_bool"
-reason = "Excel and Open365 disagree on the domain or limit behaviour of this case (Excel error \"#NUM!\", Open365 number 10.0); not analysed further"
-
-[[difference]]
-id = "binom_inv.e1_blank"
-reason = "Excel and Open365 disagree on the domain or limit behaviour of this case (Excel error \"#NUM!\", Open365 number 0.0); not analysed further"
-
-[[difference]]
-id = "binom_inv.e1_cellbool"
-reason = "Excel and Open365 disagree on the domain or limit behaviour of this case (Excel error \"#NUM!\", Open365 number 10.0); not analysed further"
-
-[[difference]]
-id = "binom_inv.e1_zero"
-reason = "Excel and Open365 disagree on the domain or limit behaviour of this case (Excel error \"#NUM!\", Open365 number 0.0); not analysed further"
-
-[[difference]]
-id = "binom_inv.e1_one"
-reason = "Excel and Open365 disagree on the domain or limit behaviour of this case (Excel error \"#NUM!\", Open365 number 10.0); not analysed further"
-
-[[difference]]
-id = "binom_inv.e2_bool"
-reason = "Excel and Open365 disagree on the domain or limit behaviour of this case (Excel error \"#NUM!\", Open365 number 10.0); not analysed further"
-
-[[difference]]
-id = "binom_inv.e2_blank"
-reason = "Excel and Open365 disagree on the domain or limit behaviour of this case (Excel error \"#NUM!\", Open365 number 0.0); not analysed further"
-
-[[difference]]
-id = "binom_inv.e2_cellbool"
-reason = "Excel and Open365 disagree on the domain or limit behaviour of this case (Excel error \"#NUM!\", Open365 number 10.0); not analysed further"
-
-[[difference]]
-id = "binom_inv.e2_zero"
-reason = "Excel and Open365 disagree on the domain or limit behaviour of this case (Excel error \"#NUM!\", Open365 number 0.0); not analysed further"
-
-[[difference]]
-id = "binom_inv.e2_one"
-reason = "Excel and Open365 disagree on the domain or limit behaviour of this case (Excel error \"#NUM!\", Open365 number 10.0); not analysed further"
-
-[[difference]]
 id = "critbinom.r00"
 reason = "Large difference (Excel 1, Open365 0.0) in an extreme-parameter or boundary region; Excel's series/iteration limits differ and the case was not analysed further"
 
@@ -17600,62 +17508,6 @@ reason = "Large difference (Excel 1, Open365 0.0) in an extreme-parameter or bou
 [[difference]]
 id = "critbinom.r72"
 reason = "Large difference (Excel 3, Open365 2.0) in an extreme-parameter or boundary region; Excel's series/iteration limits differ and the case was not analysed further"
-
-[[difference]]
-id = "critbinom.a0"
-reason = "Excel and Open365 disagree on the domain or limit behaviour of this case (Excel error \"#NUM!\", Open365 number 0.0); not analysed further"
-
-[[difference]]
-id = "critbinom.a1"
-reason = "Excel and Open365 disagree on the domain or limit behaviour of this case (Excel error \"#NUM!\", Open365 number 10.0); not analysed further"
-
-[[difference]]
-id = "critbinom.p0"
-reason = "Excel and Open365 disagree on the domain or limit behaviour of this case (Excel error \"#NUM!\", Open365 number 0.0); not analysed further"
-
-[[difference]]
-id = "critbinom.p1"
-reason = "Excel and Open365 disagree on the domain or limit behaviour of this case (Excel error \"#NUM!\", Open365 number 10.0); not analysed further"
-
-[[difference]]
-id = "critbinom.e1_bool"
-reason = "Excel and Open365 disagree on the domain or limit behaviour of this case (Excel error \"#NUM!\", Open365 number 10.0); not analysed further"
-
-[[difference]]
-id = "critbinom.e1_blank"
-reason = "Excel and Open365 disagree on the domain or limit behaviour of this case (Excel error \"#NUM!\", Open365 number 0.0); not analysed further"
-
-[[difference]]
-id = "critbinom.e1_cellbool"
-reason = "Excel and Open365 disagree on the domain or limit behaviour of this case (Excel error \"#NUM!\", Open365 number 10.0); not analysed further"
-
-[[difference]]
-id = "critbinom.e1_zero"
-reason = "Excel and Open365 disagree on the domain or limit behaviour of this case (Excel error \"#NUM!\", Open365 number 0.0); not analysed further"
-
-[[difference]]
-id = "critbinom.e1_one"
-reason = "Excel and Open365 disagree on the domain or limit behaviour of this case (Excel error \"#NUM!\", Open365 number 10.0); not analysed further"
-
-[[difference]]
-id = "critbinom.e2_bool"
-reason = "Excel and Open365 disagree on the domain or limit behaviour of this case (Excel error \"#NUM!\", Open365 number 10.0); not analysed further"
-
-[[difference]]
-id = "critbinom.e2_blank"
-reason = "Excel and Open365 disagree on the domain or limit behaviour of this case (Excel error \"#NUM!\", Open365 number 0.0); not analysed further"
-
-[[difference]]
-id = "critbinom.e2_cellbool"
-reason = "Excel and Open365 disagree on the domain or limit behaviour of this case (Excel error \"#NUM!\", Open365 number 10.0); not analysed further"
-
-[[difference]]
-id = "critbinom.e2_zero"
-reason = "Excel and Open365 disagree on the domain or limit behaviour of this case (Excel error \"#NUM!\", Open365 number 0.0); not analysed further"
-
-[[difference]]
-id = "critbinom.e2_one"
-reason = "Excel and Open365 disagree on the domain or limit behaviour of this case (Excel error \"#NUM!\", Open365 number 10.0); not analysed further"
 
 [[difference]]
 id = "poisson_dist.r03"
@@ -19062,22 +18914,6 @@ id = "hypgeom_dist.r67"
 reason = "Excel's result is 253 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel 4.7370722209044105e-148, Open365 4.737072220904586e-148)"
 
 [[difference]]
-id = "hypgeom_dist.sbig"
-reason = "Excel and Open365 disagree on the domain or limit behaviour of this case (Excel number 0, Open365 error #NUM!); not analysed further"
-
-[[difference]]
-id = "hypgeom_dist.N0"
-reason = "Excel and Open365 disagree on the domain or limit behaviour of this case (Excel number 1, Open365 error #NUM!); not analysed further"
-
-[[difference]]
-id = "hypgeom_dist.lowfeasible"
-reason = "Excel and Open365 disagree on the domain or limit behaviour of this case (Excel number 0, Open365 error #NUM!); not analysed further"
-
-[[difference]]
-id = "hypgeom_dist.lowfeasible2"
-reason = "Excel and Open365 disagree on the domain or limit behaviour of this case (Excel number 0, Open365 error #NUM!); not analysed further"
-
-[[difference]]
 id = "hypgeom_dist.frac"
 reason = "Excel's result is 2 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel 0.43133719722856756, Open365 0.43133719722856767)"
 
@@ -19104,66 +18940,6 @@ reason = "Excel's result is 1 ulp from Open365's, which is the exact value round
 [[difference]]
 id = "hypgeom_dist.e0_one"
 reason = "Excel's result is 1 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel 0.7418999792331362, Open365 0.7418999792331363)"
-
-[[difference]]
-id = "hypgeom_dist.e1_numtxt"
-reason = "Excel and Open365 disagree on the domain or limit behaviour of this case (Excel number 1, Open365 error #NUM!); not analysed further"
-
-[[difference]]
-id = "hypgeom_dist.e1_bool"
-reason = "Excel and Open365 disagree on the domain or limit behaviour of this case (Excel number 1, Open365 error #NUM!); not analysed further"
-
-[[difference]]
-id = "hypgeom_dist.e1_blank"
-reason = "Excel and Open365 disagree on the domain or limit behaviour of this case (Excel number 1, Open365 error #NUM!); not analysed further"
-
-[[difference]]
-id = "hypgeom_dist.e1_cellbool"
-reason = "Excel and Open365 disagree on the domain or limit behaviour of this case (Excel number 1, Open365 error #NUM!); not analysed further"
-
-[[difference]]
-id = "hypgeom_dist.e1_zero"
-reason = "Excel and Open365 disagree on the domain or limit behaviour of this case (Excel number 1, Open365 error #NUM!); not analysed further"
-
-[[difference]]
-id = "hypgeom_dist.e1_one"
-reason = "Excel and Open365 disagree on the domain or limit behaviour of this case (Excel number 1, Open365 error #NUM!); not analysed further"
-
-[[difference]]
-id = "hypgeom_dist.e1_half"
-reason = "Excel and Open365 disagree on the domain or limit behaviour of this case (Excel number 1, Open365 error #NUM!); not analysed further"
-
-[[difference]]
-id = "hypgeom_dist.e2_numtxt"
-reason = "Excel and Open365 disagree on the domain or limit behaviour of this case (Excel number 1, Open365 error #NUM!); not analysed further"
-
-[[difference]]
-id = "hypgeom_dist.e2_bool"
-reason = "Excel and Open365 disagree on the domain or limit behaviour of this case (Excel number 1, Open365 error #NUM!); not analysed further"
-
-[[difference]]
-id = "hypgeom_dist.e2_blank"
-reason = "Excel and Open365 disagree on the domain or limit behaviour of this case (Excel number 1, Open365 error #NUM!); not analysed further"
-
-[[difference]]
-id = "hypgeom_dist.e2_cellbool"
-reason = "Excel and Open365 disagree on the domain or limit behaviour of this case (Excel number 1, Open365 error #NUM!); not analysed further"
-
-[[difference]]
-id = "hypgeom_dist.e2_zero"
-reason = "Excel and Open365 disagree on the domain or limit behaviour of this case (Excel number 1, Open365 error #NUM!); not analysed further"
-
-[[difference]]
-id = "hypgeom_dist.e2_one"
-reason = "Excel and Open365 disagree on the domain or limit behaviour of this case (Excel number 1, Open365 error #NUM!); not analysed further"
-
-[[difference]]
-id = "hypgeom_dist.e2_half"
-reason = "Excel and Open365 disagree on the domain or limit behaviour of this case (Excel number 1, Open365 error #NUM!); not analysed further"
-
-[[difference]]
-id = "hypgeom_dist.e3_big"
-reason = "Excel and Open365 disagree on the domain or limit behaviour of this case (Excel error \"#NUM!\", Open365 number 1.0); not analysed further"
 
 [[difference]]
 id = "hypgeom_dist.e4_blank"
@@ -19226,10 +19002,6 @@ id = "hypgeomdist.r13"
 reason = "Excel's result is 14 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel 0.09418360145736296, Open365 0.09418360145736276)"
 
 [[difference]]
-id = "hypgeomdist.sbig"
-reason = "Excel and Open365 disagree on the domain or limit behaviour of this case (Excel number 0, Open365 error #NUM!); not analysed further"
-
-[[difference]]
 id = "hypgeomdist.e0_numtxt"
 reason = "Excel's result is 2 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel 0.43133719722856756, Open365 0.43133719722856767)"
 
@@ -19250,68 +19022,8 @@ id = "hypgeomdist.e0_one"
 reason = "Excel's result is 2 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel 0.43133719722856756, Open365 0.43133719722856767)"
 
 [[difference]]
-id = "hypgeomdist.e1_numtxt"
-reason = "Excel and Open365 disagree on the domain or limit behaviour of this case (Excel number 0, Open365 error #NUM!); not analysed further"
-
-[[difference]]
-id = "hypgeomdist.e1_bool"
-reason = "Excel and Open365 disagree on the domain or limit behaviour of this case (Excel number 0, Open365 error #NUM!); not analysed further"
-
-[[difference]]
-id = "hypgeomdist.e1_blank"
-reason = "Excel and Open365 disagree on the domain or limit behaviour of this case (Excel number 0, Open365 error #NUM!); not analysed further"
-
-[[difference]]
-id = "hypgeomdist.e1_cellbool"
-reason = "Excel and Open365 disagree on the domain or limit behaviour of this case (Excel number 0, Open365 error #NUM!); not analysed further"
-
-[[difference]]
-id = "hypgeomdist.e1_zero"
-reason = "Excel and Open365 disagree on the domain or limit behaviour of this case (Excel number 0, Open365 error #NUM!); not analysed further"
-
-[[difference]]
-id = "hypgeomdist.e1_one"
-reason = "Excel and Open365 disagree on the domain or limit behaviour of this case (Excel number 0, Open365 error #NUM!); not analysed further"
-
-[[difference]]
-id = "hypgeomdist.e1_half"
-reason = "Excel and Open365 disagree on the domain or limit behaviour of this case (Excel number 0, Open365 error #NUM!); not analysed further"
-
-[[difference]]
-id = "hypgeomdist.e2_numtxt"
-reason = "Excel and Open365 disagree on the domain or limit behaviour of this case (Excel number 0, Open365 error #NUM!); not analysed further"
-
-[[difference]]
-id = "hypgeomdist.e2_bool"
-reason = "Excel and Open365 disagree on the domain or limit behaviour of this case (Excel number 0, Open365 error #NUM!); not analysed further"
-
-[[difference]]
-id = "hypgeomdist.e2_blank"
-reason = "Excel and Open365 disagree on the domain or limit behaviour of this case (Excel number 0, Open365 error #NUM!); not analysed further"
-
-[[difference]]
-id = "hypgeomdist.e2_cellbool"
-reason = "Excel and Open365 disagree on the domain or limit behaviour of this case (Excel number 0, Open365 error #NUM!); not analysed further"
-
-[[difference]]
 id = "hypgeomdist.e2_cellnumtxt"
 reason = "Excel's result is 3 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel 0.0229591836734694, Open365 0.02295918367346939)"
-
-[[difference]]
-id = "hypgeomdist.e2_zero"
-reason = "Excel and Open365 disagree on the domain or limit behaviour of this case (Excel number 0, Open365 error #NUM!); not analysed further"
-
-[[difference]]
-id = "hypgeomdist.e2_one"
-reason = "Excel and Open365 disagree on the domain or limit behaviour of this case (Excel number 0, Open365 error #NUM!); not analysed further"
-
-[[difference]]
-id = "hypgeomdist.e2_half"
-reason = "Excel and Open365 disagree on the domain or limit behaviour of this case (Excel number 0, Open365 error #NUM!); not analysed further"
-
-[[difference]]
-id = "hypgeomdist.e3_big"
-reason = "Excel and Open365 disagree on the domain or limit behaviour of this case (Excel error \"#NUM!\", Open365 number 45.0); not analysed further"
 
 [[difference]]
 id = "negbinom_dist.r07"
@@ -20302,14 +20014,6 @@ id = "negbinom_dist.r417"
 reason = "Excel's result is 284 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel 4.756531994001837e-157, Open365 4.756531994001653e-157)"
 
 [[difference]]
-id = "negbinom_dist.p1"
-reason = "Excel and Open365 disagree on the domain or limit behaviour of this case (Excel error \"#NUM!\", Open365 number 1.0); not analysed further"
-
-[[difference]]
-id = "negbinom_dist.p1f0"
-reason = "Excel and Open365 disagree on the domain or limit behaviour of this case (Excel error \"#NUM!\", Open365 number 1.0); not analysed further"
-
-[[difference]]
 id = "negbinom_dist.e0_numtxt"
 reason = "Excel's result is 1 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel 0.04096000000000002, Open365 0.04096000000000001)"
 
@@ -20348,18 +20052,6 @@ reason = "Excel's result is 3 ulp from Open365's, which is the exact value round
 [[difference]]
 id = "negbinom_dist.e1_cellnumtxt"
 reason = "Excel's result is 3 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel 0.4556800000000002, Open365 0.45568000000000003)"
-
-[[difference]]
-id = "negbinom_dist.e2_bool"
-reason = "Excel and Open365 disagree on the domain or limit behaviour of this case (Excel error \"#NUM!\", Open365 number 1.0); not analysed further"
-
-[[difference]]
-id = "negbinom_dist.e2_cellbool"
-reason = "Excel and Open365 disagree on the domain or limit behaviour of this case (Excel error \"#NUM!\", Open365 number 1.0); not analysed further"
-
-[[difference]]
-id = "negbinom_dist.e2_one"
-reason = "Excel and Open365 disagree on the domain or limit behaviour of this case (Excel error \"#NUM!\", Open365 number 1.0); not analysed further"
 
 [[difference]]
 id = "negbinom_dist.e3_bool"
@@ -20790,14 +20482,6 @@ id = "negbinomdist.r119"
 reason = "Excel's result is 121 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel 1.6571842409193883e-142, Open365 1.6571842409193442e-142)"
 
 [[difference]]
-id = "negbinomdist.p1"
-reason = "Excel and Open365 disagree on the domain or limit behaviour of this case (Excel error \"#NUM!\", Open365 number 0.0); not analysed further"
-
-[[difference]]
-id = "negbinomdist.p1f0"
-reason = "Excel and Open365 disagree on the domain or limit behaviour of this case (Excel error \"#NUM!\", Open365 number 1.0); not analysed further"
-
-[[difference]]
 id = "negbinomdist.e0_numtxt"
 reason = "Excel's result is 3 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel 0.030719999999999997, Open365 0.030720000000000008)"
 
@@ -20836,22 +20520,6 @@ reason = "Excel's result is 1 ulp from Open365's, which is the exact value round
 [[difference]]
 id = "negbinomdist.e1_cellnumtxt"
 reason = "Excel's result is 1 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel 0.13823999999999997, Open365 0.13824)"
-
-[[difference]]
-id = "negbinomdist.e1_big"
-reason = "Excel and Open365 disagree on the domain or limit behaviour of this case (Excel error \"#NUM!\", Open365 number 0.0); not analysed further"
-
-[[difference]]
-id = "negbinomdist.e2_bool"
-reason = "Excel and Open365 disagree on the domain or limit behaviour of this case (Excel error \"#NUM!\", Open365 number 0.0); not analysed further"
-
-[[difference]]
-id = "negbinomdist.e2_cellbool"
-reason = "Excel and Open365 disagree on the domain or limit behaviour of this case (Excel error \"#NUM!\", Open365 number 0.0); not analysed further"
-
-[[difference]]
-id = "negbinomdist.e2_one"
-reason = "Excel and Open365 disagree on the domain or limit behaviour of this case (Excel error \"#NUM!\", Open365 number 0.0); not analysed further"
 
 [[difference]]
 id = "negbinomdist.e2_half"
@@ -21510,18 +21178,6 @@ id = "z_test.s11"
 reason = "Excel's result is 22 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel 1.46722891131244e-7, Open365 1.467228911312446e-7)"
 
 [[difference]]
-id = "z_test.n1s"
-reason = "Excel and Open365 disagree on the domain or limit behaviour of this case (Excel error \"#DIV/0!\", Open365 number 0.8413447460685429); not analysed further"
-
-[[difference]]
-id = "z_test.sig0"
-reason = "Excel and Open365 disagree on the domain or limit behaviour of this case (Excel error \"#NUM!\", Open365 error #DIV/0!); not analysed further"
-
-[[difference]]
-id = "z_test.signeg"
-reason = "Excel and Open365 disagree on the domain or limit behaviour of this case (Excel error \"#NUM!\", Open365 number 0.9873263406612659); not analysed further"
-
-[[difference]]
 id = "z_test.text"
 reason = "Excel's result is 1 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel 0.28954987097695944, Open365 0.2895498709769595)"
 
@@ -21530,16 +21186,8 @@ id = "z_test.xnumtxt"
 reason = "Excel's result is 1 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel 0.07864960352514257, Open365 0.07864960352514258)"
 
 [[difference]]
-id = "z_test.scalar3"
-reason = "Excel and Open365 disagree on the domain or limit behaviour of this case (Excel error \"#DIV/0!\", Open365 number 0.0013498980316300946); not analysed further"
-
-[[difference]]
 id = "z_test.arrlit"
 reason = "Excel's result is 1 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel 0.07864960352514257, Open365 0.07864960352514258)"
-
-[[difference]]
-id = "z_test.expr"
-reason = "Excel and Open365 disagree on the domain or limit behaviour of this case (Excel error \"#VALUE!\", Open365 number 0.07864960352514258); not analysed further"
 
 [[difference]]
 id = "ztest.r2"
@@ -21578,18 +21226,6 @@ id = "ztest.s10"
 reason = "Excel's result is 16 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel 0.0007586382085500935, Open365 0.0007586382085500952)"
 
 [[difference]]
-id = "ztest.n1s"
-reason = "Excel and Open365 disagree on the domain or limit behaviour of this case (Excel error \"#DIV/0!\", Open365 number 0.8413447460685429); not analysed further"
-
-[[difference]]
-id = "ztest.sig0"
-reason = "Excel and Open365 disagree on the domain or limit behaviour of this case (Excel error \"#NUM!\", Open365 error #DIV/0!); not analysed further"
-
-[[difference]]
-id = "ztest.signeg"
-reason = "Excel and Open365 disagree on the domain or limit behaviour of this case (Excel error \"#NUM!\", Open365 number 0.9873263406612659); not analysed further"
-
-[[difference]]
 id = "ztest.text"
 reason = "Excel's result is 1 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel 0.28954987097695944, Open365 0.2895498709769595)"
 
@@ -21598,16 +21234,8 @@ id = "ztest.xnumtxt"
 reason = "Excel's result is 1 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel 0.07864960352514257, Open365 0.07864960352514258)"
 
 [[difference]]
-id = "ztest.scalar3"
-reason = "Excel and Open365 disagree on the domain or limit behaviour of this case (Excel error \"#DIV/0!\", Open365 number 0.0013498980316300946); not analysed further"
-
-[[difference]]
 id = "ztest.arrlit"
 reason = "Excel's result is 1 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel 0.07864960352514257, Open365 0.07864960352514258)"
-
-[[difference]]
-id = "ztest.expr"
-reason = "Excel and Open365 disagree on the domain or limit behaviour of this case (Excel error \"#VALUE!\", Open365 number 0.07864960352514258); not analysed further"
 
 [[difference]]
 id = "t_test.r0"
@@ -22214,10 +21842,6 @@ id = "chisq_test.r19"
 reason = "Excel's result is 11 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel 1.3199586431597273e-41, Open365 1.3199586431597245e-41)"
 
 [[difference]]
-id = "chisq_test.one"
-reason = "Excel and Open365 disagree on the domain or limit behaviour of this case (Excel error \"#N/A\", Open365 error #DIV/0!); not analysed further"
-
-[[difference]]
 id = "chisq_test.text"
 reason = "Excel's result is 2 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel 0.4033175651094833, Open365 0.4033175651094832)"
 
@@ -22236,10 +21860,6 @@ reason = "Excel's result is 1 ulp from Open365's, which is the exact value round
 [[difference]]
 id = "chisq_test.col"
 reason = "Excel's result is 1 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel 0.7440552013012249, Open365 0.7440552013012248)"
-
-[[difference]]
-id = "chisq_test.scalar"
-reason = "Excel and Open365 disagree on the domain or limit behaviour of this case (Excel error \"#N/A\", Open365 error #DIV/0!); not analysed further"
 
 [[difference]]
 id = "chitest.r0"
@@ -22302,10 +21922,6 @@ id = "chitest.r18"
 reason = "Excel's result is 6 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel 2.3701449653240453e-44, Open365 2.370144965324048e-44)"
 
 [[difference]]
-id = "chitest.one"
-reason = "Excel and Open365 disagree on the domain or limit behaviour of this case (Excel error \"#N/A\", Open365 error #DIV/0!); not analysed further"
-
-[[difference]]
 id = "chitest.text"
 reason = "Excel's result is 2 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel 0.4033175651094833, Open365 0.4033175651094832)"
 
@@ -22324,90 +21940,6 @@ reason = "Excel's result is 1 ulp from Open365's, which is the exact value round
 [[difference]]
 id = "chitest.col"
 reason = "Excel's result is 1 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel 0.7440552013012249, Open365 0.7440552013012248)"
-
-[[difference]]
-id = "chitest.scalar"
-reason = "Excel and Open365 disagree on the domain or limit behaviour of this case (Excel error \"#N/A\", Open365 error #DIV/0!); not analysed further"
-
-[[difference]]
-id = "frequency.nobins_1"
-reason = "Large difference (Excel 0, Open365 6.0) in an extreme-parameter or boundary region; Excel's series/iteration limits differ and the case was not analysed further"
-
-[[difference]]
-id = "frequency.nobins_2"
-reason = "Excel and Open365 disagree on the domain or limit behaviour of this case (Excel number 6, Open365 error #REF!); not analysed further"
-
-[[difference]]
-id = "frequency.errbin"
-reason = "Excel and Open365 disagree on the domain or limit behaviour of this case (Excel number 2, Open365 error #N/A); not analysed further"
-
-[[difference]]
-id = "prob.sum1z"
-reason = "Excel and Open365 disagree on the domain or limit behaviour of this case (Excel error \"#NUM!\", Open365 number 0.5); not analysed further"
-
-[[difference]]
-id = "prob.neg"
-reason = "Excel and Open365 disagree on the domain or limit behaviour of this case (Excel number 0.7, Open365 error #NUM!); not analysed further"
-
-[[difference]]
-id = "prob.big"
-reason = "Excel and Open365 disagree on the domain or limit behaviour of this case (Excel number 0, Open365 error #NUM!); not analysed further"
-
-[[difference]]
-id = "prob.zero"
-reason = "Excel and Open365 disagree on the domain or limit behaviour of this case (Excel number 1, Open365 error #NUM!); not analysed further"
-
-[[difference]]
-id = "prob.text"
-reason = "Excel and Open365 disagree on the domain or limit behaviour of this case (Excel error \"#NUM!\", Open365 error #VALUE!); not analysed further"
-
-[[difference]]
-id = "prob.ptext"
-reason = "Excel and Open365 disagree on the domain or limit behaviour of this case (Excel error \"#NUM!\", Open365 error #VALUE!); not analysed further"
-
-[[difference]]
-id = "prob.blank"
-reason = "Excel and Open365 disagree on the domain or limit behaviour of this case (Excel number 0.5, Open365 error #NUM!); not analysed further"
-
-[[difference]]
-id = "percentrank.s0"
-reason = "Excel's result is 9 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel 0.785714285714286, Open365 0.785714285714285)"
-
-[[difference]]
-id = "percentrank.s14"
-reason = "Excel's result is 9 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel 0.666666666666667, Open365 0.666666666666666)"
-
-[[difference]]
-id = "percentrank.dec"
-reason = "Large difference (Excel 0.125, Open365 0.124) in an extreme-parameter or boundary region; Excel's series/iteration limits differ and the case was not analysed further"
-
-[[difference]]
-id = "percentrank_inc.s0"
-reason = "Large difference (Excel 0.69, Open365 0.6899) in an extreme-parameter or boundary region; Excel's series/iteration limits differ and the case was not analysed further"
-
-[[difference]]
-id = "percentrank_inc.s2"
-reason = "Excel's result is 9 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel 0.785714285714286, Open365 0.785714285714285)"
-
-[[difference]]
-id = "percentrank_inc.s9"
-reason = "Excel's result is 36 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel 0.185217391304348, Open365 0.185217391304347)"
-
-[[difference]]
-id = "percentrank_inc.dec"
-reason = "Large difference (Excel 0.125, Open365 0.124) in an extreme-parameter or boundary region; Excel's series/iteration limits differ and the case was not analysed further"
-
-[[difference]]
-id = "percentrank_exc.one"
-reason = "Large difference (Excel 1, Open365 0.5) in an extreme-parameter or boundary region; Excel's series/iteration limits differ and the case was not analysed further"
-
-[[difference]]
-id = "percentrank_exc.scalar"
-reason = "Large difference (Excel 1, Open365 0.5) in an extreme-parameter or boundary region; Excel's series/iteration limits differ and the case was not analysed further"
-
-[[difference]]
-id = "percentrank_exc.third2"
-reason = "Excel's result is 18 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel 0.46, Open365 0.459999999999999)"
 
 [[difference]]
 id = "linest.r0_T_1_1"
@@ -23166,32 +22698,8 @@ id = "linest.collinear"
 reason = "Large difference (Excel 0.9985714285714288, Open365 0.0) in an extreme-parameter or boundary region; Excel's series/iteration limits differ and the case was not analysed further"
 
 [[difference]]
-id = "linest.collinear2"
-reason = "Large difference (Excel 0, Open365 1.9971428571428564) in an extreme-parameter or boundary region; Excel's series/iteration limits differ and the case was not analysed further"
-
-[[difference]]
 id = "linest.collinear3"
 reason = "Excel's result is 7 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel 1.0599999999999978, Open365 1.0599999999999994)"
-
-[[difference]]
-id = "linest.collinear4"
-reason = "Large difference (Excel 0, Open365 0.04389226141639197) in an extreme-parameter or boundary region; Excel's series/iteration limits differ and the case was not analysed further"
-
-[[difference]]
-id = "linest.constx"
-reason = "Large difference (Excel 0, Open365 4.0249999999999995) in an extreme-parameter or boundary region; Excel's series/iteration limits differ and the case was not analysed further"
-
-[[difference]]
-id = "linest.constx2"
-reason = "Large difference (Excel 8.049999999999999, Open365 0.0) in an extreme-parameter or boundary region; Excel's series/iteration limits differ and the case was not analysed further"
-
-[[difference]]
-id = "linest.consty3"
-reason = "Large difference (Excel 1, Open365 NaN) in an extreme-parameter or boundary region; Excel's series/iteration limits differ and the case was not analysed further"
-
-[[difference]]
-id = "linest.consty4"
-reason = "Excel and Open365 disagree on the domain or limit behaviour of this case (Excel error \"#NUM!\", Open365 number NaN); not analysed further"
 
 [[difference]]
 id = "linest.perfect2"
@@ -23202,20 +22710,8 @@ id = "linest.perfect4"
 reason = "Large difference (Excel 6.740741470649814e+31, Open365 6.933628006437199e31) in an extreme-parameter or boundary region; Excel's series/iteration limits differ and the case was not analysed further"
 
 [[difference]]
-id = "linest.one"
-reason = "Large difference (Excel 0, Open365 3.1) in an extreme-parameter or boundary region; Excel's series/iteration limits differ and the case was not analysed further"
-
-[[difference]]
-id = "linest.err"
-reason = "Excel and Open365 disagree on the domain or limit behaviour of this case (Excel error \"#VALUE!\", Open365 error #N/A); not analysed further"
-
-[[difference]]
 id = "linest.boolc"
 reason = "Excel's result is 5 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel 1.9971428571428576, Open365 1.9971428571428564)"
-
-[[difference]]
-id = "linest.scalar"
-reason = "Large difference (Excel 0, Open365 1.6666666666666667) in an extreme-parameter or boundary region; Excel's series/iteration limits differ and the case was not analysed further"
 
 [[difference]]
 id = "linest.arr"
@@ -23710,28 +23206,8 @@ id = "logest.rowy2"
 reason = "Excel's result is 1 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel 1.3177799328741926, Open365 1.3177799328741928)"
 
 [[difference]]
-id = "logest.collinear"
-reason = "Large difference (Excel 1.1495466922804487, Open365 1.0) in an extreme-parameter or boundary region; Excel's series/iteration limits differ and the case was not analysed further"
-
-[[difference]]
-id = "logest.collinear2"
-reason = "Large difference (Excel 1, Open365 1.3214575977329206) in an extreme-parameter or boundary region; Excel's series/iteration limits differ and the case was not analysed further"
-
-[[difference]]
-id = "logest.collinear4"
-reason = "Large difference (Excel 0, Open365 0.027697493037365534) in an extreme-parameter or boundary region; Excel's series/iteration limits differ and the case was not analysed further"
-
-[[difference]]
-id = "logest.constx"
-reason = "Large difference (Excel 1, Open365 2.6899424028400647) in an extreme-parameter or boundary region; Excel's series/iteration limits differ and the case was not analysed further"
-
-[[difference]]
 id = "logest.constx2"
 reason = "Large difference (Excel 7.235790130596985, Open365 1.0) in an extreme-parameter or boundary region; Excel's series/iteration limits differ and the case was not analysed further"
-
-[[difference]]
-id = "logest.consty3"
-reason = "Large difference (Excel 1, Open365 -inf) in an extreme-parameter or boundary region; Excel's series/iteration limits differ and the case was not analysed further"
 
 [[difference]]
 id = "logest.consty4"
@@ -23748,18 +23224,6 @@ reason = "Excel's result is 5 ulp from Open365's, which is the exact value round
 [[difference]]
 id = "logest.perfect4"
 reason = "Excel's result is 12 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel 87.3730512413276, Open365 87.37305124132743)"
-
-[[difference]]
-id = "logest.one"
-reason = "Large difference (Excel 1, Open365 3.1) in an extreme-parameter or boundary region; Excel's series/iteration limits differ and the case was not analysed further"
-
-[[difference]]
-id = "logest.err"
-reason = "Excel and Open365 disagree on the domain or limit behaviour of this case (Excel error \"#VALUE!\", Open365 error #N/A); not analysed further"
-
-[[difference]]
-id = "logest.scalar"
-reason = "Large difference (Excel 1, Open365 1.7099759466766966) in an extreme-parameter or boundary region; Excel's series/iteration limits differ and the case was not analysed further"
 
 [[difference]]
 id = "logest.xy_sq2"
@@ -24026,24 +23490,8 @@ id = "trend.rowy_col"
 reason = "Excel's result is 2 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel 17.037142857142857, Open365 17.03714285714285)"
 
 [[difference]]
-id = "trend.err"
-reason = "Excel and Open365 disagree on the domain or limit behaviour of this case (Excel error \"#VALUE!\", Open365 error #N/A); not analysed further"
-
-[[difference]]
-id = "trend.newerr"
-reason = "Excel and Open365 disagree on the domain or limit behaviour of this case (Excel error \"#VALUE!\", Open365 error #N/A); not analysed further"
-
-[[difference]]
 id = "trend.newwide"
 reason = "Excel's result is 3 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel 15.04, Open365 15.039999999999994)"
-
-[[difference]]
-id = "trend.collinear"
-reason = "Excel's result is 3 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel 15.04, Open365 15.039999999999994)"
-
-[[difference]]
-id = "trend.constx"
-reason = "Large difference (Excel 8.049999999999999, Open365 28.174999999999997) in an extreme-parameter or boundary region; Excel's series/iteration limits differ and the case was not analysed further"
 
 [[difference]]
 id = "trend.perfect"
@@ -24064,10 +23512,6 @@ reason = "Excel's result is 1 ulp from Open365's, which is the exact value round
 [[difference]]
 id = "trend.bare"
 reason = "Excel's result is 3 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel 15.04, Open365 15.039999999999994)"
-
-[[difference]]
-id = "trend.scalar"
-reason = "Large difference (Excel 5, Open365 11.666666666666668) in an extreme-parameter or boundary region; Excel's series/iteration limits differ and the case was not analysed further"
 
 [[difference]]
 id = "trend.zeroy"
@@ -24390,14 +23834,6 @@ id = "growth.newonly"
 reason = "Excel's result is 1 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel 19.194299844970853, Open365 19.19429984497085)"
 
 [[difference]]
-id = "growth.err"
-reason = "Excel and Open365 disagree on the domain or limit behaviour of this case (Excel error \"#VALUE!\", Open365 error #N/A); not analysed further"
-
-[[difference]]
-id = "growth.newerr"
-reason = "Excel and Open365 disagree on the domain or limit behaviour of this case (Excel error \"#VALUE!\", Open365 error #N/A); not analysed further"
-
-[[difference]]
 id = "growth.newwide"
 reason = "Excel's result is 1 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel 19.194299844970853, Open365 19.19429984497085)"
 
@@ -24430,9 +23866,25 @@ id = "growth.bare"
 reason = "Excel's result is 1 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel 19.194299844970853, Open365 19.19429984497085)"
 
 [[difference]]
-id = "growth.scalar"
-reason = "Large difference (Excel 4.999999999999999, Open365 42.74939866691736) in an extreme-parameter or boundary region; Excel's series/iteration limits differ and the case was not analysed further"
-
-[[difference]]
 id = "growth.huge"
 reason = "Excel's result is 5 ulp from Open365's, which is the exact value rounded once (double-double evaluation); Excel's algorithm is not public and was not reproduced (Excel 1.720546517634064e+101, Open365 1.7205465176340625e101)"
+
+[[difference]]
+id = "numfmt.pad.052"
+reason = "Fill width of the negative accounting section is one space short; parenthesis glyph widths are not exact."
+
+[[difference]]
+id = "numfmt.builtin.164"
+reason = "Same as numfmt.pad.052."
+
+[[difference]]
+id = "numfmt.builtin.171"
+reason = "Same as numfmt.pad.052."
+
+[[difference]]
+id = "numfmt.builtin.178"
+reason = "Same as numfmt.pad.052."
+
+[[difference]]
+id = "numfmt.builtin.185"
+reason = "Same as numfmt.pad.052."

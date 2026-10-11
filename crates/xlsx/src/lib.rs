@@ -27,6 +27,10 @@ mod sheet;
 mod sst;
 mod structure;
 mod styles;
+mod styles_builtin;
+mod styles_edit;
+mod styles_named;
+mod styles_numfmt;
 mod tables;
 mod workbook;
 mod xml;
@@ -64,9 +68,14 @@ pub use sheet::{
 pub use sst::{SharedStrings, decode_xstring, encode_xstring};
 pub use structure::{EditAxis, FormulaShifter, StructEdit};
 pub use styles::{Styles, builtin_number_format};
+pub use styles_edit::{
+    AlignmentPatch, BorderPatch, FillSpec, FontPatch, FormatPatch, NumberFormat, ProtectionPatch,
+    Rotation,
+};
 pub use tables::{Table, TableColumn, TableStyle};
 pub use workbook::{
-    CellInput, DefinedName, DroppedItem, SheetInfo, SheetKind, SheetState, Workbook, WorkbookKind,
+    BorderSpec, CellInput, DefinedName, DroppedItem, FormatSnapshot, SheetInfo, SheetKind,
+    SheetState, Workbook, WorkbookKind,
 };
 pub use xml::{
     Attr, ElementHead, MAIN_NS, MAIN_NS_STRICT, MAX_XML_DEPTH, ParsedXml, RawXml, XmlElement,
