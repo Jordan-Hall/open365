@@ -11,6 +11,7 @@ mod docmodel;
 mod fonts;
 mod grid_text;
 mod grid_view;
+mod parts;
 
 use std::path::PathBuf;
 

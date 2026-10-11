@@ -83,6 +83,47 @@ pub fn publish_image(parent_ui: &mut Ui, doc: Id, index: usize, rect: Rect, alt:
     });
 }
 
+/// Publishes a read-only region (a page header, footer or footnote area). Its lines are
+/// static text children, so a screen reader reads them but cannot edit them.
+pub fn publish_region(
+    parent_ui: &mut Ui,
+    doc: Id,
+    key: (usize, &'static str),
+    role: accesskit::Role,
+    label: &str,
+    lines: &[(Rect, String)],
+) {
+    let bounds = lines
+        .iter()
+        .map(|l| l.0)
+        .reduce(|a, b| a.union(b))
+        .unwrap_or(Rect::NOTHING);
+    let id = doc.with(("region", key));
+    parent_ui.interact(bounds, id, Sense::hover());
+    parent_ui.ctx().accesskit_node_builder(id, |b| {
+        b.set_role(role);
+        b.set_bounds(to_ak_rect(bounds));
+        b.set_label(label.to_owned());
+        b.set_read_only();
+    });
+    let child_ui = parent_ui.new_child(
+        UiBuilder::new()
+            .id_salt(("a11y-region", key))
+            .max_rect(bounds)
+            .accessibility_parent(id),
+    );
+    for (i, (rect, text)) in lines.iter().enumerate() {
+        let line_id = id.with(("line", i));
+        child_ui.interact(*rect, line_id, Sense::hover());
+        child_ui.ctx().accesskit_node_builder(line_id, |b| {
+            b.set_role(accesskit::Role::Label);
+            b.set_bounds(to_ak_rect(*rect));
+            b.set_value(text.clone());
+            b.set_read_only();
+        });
+    }
+}
+
 /// Publishes a paragraph node with one `TextRun` per laid-out line (split into chunks of at
 /// most 255 characters). The last line carries a trailing newline so assistive technology sees the
 /// paragraph end. Returns the published runs.

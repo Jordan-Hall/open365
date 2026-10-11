@@ -11,7 +11,10 @@
 //! columns, body), each clipped to its own rectangle.
 //!
 //! Selection is a range: the active cell is the anchor and `extent` the moving corner, grown
-//! by Shift+click, Shift+arrows or a drag, and widened to whole merged cells. Cell edits go
+//! by Shift+click, Shift+arrows or a drag, and widened to whole merged cells. A click on a
+//! column or row header, Ctrl+Space, Shift+Space and Ctrl+A select whole columns, whole rows
+//! or the whole sheet: the active cell stays where it was, and [`Reach`] says how far the
+//! range extends past the two corners. Dragging past the edge of the viewport scrolls. Cell edits go
 //! through the formula bar and the command layer: text starting with `=` becomes
 //! `XlsxSetCellFormula`, anything else `XlsxSetCellValue`.
 
@@ -235,6 +238,32 @@ impl SheetLayout {
     }
 }
 
+/// How far the selection extends past the active cell and the moving corner.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+enum Reach {
+    /// Just the rectangle between the two cells.
+    #[default]
+    Cells,
+    /// Every row of the columns between them.
+    Cols,
+    /// Every column of the rows between them.
+    Rows,
+    /// The whole sheet.
+    All,
+}
+
+/// A part of the column and row headers under the pointer.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Header {
+    Col(u32),
+    Row(u32),
+    /// The corner square above the row numbers: selects the sheet.
+    Corner,
+}
+
+/// The selection while the pointer changes it: active cell, moving corner, dragging, reach.
+type SelState = ((u32, u32), (u32, u32), bool, Reach);
+
 /// Where cells sit on screen for one frame.
 struct View<'a> {
     layout: &'a SheetLayout,
@@ -277,6 +306,34 @@ impl View<'_> {
         vec2(self.layout.x(f.cols + 1), self.layout.y(f.rows + 1))
     }
 
+    /// Position along one axis on the sheet, with the frozen block pinned to the edge.
+    fn along(local: f32, frozen: f32, scroll: f32) -> f32 {
+        if local < frozen {
+            local.max(0.0)
+        } else {
+            local + scroll
+        }
+    }
+
+    /// The header under a screen position, if any.
+    fn header_at(&self, pos: Pos2, limits: (u32, u32)) -> Option<Header> {
+        let local = pos - (self.origin + self.scroll);
+        let fz = self.frozen_size();
+        match (local.x < ROW_HEADER_W, local.y < COL_HEADER_H) {
+            _ if local.x < 0.0 || local.y < 0.0 => None,
+            (true, true) => Some(Header::Corner),
+            (false, true) => {
+                let x = Self::along(local.x - ROW_HEADER_W, fz.x, self.scroll.x);
+                Some(Header::Col(self.layout.col_at(x, limits.1)))
+            }
+            (true, false) => {
+                let y = Self::along(local.y - COL_HEADER_H, fz.y, self.scroll.y);
+                Some(Header::Row(self.layout.row_at(y, limits.0)))
+            }
+            (false, false) => None,
+        }
+    }
+
     /// The cell under a screen position; `clamp` keeps a position outside the cell area
     /// inside it (used while dragging).
     fn cell_at(&self, pos: Pos2, clamp: bool, limits: (u32, u32)) -> Option<(u32, u32)> {
@@ -286,16 +343,8 @@ impl View<'_> {
             return None;
         }
         let fz = self.frozen_size();
-        let sheet_x = if local.x < fz.x {
-            local.x.max(0.0)
-        } else {
-            local.x + self.scroll.x
-        };
-        let sheet_y = if local.y < fz.y {
-            local.y.max(0.0)
-        } else {
-            local.y + self.scroll.y
-        };
+        let sheet_x = Self::along(local.x, fz.x, self.scroll.x);
+        let sheet_y = Self::along(local.y, fz.y, self.scroll.y);
         let col = self.layout.col_at(sheet_x, limits.1);
         let row = self.layout.row_at(sheet_y, limits.0);
         Some((row, col))
@@ -338,7 +387,11 @@ pub struct GridView {
     active: (u32, u32),
     /// The moving corner of the selection.
     extent: (u32, u32),
+    /// Whether the selection runs past the corners to whole columns, rows or the sheet.
+    reach: Reach,
     dragging: bool,
+    /// The last press was on a header (a double click there does not edit a cell).
+    press_on_header: bool,
     /// Frame in which a press or move changed the selection. Egui drops focus from the cell
     /// widgets in that frame and the next (press, then click), so both ask again.
     refocus_frame: Option<u64>,
@@ -406,8 +459,19 @@ fn display_text(wb: &Workbook, cell: &Cell) -> String {
     }
 }
 
-/// The address of a range: `B2` or `B2:C4`.
+/// The address of a range: `B2`, `B2:C4`, `B:D` for whole columns, `2:4` for whole rows.
 fn range_label(span: Span) -> String {
+    let whole_cols = span.0 == 1 && span.2 == MAX_ROW;
+    let whole_rows = span.1 == 1 && span.3 == MAX_COL;
+    if whole_cols && whole_rows {
+        return format!("A:{}", col_letters(MAX_COL));
+    }
+    if whole_cols {
+        return format!("{}:{}", col_letters(span.1), col_letters(span.3));
+    }
+    if whole_rows {
+        return format!("{}:{}", span.0, span.2);
+    }
     let a = format!("{}{}", col_letters(span.1), span.0);
     if (span.0, span.1) == (span.2, span.3) {
         a
@@ -422,7 +486,9 @@ impl GridView {
             sheet: 0,
             active: (1, 1),
             extent: (1, 1),
+            reach: Reach::Cells,
             dragging: false,
+            press_on_header: false,
             refocus_frame: None,
             editing: false,
             edit_text: String::new(),
@@ -473,7 +539,13 @@ impl GridView {
     /// The selected range `(row1, col1, row2, col2)`, widened to whole merged cells.
     pub fn selection(&self) -> (u32, u32, u32, u32) {
         let (a, e) = (self.active, self.extent);
-        let raw = (a.0.min(e.0), a.1.min(e.1), a.0.max(e.0), a.1.max(e.1));
+        let (r1, c1, r2, c2) = (a.0.min(e.0), a.1.min(e.1), a.0.max(e.0), a.1.max(e.1));
+        let raw = match self.reach {
+            Reach::Cells => (r1, c1, r2, c2),
+            Reach::Cols => (1, c1, MAX_ROW, c2),
+            Reach::Rows => (r1, 1, r2, MAX_COL),
+            Reach::All => (1, 1, MAX_ROW, MAX_COL),
+        };
         self.layout
             .as_ref()
             .map_or(raw, |(_, _, layout)| layout.expand(raw))
@@ -490,13 +562,52 @@ impl GridView {
     pub fn set_active(&mut self, row: u32, col: u32) {
         self.active = (row.clamp(1, MAX_ROW), col.clamp(1, MAX_COL));
         self.extent = self.active;
+        self.reach = Reach::Cells;
         self.scroll_target = Some(self.active);
+    }
+
+    /// Selects whole columns `first..=last`. The active cell keeps its row, and its column if
+    /// that is an end of the range (else it moves to `first`).
+    pub fn select_columns(&mut self, first: u32, last: u32) {
+        let (first, last) = (first.clamp(1, MAX_COL), last.clamp(1, MAX_COL));
+        let (first, last) = (first.min(last), first.max(last));
+        let (col, other) = Self::ends(self.active.1, first, last);
+        self.active = (self.active.0, col);
+        self.extent = (self.active.0, other);
+        self.reach = Reach::Cols;
+    }
+
+    /// Selects whole rows `first..=last` (see [`GridView::select_columns`]).
+    pub fn select_rows(&mut self, first: u32, last: u32) {
+        let (first, last) = (first.clamp(1, MAX_ROW), last.clamp(1, MAX_ROW));
+        let (first, last) = (first.min(last), first.max(last));
+        let (row, other) = Self::ends(self.active.0, first, last);
+        self.active = (row, self.active.1);
+        self.extent = (other, self.active.1);
+        self.reach = Reach::Rows;
+    }
+
+    /// The active index and the moving corner's index for a range `first..=last`: the active
+    /// cell stays when it is at one end of the range.
+    fn ends(active: u32, first: u32, last: u32) -> (u32, u32) {
+        if active == last {
+            (last, first)
+        } else {
+            (first, last)
+        }
+    }
+
+    /// Selects the whole sheet; the active cell stays.
+    pub fn select_all(&mut self) {
+        self.extent = self.active;
+        self.reach = Reach::All;
     }
 
     /// Selects the range from `anchor` (the active cell) to `corner`.
     pub fn select_range(&mut self, anchor: (u32, u32), corner: (u32, u32)) {
         self.set_active(anchor.0, anchor.1);
         self.extent = (corner.0.clamp(1, MAX_ROW), corner.1.clamp(1, MAX_COL));
+        self.reach = Reach::Cells;
         self.scroll_target = Some(self.extent);
     }
 
@@ -505,6 +616,7 @@ impl GridView {
             self.sheet = sheet;
             self.active = (1, 1);
             self.extent = (1, 1);
+            self.reach = Reach::Cells;
             self.dragging = false;
             self.editing = false;
             self.layout = None;
@@ -630,12 +742,29 @@ impl GridView {
     }
 
     /// Moves the selection's moving corner, keeping the active cell.
+    /// Whole columns grow only sideways and whole rows only down; the whole sheet stays.
     fn extend(&mut self, d_row: i32, d_col: i32) {
+        let (d_row, d_col) = match self.reach {
+            Reach::Cells => (d_row, d_col),
+            Reach::Cols => (0, d_col),
+            Reach::Rows => (d_row, 0),
+            Reach::All => (0, 0),
+        };
         self.extent = self.walk(self.extent, d_row, d_col);
         self.scroll_target = Some(self.extent);
     }
 
     fn extend_to(&mut self, row: u32, col: u32) {
+        let row = if matches!(self.reach, Reach::Cols | Reach::All) {
+            self.extent.0
+        } else {
+            row
+        };
+        let col = if matches!(self.reach, Reach::Rows | Reach::All) {
+            self.extent.1
+        } else {
+            col
+        };
         self.extent = (row.clamp(1, MAX_ROW), col.clamp(1, MAX_COL));
         self.scroll_target = Some(self.extent);
     }
@@ -826,7 +955,8 @@ impl GridView {
         let grid_id = self.grid_id;
         let ws = wb.sheet(sheet);
 
-        let mut sel_state = (self.active, self.extent, self.dragging);
+        let mut sel_state = (self.active, self.extent, self.dragging, self.reach);
+        let mut press_on_header = self.press_on_header;
         let mut pressed = false;
         let mut double_clicked = false;
         let mut visible = Visible::default();
@@ -888,6 +1018,18 @@ impl GridView {
                             .layer_id_at(pos)
                             .is_none_or(|layer| layer == ui.layer_id())
                 };
+                // Moves the dragged corner to the cell under `pos`, along the axes the
+                // selection grows on.
+                let drag_to = |sel: &mut SelState, pos: Pos2| {
+                    if let Some(cell) = view.cell_at(pos, true, limits) {
+                        match sel.3 {
+                            Reach::Cells => sel.1 = cell,
+                            Reach::Cols => sel.1.1 = cell.1,
+                            Reach::Rows => sel.1.0 = cell.0,
+                            Reach::All => {}
+                        }
+                    }
+                };
                 for event in events {
                     match event {
                         Event::PointerButton {
@@ -896,8 +1038,35 @@ impl GridView {
                             pressed: true,
                             modifiers,
                         } if own_layer(pos) => {
-                            if let Some(cell) = view.cell_at(pos, false, limits) {
+                            if let Some(header) = view.header_at(pos, limits) {
                                 pressed = true;
+                                press_on_header = true;
+                                // Like Excel: the active cell stays; Shift grows from it.
+                                match header {
+                                    Header::Col(c) => {
+                                        if !modifiers.shift {
+                                            sel_state.0.1 = c;
+                                        }
+                                        sel_state.1 = (sel_state.0.0, c);
+                                        sel_state.3 = Reach::Cols;
+                                    }
+                                    Header::Row(r) => {
+                                        if !modifiers.shift {
+                                            sel_state.0.0 = r;
+                                        }
+                                        sel_state.1 = (r, sel_state.0.1);
+                                        sel_state.3 = Reach::Rows;
+                                    }
+                                    Header::Corner => {
+                                        sel_state.1 = sel_state.0;
+                                        sel_state.3 = Reach::All;
+                                    }
+                                }
+                                sel_state.2 = header != Header::Corner;
+                            } else if let Some(cell) = view.cell_at(pos, false, limits) {
+                                pressed = true;
+                                press_on_header = false;
+                                sel_state.3 = Reach::Cells;
                                 if modifiers.shift {
                                     sel_state.1 = cell;
                                 } else {
@@ -915,12 +1084,41 @@ impl GridView {
                             pressed: false,
                             ..
                         } => sel_state.2 = false,
-                        Event::PointerMoved(pos) if sel_state.2 => {
-                            if let Some(cell) = view.cell_at(pos, true, limits) {
-                                sel_state.1 = cell;
-                            }
-                        }
+                        Event::PointerMoved(pos) if sel_state.2 => drag_to(&mut sel_state, pos),
                         _ => {}
+                    }
+                }
+                // While dragging, the pointer decides the corner every frame, also when it is
+                // held still outside the viewport and the sheet scrolls under it.
+                if sel_state.2
+                    && let Some(pos) = ctx.input(|i| i.pointer.latest_pos())
+                {
+                    drag_to(&mut sel_state, pos);
+                    let data_min = view_min + vec2(ROW_HEADER_W + fz.x, COL_HEADER_H + fz.y);
+                    let beyond = |p: f32, lo: f32, hi: f32| {
+                        if p < lo {
+                            p - lo
+                        } else if p > hi {
+                            p - hi
+                        } else {
+                            0.0
+                        }
+                    };
+                    let dx = beyond(pos.x, data_min.x, clip_all.right());
+                    let dy = beyond(pos.y, data_min.y, clip_all.bottom());
+                    let (dx, dy) = match sel_state.3 {
+                        Reach::Cells => (dx, dy),
+                        Reach::Cols => (dx, 0.0),
+                        Reach::Rows => (0.0, dy),
+                        Reach::All => (0.0, 0.0),
+                    };
+                    if dx != 0.0 || dy != 0.0 {
+                        let dt = ctx.input(|i| i.stable_dt).clamp(0.001, 0.1);
+                        // Points per second grow with the distance past the edge.
+                        let speed = |d: f32| d.signum() * (d.abs() * 12.0).clamp(60.0, 2400.0) * dt;
+                        let step = |d: f32| if d == 0.0 { 0.0 } else { speed(d) };
+                        // Scrolling the content left shows columns to the right.
+                        ui.scroll_with_delta(-vec2(step(dx), step(dy)));
                     }
                 }
                 double_clicked = response.double_clicked();
@@ -1031,13 +1229,15 @@ impl GridView {
         self.active = sel_state.0;
         self.extent = sel_state.1;
         self.dragging = sel_state.2;
+        self.reach = sel_state.3;
+        self.press_on_header = press_on_header;
         if pressed || moved {
             self.refocus_frame = Some(ctx.cumulative_frame_nr());
         }
         if self.dragging {
             ctx.request_repaint();
         }
-        if double_clicked {
+        if double_clicked && !self.press_on_header {
             self.status = None;
             let (r, c) = self.active;
             let text = target
@@ -1099,8 +1299,11 @@ impl GridView {
 
     fn handle_keys(&mut self, ctx: &Context, target: &mut Target, rows_n: u32, cols_n: u32) {
         let events = ctx.input(|i| i.events.clone());
+        // Shift+Space also sends a space as text, which must not start an edit.
+        let mut swallow_space = false;
         for event in events {
             match event {
+                Event::Text(t) if swallow_space && t == " " => swallow_space = false,
                 Event::Text(t) => {
                     let first: String = t.chars().filter(|c| !c.is_control()).collect();
                     if !first.is_empty() {
@@ -1116,6 +1319,16 @@ impl GridView {
                     let page = 20;
                     let shift = modifiers.shift;
                     match key {
+                        Key::Space if modifiers.ctrl => {
+                            let sel = self.selection();
+                            self.select_columns(sel.1, sel.3);
+                        }
+                        Key::Space if shift => {
+                            swallow_space = true;
+                            let sel = self.selection();
+                            self.select_rows(sel.0, sel.2);
+                        }
+                        Key::A if modifiers.command => self.select_all(),
                         Key::ArrowUp if modifiers.command && shift => {
                             self.extend_to(1, self.extent.1);
                         }

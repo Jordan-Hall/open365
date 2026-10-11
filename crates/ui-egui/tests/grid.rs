@@ -342,3 +342,184 @@ fn displayed_text_matches_excel_for_the_number_format_fixture() {
     }
     assert!(compared > 5, "compared {compared}");
 }
+
+// ----- whole column, row and sheet selection; auto-scroll -----
+
+fn click_at(h: &mut Harness<'_, App>, pos: egui::Pos2, modifiers: Modifiers) {
+    h.event(egui::Event::PointerMoved(pos));
+    for pressed in [true, false] {
+        h.event(egui::Event::PointerButton {
+            pos,
+            button: egui::PointerButton::Primary,
+            pressed,
+            modifiers,
+        });
+        // A press asks for repaints while the button is down.
+        h.step();
+    }
+    h.run();
+}
+
+/// Centre of the column header above column `col` (row 1 must be visible).
+fn col_header(h: &Harness<'_, App>, col: u32) -> egui::Pos2 {
+    let r = rect_of(h, 1, col);
+    egui::pos2(r.center().x, r.min.y - 12.0)
+}
+
+/// Centre of the row header left of row `row` (column 1 must be visible).
+fn row_header(h: &Harness<'_, App>, row: u32) -> egui::Pos2 {
+    let r = rect_of(h, row, 1);
+    egui::pos2(r.min.x - 20.0, r.center().y)
+}
+
+#[test]
+fn clicking_a_column_header_selects_the_column_and_shift_extends_it() {
+    use open365_xlsx::MAX_ROW;
+    let mut h = harness("formulas-basic");
+    cell(&h, 3, 2).expect("B3").click();
+    h.run();
+    let pos = col_header(&h, 3);
+    click_at(&mut h, pos, Modifiers::NONE);
+    // The whole column C is selected and the active cell keeps its row, as in Excel.
+    assert_eq!(h.state().grid.selection(), (1, 3, MAX_ROW, 3));
+    assert_eq!(h.state().grid.active(), (3, 3));
+    assert!(selected(&h, 2, 3));
+    assert!(!selected(&h, 2, 2));
+    let pos = col_header(&h, 5);
+    click_at(&mut h, pos, Modifiers::SHIFT);
+    assert_eq!(h.state().grid.selection(), (1, 3, MAX_ROW, 5));
+    assert_eq!(h.state().grid.active(), (3, 3), "Shift keeps the anchor");
+    // Shift-clicking back to the left of the anchor normalises the range.
+    let pos = col_header(&h, 1);
+    click_at(&mut h, pos, Modifiers::SHIFT);
+    assert_eq!(h.state().grid.selection(), (1, 1, MAX_ROW, 3));
+    // A plain click on a cell collapses it.
+    cell(&h, 2, 2).expect("B2").click();
+    h.run();
+    assert_eq!(h.state().grid.selection(), (2, 2, 2, 2));
+}
+
+#[test]
+fn clicking_a_row_header_selects_the_row_and_the_corner_selects_the_sheet() {
+    use open365_xlsx::{MAX_COL, MAX_ROW};
+    let mut h = harness("formulas-basic");
+    let pos = row_header(&h, 2);
+    click_at(&mut h, pos, Modifiers::NONE);
+    assert_eq!(h.state().grid.selection(), (2, 1, 2, MAX_COL));
+    let pos = row_header(&h, 4);
+    click_at(&mut h, pos, Modifiers::SHIFT);
+    assert_eq!(h.state().grid.selection(), (2, 1, 4, MAX_COL));
+    // Dragging across headers grows the selection by whole rows.
+    let (from, to) = (row_header(&h, 5), row_header(&h, 7));
+    h.drag_at(from);
+    h.hover_at(to);
+    h.drop_at(to);
+    h.run();
+    assert_eq!(h.state().grid.selection(), (5, 1, 7, MAX_COL));
+    // The square above the row numbers selects everything.
+    let first = rect_of(&h, 1, 1);
+    let corner = egui::pos2(first.min.x - 20.0, first.min.y - 12.0);
+    click_at(&mut h, corner, Modifiers::NONE);
+    assert_eq!(h.state().grid.selection(), (1, 1, MAX_ROW, MAX_COL));
+}
+
+#[test]
+fn a_double_click_on_a_header_does_not_start_a_cell_edit() {
+    let mut h = harness("formulas-basic");
+    let pos = col_header(&h, 2);
+    click_at(&mut h, pos, Modifiers::NONE);
+    click_at(&mut h, pos, Modifiers::NONE);
+    assert!(!h.state().grid.is_editing());
+}
+
+#[test]
+fn ctrl_space_shift_space_and_ctrl_a_select_column_row_and_sheet() {
+    use open365_xlsx::{MAX_COL, MAX_ROW};
+    let mut h = harness("formulas-basic");
+    h.state_mut().grid.set_active(3, 2);
+    h.run();
+    h.key_press_modifiers(Modifiers::CTRL, Key::Space);
+    h.run();
+    assert_eq!(h.state().grid.selection(), (1, 2, MAX_ROW, 2));
+    assert_eq!(h.state().grid.active(), (3, 2));
+    // Whole column plus Shift+Space is the whole sheet, as in Excel.
+    h.key_press_modifiers(Modifiers::SHIFT, Key::Space);
+    h.run();
+    assert_eq!(h.state().grid.selection(), (1, 1, MAX_ROW, MAX_COL));
+    h.state_mut().grid.set_active(3, 2);
+    h.run();
+    h.key_press_modifiers(Modifiers::SHIFT, Key::Space);
+    h.run();
+    assert_eq!(h.state().grid.selection(), (3, 1, 3, MAX_COL));
+    assert!(
+        !h.state().grid.is_editing(),
+        "the space did not start an edit"
+    );
+    h.state_mut().grid.set_active(3, 2);
+    h.run();
+    h.key_press_modifiers(Modifiers::CTRL, Key::Space);
+    h.run();
+    // Shift+Right on whole columns widens by whole columns.
+    h.key_press_modifiers(Modifiers::CTRL, Key::Space);
+    h.run();
+    h.key_press_modifiers(Modifiers::SHIFT, Key::ArrowRight);
+    h.run();
+    h.key_press_modifiers(Modifiers::SHIFT, Key::ArrowDown);
+    h.run();
+    assert_eq!(h.state().grid.selection(), (1, 2, MAX_ROW, 3));
+    h.key_press_modifiers(Modifiers::COMMAND, Key::A);
+    h.run();
+    assert_eq!(h.state().grid.selection(), (1, 1, MAX_ROW, MAX_COL));
+    // An arrow key goes back to a single cell.
+    h.key_press(Key::ArrowDown);
+    h.run();
+    assert_eq!(h.state().grid.selection(), (4, 2, 4, 2));
+}
+
+#[test]
+fn the_address_box_names_whole_columns_and_rows() {
+    let mut h = harness("formulas-basic");
+    h.state_mut().grid.select_columns(2, 4);
+    h.run();
+    assert!(h.query_by_label("B:D").is_some(), "address box shows B:D");
+    h.state_mut().grid.select_rows(3, 5);
+    h.run();
+    assert!(h.query_by_label("3:5").is_some(), "address box shows 3:5");
+}
+
+#[test]
+fn dragging_past_the_bottom_edge_scrolls_and_keeps_extending() {
+    let mut h = harness("large-sheet");
+    let from = rect_of(&h, 2, 2).center();
+    h.drag_at(from);
+    // Hold the pointer well below the viewport for several frames.
+    let outside = egui::pos2(from.x, 900.0);
+    h.hover_at(outside);
+    for _ in 0..30 {
+        h.step();
+    }
+    let sel = h.state().grid.selection();
+    assert_eq!((sel.0, sel.1), (2, 2));
+    assert!(sel.2 > 40, "selection reached only row {}", sel.2);
+    assert!(
+        cell(&h, 6, 2).is_none(),
+        "rows near the top scrolled out of view"
+    );
+    h.drop_at(outside);
+    h.step();
+    // Sideways, with the pointer held right of the viewport.
+    let mut h = harness("large-sheet");
+    let from = rect_of(&h, 2, 2).center();
+    h.drag_at(from);
+    let outside = egui::pos2(1500.0, from.y);
+    h.hover_at(outside);
+    for _ in 0..30 {
+        h.step();
+    }
+    let sel = h.state().grid.selection();
+    assert!(sel.3 > 12, "selection reached only column {}", sel.3);
+    assert!(
+        cell(&h, 3, 2).is_none(),
+        "the first columns scrolled out of view"
+    );
+}

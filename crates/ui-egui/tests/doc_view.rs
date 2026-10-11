@@ -427,3 +427,268 @@ fn print_hands_the_pdf_to_the_operating_system_by_path_not_script_text() {
         assert_eq!(cmd.get_program().to_string_lossy(), "lp");
     }
 }
+
+/// Undo or redo through the view, then one frame: (milliseconds in the command layer,
+/// milliseconds of layout in the frame).
+fn history_step(h: &mut Harness<'_, State>, undo: bool) -> (f32, f32) {
+    let started = Instant::now();
+    let State { view, target } = h.state_mut();
+    let result = if undo {
+        view.undo(target)
+    } else {
+        view.redo(target)
+    };
+    result.expect("history");
+    let command_ms = started.elapsed().as_secs_f32() * 1000.0;
+    h.run();
+    (command_ms, h.state().view.last_layout_ms)
+}
+
+fn median(mut v: Vec<f32>) -> f32 {
+    v.sort_by(f32::total_cmp);
+    v[v.len() / 2]
+}
+
+/// Undo and redo on a 300-page document: layout time per step. Prints the timings.
+#[test]
+fn undo_and_redo_use_the_incremental_layout() {
+    let mut h = harness_for(long_document(2600));
+    focus(&mut h);
+    let pages = h.state().view.page_count();
+    h.state_mut().view.set_caret(DocPos::new(1300, 3));
+    let (mut undo_cmd, mut undo_layout) = (Vec::new(), Vec::new());
+    let (mut redo_cmd, mut redo_layout) = (Vec::new(), Vec::new());
+    for _ in 0..5 {
+        h.event(Event::Text("Z".to_owned()));
+        h.run();
+        let (c, l) = history_step(&mut h, true);
+        undo_cmd.push(c);
+        undo_layout.push(l);
+        let stats = h.state().view.layout_stats();
+        assert!(!stats.full, "undo laid everything out again: {stats:?}");
+        assert!(
+            stats.blocks_laid_out <= 3,
+            "undo laid out {} blocks",
+            stats.blocks_laid_out
+        );
+        let (c, l) = history_step(&mut h, false);
+        redo_cmd.push(c);
+        redo_layout.push(l);
+        history_step(&mut h, true);
+    }
+    println!(
+        "{pages}-page document: undo command {:.1} ms + layout {:.1} ms; redo command {:.1} ms + layout {:.1} ms",
+        median(undo_cmd),
+        median(undo_layout.clone()),
+        median(redo_cmd),
+        median(redo_layout)
+    );
+    assert_eq!(
+        h.state()
+            .target
+            .docx()
+            .and_then(|d| d.paragraph_text(1300))
+            .map(|t| t.starts_with("The ")),
+        Some(true),
+        "undo restored the text"
+    );
+}
+
+/// Undoing a paste that added paragraphs and redoing it gives the layout a full pass gives.
+#[test]
+fn undo_after_a_multi_paragraph_paste_matches_a_fresh_layout() {
+    let mut h = open("docx/plain-paragraphs.docx");
+    let fresh = open("docx/plain-paragraphs.docx");
+    focus(&mut h);
+    let before = h.state().view.paragraph_count();
+    h.event(Event::Paste("one\ntwo\nthree\n".repeat(40)));
+    h.run();
+    assert!(h.state().view.paragraph_count() > before + 100);
+    let pasted = h.state().view.layout().clone();
+    let State { view, target } = h.state_mut();
+    view.undo(target).expect("undo");
+    h.run();
+    assert_eq!(h.state().view.paragraph_count(), before);
+    assert_eq!(h.state().view.layout(), fresh.state().view.layout());
+    let State { view, target } = h.state_mut();
+    view.redo(target).expect("redo");
+    h.run();
+    assert_eq!(h.state().view.layout(), &pasted);
+}
+
+/// Glyph quads drawn last frame whose colour is not fully opaque: dimmed text.
+fn dimmed_quads(h: &Harness<'_, State>) -> usize {
+    h.output()
+        .shapes
+        .iter()
+        .filter_map(|s| match &s.shape {
+            egui::Shape::Mesh(m) if m.texture_id != egui::TextureId::default() => Some(
+                m.vertices
+                    .chunks(4)
+                    .filter(|q| q[0].color.a() < 255)
+                    .count(),
+            ),
+            _ => None,
+        })
+        .sum()
+}
+
+fn glyphs(lines: &[open365_layout::Line]) -> usize {
+    lines
+        .iter()
+        .flat_map(|l| &l.runs)
+        .map(|r| r.glyphs.len())
+        .sum()
+}
+
+#[test]
+fn headers_and_footers_are_drawn_dimmed_and_published_read_only() {
+    let mut h = open("docx/layout-hf-basic.docx");
+    // Small enough that every page is on screen.
+    h.state_mut().view.set_zoom(Some(0.25));
+    h.run();
+    h.run();
+    let pages = h.state().view.layout().pages.clone();
+    assert!(pages.len() <= 3, "{} pages", pages.len());
+    let page = pages[0].clone();
+    assert!(
+        !page.header.is_empty() && !page.footer.is_empty(),
+        "fixture has furniture"
+    );
+    let furniture: usize = pages
+        .iter()
+        .map(|p| glyphs(&p.header) + glyphs(&p.footer))
+        .sum();
+    // Blank glyphs (spaces) have no quad, so the dimmed quads are at most the glyph count.
+    let dimmed = dimmed_quads(&h);
+    assert!(
+        dimmed > furniture / 2 && dimmed <= furniture,
+        "{dimmed} dimmed quads for {furniture} header and footer glyphs"
+    );
+    assert!(glyph_quads(&h) > dimmed, "the body is drawn in full");
+
+    // Both are regions of read-only static text, not part of the editable text.
+    let header = h
+        .query_all_by_label("Page header")
+        .next()
+        .expect("header region");
+    assert_eq!(header.accesskit_node().role(), Role::Header);
+    assert!(header.accesskit_node().data().is_read_only());
+    let footer = h
+        .query_all_by_label("Page footer")
+        .next()
+        .expect("footer region");
+    assert_eq!(footer.accesskit_node().role(), Role::Footer);
+    let want: String = page
+        .header
+        .iter()
+        .map(|l| l.text.trim())
+        .collect::<Vec<_>>()
+        .join("");
+    let lines: Vec<_> = header
+        .children_recursive()
+        .filter(|c| c.accesskit_node().role() == Role::Label)
+        .collect();
+    let got: Vec<String> = lines
+        .iter()
+        .filter_map(|c| c.accesskit_node().value())
+        .collect();
+    assert!(!got.is_empty(), "header lines are published");
+    assert!(
+        want.starts_with(got[0].trim()) || got.join("").trim().starts_with(want.trim()),
+        "{got:?} vs {want:?}"
+    );
+    for line in lines {
+        assert!(line.accesskit_node().data().is_read_only());
+    }
+}
+
+#[test]
+fn footnote_lines_are_drawn_in_full_and_published() {
+    let mut h = open("docx/layout-fn-basic.docx");
+    h.state_mut().view.set_zoom(Some(0.25));
+    h.run();
+    h.run();
+    let pages = h.state().view.layout().pages.clone();
+    assert!(pages.len() <= 3, "{} pages", pages.len());
+    assert!(glyphs(&pages[0].notes) > 0, "fixture has footnote text");
+    let furniture: usize = pages
+        .iter()
+        .map(|p| glyphs(&p.header) + glyphs(&p.footer))
+        .sum();
+    assert_eq!(
+        dimmed_quads(&h),
+        furniture,
+        "only header and footer are dimmed"
+    );
+    let notes: Vec<_> = h.query_all_by_label("Footnotes").collect();
+    assert!(!notes.is_empty(), "footnote regions are published");
+    for region in notes {
+        assert!(region.accesskit_node().data().is_read_only());
+        assert!(region.children_recursive().count() > 0);
+    }
+}
+
+#[test]
+fn pictures_in_headers_and_footers_resolve_through_their_own_part() {
+    let dir = fixture("external/ms-templates");
+    let Ok(entries) = std::fs::read_dir(&dir) else {
+        eprintln!("no external templates; skipped");
+        return;
+    };
+    let mut checked = 0;
+    for path in entries.flatten().map(|e| e.path()) {
+        if path.extension().and_then(|e| e.to_str()) != Some("docx") {
+            continue;
+        }
+        let Ok(bytes) = std::fs::read(&path) else {
+            continue;
+        };
+        let Ok(target) = Target::open_docx(&bytes) else {
+            continue;
+        };
+        let mut h = harness_for(target);
+        let layout = h.state().view.layout();
+        let furniture_images = layout
+            .pages
+            .iter()
+            .map(|p| p.header_images.len() + p.footer_images.len() + p.note_images.len())
+            .sum::<usize>();
+        if furniture_images == 0 {
+            continue;
+        }
+        h.state_mut().view.set_zoom(Some(0.5));
+        h.run();
+        h.run();
+        let page = h.state().view.layout().pages[0].clone();
+        let want = page.images.len()
+            + page.header_images.len()
+            + page.note_images.len()
+            + page.footer_images.len();
+        let drawn = h.query_all_by_role(Role::Image).count();
+        assert!(drawn >= page.header_images.len() + page.footer_images.len());
+        assert!(
+            drawn <= want,
+            "{}: {drawn} nodes for {want} pictures",
+            path.display()
+        );
+        // A picture resolved from a header part is a texture, not the grey placeholder frame.
+        let textured = h
+            .output()
+            .shapes
+            .iter()
+            .filter(|s| matches!(&s.shape, egui::Shape::Rect(r) if r.stroke.color == egui::Color32::from_gray(160)))
+            .count();
+        assert_eq!(
+            textured,
+            0,
+            "{}: a picture was not resolved",
+            path.display()
+        );
+        checked += 1;
+        if checked == 3 {
+            break;
+        }
+    }
+    eprintln!("templates with furniture pictures checked: {checked}");
+}

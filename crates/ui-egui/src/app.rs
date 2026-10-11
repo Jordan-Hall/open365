@@ -322,9 +322,8 @@ impl App {
         let Some(target) = &mut self.target else {
             return;
         };
-        match target.undo() {
+        match self.doc.undo(target) {
             Ok(_) => {
-                self.doc.reset();
                 self.status = "Undid last change".to_owned();
             }
             Err(e) => self.status = e.to_string(),
@@ -335,9 +334,8 @@ impl App {
         let Some(target) = &mut self.target else {
             return;
         };
-        match target.redo() {
+        match self.doc.redo(target) {
             Ok(_) => {
-                self.doc.reset();
                 self.status = "Redid change".to_owned();
             }
             Err(e) => self.status = e.to_string(),

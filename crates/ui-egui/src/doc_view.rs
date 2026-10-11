@@ -19,7 +19,7 @@ use egui::{
     Color32, Context, Event, EventFilter, IMEPurpose, Id, Pos2, Rect, Sense, Shape, Stroke, Ui,
     UiBuilder, Vec2, accesskit, vec2,
 };
-use open365_commands::{Command, Outcome, Target};
+use open365_commands::{Command, CommandError, Outcome, Target};
 use open365_docx::{Alignment, RunPropsPatch};
 use open365_layout::{
     BorderLine, BorderStyle, ClusterKind, IncrementalLayout, Layout, LayoutOptions, Line, ParaRole,
@@ -31,6 +31,8 @@ use self::glyphs::{Atlas, FontSet, GlyphBatch};
 use self::keys::{KeyAction, Nav};
 use crate::a11y::{self, RunEntry};
 use crate::docmodel::{ParaModel, SpanStyle, build_models};
+
+use crate::parts;
 
 // The glyph atlas and the key map live next to this file; `lib.rs` need not know them.
 #[path = "glyphs.rs"]
@@ -47,6 +49,10 @@ const SIDE_PAD: f32 = 16.0;
 const POINT_SCALE: f32 = 96.0 / 72.0;
 /// Width of the highlight past the end of a selected paragraph, document points.
 const MARK_WIDTH_PT: f64 = 4.0;
+/// Opacity of header and footer text and pictures: Word dims them while the body is edited.
+const FURNITURE_DIM: f32 = 0.45;
+/// Spacing of the accessibility ids of the picture groups (body, header, notes, footer).
+const IMAGE_GROUP_STRIDE: usize = 1 << 28;
 
 /// Which character toggle a button or shortcut flips.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -191,6 +197,9 @@ pub struct DocView {
     probed: HashSet<String>,
     index: LayoutIndex,
     layout_dirty: bool,
+    /// The next model rebuild follows undo or redo: the layout cache stays, because the
+    /// incremental engine finds the changed blocks by comparing them with what it laid out.
+    after_history: bool,
     caret: DocPos,
     anchor: DocPos,
     /// The caret sits at the end of a wrapped line rather than the start of the next.
@@ -215,6 +224,8 @@ pub struct DocView {
     pending: RunPropsPatch,
     /// Paragraphs whose lines were painted last frame.
     painted: Vec<usize>,
+    /// Pages painted last frame (first, last), for the read-only regions of the tree.
+    visible_pages: (usize, usize),
     /// Decoded pictures by relationship id (`None`: undecodable), valid for one revision.
     pictures: HashMap<String, Option<Picture>>,
     pictures_rev: Option<u64>,
@@ -246,6 +257,7 @@ impl DocView {
             probed: HashSet::new(),
             index: LayoutIndex::default(),
             layout_dirty: true,
+            after_history: false,
             caret: DocPos::default(),
             anchor: DocPos::default(),
             upstream: false,
@@ -262,6 +274,7 @@ impl DocView {
             doc_id: Id::new("open365-doc-view"),
             pending: RunPropsPatch::default(),
             painted: Vec::new(),
+            visible_pages: (0, 0),
             pictures: HashMap::new(),
             pictures_rev: None,
             status: None,
@@ -385,10 +398,38 @@ impl DocView {
         }
     }
 
-    /// Throws away everything derived from the document (after open, undo or redo).
+    /// Throws away everything derived from the document (after open or a replaced document).
     pub fn reset(&mut self) {
         self.model_revision = None;
+        self.after_history = false;
         self.engine.invalidate();
+    }
+
+    /// Undoes the last change. The layout is updated incrementally on the next frame: only the
+    /// blocks the undo changed are laid out again.
+    pub fn undo(&mut self, target: &mut Target) -> Result<Outcome, CommandError> {
+        let outcome = target.undo()?;
+        self.history_applied();
+        Ok(outcome)
+    }
+
+    /// Redoes the last undone change (see [`DocView::undo`]).
+    pub fn redo(&mut self, target: &mut Target) -> Result<Outcome, CommandError> {
+        let outcome = target.redo()?;
+        self.history_applied();
+        Ok(outcome)
+    }
+
+    fn history_applied(&mut self) {
+        self.model_revision = None;
+        self.after_history = true;
+        self.preedit = None;
+        self.pending = RunPropsPatch::default();
+    }
+
+    /// What the last layout update did (blocks laid out again, whether it was a full pass).
+    pub fn layout_stats(&self) -> open365_layout::UpdateStats {
+        self.engine.stats()
     }
 
     /// Uses the fonts installed on this machine before the bundled ones, so the layout on
@@ -457,9 +498,12 @@ impl DocView {
             return;
         };
         self.models = build_models(doc);
-        // The document changed in a way the edit helpers did not follow (undo, redo, a
-        // replaced document): nothing cached can be trusted.
-        self.engine.invalidate();
+        // The document changed in a way the edit helpers did not follow. After undo or redo
+        // the incremental layout still diffs against its cache; for anything else (a replaced
+        // document) nothing cached can be trusted.
+        if !std::mem::take(&mut self.after_history) {
+            self.engine.invalidate();
+        }
         self.caret = self.clamp(self.caret);
         self.anchor = self.clamp(self.anchor);
         self.layout_dirty = true;
@@ -501,13 +545,13 @@ impl DocView {
 
     /// Lays the document out again when an edit invalidated the layout.
     fn ensure_layout(&mut self, target: &Target) {
+        let started = Instant::now();
         if self.model_revision != Some(target.revision()) {
             self.rebuild_all(target);
         }
         if !self.layout_dirty {
             return;
         }
-        let started = Instant::now();
         if let Some(doc) = target.docx() {
             let options = LayoutOptions::default();
             self.engine.update(doc, &self.fonts.library, options);
@@ -1504,6 +1548,7 @@ impl DocView {
                     )
                 };
                 self.painted.clear();
+                self.visible_pages = (first, last.max(first));
                 if self.engine.layout().pages.is_empty() {
                     let origin = self.page_origin(canvas, 0);
                     let size = vec2(612.0, 792.0) * scale;
@@ -1586,7 +1631,9 @@ impl DocView {
     }
 
     /// Draws the pictures of `page` at their layout positions and publishes an image node for
-    /// each. Pictures that cannot be decoded are left blank (a grey frame).
+    /// each: the body's first, then those of the header, the footnotes and the footer (the
+    /// header and footer dimmed, as in Word's print layout). Pictures that cannot be decoded
+    /// are left blank (a grey frame).
     fn paint_pictures(
         &mut self,
         ui: &mut Ui,
@@ -1603,53 +1650,132 @@ impl DocView {
         }
         let origin = self.page_origin(canvas, page);
         let s = self.scale;
-        let images = self.engine.layout().pages[page].images.clone();
-        for (i, im) in images.iter().enumerate() {
-            let rect = Rect::from_min_size(
-                origin + vec2(im.x as f32, im.y as f32) * s,
-                vec2(im.width as f32, im.height as f32) * s,
-            );
-            if !rect.intersects(clip) {
-                continue;
-            }
-            if let Some(key) = &im.embed {
-                if !self.pictures.contains_key(key) {
-                    let tex = target
-                        .docx()
-                        .and_then(|d| d.image_part(key))
-                        .and_then(|p| decode_picture(p.bytes))
-                        .map(|img| {
-                            Picture(ui.ctx().load_texture(
-                                format!("pic-{key}"),
-                                img,
-                                Default::default(),
-                            ))
-                        });
-                    self.pictures.insert(key.clone(), tex);
+        let max_side = ui.ctx().input(|i| i.max_texture_side) as u32;
+        let p = &self.engine.layout().pages[page];
+        let groups = [
+            (p.images.clone(), 1.0f32),
+            (p.header_images.clone(), FURNITURE_DIM),
+            (p.note_images.clone(), 1.0),
+            (p.footer_images.clone(), FURNITURE_DIM),
+        ];
+        for (group, (images, dim)) in groups.iter().enumerate() {
+            let tint = Color32::WHITE.gamma_multiply(*dim);
+            for (i, im) in images.iter().enumerate() {
+                let rect = Rect::from_min_size(
+                    origin + vec2(im.x as f32, im.y as f32) * s,
+                    vec2(im.width as f32, im.height as f32) * s,
+                );
+                if !rect.intersects(clip) {
+                    continue;
                 }
-                if let Some(Some(tex)) = self.pictures.get(key) {
-                    painter.image(
-                        tex.0.id(),
-                        rect,
-                        Rect::from_min_max(Pos2::ZERO, Pos2::new(1.0, 1.0)),
-                        Color32::WHITE,
-                    );
-                } else {
-                    painter.rect_stroke(
-                        rect,
-                        0.0,
-                        Stroke::new(1.0, Color32::from_gray(160)),
-                        egui::StrokeKind::Inside,
-                    );
+                if let Some(embed) = &im.embed {
+                    let key = parts::cache_key(&im.source, embed);
+                    if !self.pictures.contains_key(&key) {
+                        let tex = target
+                            .docx()
+                            .and_then(|d| parts::image_bytes(d, &im.source, embed))
+                            .and_then(|bytes| decode_picture(bytes, max_side))
+                            .map(|img| {
+                                Picture(ui.ctx().load_texture(
+                                    format!("pic-{key}"),
+                                    img,
+                                    Default::default(),
+                                ))
+                            });
+                        self.pictures.insert(key.clone(), tex);
+                    }
+                    if let Some(Some(tex)) = self.pictures.get(&key) {
+                        painter.image(
+                            tex.0.id(),
+                            rect,
+                            Rect::from_min_max(Pos2::ZERO, Pos2::new(1.0, 1.0)),
+                            tint,
+                        );
+                    } else {
+                        painter.rect_stroke(
+                            rect,
+                            0.0,
+                            Stroke::new(1.0, Color32::from_gray(160)),
+                            egui::StrokeKind::Inside,
+                        );
+                    }
+                }
+                a11y::publish_image(
+                    ui,
+                    self.doc_id,
+                    group * IMAGE_GROUP_STRIDE + page * 4096 + i,
+                    rect,
+                    im.description.as_deref(),
+                );
+            }
+        }
+    }
+
+    /// Draws the lines of a page's header, footnote area and footer. Header and footer are
+    /// dimmed, as Word does in print layout, because they are not edited here; the footnotes
+    /// are drawn in full.
+    fn paint_furniture_text(
+        &mut self,
+        ctx: &Context,
+        painter: &egui::Painter,
+        origin: Pos2,
+        page: usize,
+        clip: Rect,
+    ) {
+        let s = self.scale;
+        let ppp = ctx.pixels_per_point();
+        let p = &self.engine.layout().pages[page];
+        let fonts = &self.fonts;
+        let atlas = &mut self.atlas;
+        let mut batch = GlyphBatch::default();
+        let mut decorations: Vec<(Pos2, Pos2, Color32, f32)> = Vec::new();
+        for (lines, dim) in [
+            (&p.header, FURNITURE_DIM),
+            (&p.notes, 1.0),
+            (&p.footer, FURNITURE_DIM),
+        ] {
+            for line in lines {
+                let top = origin.y + line.top as f32 * s;
+                if top > clip.max.y || top + line.height as f32 * s < clip.min.y {
+                    continue;
+                }
+                let base_y = origin.y + line.baseline as f32 * s;
+                for run in &line.runs {
+                    let (Some(first_g), Some(last_g)) = (run.glyphs.first(), run.glyphs.last())
+                    else {
+                        continue;
+                    };
+                    let px = run.size as f32 * s * ppp;
+                    let color = run
+                        .color
+                        .map_or(Color32::BLACK, |[r, g, b]| Color32::from_rgb(r, g, b))
+                        .gamma_multiply(dim);
+                    for g in &run.glyphs {
+                        let at =
+                            Pos2::new(origin.x + g.x as f32 * s, base_y - g.y_offset as f32 * s);
+                        atlas.push(
+                            ctx, fonts, &mut batch, g.face, g.glyph_id, px, at, ppp, color,
+                        );
+                    }
+                    let x0 = origin.x + first_g.x as f32 * s;
+                    let x1 = origin.x + (last_g.x + last_g.advance) as f32 * s;
+                    let thickness = (run.size as f32 * 0.06 * s).max(1.0 / ppp);
+                    if run.underline {
+                        let y = base_y + run.size as f32 * 0.12 * s;
+                        decorations.push((Pos2::new(x0, y), Pos2::new(x1, y), color, thickness));
+                    }
+                    if run.strike {
+                        let y = base_y - run.size as f32 * 0.28 * s;
+                        decorations.push((Pos2::new(x0, y), Pos2::new(x1, y), color, thickness));
+                    }
                 }
             }
-            a11y::publish_image(
-                ui,
-                self.doc_id,
-                page * 4096 + i,
-                rect,
-                im.description.as_deref(),
-            );
+        }
+        for mesh in batch.into_meshes() {
+            painter.add(Shape::mesh(mesh));
+        }
+        for (a, b, color, width) in decorations {
+            painter.line_segment([a, b], Stroke::new(width, color));
         }
     }
 
@@ -1903,6 +2029,7 @@ impl DocView {
             painter.line_segment([a, b], Stroke::new(width, color));
         }
         self.painted.extend(painted);
+        self.paint_furniture_text(ctx, painter, origin, page, clip);
     }
 
     fn handle_pointer(&mut self, ctx: &Context, response: &egui::Response, canvas: Rect) {
@@ -2145,6 +2272,7 @@ impl DocView {
             ));
         }
         self.runs = entries;
+        self.publish_furniture_regions(&mut run_ui, canvas);
 
         let selection = (!self.models.is_empty()).then(|| accesskit::TextSelection {
             anchor: self.access_position(self.anchor),
@@ -2164,10 +2292,68 @@ impl DocView {
         });
     }
 
+    /// Header, footnote and footer lines of the visible pages as read-only regions.
+    fn publish_furniture_regions(&self, ui: &mut Ui, canvas: Rect) {
+        let layout = self.engine.layout();
+        let (first, last) = self.visible_pages;
+        let s = f64::from(self.scale);
+        for page in first..=last {
+            let Some(p) = layout.pages.get(page) else {
+                continue;
+            };
+            let origin = self.page_origin(canvas, page);
+            let line_data = |lines: &[Line]| -> Vec<(Rect, String)> {
+                lines
+                    .iter()
+                    .filter_map(|l| {
+                        let text = line_text(l);
+                        if text.trim().is_empty() {
+                            return None;
+                        }
+                        let x1 = l
+                            .runs
+                            .iter()
+                            .flat_map(|r| &r.glyphs)
+                            .fold(l.left, |m, g| m.max(g.x + g.advance));
+                        let min = Pos2::new(
+                            origin.x + (l.left * s) as f32,
+                            origin.y + (l.top * s) as f32,
+                        );
+                        let max = Pos2::new(
+                            origin.x + (x1 * s) as f32,
+                            origin.y + ((l.top + l.height) * s) as f32,
+                        );
+                        Some((Rect::from_min_max(min, max), text))
+                    })
+                    .collect()
+            };
+            for (lines, tag, role, label) in [
+                (&p.header, "header", accesskit::Role::Header, "Page header"),
+                (&p.notes, "notes", accesskit::Role::Group, "Footnotes"),
+                (&p.footer, "footer", accesskit::Role::Footer, "Page footer"),
+            ] {
+                let data = line_data(lines);
+                if !data.is_empty() {
+                    a11y::publish_region(ui, self.doc_id, (page, tag), role, label, &data);
+                }
+            }
+        }
+    }
+
     /// Text of a paragraph as laid out (for tests and the status bar).
     pub fn paragraph_text(&self, para: usize) -> Option<&str> {
         self.models.get(para).map(|m| m.text.as_str())
     }
+}
+
+/// The text a laid-out line shows, from its glyph clusters (list label included).
+fn line_text(line: &Line) -> String {
+    line.runs
+        .iter()
+        .flat_map(|r| &r.glyphs)
+        .map(|g| line.cluster_text(g))
+        .collect::<String>()
+        .replace(['\u{2003}', '\r', '\n'], " ")
 }
 
 /// A list label for a screen reader: bullets are private-use symbol characters, spoken as a
@@ -2199,9 +2385,9 @@ const MAX_PICTURE_SIDE: u32 = 8192;
 const MAX_PICTURE_BYTES: u64 = 256 * 1024 * 1024;
 const MAX_PICTURE_INPUT: usize = 64 * 1024 * 1024;
 
-/// Decodes a PNG, JPEG, GIF or BMP picture from untrusted bytes. Oversized or malformed input
-/// gives `None`; nothing here panics.
-fn decode_picture(bytes: &[u8]) -> Option<egui::ColorImage> {
+/// Decodes a PNG, JPEG, GIF or BMP picture from untrusted bytes, scaled down to fit a GPU
+/// texture of `max_side` pixels. Oversized or malformed input gives `None`; nothing here panics.
+fn decode_picture(bytes: &[u8], max_side: u32) -> Option<egui::ColorImage> {
     if bytes.len() > MAX_PICTURE_INPUT {
         return None;
     }
@@ -2213,7 +2399,14 @@ fn decode_picture(bytes: &[u8]) -> Option<egui::ColorImage> {
     limits.max_image_height = Some(MAX_PICTURE_SIDE);
     limits.max_alloc = Some(MAX_PICTURE_BYTES);
     reader.limits(limits);
-    let rgba = reader.decode().ok()?.to_rgba8();
+    let mut rgba = reader.decode().ok()?.to_rgba8();
+    let longest = rgba.width().max(rgba.height());
+    if max_side > 0 && longest > max_side {
+        let k = f64::from(max_side) / f64::from(longest);
+        let w = ((f64::from(rgba.width()) * k) as u32).max(1);
+        let h = ((f64::from(rgba.height()) * k) as u32).max(1);
+        rgba = image::imageops::resize(&rgba, w, h, image::imageops::FilterType::Triangle);
+    }
     let size = [rgba.width() as usize, rgba.height() as usize];
     Some(egui::ColorImage::from_rgba_unmultiplied(
         size,
