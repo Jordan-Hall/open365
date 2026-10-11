@@ -1,0 +1,300 @@
+# Ratchet for crates/layout/tests/ms_template_parity.rs: lines, cells and pictures that must
+# match Word on the Microsoft template corpus (system fonts). Counts only, keyed by template
+# id; no template content. Raise `matched` when the engine improves
+# (UPDATE_PARITY_FLOOR=1 cargo test -p open365-layout --test ms_template_parity); never lower it.
+
+[027ecc7a-145a-4eeb-82f0-ff551202963e]
+matched = 0
+total = 45
+
+[04bbacdc-34ff-4b89-ab9e-e5503f74b32a]
+matched = 9
+total = 32
+
+[0a90ca9d-f486-4165-81d8-f92784cb975b]
+matched = 3
+total = 173
+
+[0c8d491f-4710-463f-b965-b49a9c0730af]
+matched = 6
+total = 35
+
+[114ed224-91a8-4b7e-bcf3-2248d12bffd7]
+matched = 11
+total = 49
+
+[15d030a7-4d0a-4c1c-8a3e-3a7590a124ce]
+matched = 3
+total = 61
+
+[164be44f-892e-4713-b71c-e27c99934606]
+matched = 37
+total = 38
+
+[1907b7c8-c14a-492f-a2d5-9dbf1d4f4b0d]
+matched = 33
+total = 33
+
+[1b4c752f-b419-4ae7-850a-9bb757ac1b75]
+matched = 19
+total = 19
+
+[1dd4b3a8-9564-4143-813b-da0628316a8c]
+matched = 16
+total = 105
+
+[2228e0d1-b139-4b3c-89ef-4892b23b5e90]
+matched = 0
+total = 72
+
+[25409d45-e3c3-4656-a565-7e955c695cb9]
+matched = 8
+total = 26
+
+[2d87354f-fa0f-46c8-88b6-0514450b980a]
+matched = 1
+total = 94
+
+[2f858f7d-3675-4a8c-9728-c9fcd31d5649]
+matched = 3
+total = 81
+
+[2f890747-6bef-4925-841c-82b764415856]
+matched = 10
+total = 43
+
+[33449d14-b590-4c13-929a-4931b797f8f9]
+matched = 1
+total = 81
+
+[36057f4e-b8b5-4325-ac49-21023c33eebb]
+matched = 6
+total = 29
+
+[371fe1a1-54c3-477c-9fb2-1b14c284b079]
+matched = 4
+total = 127
+
+[3b40ec86-59ea-4e4d-83b2-c01ee5745df1]
+matched = 1
+total = 428
+
+[463abd5c-3d84-43d5-baac-0a41cfac14d3]
+matched = 14
+total = 130
+
+[494a603b-70b3-42f9-bc91-413bfdf33826]
+matched = 7
+total = 36
+
+[4b9c352f-5be1-44f5-8ead-264f4585d82f]
+matched = 11
+total = 111
+
+[4c5d5d40-32a7-4440-9337-c639980b08c4]
+matched = 1
+total = 120
+
+[4e493df5-736e-4f05-aa5a-ca93783f12a1]
+matched = 29
+total = 287
+
+[4ebce9eb-5745-45e1-aef0-518b656b7284]
+matched = 6
+total = 26
+
+[4f837650-9a96-434c-839f-bb412db5f497]
+matched = 1
+total = 45
+
+[54d00e5f-3f41-4a6c-b540-5763773e940e]
+matched = 6
+total = 108
+
+[5559888d-e34b-4ae1-9505-bfe741291f71]
+matched = 8
+total = 40
+
+[57cae682-222c-4646-9a80-c404ee5c5d7e]
+matched = 33
+total = 33
+
+[591e685e-fff1-400f-9fdf-92cb88141bbd]
+matched = 42
+total = 43
+
+[59ab7c0a-01b4-4a8b-8704-1629ef74476b]
+matched = 36
+total = 42
+
+[5c624cb4-bcf0-433e-8d06-329ca778a50b]
+matched = 1
+total = 44
+
+[5ff67a28-3747-45d8-ab40-465bf569783b]
+matched = 10
+total = 192
+
+[6158e9a0-e929-469e-b015-c5d218807bf2]
+matched = 3
+total = 66
+
+[65cf689e-03c5-47f2-80bf-a489d7b9d54e]
+matched = 12
+total = 502
+
+[67792a9e-d689-4239-a9e8-5e0519041839]
+matched = 1
+total = 59
+
+[677f5c66-2320-431a-b04f-e13165d80e78]
+matched = 1
+total = 43
+
+[741ee369-f6fc-40a7-8969-ddaee72c0442]
+matched = 16
+total = 232
+
+[7c0a9cf6-906b-4a30-9ddc-41f41c2202ad]
+matched = 3
+total = 59
+
+[7e53ee0d-dd7d-4335-8cfd-efae5a747b05]
+matched = 9
+total = 43
+
+[7fc3ccc4-5d2f-4656-a0a3-eaf00540c4b4]
+matched = 48
+total = 546
+
+[8583a4ca-c9b8-4b4a-9a8f-97117cc4ea58]
+matched = 1
+total = 118
+
+[86e768be-2d8d-49c5-ad69-eb7cdf4a973d]
+matched = 7
+total = 96
+
+[91c3b989-adc7-42c3-99c5-6d8c7f3a5c0a]
+matched = 9
+total = 56
+
+[938d0510-ae51-479a-98d3-6a9fe5ba8c9f]
+matched = 29
+total = 31
+
+[95a2391d-2fc7-44e3-ba55-d9c55fdee70b]
+matched = 1
+total = 102
+
+[9986a0d9-9022-4d2d-b6e2-32852f14bae5]
+matched = 5
+total = 35
+
+[9f1fce92-bc37-4819-9989-67b5593c3582]
+matched = 1
+total = 102
+
+[a2a7720e-9d4b-4ea1-8ace-6f8064829d23]
+matched = 8
+total = 50
+
+[a60c389b-9052-4d35-bcfe-b7918b8aad5e]
+matched = 11
+total = 71
+
+[a6f9b007-de86-4fbd-9192-3fe31c2873cc]
+matched = 6
+total = 53
+
+[aae2ed66-a0df-4222-b732-502ad80e9ed0]
+matched = 1
+total = 84
+
+[ad265748-351c-4e2e-939a-1ff919a1a2a0]
+matched = 1
+total = 519
+
+[ae0aba0c-0162-4fc9-9ae2-05bb68899b85]
+matched = 3
+total = 51
+
+[b0e9c2cf-5846-4100-b673-e7322a90f1e2]
+matched = 7
+total = 16
+
+[b30688e1-3cd6-47b6-b274-8c187e76b335]
+matched = 1
+total = 20
+
+[b5864d32-4451-4ff2-ab42-0f41296b2b4f]
+matched = 200
+total = 483
+
+[b72b748c-ce40-4de7-8c0b-f2ae9b669eeb]
+matched = 10
+total = 123
+
+[b97c34b7-bcc4-4366-92c6-8b5a08ba27cc]
+matched = 25
+total = 25
+
+[c0651bb6-b39b-4919-91c4-1b031ad4dc0c]
+matched = 1
+total = 35
+
+[c5871878-ab3d-4671-adf7-af65b58cf429]
+matched = 1
+total = 25
+
+[ca4e5536-5f4f-40f6-8c24-37e4a1f0d8f7]
+matched = 63
+total = 612
+
+[ce343500-4aff-4dfa-b337-57c78459c6ee]
+matched = 3
+total = 56
+
+[d14ca19d-7956-4aa7-942b-732252bc3090]
+matched = 6
+total = 29
+
+[d52c20af-1aa7-4957-b3e2-92a57bb4e8f7]
+matched = 2
+total = 138
+
+[e41daea3-53c8-4ab5-9e9c-c7837b7c95cd]
+matched = 1
+total = 52
+
+[e5418ab0-a274-4997-b880-24230d938372]
+matched = 1
+total = 39
+
+[e93a3c0c-ed4b-4c33-98b7-73b82ffa6397]
+matched = 33
+total = 33
+
+[eab22234-d811-47a9-aeb3-45a0291477c9]
+matched = 41
+total = 288
+
+[ee25c76b-4333-436f-852e-d7e17c6b0f01]
+matched = 7
+total = 70
+
+[ee8d0c24-0878-4e72-bbbc-172b9f8bd443]
+matched = 1
+total = 47
+
+[f5b49e76-2031-4fce-852f-1185a53ea762]
+matched = 19
+total = 78
+
+[f81d6387-e06d-4719-9d92-8189f7582b1f]
+matched = 1
+total = 40
+
+[fd5e4022-7fee-46b1-b7bd-65f6f26bdbd4]
+matched = 4
+total = 163

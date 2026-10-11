@@ -1,0 +1,5 @@
+feature = "layout-face-typo"
+made_with = "Microsoft Word 16.0.20430 (Windows)"
+author = "project member"
+expect_dropped = []
+notes = "line height of 24 and 10 pt text in Gabriola, which sets USE_TYPO_METRICS (typographic metrics, large line gap)"

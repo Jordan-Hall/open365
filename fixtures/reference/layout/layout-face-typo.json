@@ -1,0 +1,17 @@
+{
+  "source": "fixtures/docx/layout-face-typo.docx",
+  "oracle": "Microsoft Word 16.0 (16.0.20430), Print Layout, tools/office/word-layout-oracle.ps1",
+  "units": "points; page and top/left/baseline measured from the page top-left corner; start/end are UTF-16 offsets in the main story",
+  "precision": "top/left/lastX are screen-quantised (+-0.3 pt); baseline/inkLeft and cell rectangles come from the 600 dpi PDF and are exact",
+  "pageCount": 1,
+  "lines": [
+    {"page": 1, "start": 0, "end": 2, "top": 72.0, "left": 72.0, "lastX": 81.6, "baseline": 82.58, "inkLeft": 72.024, "text": "M\u000d"},
+    {"page": 1, "start": 2, "end": 7, "top": 85.2, "left": 72.0, "lastX": 107.4, "baseline": 118.58, "inkLeft": 72.024, "text": "abcd\u000d"},
+    {"page": 1, "start": 7, "end": 12, "top": 126.0, "left": 72.0, "lastX": 103.8, "baseline": 159.41, "inkLeft": 72.024, "text": "efgh\u000d"},
+    {"page": 1, "start": 12, "end": 14, "top": 166.8, "left": 72.0, "lastX": 81.6, "baseline": 177.65, "inkLeft": 72.024, "text": "M\u000d"},
+    {"page": 1, "start": 14, "end": 19, "top": 180.6, "left": 72.0, "lastX": 87.0, "baseline": 194.45, "inkLeft": 72.024, "text": "abcd\u000d"},
+    {"page": 1, "start": 19, "end": 24, "top": 197.4, "left": 72.0, "lastX": 85.2, "baseline": 211.51, "inkLeft": 72.024, "text": "efgh\u000d"},
+    {"page": 1, "start": 24, "end": 26, "top": 214.2, "left": 72.0, "lastX": 81.6, "baseline": 224.95, "inkLeft": 72.024, "text": "M\u000d"},
+    {"page": 1, "start": 26, "end": 27, "top": 228.0, "left": 72.0, "lastX": 72.0, "baseline": 238.39, "inkLeft": 72.024, "text": "\u000d"}
+  ]
+}

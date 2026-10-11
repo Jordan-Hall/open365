@@ -911,6 +911,38 @@ try {
     [void](Add-Float 6 $PNG_GREEN 100 60 0 0 -999998 2 0 @(0, 0, 0, 0) 3)
   }
 
+  # Faces whose OS/2 fsSelection sets USE_TYPO_METRICS and whose typographic metrics differ from the Windows ones (Gabriola;
+  # Cascadia Mono, Bahnschrift and Aptos too, but Word's PDF draws those as pictures, so only Gabriola can give baselines). System fonts only.
+  L-Fixture 'layout-face-typo' 'layout-face-typo' 'line height of 24 and 10 pt text in Gabriola, which sets USE_TYPO_METRICS (typographic metrics, large line gap)' {
+    Init-Doc 0
+    foreach ($f in 'Gabriola') {
+      foreach ($sz in 24, 10) {
+        Marker
+        $s = $script:word.Selection; [void]$s.EndKey(6); $s.Font.Name = $f; $s.Font.Size = $sz; $s.TypeText('abcd'); End-Para
+        $s = $script:word.Selection; [void]$s.EndKey(6); $s.Font.Name = $f; $s.Font.Size = $sz; $s.TypeText('efgh'); End-Para
+      }
+    }
+    Marker
+  }
+
+  # Multiple line spacing above one in faces whose font height is not the Windows one: Gabriola (typographic metrics), and Calibri,
+  # Cambria and Arial as controls, at 10 and 24 pt. System fonts only.
+  L-Fixture 'layout-face-multiple' 'layout-face-multiple' 'multiple line spacing 1.3 and 2.0 at 10 and 24 pt in Gabriola, Calibri, Cambria and Arial' {
+    Init-Doc 0
+    foreach ($f in 'Gabriola', 'Calibri', 'Cambria', 'Arial') {
+      foreach ($sz in 24, 10) {
+        foreach ($m in 1.3, 2.0) {
+          Marker
+          foreach ($t in 'abcd', 'efgh', 'ijkl') {
+            $s = $script:word.Selection; [void]$s.EndKey(6); $s.Font.Name = $f; $s.Font.Size = $sz; $s.TypeText($t)
+            $p = Last-Format; $p.LineSpacingRule = 5; $p.LineSpacing = 12 * $m; End-Para
+          }
+        }
+      }
+    }
+    Marker
+  }
+
   L-Fixture 'layout-img-none' 'layout-img-none' 'floating pictures in front of and behind text: no displacement' {
     Init-Doc 6
     L-Para $LONG1; L-Para $LONG2; L-Para $LONG1

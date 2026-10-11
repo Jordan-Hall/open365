@@ -216,6 +216,14 @@ total = 3
 matched = 22
 total = 22
 
+[system.layout-face-multiple]
+matched = 61
+total = 66
+
+[system.layout-face-typo]
+matched = 8
+total = 8
+
 [system.layout-fn-basic]
 matched = 97
 total = 101

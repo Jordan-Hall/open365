@@ -18,6 +18,10 @@ impl LineMetricModel {
     pub fn ascent_descent(self, m: &FaceMetrics, size: f64) -> (f64, f64) {
         let upem = f64::from(m.units_per_em);
         let (a, d) = match self {
+            // Faces that set USE_TYPO_METRICS (fsSelection bit 7: Aptos, Cascadia, Bahnschrift,
+            // Gabriola) get their line from the typographic metrics, the line gap above the
+            // ascent. Measured with layout-face-typo (24 pt line pitch 29.3, 27.9, 28.8, 40.8 pt).
+            Self::Win if m.use_typo_metrics => (m.typo_ascent + m.typo_line_gap, m.typo_descent),
             Self::Win => {
                 // GDI's external leading: the part of the hhea line gap that the Windows
                 // metrics do not already cover goes above the line (Arial and Times New

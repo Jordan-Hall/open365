@@ -113,13 +113,24 @@ fn best_system_face(
                 .next()
                 .unwrap_or_default()
                 .to_lowercase();
+            // "AptosDisplay" and "AptosDisplay-Bold" are the regular and bold faces of the
+            // family "Aptos Display", which fontdb files under "Aptos" (the typographic family).
+            let style_suffix = f
+                .post_script_name
+                .split_once('-')
+                .map_or("", |(_, s)| s)
+                .to_lowercase();
+            let plain_style = matches!(
+                style_suffix.as_str(),
+                "" | "regular" | "bold" | "italic" | "bolditalic" | "oblique" | "boldoblique"
+            );
             let by_ps = f
                 .post_script_name
                 .replace('-', "")
                 .to_lowercase()
                 .starts_with(&want_compact)
-                && base != want_compact
-                && want_compact.len() > base.len();
+                && ((base != want_compact && want_compact.len() > base.len())
+                    || (base == want_compact && plain_style));
             // A bold slot takes only bold faces, a regular slot only regular ones.
             if !(by_name || by_ps) || bold != (f.weight.0 >= 600) {
                 return None;

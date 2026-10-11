@@ -18,6 +18,8 @@ Units are points. Baselines come from Word's 600 dpi PDF and sit on a 0.24 pt gr
 | "At least" puts the extra above the baseline and ignores the picture's run font (the picture height still counts). | `layout-img-spacing` |
 | "Exactly" puts the baseline at 80 % of the line height, whatever the font, size or picture. | `layout-img-spacing`, probes in 5 faces and 3 sizes |
 | A paragraph mark sizes its line only when nothing else is on it. | `layout-marks` |
+| A face whose `OS/2` `fsSelection` bit 7 (USE_TYPO_METRICS) is set takes its line from the typographic metrics: ascent `sTypoAscender + sTypoLineGap` (gap above), descent `-sTypoDescender`. Gabriola 24 pt gives 33.2 above and 7.6 below the baseline; Aptos, Cascadia Mono and Bahnschrift pitches agree (Word's PDF draws those three as pictures, so only screen tops and picture rectangles exist for them). | `layout-face-typo`, `layout-face-multiple`, Aptos templates in the corpus |
+| Multiple spacing 1.3 and 2.0 at 10 and 24 pt in Gabriola, Calibri, Cambria and Arial follows the rule above. | `layout-face-multiple` (61 of 66 lines) |
 
 ## Tables (`table.rs`, `flow.rs`)
 
@@ -41,3 +43,21 @@ Inline and floating placements match `layout-img-inline`, `layout-img-none`, `la
 - The zero-height line of the empty paragraph after a nested table (`layout-table-flow`, 1 line).
 - Contextual spacing (`layout-indents-spacing`, 7 lines) and the Caladea/Cambria vertical metric difference in bundled mode.
 - The cell tolerance in `word_parity.rs` (0.05 pt) remains: the PDF scale constants leave about 0.02 pt of rounding.
+
+## Microsoft template corpus (`crates/layout/tests/ms_template_parity.rs`)
+
+Local references for the 74 public .dotx templates (gitignored; see `docs/testing/ms-template-corpus.md`) are scored in
+system-font mode; counts live in `fixtures/reference/ms-templates-layout-floor.toml`. Lines, cells and pictures matched:
+799 of 8118 (4 templates at 100 %) before, 979 of 8118 (5 at 100 %) after the USE_TYPO_METRICS rule and the PostScript-name
+family match for "Aptos Display". Largest causes still open, by lines affected:
+
+- Paragraph borders (`w:pBdr`, about 30 templates): the border width plus `w:space` is added above or below the paragraph
+  (a Heading 1 with a top border, space 11, sits 11.33 pt lower in Word). `open365-docx` does not resolve `pBdr`.
+- `w:caps` and `w:smallCaps` (most templates): the layout measures lower-case glyphs, so widths and line breaks differ.
+  `RunLayoutProps` has no caps flag.
+- Text boxes, drawing groups, floating shapes and content-control placeholders (`wps`, `wpg`, `txbxContent`, `sdt`): their
+  text is not in the main-story line list the way Word reports it; most of the worst templates are flyers and brochures.
+- Columns, frames (`framePr`), floating tables (`tblpPr`) and page borders.
+- The last line of a page when multiple spacing adds space below the baseline: Word keeps the line when the text part fits
+  (`layout-face-multiple`, Arial 10 pt, multiple 2.0, 5 lines); the engine moves it to the next page.
+- The `tblCellMar` padding and contextual spacing residue listed above is unchanged.

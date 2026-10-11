@@ -1,0 +1,5 @@
+feature = "layout-face-multiple"
+made_with = "Microsoft Word 16.0.20430 (Windows)"
+author = "project member"
+expect_dropped = []
+notes = "multiple line spacing 1.3 and 2.0 at 10 and 24 pt in Gabriola, Calibri, Cambria and Arial"
