@@ -1,0 +1,1912 @@
+{
+  "schema": 1,
+  "note": "Counts and sha256 of local Office-oracle reference outputs for the Microsoft template corpus. No template content.",
+  "entries": 136,
+  "complete": 136,
+  "items": [
+    {
+      "id": "027ecc7a-145a-4eeb-82f0-ff551202963e",
+      "kind": "docx",
+      "category": "planners",
+      "templateSha256": "80ea1bcaed11d1258f62411708cca8a59a84c18317174fecb649462140f3aa67",
+      "pageCount": 1,
+      "layoutLines": 37,
+      "layoutCells": 6,
+      "complete": true,
+      "outputSha256": {
+        "pages.json": "2cb176282efc1ae7dcf2e22eccc6b00607eb71d5871cbd678095c23f203a070f",
+        "layout.json": "41e48328395656041c2116fc84ad81e1bd8c02fb8ab5f97693608b7cc27fb2cb"
+      }
+    },
+    {
+      "id": "02f1e98d-bd90-4353-a769-f6709a432f3c",
+      "kind": "xlsx",
+      "category": "invoices",
+      "templateSha256": "e99df8c93e226f94eb9ff4f2a7ea1af88bba37ffa59089d9016af7a9056ad764",
+      "sheets": 1,
+      "cells": 50,
+      "formulaCells": 9,
+      "truncatedSheets": 0,
+      "complete": true,
+      "outputSha256": {
+        "values.json": "e116c77dfd0a93e8fe868b21610280c32e80b3f3418cac88fdaec4213b3e2c7c"
+      }
+    },
+    {
+      "id": "04bbacdc-34ff-4b89-ab9e-e5503f74b32a",
+      "kind": "docx",
+      "category": "letters",
+      "templateSha256": "f09121bddecae099805f6e0c3da91edb08ca5bb82c846b42b85341c36cbf2ac4",
+      "pageCount": 1,
+      "layoutLines": 31,
+      "layoutCells": 1,
+      "complete": true,
+      "outputSha256": {
+        "pages.json": "97a17a7338d72b3190df7c6f317099be5a35a391576a695598f32ea98d37e983",
+        "layout.json": "3751737c5bb22d12a11bb1226b3a23d16683ade85e05292b5e3bd9be33e66121"
+      }
+    },
+    {
+      "id": "098a0353-643d-4b2e-9eac-ea919d7f3361",
+      "kind": "xlsx",
+      "category": "charts",
+      "templateSha256": "cb7476ea0e9f88573675a465599388586ff549b0b2816c3cc5ca0cc223017050",
+      "sheets": 1,
+      "cells": 168,
+      "formulaCells": 57,
+      "truncatedSheets": 0,
+      "complete": true,
+      "outputSha256": {
+        "values.json": "448a4cedec49f8541daf63daa2a466d8760ccf92406c4c325fd0842d82c51742"
+      }
+    },
+    {
+      "id": "09eef93c-0551-4864-9f87-312b1e0b1eb2",
+      "kind": "xlsx",
+      "category": "charts",
+      "templateSha256": "88570318286c81a015fc73d25c9db6816c2e3adbcf06fc8f3c1e8b413297fc41",
+      "sheets": 1,
+      "cells": 51,
+      "formulaCells": 24,
+      "truncatedSheets": 0,
+      "complete": true,
+      "outputSha256": {
+        "values.json": "177f0714aa46a6a369adb0cb965cbdf4a109f35669fbebefaefddeca6c20281e"
+      }
+    },
+    {
+      "id": "0a90ca9d-f486-4165-81d8-f92784cb975b",
+      "kind": "docx",
+      "category": "newsletters",
+      "templateSha256": "99f0e6fc3d457f4c6e8a32b0478bf827ba3b5d8e086af0ab97ad422d8a7d3995",
+      "pageCount": 4,
+      "layoutLines": 132,
+      "layoutCells": 28,
+      "complete": true,
+      "outputSha256": {
+        "pages.json": "382c2013a188d9287cef41a69d17dbec32293afa8ef7ce25290e4d84ef5ad233",
+        "layout.json": "ee2589e7ec85b951daf6086bc2c5e9db29dd5a2038a8040290ea095c8ca61d68"
+      }
+    },
+    {
+      "id": "0c8d491f-4710-463f-b965-b49a9c0730af",
+      "kind": "docx",
+      "category": "reports",
+      "templateSha256": "e1d47d63c8a0fc8feabbda3a1037fa85c485529e96e2f4c7daf2b21d8d512af2",
+      "pageCount": 1,
+      "layoutLines": 30,
+      "layoutCells": 5,
+      "complete": true,
+      "outputSha256": {
+        "pages.json": "b6a8845e05f2a1615ffdc7667f769b61698f7896b3dd24c8d3b5889de850723b",
+        "layout.json": "856ececbd4b048ea9a4d546b3ad832c941f89eaddde627492fbb55445ca48db9"
+      }
+    },
+    {
+      "id": "0ffdef6d-9a19-4593-bdde-924d9e0aba2d",
+      "kind": "xlsx",
+      "category": "trackers",
+      "templateSha256": "f6a0b2619e7fe8f8cbee29166f08652f56f8393cd8f89976960272380e8ff655",
+      "sheets": 2,
+      "cells": 2413,
+      "formulaCells": 2322,
+      "truncatedSheets": 1,
+      "complete": true,
+      "outputSha256": {
+        "values.json": "d4939ce0071672094a58e92daf0488488a623579e06903155fd72aa05fef0bf4"
+      }
+    },
+    {
+      "id": "114ed224-91a8-4b7e-bcf3-2248d12bffd7",
+      "kind": "docx",
+      "category": "reports",
+      "templateSha256": "db4918bfe60e9d88fbe4e342de20ca3dabd2c719dd224d5dc84af2e8557a43c2",
+      "pageCount": 1,
+      "layoutLines": 33,
+      "layoutCells": 15,
+      "complete": true,
+      "outputSha256": {
+        "pages.json": "6e9b88fc6e1286b282a348b48699ff3fb5247c6f2dfa0eb80cf6d64b1e312bad",
+        "layout.json": "d436022ccb1b3fe30c7647d9d8f3cc51d7ee10c654c0d60af2649b6163cb3cbb"
+      }
+    },
+    {
+      "id": "142337c5-35f0-4e42-ab85-0643840d738c",
+      "kind": "xlsx",
+      "category": "budgets",
+      "templateSha256": "d13be03b89b75ff8fe08ec6424cabc282227c4598b1c26fc6ab2262cb26d7de2",
+      "sheets": 2,
+      "cells": 120,
+      "formulaCells": 33,
+      "truncatedSheets": 0,
+      "complete": true,
+      "outputSha256": {
+        "values.json": "0b682e2acf3edd463e252d58903f858793e5ce18e6567dcdeb4ca7d39c440e1e"
+      }
+    },
+    {
+      "id": "14a0058b-54c0-4793-b5e1-7d438e7bf2c2",
+      "kind": "xlsx",
+      "category": "calendars",
+      "templateSha256": "8677d7a90b106a6ed22bfdb0858f545e091385ef33d4e5362a7650c9ea9e06c0",
+      "sheets": 1,
+      "cells": 603,
+      "formulaCells": 601,
+      "truncatedSheets": 0,
+      "complete": true,
+      "outputSha256": {
+        "values.json": "973ec5c84443af80b3912d9521fb2c3ebbbc336ef06093ddd404512a50fd13d1"
+      }
+    },
+    {
+      "id": "15d030a7-4d0a-4c1c-8a3e-3a7590a124ce",
+      "kind": "docx",
+      "category": "reports",
+      "templateSha256": "114aaf6641c1121bae8a7d9810a526468d332c42fcba1158f9794e54393d3acb",
+      "pageCount": 2,
+      "layoutLines": 60,
+      "layoutCells": 1,
+      "complete": true,
+      "outputSha256": {
+        "pages.json": "edc786d6c966ccbd93041f46c9e744529d26ba4895de73a60e011f88e009b400",
+        "layout.json": "a1dd834969068ccfb5e4292e2c21218228df33ef5975d2377721362f02382649"
+      }
+    },
+    {
+      "id": "164be44f-892e-4713-b71c-e27c99934606",
+      "kind": "docx",
+      "category": "letters",
+      "templateSha256": "a69d1e6ba3325c46c9040d98e45fa650900fba938977c9d160e61f5b6cbb51bc",
+      "pageCount": 1,
+      "layoutLines": 37,
+      "layoutCells": 1,
+      "complete": true,
+      "outputSha256": {
+        "pages.json": "815ec53ec73d7e26b99df867f8385b9fb81cd3c0b0741c52bf9d0bb3e52c5c74",
+        "layout.json": "1f8b2a5277e9fe7b448656b509c4a21424dd8fb3a3f4a9a397621cdb22fcbb47"
+      }
+    },
+    {
+      "id": "1907b7c8-c14a-492f-a2d5-9dbf1d4f4b0d",
+      "kind": "docx",
+      "category": "letters",
+      "templateSha256": "9e1e9c3fa07af9ef27e2aa867d013d1b4d42b843706f8b21152d9f91a70fe548",
+      "pageCount": 1,
+      "layoutLines": 32,
+      "layoutCells": 1,
+      "complete": true,
+      "outputSha256": {
+        "pages.json": "8633d232fd872cdc635bcdec3e3864a2298500b2163977b564b22221c395ae45",
+        "layout.json": "9e05d3aa42d83a3f42236157b1103f9064e92d001378e6041a30e221004858f1"
+      }
+    },
+    {
+      "id": "1b4c752f-b419-4ae7-850a-9bb757ac1b75",
+      "kind": "docx",
+      "category": "reports",
+      "templateSha256": "0eb9b638b22b339c1c0580075626f099888e1aa81972175f2cebd04afa604572",
+      "pageCount": 1,
+      "layoutLines": 17,
+      "layoutCells": 2,
+      "complete": true,
+      "outputSha256": {
+        "pages.json": "7a6aba4fa6914bee087fd84dc727a097a049ad3bd57135b40ba878a3315c2cbd",
+        "layout.json": "b0566b5e3942a4dac5072c7921bd37f2275e5b50c6dd56c399d4cfb0c561eff0"
+      }
+    },
+    {
+      "id": "1c4bd473-9f92-4725-926d-3f198b6152b4",
+      "kind": "xlsx",
+      "category": "charts",
+      "templateSha256": "aec5701315c1cc447ac46eb6a6f31183785b9a80c3715812c239c813b8e46981",
+      "sheets": 2,
+      "cells": 158,
+      "formulaCells": 80,
+      "truncatedSheets": 0,
+      "complete": true,
+      "outputSha256": {
+        "values.json": "5e66fd06e12b9c872d77b6ba1fad29079f5cd81e8c288e2e2681251d0b348148"
+      }
+    },
+    {
+      "id": "1cbd5c5c-4e0d-41ba-981f-5d9dc99ffbf6",
+      "kind": "xlsx",
+      "category": "budgets",
+      "templateSha256": "3084c059181495c5f3698d832282ba0e76eaeeeadc583e9af3ffec14bdabdf77",
+      "sheets": 3,
+      "cells": 629,
+      "formulaCells": 283,
+      "truncatedSheets": 0,
+      "complete": true,
+      "outputSha256": {
+        "values.json": "a406f765b7f3040adaa569433118c78d7e640d997d9cf3c289b68ed68e9239e6"
+      }
+    },
+    {
+      "id": "1dd4b3a8-9564-4143-813b-da0628316a8c",
+      "kind": "docx",
+      "category": "letters",
+      "templateSha256": "5748ad0aed5fa9924e10941954543428fc5f5d2dfa73fb8e36dd2961fa945889",
+      "pageCount": 3,
+      "layoutLines": 84,
+      "layoutCells": 21,
+      "complete": true,
+      "outputSha256": {
+        "pages.json": "438cdb25650d7286cb3e476551368010f27227baf0f0a57195bf3c113fc25114",
+        "layout.json": "158f5947e1d3d81dd9f79b981e429383936e435e6a99f732c93ee1dd13603eda"
+      }
+    },
+    {
+      "id": "1ed52567-f187-484c-8bad-0ff5eb2f1e22",
+      "kind": "xlsx",
+      "category": "charts",
+      "templateSha256": "cb9eb69038b4d3cecb475ca11987d3c86fd2661df37e513788315cdc4e5d4786",
+      "sheets": 1,
+      "cells": 82,
+      "formulaCells": 38,
+      "truncatedSheets": 0,
+      "complete": true,
+      "outputSha256": {
+        "values.json": "7f66b50cb0865b30d9efe9f6414a071d30c8ab646a521b1355c8cdde70af60e9"
+      }
+    },
+    {
+      "id": "220529be-9f6e-483a-88f5-703eff93a9e7",
+      "kind": "xlsx",
+      "category": "calendars",
+      "templateSha256": "4d4219d64c485718ae2b4e0f4fb7e98dacb2b723527982ed6d985152511b351f",
+      "sheets": 1,
+      "cells": 470,
+      "formulaCells": 463,
+      "truncatedSheets": 0,
+      "complete": true,
+      "outputSha256": {
+        "values.json": "b513347e34475af6622b356155e1fb0917f087f020fc22aa97f934ec65f4a652"
+      }
+    },
+    {
+      "id": "2228e0d1-b139-4b3c-89ef-4892b23b5e90",
+      "kind": "docx",
+      "category": "schedules",
+      "templateSha256": "7702444568f11489d7a06265df7ce4151c7914c028a1b75a38aa33c1435e09a9",
+      "pageCount": 2,
+      "layoutLines": 68,
+      "layoutCells": 1,
+      "complete": true,
+      "outputSha256": {
+        "pages.json": "477d0c339c0a95b8273ba81cc3df3665a8ea4caa80491cdaa342e2ef4c0f9e46",
+        "layout.json": "25164ec72507c4e767760f4a3c77690868c25f175de3ededf3aaca97514f61f3"
+      }
+    },
+    {
+      "id": "25409d45-e3c3-4656-a565-7e955c695cb9",
+      "kind": "docx",
+      "category": "schedules",
+      "templateSha256": "546e8a40275aff4a8bd2b980248f96a1a112b2af2f421d5d2174060501fa40d6",
+      "pageCount": 1,
+      "layoutLines": 19,
+      "layoutCells": 7,
+      "complete": true,
+      "outputSha256": {
+        "pages.json": "fca6f6065968dab073f059a15fd3ef01f839593b71b1a73439b55fb7a024abad",
+        "layout.json": "ce017ca5a4288bfe10c6251169a2bb22067d5ab536ebe6911ceabf70b4a48afa"
+      }
+    },
+    {
+      "id": "2a72be1c-7be5-413d-b345-417c06878d3a",
+      "kind": "xlsx",
+      "category": "trackers",
+      "templateSha256": "c3c7f7ce797528ec8a5c2da648df44f23c73d7550822265aa0737cd481544240",
+      "sheets": 3,
+      "cells": 213,
+      "formulaCells": 169,
+      "truncatedSheets": 0,
+      "complete": true,
+      "outputSha256": {
+        "values.json": "f85bba033c54095528dceea6d1e980f3c2a0b3f83aef843978218ad3ddf7deb7"
+      }
+    },
+    {
+      "id": "2d87354f-fa0f-46c8-88b6-0514450b980a",
+      "kind": "docx",
+      "category": "planners",
+      "templateSha256": "e6ca0beb08f064ff64b3f9f0f9b1d2e051e15759a182c2ea3ec21fde9d5b5145",
+      "pageCount": 2,
+      "layoutLines": 48,
+      "layoutCells": 38,
+      "complete": true,
+      "outputSha256": {
+        "pages.json": "49a875a02c72f8b7f8d654f7c501a057e55449c77754b4752b1a7015b1662d90",
+        "layout.json": "8c103a708df8faa615effe96db32eb95c2cddcaffe85c41f94c77d06d778286a"
+      }
+    },
+    {
+      "id": "2f29bdf2-fcff-4e7a-a9de-9459eb8f1b98",
+      "kind": "xlsx",
+      "category": "trackers",
+      "templateSha256": "7f46de41c46fec91eb8031a5758251ca754cc824222e4d91268c3f5a657397f4",
+      "sheets": 4,
+      "cells": 76,
+      "formulaCells": 0,
+      "truncatedSheets": 0,
+      "complete": true,
+      "outputSha256": {
+        "values.json": "48473549f28a91dcea206dda8713ad8dc6172c872a4e8a1d3b050bc0d6381177"
+      }
+    },
+    {
+      "id": "2f858f7d-3675-4a8c-9728-c9fcd31d5649",
+      "kind": "docx",
+      "category": "resumes",
+      "templateSha256": "e7e2dacd66712983ba5c0688656e22cb237ad4661987588a0a1f90c0d9617405",
+      "pageCount": 1,
+      "layoutLines": 51,
+      "layoutCells": 30,
+      "complete": true,
+      "outputSha256": {
+        "pages.json": "0baa185438fc6a7e08616a27b299bf87205c5f10681ac32d20014adfb41da887",
+        "layout.json": "af561f6714207f92ec551a51f33f393042283b26eadd8b272703f5bd2d9cea15"
+      }
+    },
+    {
+      "id": "2f890747-6bef-4925-841c-82b764415856",
+      "kind": "docx",
+      "category": "schedules",
+      "templateSha256": "7fe261e07be9e0ea6775eb6b0c97a7325abdcf6083dc0631674dcf692b2bb660",
+      "pageCount": 1,
+      "layoutLines": 34,
+      "layoutCells": 8,
+      "complete": true,
+      "outputSha256": {
+        "pages.json": "b7a3e10914793c620da9b970762886eb00533e382cd945a82b6fe217ec258659",
+        "layout.json": "1aa851b5302b5d5fe8b2f0b62f2f847ce3c7e3af56c6fd6ce80c4fdc59a01059"
+      }
+    },
+    {
+      "id": "31cdcf05-df3b-49ad-9932-71b89e4a0759",
+      "kind": "xlsx",
+      "category": "schedules",
+      "templateSha256": "6b2157d33769873aaaf41013ec0b0d2b427968e1fb1d453711a0d4ff5e6c81e3",
+      "sheets": 1,
+      "cells": 64,
+      "formulaCells": 33,
+      "truncatedSheets": 0,
+      "complete": true,
+      "outputSha256": {
+        "values.json": "8d0d79e718bba09cf128dc500832aeee89953ac603ab675735623d24e34eec09"
+      }
+    },
+    {
+      "id": "33449d14-b590-4c13-929a-4931b797f8f9",
+      "kind": "docx",
+      "category": "resumes",
+      "templateSha256": "75a2fd37f4494635acf3688d7bccd08f450fdc436522ef434969f88545b73b49",
+      "pageCount": 1,
+      "layoutLines": 73,
+      "layoutCells": 8,
+      "complete": true,
+      "outputSha256": {
+        "pages.json": "00fbcf604eb4e965575dd2b0c28197694c6ac074771807e756cdfb44df243d12",
+        "layout.json": "47c6bed6cccddaa31d41b712d43f83ec1a2512e559b4432f02b394b2bedf30b1"
+      }
+    },
+    {
+      "id": "36057f4e-b8b5-4325-ac49-21023c33eebb",
+      "kind": "docx",
+      "category": "planners",
+      "templateSha256": "393f7642bf09ee9f860e707180a5df56e509597ced91beae5ae093da10b6f69b",
+      "pageCount": 2,
+      "layoutLines": 19,
+      "layoutCells": 6,
+      "complete": true,
+      "outputSha256": {
+        "pages.json": "47b4d7ca5a701e4102c66085b3df0f10a9388370bb9c2f780ccec07e6081b506",
+        "layout.json": "51d65a8d3b124c29e1b873af9f0e0ffbe1be2af68aaa93e2f2bc4dd17d6bfc43"
+      }
+    },
+    {
+      "id": "369564be-c72a-4eb8-a1f8-27dc5256c0ed",
+      "kind": "xlsx",
+      "category": "schedules",
+      "templateSha256": "6224942925407092b048aced8d4a4b5ef650a4820f485ec187c45fbb458cbdf9",
+      "sheets": 1,
+      "cells": 50,
+      "formulaCells": 5,
+      "truncatedSheets": 0,
+      "complete": true,
+      "outputSha256": {
+        "values.json": "7787b1a8d6bd2a812f643aa2c4158c5b88311696dd148e65e4100fe58c451e2c"
+      }
+    },
+    {
+      "id": "371fe1a1-54c3-477c-9fb2-1b14c284b079",
+      "kind": "docx",
+      "category": "newsletters",
+      "templateSha256": "40f405ac54d358ad639d8b4b593ca201f93fa1017d82548965d64cb948738c2a",
+      "pageCount": 2,
+      "layoutLines": 103,
+      "layoutCells": 21,
+      "complete": true,
+      "outputSha256": {
+        "pages.json": "202a67f618f2af5ec8f543ececeb8e92200478299eff06c9ee51917e1d22d5d1",
+        "layout.json": "edba5662666036fba415328370e160bac2927594f2a3827d2cca39eef2345652"
+      }
+    },
+    {
+      "id": "3b40ec86-59ea-4e4d-83b2-c01ee5745df1",
+      "kind": "docx",
+      "category": "planners",
+      "templateSha256": "921cdea39a9013a95014df1d0e36ae27cad25289b89eb5d61444bf1b49047493",
+      "pageCount": 2,
+      "layoutLines": 224,
+      "layoutCells": 203,
+      "complete": true,
+      "outputSha256": {
+        "pages.json": "e2e877bcb3b0df130aba7da2c9392c5f71fc8cf26a51d81217c70e3bc1d23c1d",
+        "layout.json": "aadfea8ae8f191a345941f3e101fbb4b1835370be6c28210554ea32b7681e391"
+      }
+    },
+    {
+      "id": "3e07a89b-bbd4-4998-892f-8b480e1fe7d4",
+      "kind": "xlsx",
+      "category": "schedules",
+      "templateSha256": "5a33cbca586f089537be5332b4c6e505533ccd2ac48038217185ee872579a536",
+      "sheets": 3,
+      "cells": 85,
+      "formulaCells": 47,
+      "truncatedSheets": 0,
+      "complete": true,
+      "outputSha256": {
+        "values.json": "56b5b2e03444a346cc91dfe164a529b57fa4f0fcf65e2f9b0a96c395404dbfaa"
+      }
+    },
+    {
+      "id": "463abd5c-3d84-43d5-baac-0a41cfac14d3",
+      "kind": "docx",
+      "category": "newsletters",
+      "templateSha256": "b727ec90432795939c2fbbc403479f69f18da866c9995eb2e5dcee2bc10c6058",
+      "pageCount": 4,
+      "layoutLines": 91,
+      "layoutCells": 34,
+      "complete": true,
+      "outputSha256": {
+        "pages.json": "85a906033d5b3d1ba222eefe61d45e182822be5f7a7ebdfecb09d370f4a24e61",
+        "layout.json": "532e02f77193c00609997e0cd26a63f1038b4912069aa64a827f6a2205b3c014"
+      }
+    },
+    {
+      "id": "48f98fd1-a81d-4d08-9d99-6cb0fa8c5b52",
+      "kind": "xlsx",
+      "category": "schedules",
+      "templateSha256": "afb1fd63f081d46bdf3de8e3244e022468afc232965cf2d336b72819994a7dd8",
+      "sheets": 2,
+      "cells": 504,
+      "formulaCells": 431,
+      "truncatedSheets": 0,
+      "complete": true,
+      "outputSha256": {
+        "values.json": "30db7dda37e53d66f810a03390982b102e7ffc6d65d5d543fd52a0ee422b6e06"
+      }
+    },
+    {
+      "id": "494a603b-70b3-42f9-bc91-413bfdf33826",
+      "kind": "docx",
+      "category": "planners",
+      "templateSha256": "3c10552ea60814318fa670864deb3e620dedcbee85e13df95e7d148bedeced69",
+      "pageCount": 2,
+      "layoutLines": 18,
+      "layoutCells": 18,
+      "complete": true,
+      "outputSha256": {
+        "pages.json": "ef8462821ff495e618a46bbb36c1ee740675545ed0f267b5ddd56ab6cdf99ee8",
+        "layout.json": "7ba4b9e9a76ee82b222c97f4352d88f33faff05ef18873233d115c0d98d00e54"
+      }
+    },
+    {
+      "id": "4b371a73-0346-4f26-a194-75ec59ca6c0e",
+      "kind": "xlsx",
+      "category": "trackers",
+      "templateSha256": "725447724dfbef565e6ca64cc3240c9a5eefeb008906b3610754d1d96f82c98c",
+      "sheets": 3,
+      "cells": 186,
+      "formulaCells": 87,
+      "truncatedSheets": 0,
+      "complete": true,
+      "outputSha256": {
+        "values.json": "902ffd4ed9b9c34bb394eded6409806d7224d53a162c3b71684f05563fdfc0fe"
+      }
+    },
+    {
+      "id": "4b9c352f-5be1-44f5-8ead-264f4585d82f",
+      "kind": "docx",
+      "category": "planners",
+      "templateSha256": "7f057bbfa58479327699c235344e11158cae7af022ecec0db55e1bb4eed3780b",
+      "pageCount": 2,
+      "layoutLines": 83,
+      "layoutCells": 24,
+      "complete": true,
+      "outputSha256": {
+        "pages.json": "fc633be7574a1e279eb76e3c1c7fe7e5284a50ba892afa185cd577ce214cec41",
+        "layout.json": "51c4158fafd1062ad8e34d373ce698116a8fd49d9d72afc05665f74c8b82f53a"
+      }
+    },
+    {
+      "id": "4bf6b793-490f-4623-84ca-c9c6251a91fc",
+      "kind": "xlsx",
+      "category": "charts",
+      "templateSha256": "d65b8377a4209154a99d5861efca8f0341ba480afd073bfd47f2730eb9d8f7ea",
+      "sheets": 2,
+      "cells": 270,
+      "formulaCells": 181,
+      "truncatedSheets": 0,
+      "complete": true,
+      "outputSha256": {
+        "values.json": "53cabb6e488d6181a35272827dc166cf39053a25bb4ac213d938303f319d7d51"
+      }
+    },
+    {
+      "id": "4c5d5d40-32a7-4440-9337-c639980b08c4",
+      "kind": "docx",
+      "category": "planners",
+      "templateSha256": "ebfda3f3e0cef1877ae0fbf85ebc8c43d0c7a4a00e921b8463e529d34c2943ac",
+      "pageCount": 2,
+      "layoutLines": 68,
+      "layoutCells": 42,
+      "complete": true,
+      "outputSha256": {
+        "pages.json": "4429bec792fc44914acc6aadb6f894b603cee226a75dbad4a323cf5bf6b85daf",
+        "layout.json": "795fc1572a93f383938ef279f4a8b70ca605f30a52ae130a915315f799895265"
+      }
+    },
+    {
+      "id": "4e493df5-736e-4f05-aa5a-ca93783f12a1",
+      "kind": "docx",
+      "category": "reports",
+      "templateSha256": "7c657cc6e1de2acc2e4504bfcbd1d3834bb389fea2992bc74384ad5171a7689c",
+      "pageCount": 8,
+      "layoutLines": 202,
+      "layoutCells": 81,
+      "complete": true,
+      "outputSha256": {
+        "pages.json": "432c4abdfcc2d7aca3fb0339f7b8453fd0981cec3289c7f8fb08b2616767f62c",
+        "layout.json": "ecdf7e03aded438b8019085eb6069149762104bd4dfa064d067d77f99671a8fe"
+      }
+    },
+    {
+      "id": "4ebce9eb-5745-45e1-aef0-518b656b7284",
+      "kind": "docx",
+      "category": "planners",
+      "templateSha256": "e16c5158e67277b0076a40706e0505ddfdb5fa98874885d12c1e836cf4248939",
+      "pageCount": 1,
+      "layoutLines": 15,
+      "layoutCells": 11,
+      "complete": true,
+      "outputSha256": {
+        "pages.json": "d838098cef083688b83bb594d3469ffd3b92948dd01327d07add5e0871e0f161",
+        "layout.json": "5366df0a04e52683cd0331138bbfe1147045b32172aba750464108f27a8b0bf2"
+      }
+    },
+    {
+      "id": "4eec2072-a2d7-43fe-baa2-1cc1ee4e84cc",
+      "kind": "xlsx",
+      "category": "charts",
+      "templateSha256": "11058329e2942081d4406c0fb8b1c3ed232c1ba58c293b2b7d55a85d5d11300b",
+      "sheets": 1,
+      "cells": 50,
+      "formulaCells": 22,
+      "truncatedSheets": 0,
+      "complete": true,
+      "outputSha256": {
+        "values.json": "1d51ac4f8442ecd8aa83bb6d9fe65fb691699b191560d47c186874497e5dec08"
+      }
+    },
+    {
+      "id": "4f837650-9a96-434c-839f-bb412db5f497",
+      "kind": "docx",
+      "category": "letters",
+      "templateSha256": "cf6ceb30cec2471e974c66498dc56664b2f8a1615c4dfc41c7a962f248a5a0a3",
+      "pageCount": 1,
+      "layoutLines": 30,
+      "layoutCells": 14,
+      "complete": true,
+      "outputSha256": {
+        "pages.json": "fd2374cfdff60b51cc209c0d57dfb184ae80b8f55516ad33cf965b9432704762",
+        "layout.json": "cdc3c8d9f54167c0c07828fc4efaad7fc38c58960a4e4ec61a1e070dcfdea459"
+      }
+    },
+    {
+      "id": "502c3712-653b-42ab-8a75-4574f6040930",
+      "kind": "xlsx",
+      "category": "trackers",
+      "templateSha256": "f4186cb1069cb65fabb03d7c82c2a24df20766627a0faabb5153e764b0950ca2",
+      "sheets": 1,
+      "cells": 44,
+      "formulaCells": 17,
+      "truncatedSheets": 0,
+      "complete": true,
+      "outputSha256": {
+        "values.json": "9b3397e94f0fcddec277f3a0e6fdfa9bf4276057f7643ef287e91ca092fdb787"
+      }
+    },
+    {
+      "id": "54d00e5f-3f41-4a6c-b540-5763773e940e",
+      "kind": "docx",
+      "category": "planners",
+      "templateSha256": "8486137e957efc1960aedc3e86c741bac63c89c8df8096f47bd49e4367ad7936",
+      "pageCount": 2,
+      "layoutLines": 73,
+      "layoutCells": 35,
+      "complete": true,
+      "outputSha256": {
+        "pages.json": "615471c0fe13011b3b1fb09537a34bcb37b6c843ccfee1dfaa304226e121a6cb",
+        "layout.json": "06180eead647f3553898266d400f8f6827897e9dca4d47253f148701b1f56bf3"
+      }
+    },
+    {
+      "id": "54d4fddf-e282-4682-8cd9-b8e56604e0e5",
+      "kind": "xlsx",
+      "category": "schedules",
+      "templateSha256": "5a5f1e740a60c2a14764d44c4e0b4dfc8147b29edcb4618cf1caf1a0bf00c976",
+      "sheets": 7,
+      "cells": 392,
+      "formulaCells": 35,
+      "truncatedSheets": 0,
+      "complete": true,
+      "outputSha256": {
+        "values.json": "6290a4098cf6f33d46f7ff147b57bb61fdaa81de272c6b1ee7f54779d24c225e"
+      }
+    },
+    {
+      "id": "5559888d-e34b-4ae1-9505-bfe741291f71",
+      "kind": "docx",
+      "category": "letters",
+      "templateSha256": "c8a0cb60377ed00bb0c0ae96fd078efc6288c2136a06a9b95a6feefb81425c03",
+      "pageCount": 1,
+      "layoutLines": 33,
+      "layoutCells": 7,
+      "complete": true,
+      "outputSha256": {
+        "pages.json": "bbd80ed0d025d9b5adbc7b1ebd81122de7bc5a76a5c51bc51f993b5cd4a082ee",
+        "layout.json": "83ba0d21dfdf0960dd5bee1a3cbb2a2ecf9473ff05f8ab47374a0579984e65ce"
+      }
+    },
+    {
+      "id": "5673dfc3-6f8f-4810-b7e5-a90ae5ff1123",
+      "kind": "xlsx",
+      "category": "trackers",
+      "templateSha256": "bacaa12323b88734f3bdb527eb74f51b3711cd1feeb562a8085c45cd6bc67d25",
+      "sheets": 1,
+      "cells": 37,
+      "formulaCells": 0,
+      "truncatedSheets": 0,
+      "complete": true,
+      "outputSha256": {
+        "values.json": "d8d49322f5ac04a83dbf77023e87d276d466c50f7d01efdbba1c2b52d60cc964"
+      }
+    },
+    {
+      "id": "57cae682-222c-4646-9a80-c404ee5c5d7e",
+      "kind": "docx",
+      "category": "resumes",
+      "templateSha256": "4b91a9abc605a4851937eefe119f80732a06a0f3c291fdd41e6fafb91d686083",
+      "pageCount": 1,
+      "layoutLines": 30,
+      "layoutCells": 3,
+      "complete": true,
+      "outputSha256": {
+        "pages.json": "57428a1e3019c4164c8f4b480943c72bc9a2bd654e7c89953317957f82baf725",
+        "layout.json": "e54b5c447a1ab7cccfce2443361a8a23985122e07cfaca04230ca0af732bf6ef"
+      }
+    },
+    {
+      "id": "591e685e-fff1-400f-9fdf-92cb88141bbd",
+      "kind": "docx",
+      "category": "resumes",
+      "templateSha256": "8bba99f73ecc79f204316366fb0c4f1b61f2f960899a403e6b8e9b0ea9cfe536",
+      "pageCount": 1,
+      "layoutLines": 42,
+      "layoutCells": 1,
+      "complete": true,
+      "outputSha256": {
+        "pages.json": "49dcc1669267323fdd7b437b3d26f2f64756f2fc79ff8d99644c90ab316b0798",
+        "layout.json": "adcc950e2bdae67c8d6845d1c2c88e1202c893130cdb25c4b64b07b3151fe326"
+      }
+    },
+    {
+      "id": "59ab7c0a-01b4-4a8b-8704-1629ef74476b",
+      "kind": "docx",
+      "category": "resumes",
+      "templateSha256": "fde5eaa85f01acd00f78f54dd6c97501e353a1773ffc299f0bdac33f31eec3b0",
+      "pageCount": 1,
+      "layoutLines": 41,
+      "layoutCells": 1,
+      "complete": true,
+      "outputSha256": {
+        "pages.json": "a6a1d98651ffc340a9d3ad815172314aeea779e6fbf22569eaecab0fdd44c873",
+        "layout.json": "33e15f1ea38da42ece21f884789ccc3f1d4d3baa3f5854ab2e031dc76e5d55ce"
+      }
+    },
+    {
+      "id": "5c624cb4-bcf0-433e-8d06-329ca778a50b",
+      "kind": "docx",
+      "category": "letters",
+      "templateSha256": "6cd150fbf1a568297a8f6c6b53336546bd513e4b50798032fdbc115594ed8c20",
+      "pageCount": 1,
+      "layoutLines": 38,
+      "layoutCells": 6,
+      "complete": true,
+      "outputSha256": {
+        "pages.json": "58e9c2fc0b770c680ac0f32a13b1172b7d2772b1697d15d1e3ae2249f037a496",
+        "layout.json": "969fc8b6903bbd894bc5a9859f299d9ce7e159b572b61e4507ed450c7bfe4f35"
+      }
+    },
+    {
+      "id": "5ff67a28-3747-45d8-ab40-465bf569783b",
+      "kind": "docx",
+      "category": "resumes",
+      "templateSha256": "e7a61480b798511222082877224e0ec5acdae803de63e94f195bc711dfcdaa33",
+      "pageCount": 3,
+      "layoutLines": 120,
+      "layoutCells": 72,
+      "complete": true,
+      "outputSha256": {
+        "pages.json": "177425711dc3fe1fc2ed464a7ea2140f879f428fe36c21301a824301f458c0bc",
+        "layout.json": "91d22ec2f282d3a8cc89c5153662381ae48aecd651fc47bd9b56cb7fa62f8b97"
+      }
+    },
+    {
+      "id": "60c5b272-ef3b-44bb-babc-c0caea29057d",
+      "kind": "xlsx",
+      "category": "budgets",
+      "templateSha256": "30324a978f927c1d06bdb678b53af29aebb2d24ce3222909a89589c8baa22cab",
+      "sheets": 1,
+      "cells": 156,
+      "formulaCells": 74,
+      "truncatedSheets": 0,
+      "complete": true,
+      "outputSha256": {
+        "values.json": "3e70c0ef4385969e57256cb5ef581d418033dba2441737547fac0e6c8b1d35c3"
+      }
+    },
+    {
+      "id": "6158e9a0-e929-469e-b015-c5d218807bf2",
+      "kind": "docx",
+      "category": "letters",
+      "templateSha256": "d794edfb05cd5463f561074bb30b699679acfc533aef9a49a03d1cc24e0fb717",
+      "pageCount": 1,
+      "layoutLines": 43,
+      "layoutCells": 22,
+      "complete": true,
+      "outputSha256": {
+        "pages.json": "2e4ff30baab35b9d87b1ad7f9aa04004c547aa4ba442466d9ccdcbf62a322cde",
+        "layout.json": "564b06a321e0cdcb60612672f8b5fe4d8de96834b78441fb898f7300c7e04e99"
+      }
+    },
+    {
+      "id": "65cf689e-03c5-47f2-80bf-a489d7b9d54e",
+      "kind": "docx",
+      "category": "newsletters",
+      "templateSha256": "f4358194d37cb1adb100331214b136a7d20906d839409358b7cc1d74f8b14873",
+      "pageCount": 4,
+      "layoutLines": 428,
+      "layoutCells": 66,
+      "complete": true,
+      "outputSha256": {
+        "pages.json": "b8228ae1c45e9b77b80e7e7e5a747c0db1f61d662de0aa87b548c1898c02a467",
+        "layout.json": "d78d3e63252c55fe2ad1741f359de9d920c0d8df9267bd1d3b56c26f2e9b64f6"
+      }
+    },
+    {
+      "id": "6667de34-e27d-4c5e-8a86-151e798da560",
+      "kind": "xlsx",
+      "category": "budgets",
+      "templateSha256": "02be3935468092abe51b1490268f83d044ffa62563eb92d4b932a7d954d9b477",
+      "sheets": 2,
+      "cells": 859,
+      "formulaCells": 310,
+      "truncatedSheets": 0,
+      "complete": true,
+      "outputSha256": {
+        "values.json": "bcee03e92024b3a516301a2b4748bd2c07063c12e93c565433afca9ca8797dd3"
+      }
+    },
+    {
+      "id": "67792a9e-d689-4239-a9e8-5e0519041839",
+      "kind": "docx",
+      "category": "resumes",
+      "templateSha256": "9e5fe2a9bf0ef96200d088da063e85fa26d2f8a2e829a9ffaa40bd1306679b51",
+      "pageCount": 1,
+      "layoutLines": 56,
+      "layoutCells": 3,
+      "complete": true,
+      "outputSha256": {
+        "pages.json": "7741b932db5e4ab50698ce317c14db0850e826163a33608bfbe4dbcc697372cd",
+        "layout.json": "ec5861c13fee88fcac947ba0ae13255a4a1fde4cf2a7ffb4d33e93575f27946e"
+      }
+    },
+    {
+      "id": "677f5c66-2320-431a-b04f-e13165d80e78",
+      "kind": "docx",
+      "category": "resumes",
+      "templateSha256": "e05409172f68118828b60c7298e0d9b3dbf4cf719aa73e471d734ef40c2af1d6",
+      "pageCount": 1,
+      "layoutLines": 43,
+      "layoutCells": 1,
+      "complete": true,
+      "outputSha256": {
+        "pages.json": "f8f77c4aa2f346a38ba8fd9a8407e3f3ceeba919c024c4a879f76ef0affeaf82",
+        "layout.json": "cb02d300742f22c1f2d8e5d8468ea4e05731efecf130fcc843bdccd65a83834e"
+      }
+    },
+    {
+      "id": "684d3472-ad1c-4b10-b8e7-6f0757115700",
+      "kind": "xlsx",
+      "category": "trackers",
+      "templateSha256": "f44ebd730e7333797e0163c6319f4c554a54a51cba4a3672ba8ee42f889785ab",
+      "sheets": 1,
+      "cells": 40,
+      "formulaCells": 13,
+      "truncatedSheets": 0,
+      "complete": true,
+      "outputSha256": {
+        "values.json": "d4d23e789c00966aa2563657e088eb9db22d124731ab23f216aee5ec0bd4d6bc"
+      }
+    },
+    {
+      "id": "6aab7182-eafe-4373-8c7c-ca9b212ff512",
+      "kind": "xlsx",
+      "category": "trackers",
+      "templateSha256": "759ca50fb010d1c6d6703e652808034b0a69307fd0b0dd80dae1e2e0e97ec39e",
+      "sheets": 1,
+      "cells": 80,
+      "formulaCells": 24,
+      "truncatedSheets": 0,
+      "complete": true,
+      "outputSha256": {
+        "values.json": "4f4b602fcfea8348d957b30442c8aa559d619f2f754777edd0316244597c40a4"
+      }
+    },
+    {
+      "id": "6abb6cbd-cdaa-4f51-af17-796e15ea9c80",
+      "kind": "xlsx",
+      "category": "charts",
+      "templateSha256": "24f1e8f18fd340f54c68b7c47b2c5e390e84ed6e7fdf37800ce08d368e4309bb",
+      "sheets": 2,
+      "cells": 103,
+      "formulaCells": 35,
+      "truncatedSheets": 0,
+      "complete": true,
+      "outputSha256": {
+        "values.json": "0e0044c9d932de67d57e6addb22c5eaa801c55be8ef17d8edc4f1f23cd66ab54"
+      }
+    },
+    {
+      "id": "741ee369-f6fc-40a7-8969-ddaee72c0442",
+      "kind": "docx",
+      "category": "newsletters",
+      "templateSha256": "7ddbaea3c06b2f38288ff7143de1226984052103d509cf5e3ca4a3924c6035ca",
+      "pageCount": 4,
+      "layoutLines": 182,
+      "layoutCells": 46,
+      "complete": true,
+      "outputSha256": {
+        "pages.json": "7a79fb099eb1d10f8a93ecc9ea181a3e805cba95a0eecc1f01680f0c239e89e0",
+        "layout.json": "522583305beec1f714750f5036e714d8a4337ca7d5fefc473259cec72fe9ea06"
+      }
+    },
+    {
+      "id": "792c56ff-5931-4f2e-bbd3-a00d737f9b57",
+      "kind": "xlsx",
+      "category": "schedules",
+      "templateSha256": "bde87c368afde9777640fab4973a7f6b3527a3d03cddc67f73d192dc7a61f996",
+      "sheets": 1,
+      "cells": 100,
+      "formulaCells": 48,
+      "truncatedSheets": 0,
+      "complete": true,
+      "outputSha256": {
+        "values.json": "a7d0c8104c2bcebaa122ac29f9f8ebcb6610fce00e7ff127d5f804db0ae57705"
+      }
+    },
+    {
+      "id": "7c0a9cf6-906b-4a30-9ddc-41f41c2202ad",
+      "kind": "docx",
+      "category": "resumes",
+      "templateSha256": "018c07d3ce1b7e5231b280aa913ed8618c0c07b02c658566ef6aa60d483cce28",
+      "pageCount": 1,
+      "layoutLines": 45,
+      "layoutCells": 14,
+      "complete": true,
+      "outputSha256": {
+        "pages.json": "31e6d7d297fe6c29eafb87ac7f090eaa4240a4be8861e12ba48d0a2cea8b9ad4",
+        "layout.json": "f8bf5fcff443da0de781d4b9aa6d0363641a48797c38abc2aff723e7746a1479"
+      }
+    },
+    {
+      "id": "7c5c0318-8bc0-4ec9-8be3-2683dbf8adae",
+      "kind": "xlsx",
+      "category": "invoices",
+      "templateSha256": "3d0991a6af168d47e027bfacd7c61248625015b6308c66904ce294c6dcd6d4af",
+      "sheets": 1,
+      "cells": 58,
+      "formulaCells": 8,
+      "truncatedSheets": 0,
+      "complete": true,
+      "outputSha256": {
+        "values.json": "cb1fbefc3b2319c670336a5777b7a2e109b66a1ea53c8716cc8656ac4060bea7"
+      }
+    },
+    {
+      "id": "7e53ee0d-dd7d-4335-8cfd-efae5a747b05",
+      "kind": "docx",
+      "category": "reports",
+      "templateSha256": "1c2161843f249cb5a208012fb245c4dcb38ef8c1d9f2d0f2d020f6603737c904",
+      "pageCount": 2,
+      "layoutLines": 29,
+      "layoutCells": 13,
+      "complete": true,
+      "outputSha256": {
+        "pages.json": "f71dde73338cae9f50886ec02436d57b7f3be6c363cc2958ab016a6233456512",
+        "layout.json": "784437298ba136c157a5828e801f717cc1beb8297ce70c48db2c6826f98d38ac"
+      }
+    },
+    {
+      "id": "7fc3ccc4-5d2f-4656-a0a3-eaf00540c4b4",
+      "kind": "docx",
+      "category": "newsletters",
+      "templateSha256": "675a36a4b2e1a5c8918ed9e8e95cf0f87fcd862d3cf0b60e83b0e63ed5ad7641",
+      "pageCount": 4,
+      "layoutLines": 434,
+      "layoutCells": 112,
+      "complete": true,
+      "outputSha256": {
+        "pages.json": "d70ac7b78f09cfb72fab1332ee77f9adaa595561dd9cab01b0e654e778701193",
+        "layout.json": "31f67b7399b0f933b3b42862f2425fe6d807c16418e8fb8b6672933715882d3a"
+      }
+    },
+    {
+      "id": "8583a4ca-c9b8-4b4a-9a8f-97117cc4ea58",
+      "kind": "docx",
+      "category": "planners",
+      "templateSha256": "c4db71f8ab6bbbed9eca4bf81d2c019e8deba48d9623aa94db8b4b0072149215",
+      "pageCount": 2,
+      "layoutLines": 66,
+      "layoutCells": 42,
+      "complete": true,
+      "outputSha256": {
+        "pages.json": "30b7751575fa1e79cd9d8b554b65b8256ab6db7f96db471e83dd0ee6e42c48a5",
+        "layout.json": "bed9911b9764a1b768b06211349f8442ec5486a7f6f8862a4d97835d288ce6f5"
+      }
+    },
+    {
+      "id": "86466670-3e9e-4baa-a47b-7ddd073708d0",
+      "kind": "xlsx",
+      "category": "charts",
+      "templateSha256": "4becb8a0fee930466d1865e9f418d6d169050da24a635e356ab0a79e1e5d2c29",
+      "sheets": 1,
+      "cells": 123,
+      "formulaCells": 52,
+      "truncatedSheets": 0,
+      "complete": true,
+      "outputSha256": {
+        "values.json": "dc48a0243b9a17a4a8ce97de2a50bd3d9a47bf71439b6f019ddffdb561e74fab"
+      }
+    },
+    {
+      "id": "86e768be-2d8d-49c5-ad69-eb7cdf4a973d",
+      "kind": "docx",
+      "category": "newsletters",
+      "templateSha256": "9d0868e356ef050a6f3d7c810596d85f46d0c930a4f1848c7d7e1d88a4c731be",
+      "pageCount": 2,
+      "layoutLines": 78,
+      "layoutCells": 15,
+      "complete": true,
+      "outputSha256": {
+        "pages.json": "91328485118cba20df81640ea28beebb31459e1f013eae2603974fa0eba7b452",
+        "layout.json": "4e6bb0cc0022233738ebb635cfe26a4d90c7a083a3370bd23733d654b4fe674b"
+      }
+    },
+    {
+      "id": "8c4be8ed-3202-4365-acfd-63ea7c279aeb",
+      "kind": "xlsx",
+      "category": "charts",
+      "templateSha256": "cfa1cb18d8af413076c5caeafdb7626a4f0e45aaee04c8f37eb79ec998f2fe7d",
+      "sheets": 1,
+      "cells": 51,
+      "formulaCells": 24,
+      "truncatedSheets": 0,
+      "complete": true,
+      "outputSha256": {
+        "values.json": "b567cc3d8c950db0a2e2df8c02b3ead38c9b94be2dee222255ec28dce8dac409"
+      }
+    },
+    {
+      "id": "8eb8ecb2-3517-422f-a00d-cb63faea9048",
+      "kind": "xlsx",
+      "category": "budgets",
+      "templateSha256": "7fe86628af6fdffa3d3321c0627210511a0baee1a73931166db1491224771b8e",
+      "sheets": 5,
+      "cells": 511,
+      "formulaCells": 105,
+      "truncatedSheets": 0,
+      "complete": true,
+      "outputSha256": {
+        "values.json": "6b6e93a45f4af24970111920abf8a6a3bba9e33f8aee903469de7843444ec858"
+      }
+    },
+    {
+      "id": "90e1e4c9-80f7-4176-986d-c73167e6c0f0",
+      "kind": "xlsx",
+      "category": "calendars",
+      "templateSha256": "9e10b2ae0c09d2e76e72ce83722eaece68d13d1f84580d119cc4e30f97dc48bd",
+      "sheets": 13,
+      "cells": 1550,
+      "formulaCells": 1523,
+      "truncatedSheets": 0,
+      "complete": true,
+      "outputSha256": {
+        "values.json": "7a1105e36bd9d9d3c0f7dadf162e93b39f35fdfc7bbe5beea4e43e68f6e1f0bf"
+      }
+    },
+    {
+      "id": "91b9548b-6080-4dbc-bbe0-35bd56e81311",
+      "kind": "xlsx",
+      "category": "budgets",
+      "templateSha256": "64b717c1d1a58da2d658904cf2e517086a920d61184fde69b7b2931e534e9965",
+      "sheets": 1,
+      "cells": 33,
+      "formulaCells": 9,
+      "truncatedSheets": 0,
+      "complete": true,
+      "outputSha256": {
+        "values.json": "9c2ae60f84d60d2b4171035805cf37312aeb74f380f4ab449aa7a8b01cd3969a"
+      }
+    },
+    {
+      "id": "91c3b989-adc7-42c3-99c5-6d8c7f3a5c0a",
+      "kind": "docx",
+      "category": "letters",
+      "templateSha256": "4bf01364decdf7d82acae55b78e9fc8060932b54cd0f0779dd566a2740f2ad8a",
+      "pageCount": 1,
+      "layoutLines": 46,
+      "layoutCells": 10,
+      "complete": true,
+      "outputSha256": {
+        "pages.json": "47d0f7548a7b38507103fb2968b1bf6be0241f39198b5e00edb5d2173b7869de",
+        "layout.json": "a366e19b2e9d9fe1c6c740e966845e403572551828fc679ee74f2728810fa92e"
+      }
+    },
+    {
+      "id": "938d0510-ae51-479a-98d3-6a9fe5ba8c9f",
+      "kind": "docx",
+      "category": "letters",
+      "templateSha256": "ee4a73db06467a02a7ff53d4311a91e214733dae0971e0a4b8433c388ae46cef",
+      "pageCount": 1,
+      "layoutLines": 29,
+      "layoutCells": 2,
+      "complete": true,
+      "outputSha256": {
+        "pages.json": "fe640c71102a5234cb5b655ed52ab62f301f8857b2d661d8132fb6502292feb5",
+        "layout.json": "ad072cb65b900da2cec79b9e1e4a925ddbe985ba1262698dfe6a88b9baf75c64"
+      }
+    },
+    {
+      "id": "94d2de40-69ce-4a0f-bce8-5a38b9cd710a",
+      "kind": "xlsx",
+      "category": "budgets",
+      "templateSha256": "c5d9b4396f3836d870eb36d28b32d44ee3fd73b42d14449fb1e3134ac8cfb567",
+      "sheets": 4,
+      "cells": 79,
+      "formulaCells": 18,
+      "truncatedSheets": 0,
+      "complete": true,
+      "outputSha256": {
+        "values.json": "98e516260b936573b13fbb0b2a04aa28046e32d9a27e392f0294d27e3fef5552"
+      }
+    },
+    {
+      "id": "94db67f1-b638-4ed2-a9a2-e77a9221d8db",
+      "kind": "xlsx",
+      "category": "invoices",
+      "templateSha256": "b3fed0103224031313137c03b5040fd037991f2d9018dc97bb1750afde245147",
+      "sheets": 1,
+      "cells": 43,
+      "formulaCells": 5,
+      "truncatedSheets": 0,
+      "complete": true,
+      "outputSha256": {
+        "values.json": "6994e8083d5d51951a4c0fb2fb5fe7992d793feea4b9276bf576c9a962cd4185"
+      }
+    },
+    {
+      "id": "95a2391d-2fc7-44e3-ba55-d9c55fdee70b",
+      "kind": "docx",
+      "category": "reports",
+      "templateSha256": "9ee8b664410f43260bf0d8e88e047cb7f9bad631b96627fb6cd4c53e5776b0c8",
+      "pageCount": 1,
+      "layoutLines": 92,
+      "layoutCells": 10,
+      "complete": true,
+      "outputSha256": {
+        "pages.json": "61886f7fd36a9d8c1a922f34d3a17368c4735904b686f59e2767ae1d2696ecff",
+        "layout.json": "27844aad8471be90466d96e0e2e62ee295826fdf3be158335cb22406fe07e5be"
+      }
+    },
+    {
+      "id": "97739ac3-cc1c-40fb-8682-f809e067145e",
+      "kind": "xlsx",
+      "category": "trackers",
+      "templateSha256": "0b29d8cc73d029823569d8537b9271e24cdee3c03c99e0052c7ab3ec3a8a9bc8",
+      "sheets": 2,
+      "cells": 145,
+      "formulaCells": 101,
+      "truncatedSheets": 0,
+      "complete": true,
+      "outputSha256": {
+        "values.json": "7806a3067cd41763ec9559197eaec80ada7836d26c739eaa7450c8d1fc81a1b2"
+      }
+    },
+    {
+      "id": "9986a0d9-9022-4d2d-b6e2-32852f14bae5",
+      "kind": "docx",
+      "category": "reports",
+      "templateSha256": "8529dff891f090b1bd07ba0d0c2050f473805f1bcd54ab592339429bfb7fb0e0",
+      "pageCount": 1,
+      "layoutLines": 31,
+      "layoutCells": 4,
+      "complete": true,
+      "outputSha256": {
+        "pages.json": "7bb3eca71040de20a21e036b23b2c95b7c126fe12e708ef06437c7adc7b37930",
+        "layout.json": "efcd366bc45afc7bb41c3798e7816361015b0044b9fb815033cea04e548a01b5"
+      }
+    },
+    {
+      "id": "9ac62cd3-d82b-412b-a9d0-66bda0b70165",
+      "kind": "xlsx",
+      "category": "schedules",
+      "templateSha256": "385b8b81ce63418373d056e7e5d6eea8c45675229348737a50eb9453987cf500",
+      "sheets": 1,
+      "cells": 65,
+      "formulaCells": 1,
+      "truncatedSheets": 0,
+      "complete": true,
+      "outputSha256": {
+        "values.json": "271983b98f5a7a501f3d7607dd0f73bb11fe7cb8cce3c679dbba56bb586a9ffa"
+      }
+    },
+    {
+      "id": "9d91ef48-a0d0-41b8-9ae0-4d9b6033dd6e",
+      "kind": "xlsx",
+      "category": "charts",
+      "templateSha256": "53db27eacf3b981312323fbf5399074a6ca45782e95e8dd0790480d2a7d02c1d",
+      "sheets": 1,
+      "cells": 50,
+      "formulaCells": 22,
+      "truncatedSheets": 0,
+      "complete": true,
+      "outputSha256": {
+        "values.json": "0d146391131a822a41150214a0a0cd4b33f17a5d3cfe8ccb57e078797f8c7f5c"
+      }
+    },
+    {
+      "id": "9e1c479f-d30e-46d3-a816-131e292c12e9",
+      "kind": "xlsx",
+      "category": "trackers",
+      "templateSha256": "46f328526a7f0c25c0060fc0237771321e39f581368c27bd9bd8d4c15309d51f",
+      "sheets": 1,
+      "cells": 44,
+      "formulaCells": 14,
+      "truncatedSheets": 0,
+      "complete": true,
+      "outputSha256": {
+        "values.json": "48d4d93fa71d1de2110024f0df9e5a7190ce56e47ca256746480a10a45a20403"
+      }
+    },
+    {
+      "id": "9f1fce92-bc37-4819-9989-67b5593c3582",
+      "kind": "docx",
+      "category": "reports",
+      "templateSha256": "578d2f3d7ecbe91513940d9031d19cd3cefb9d0ccc6eb90dcfa3215d3daa99d7",
+      "pageCount": 1,
+      "layoutLines": 62,
+      "layoutCells": 30,
+      "complete": true,
+      "outputSha256": {
+        "pages.json": "94055919157aa36a1ce6f36c163fad8f3a6c3fd03e2df8fe5a8f2b96b3150b12",
+        "layout.json": "75701b4411774f097db6dcf9b5b8899d560b8575ae5bcc7057028c2a391f88ee"
+      }
+    },
+    {
+      "id": "a146c834-f9db-4f07-9545-eb00257688cb",
+      "kind": "xlsx",
+      "category": "budgets",
+      "templateSha256": "68156f069c9a140495dad90d1cd72557c0736dcae29d75881dee89f7419aae90",
+      "sheets": 3,
+      "cells": 52,
+      "formulaCells": 6,
+      "truncatedSheets": 0,
+      "complete": true,
+      "outputSha256": {
+        "values.json": "74ffc74a9a88ec516f987cd9d459a1548f54c58f714330562b82ffca862716ab"
+      }
+    },
+    {
+      "id": "a2a7720e-9d4b-4ea1-8ace-6f8064829d23",
+      "kind": "docx",
+      "category": "newsletters",
+      "templateSha256": "15ba280d2cf093fccb71ccbab89c12846ee5e1e3f80cdbdb8e74ecbd830fa160",
+      "pageCount": 2,
+      "layoutLines": 35,
+      "layoutCells": 13,
+      "complete": true,
+      "outputSha256": {
+        "pages.json": "b24d6f02dcaab543cc44e51c98e6f2fcf418a3b5e1cf5e02827f0c3d76413711",
+        "layout.json": "dbe7f922994b4b1b1e745004be795124156e7da59b65f2c9d2a56c23f6470b73"
+      }
+    },
+    {
+      "id": "a60c389b-9052-4d35-bcfe-b7918b8aad5e",
+      "kind": "docx",
+      "category": "resumes",
+      "templateSha256": "8e4a563e90b1f90014c606df3c7bf36631071ea3ef708c8b7603e7fad6889fde",
+      "pageCount": 1,
+      "layoutLines": 48,
+      "layoutCells": 22,
+      "complete": true,
+      "outputSha256": {
+        "pages.json": "68f5d11d84c2dbe73669efe95145aebcf531b9d343f10f9d9e010eadae5e8503",
+        "layout.json": "cd58382e6bf02af53e20c9a0c2e27ddae6918c02e8670d065540f79b68ed60e4"
+      }
+    },
+    {
+      "id": "a6f9b007-de86-4fbd-9192-3fe31c2873cc",
+      "kind": "docx",
+      "category": "schedules",
+      "templateSha256": "c580fa8dbb835a570afc9f6d58f33ae27f8a58973e055881342d9488e2d1ab40",
+      "pageCount": 1,
+      "layoutLines": 21,
+      "layoutCells": 32,
+      "complete": true,
+      "outputSha256": {
+        "pages.json": "45aa8845fc2628691395cae6d11d8dfd439ad944d1902ba76842ed0ff2b6af09",
+        "layout.json": "a8852baebc1739e718c8f98736ff1ecf8119ce64a569529747af2af5ca6587e9"
+      }
+    },
+    {
+      "id": "aae2ed66-a0df-4222-b732-502ad80e9ed0",
+      "kind": "docx",
+      "category": "reports",
+      "templateSha256": "37022f5a98307251ce396ea9e0d5833f5b896ffaec39340c9d8a453b7cf2f5c9",
+      "pageCount": 1,
+      "layoutLines": 83,
+      "layoutCells": 1,
+      "complete": true,
+      "outputSha256": {
+        "pages.json": "192cbdd8e3098938024004ef9f6ebcb28ed53c1bed91cede43fe3c9221074afa",
+        "layout.json": "a528d7109a0505c14c728474ce1290b22a1795ecdac45dedaa8802cbd0287182"
+      }
+    },
+    {
+      "id": "ab449fed-18a0-4af2-844b-0beecceecf83",
+      "kind": "xlsx",
+      "category": "charts",
+      "templateSha256": "248d1dcfb767bb2c07f0e155da6277c42a3ff6b5aded5ea29f911e99e7771f06",
+      "sheets": 3,
+      "cells": 110,
+      "formulaCells": 0,
+      "truncatedSheets": 0,
+      "complete": true,
+      "outputSha256": {
+        "values.json": "b476eddc54d47446268a47e5887a1239977688b1217f4f15e3a85f1f919db9ed"
+      }
+    },
+    {
+      "id": "ad265748-351c-4e2e-939a-1ff919a1a2a0",
+      "kind": "docx",
+      "category": "newsletters",
+      "templateSha256": "de469cda279544d9f1c4ee2a23648385c9b31731a126f3bb1a6a9c2485c6d794",
+      "pageCount": 4,
+      "layoutLines": 415,
+      "layoutCells": 94,
+      "complete": true,
+      "outputSha256": {
+        "pages.json": "a3d85d96846f7818b6857fcc2357370979bd27340d6f361536c79d90be9685da",
+        "layout.json": "72661371e07a434eecc18e2270e2a5dae64e61c558b717ee24528492ec1ceecc"
+      }
+    },
+    {
+      "id": "ae0aba0c-0162-4fc9-9ae2-05bb68899b85",
+      "kind": "docx",
+      "category": "resumes",
+      "templateSha256": "83cd9708f499af0c9c1e149d4c5088b2619883521f3162e076e53b432276bf14",
+      "pageCount": 1,
+      "layoutLines": 50,
+      "layoutCells": 1,
+      "complete": true,
+      "outputSha256": {
+        "pages.json": "09c4a37f23465ba0b37d9aa017544dd0f33b77a0817150970f1a275e2ae45725",
+        "layout.json": "59338fb1315687ebe0f795af5b4b737f4c8885f8e7f5d36d3d3cf316ee05594a"
+      }
+    },
+    {
+      "id": "b0a247ff-298f-400f-9d2b-e6be95011bc1",
+      "kind": "xlsx",
+      "category": "budgets",
+      "templateSha256": "40d747fb5d9e5bd186ead97e159ccb9d09c29dc792281ef26bdcc58e3a2e86fd",
+      "sheets": 2,
+      "cells": 132,
+      "formulaCells": 63,
+      "truncatedSheets": 0,
+      "complete": true,
+      "outputSha256": {
+        "values.json": "f5b68811ceb2db52d2efc806eac526c0f45309610f15729b17ace19d97ccb237"
+      }
+    },
+    {
+      "id": "b0e9c2cf-5846-4100-b673-e7322a90f1e2",
+      "kind": "docx",
+      "category": "newsletters",
+      "templateSha256": "ba715dfd623789cb378dff7426aa2a11c4a3e9aa2ce88799d3d77fbd671443d8",
+      "pageCount": 1,
+      "layoutLines": 10,
+      "layoutCells": 5,
+      "complete": true,
+      "outputSha256": {
+        "pages.json": "6c0a6ca0fec0bb07abc0fd02a98e2ee27ce2e20e04a8b66e42b1dda135bf4c7e",
+        "layout.json": "6fbde43e826a419e71a837b7896fed2cb036ebb53fa46bc62437bcad0102a610"
+      }
+    },
+    {
+      "id": "b1eea1e2-2c33-4a7b-bf0f-b9e2f88f1d6e",
+      "kind": "xlsx",
+      "category": "calendars",
+      "templateSha256": "1eb67b4f73b9f5d8f4df280aa51a135383a7c251984a6daf6d3ac06d9027089e",
+      "sheets": 12,
+      "cells": 581,
+      "formulaCells": 541,
+      "truncatedSheets": 0,
+      "complete": true,
+      "outputSha256": {
+        "values.json": "76b485402648bb5ce145f64c7a694dff8dd0d3487b771d43e59ff48e5e71c8ae"
+      }
+    },
+    {
+      "id": "b30688e1-3cd6-47b6-b274-8c187e76b335",
+      "kind": "docx",
+      "category": "reports",
+      "templateSha256": "38260ab522f0f531122eb3ba425d74fe2a8e490aa3bf872b81b97c1b7815723b",
+      "pageCount": 1,
+      "layoutLines": 20,
+      "layoutCells": 1,
+      "complete": true,
+      "outputSha256": {
+        "pages.json": "c52fa062d3a7d064d945bdc6f3f715f1e610f41ea4e9b3835d5a66ec30990849",
+        "layout.json": "a1708200ee428c8ed7e928c00fd9c93dba2982ae64ac2860ddf2f6788b0e7cb8"
+      }
+    },
+    {
+      "id": "b5864d32-4451-4ff2-ab42-0f41296b2b4f",
+      "kind": "docx",
+      "category": "reports",
+      "templateSha256": "aba753797c3716a419ed31efd0f3706e07bc1cf5811a13bbe8e583b163e7a503",
+      "pageCount": 1,
+      "layoutLines": 242,
+      "layoutCells": 239,
+      "complete": true,
+      "outputSha256": {
+        "pages.json": "9bb7cd34db63df4e292685c02294d8629f9b79d3f4d9d1ff0a819e51bcb7ce23",
+        "layout.json": "208c825bdf0ea469e0109c7e0cd8171504b3dee3f4cc528e4f98cb580f35ef99"
+      }
+    },
+    {
+      "id": "b6c07597-04ed-458a-93ef-786081eb4999",
+      "kind": "xlsx",
+      "category": "budgets",
+      "templateSha256": "3cf9b1afb6359a9603951ea8dd2300d128d03fb1b8a81475796ba8ad3b007b1a",
+      "sheets": 1,
+      "cells": 627,
+      "formulaCells": 245,
+      "truncatedSheets": 0,
+      "complete": true,
+      "outputSha256": {
+        "values.json": "d17a5e418b4d9b94e90dab1e9943926e0d5c716b234f6b9eda23a23dcc7176d9"
+      }
+    },
+    {
+      "id": "b72b748c-ce40-4de7-8c0b-f2ae9b669eeb",
+      "kind": "docx",
+      "category": "newsletters",
+      "templateSha256": "3adc0b57ff716fc7523499e866c33bcf5c09cbe24bda2c4acf3eb87cd4350e3b",
+      "pageCount": 2,
+      "layoutLines": 104,
+      "layoutCells": 16,
+      "complete": true,
+      "outputSha256": {
+        "pages.json": "208b6bd4b32d53ed9d87788fa54c27c071b43f94c8d4aaffbf80e137ad562d3b",
+        "layout.json": "0c6e2686d9c8f775201482e7c451f055de41d50b3a5a51bbe0c87ce6d13874f2"
+      }
+    },
+    {
+      "id": "b795847d-eab5-40e7-b041-63c454160fc7",
+      "kind": "xlsx",
+      "category": "charts",
+      "templateSha256": "bb9cd67281ce6244590645887397865502e35e84e037e8b6a37645db41d77079",
+      "sheets": 2,
+      "cells": 91,
+      "formulaCells": 20,
+      "truncatedSheets": 0,
+      "complete": true,
+      "outputSha256": {
+        "values.json": "67a759ab797f23ee730b4fb48e00b90520c4320e2fdf68a85b9c81bc60944345"
+      }
+    },
+    {
+      "id": "b86f671c-8d23-4af3-84ee-5d1d9fd9b07f",
+      "kind": "xlsx",
+      "category": "trackers",
+      "templateSha256": "9e7312bd8c2a108d555dfe4233d6ad5303bf5e681f11fc36bf092ccbdd101859",
+      "sheets": 1,
+      "cells": 31,
+      "formulaCells": 0,
+      "truncatedSheets": 0,
+      "complete": true,
+      "outputSha256": {
+        "values.json": "4f4643308002482bdae581d4814d4308ee72edd4476aa342a73325831d363043"
+      }
+    },
+    {
+      "id": "b97c34b7-bcc4-4366-92c6-8b5a08ba27cc",
+      "kind": "docx",
+      "category": "resumes",
+      "templateSha256": "69bf8b9c22164abad2d794a26cd9beeae807f266b2c8203839d38410437342e8",
+      "pageCount": 1,
+      "layoutLines": 20,
+      "layoutCells": 5,
+      "complete": true,
+      "outputSha256": {
+        "pages.json": "c0f913d8cd98cc22fd184ceaffc561c7573cd0564e131fbdd8188b29d7ad617d",
+        "layout.json": "6d685a2781c0075606569c1af1d8174c3a1e39ea1f7bb1de74964da35642237b"
+      }
+    },
+    {
+      "id": "ba55235e-4140-4e28-abf8-bb45d8db4934",
+      "kind": "xlsx",
+      "category": "invoices",
+      "templateSha256": "26f8fef7d6d7acac95816a480cff54c17825e2dd1122fac946de130f1fe2607e",
+      "sheets": 1,
+      "cells": 65,
+      "formulaCells": 20,
+      "truncatedSheets": 0,
+      "complete": true,
+      "outputSha256": {
+        "values.json": "850c9c74523e131e19631f51228279e4c16b727ec4417b69debef409b5d23d13"
+      }
+    },
+    {
+      "id": "c0651bb6-b39b-4919-91c4-1b031ad4dc0c",
+      "kind": "docx",
+      "category": "letters",
+      "templateSha256": "fc5bb565f3f8e678a31051b304c174bdec9b266228b6d6813507ef6e1a186e1f",
+      "pageCount": 1,
+      "layoutLines": 29,
+      "layoutCells": 6,
+      "complete": true,
+      "outputSha256": {
+        "pages.json": "9c97f0a5e03f21a1192ca7fdeb6909e72865a1cd012a0c9da974cb558fc3a156",
+        "layout.json": "67ca71d55696dd6bd0e80eee2f79da04d6cee2077c0806755f4c52aac470beca"
+      }
+    },
+    {
+      "id": "c2b640a6-8ee1-4258-9669-a8ab0b41240f",
+      "kind": "xlsx",
+      "category": "trackers",
+      "templateSha256": "b02ba57be37a34e2a49a08546f62b42ce7dd40ba99a15508cebf96a0e85a404c",
+      "sheets": 4,
+      "cells": 330,
+      "formulaCells": 67,
+      "truncatedSheets": 0,
+      "complete": true,
+      "outputSha256": {
+        "values.json": "45f6b2f175934bae1afab6881604dddd231ee5d89fefe353a1ef30413b3bb87b"
+      }
+    },
+    {
+      "id": "c5871878-ab3d-4671-adf7-af65b58cf429",
+      "kind": "docx",
+      "category": "reports",
+      "templateSha256": "7bc632ff3aafde2a00a3c2b6dbbc5e1d758b643ba918b628e403a9b8a2f7fbbe",
+      "pageCount": 1,
+      "layoutLines": 24,
+      "layoutCells": 1,
+      "complete": true,
+      "outputSha256": {
+        "pages.json": "7917036b4059d64a272b4f11a554876520fd575f4aa2a91603f8e0678bb2e8ac",
+        "layout.json": "0d30ad3e3602c5b108737398cadcad115f1afc0ef5a6eb0989a16b86d4a8c9bf"
+      }
+    },
+    {
+      "id": "ca4e5536-5f4f-40f6-8c24-37e4a1f0d8f7",
+      "kind": "docx",
+      "category": "planners",
+      "templateSha256": "de82384710cbc9f66fe51c1dc711c190b90ecdef704550c57c8b89ebadbc4a44",
+      "pageCount": 5,
+      "layoutLines": 330,
+      "layoutCells": 282,
+      "complete": true,
+      "outputSha256": {
+        "pages.json": "20eb40166e3753db442d6bb562040b6e58a82e7d002c3d04e56451156e0c6d2a",
+        "layout.json": "9b59485187c51d85b72daf005a9296b50fb5cd22de92cbcfe568c0b123a6fc01"
+      }
+    },
+    {
+      "id": "cc4028ec-32a3-4310-9127-8050fd0e7c05",
+      "kind": "xlsx",
+      "category": "invoices",
+      "templateSha256": "3340fe0a8b583badda054a7c625a8890872e2c5f5a87909e5085c22446ad94dd",
+      "sheets": 1,
+      "cells": 53,
+      "formulaCells": 8,
+      "truncatedSheets": 0,
+      "complete": true,
+      "outputSha256": {
+        "values.json": "a2ff15ac1d5a72a1720f0defd29be61b4cd4e683468c3c2a949efa8f897a164d"
+      }
+    },
+    {
+      "id": "cc8dfa38-e399-4f59-9f4b-03eb2c124f9d",
+      "kind": "xlsx",
+      "category": "schedules",
+      "templateSha256": "e7a312474848a31f29897631f66f46516987d8efdd1e3c199b5b8ed64ccd2dff",
+      "sheets": 1,
+      "cells": 50,
+      "formulaCells": 5,
+      "truncatedSheets": 0,
+      "complete": true,
+      "outputSha256": {
+        "values.json": "05b340578a17df2e53257399e4b4555030f5c1dbb1631410b4b281b1f0a0f33d"
+      }
+    },
+    {
+      "id": "cc8f8a79-96c3-4a3f-9398-5fdcfa9b27e9",
+      "kind": "xlsx",
+      "category": "invoices",
+      "templateSha256": "ce9db918197187f4095235464337fb5214cd19b748874c99e3723c7e8e3efd54",
+      "sheets": 1,
+      "cells": 69,
+      "formulaCells": 10,
+      "truncatedSheets": 0,
+      "complete": true,
+      "outputSha256": {
+        "values.json": "b1aab7a32024b5b4550f6e66aafcab465d712bf7c8d0de2790fae835dbce9fc7"
+      }
+    },
+    {
+      "id": "ce343500-4aff-4dfa-b337-57c78459c6ee",
+      "kind": "docx",
+      "category": "resumes",
+      "templateSha256": "7d0dc8deb224664642330ae6f3bc8fe0b98e12cd9c2bd48a60bdeb68048c1a50",
+      "pageCount": 1,
+      "layoutLines": 51,
+      "layoutCells": 4,
+      "complete": true,
+      "outputSha256": {
+        "pages.json": "9dbda84205a19e29b0860751d8f2e4210112ce59d7c57be5bb05b4cb5d791c77",
+        "layout.json": "0a3776de1666d4493805e85778e4bdcdd06f7799737c5459ab6e379def71aa96"
+      }
+    },
+    {
+      "id": "d14ca19d-7956-4aa7-942b-732252bc3090",
+      "kind": "docx",
+      "category": "planners",
+      "templateSha256": "33d26e6453dae5a938f2eedfc6c8b82d31b276ec88c94b3b2339290d430ce0b0",
+      "pageCount": 2,
+      "layoutLines": 19,
+      "layoutCells": 6,
+      "complete": true,
+      "outputSha256": {
+        "pages.json": "55a8310821845ed7834f1c82d9f0c8453ae52d0341c5368ad4e4a2e49645369b",
+        "layout.json": "427722b4552539775a1888b2814b57f294db83567ebccb1803ab8016fbd7398f"
+      }
+    },
+    {
+      "id": "d14f83e2-f49d-4080-9e95-0bd4849fa63f",
+      "kind": "xlsx",
+      "category": "budgets",
+      "templateSha256": "f3a462783621ea3d1280f6639c78c8ac3811e3d4229e03ac2a94c2274d51febb",
+      "sheets": 5,
+      "cells": 1170,
+      "formulaCells": 554,
+      "truncatedSheets": 0,
+      "complete": true,
+      "outputSha256": {
+        "values.json": "a1a9be6c66760447e55b2820a7ccd43152a3db292c23867b7dc7c9090412b215"
+      }
+    },
+    {
+      "id": "d52c20af-1aa7-4957-b3e2-92a57bb4e8f7",
+      "kind": "docx",
+      "category": "newsletters",
+      "templateSha256": "e1d6faca13c39f1bb3c549f937e7fa19d0e503e64ac4298c7b61e1f6da08a50c",
+      "pageCount": 2,
+      "layoutLines": 87,
+      "layoutCells": 46,
+      "complete": true,
+      "outputSha256": {
+        "pages.json": "bc22aa9db299cb3e20bfd33adc9a90a589d4c2a6a6f3afdc2d28daf2f1925806",
+        "layout.json": "bb16e2ea31774d67657a22568c7685c2b8480caaa14e0ad156d38edda77edf02"
+      }
+    },
+    {
+      "id": "d75b85c4-1d95-41cf-a47e-81b8c0907101",
+      "kind": "xlsx",
+      "category": "budgets",
+      "templateSha256": "6dc6a9fcbf7bebe0cae7f7d0d913651a0cc63d509db7c540baa46fa90e9d9c84",
+      "sheets": 2,
+      "cells": 80,
+      "formulaCells": 25,
+      "truncatedSheets": 0,
+      "complete": true,
+      "outputSha256": {
+        "values.json": "51767db8e981edf27377639d8d74f27f70f3a7cf55883aff458338cb6fd91fa0"
+      }
+    },
+    {
+      "id": "d8df692e-a5b8-41b7-8c6e-65a38009a5ab",
+      "kind": "xlsx",
+      "category": "budgets",
+      "templateSha256": "dc74aafbdb57d4aea0af7867348af5a022445feacc7094b2788a0a4794c00ddf",
+      "sheets": 1,
+      "cells": 270,
+      "formulaCells": 109,
+      "truncatedSheets": 0,
+      "complete": true,
+      "outputSha256": {
+        "values.json": "1b977800bb8185196e5b2071c61cf442b24236acf6747bbd1ae2e14da70e068f"
+      }
+    },
+    {
+      "id": "dcb1bbfe-6172-435d-bb30-3d21de287a1a",
+      "kind": "xlsx",
+      "category": "budgets",
+      "templateSha256": "9cbcb6f1a3241e9cbb5b6de7113a31760634271efc719dba91341d03c3028c70",
+      "sheets": 1,
+      "cells": 33,
+      "formulaCells": 4,
+      "truncatedSheets": 0,
+      "complete": true,
+      "outputSha256": {
+        "values.json": "7a777bd852e2d7ce46b89693d65eab5f5f417e38cc94b852799ebdf1f77956b1"
+      }
+    },
+    {
+      "id": "de27afd1-55a2-404a-af1b-0e4de8fefd24",
+      "kind": "xlsx",
+      "category": "schedules",
+      "templateSha256": "dbf05a27cdbf26458c682da2567060f963c7bdc833782a3882a3dc511a5c50f5",
+      "sheets": 2,
+      "cells": 76,
+      "formulaCells": 34,
+      "truncatedSheets": 0,
+      "complete": true,
+      "outputSha256": {
+        "values.json": "f9dd16fe8c5634f7b8598a9567d3c3bdd938f23ae7bd097c3ec454dd2d9bb2c6"
+      }
+    },
+    {
+      "id": "e41daea3-53c8-4ab5-9e9c-c7837b7c95cd",
+      "kind": "docx",
+      "category": "letters",
+      "templateSha256": "5c2565a3a8fed2de36125ddcb9d1c8d72695b247f74ca136a7a8fba4e1e050f6",
+      "pageCount": 1,
+      "layoutLines": 43,
+      "layoutCells": 9,
+      "complete": true,
+      "outputSha256": {
+        "pages.json": "0a1afd3be6be4234d178fff94fe65ad5494c7097920411502a957cd6231d9a96",
+        "layout.json": "70bc800e936dfd303e274e00497fc054a0072381d07285046f3a1007408fc82d"
+      }
+    },
+    {
+      "id": "e5418ab0-a274-4997-b880-24230d938372",
+      "kind": "docx",
+      "category": "letters",
+      "templateSha256": "4f057b6b26027336314e8b1a0fb0144967efcdb69552b0c962a2c55ae5aa85bd",
+      "pageCount": 1,
+      "layoutLines": 39,
+      "layoutCells": 1,
+      "complete": true,
+      "outputSha256": {
+        "pages.json": "b7fe64cbac247eaf645f9e681a9ce555a6752f1a476a5cb3630fcbd57b96bce0",
+        "layout.json": "753ae24382ac7ddb82ecf2e6cf4b1d6bbe2b0fb455476c291f268cc0b2a45bad"
+      }
+    },
+    {
+      "id": "e6ae6c3f-7542-4b5a-80ce-d131a04ae548",
+      "kind": "xlsx",
+      "category": "trackers",
+      "templateSha256": "f4cd9b0d72e7f69190f809474a8386568b44dcf7ec969f06f721a02ac6dc8ed0",
+      "sheets": 4,
+      "cells": 140,
+      "formulaCells": 23,
+      "truncatedSheets": 0,
+      "complete": true,
+      "outputSha256": {
+        "values.json": "ff0c91b181b1bc3bf4a4657d2509d20c3be818596ace77991e391e07d22fda3d"
+      }
+    },
+    {
+      "id": "e93a3c0c-ed4b-4c33-98b7-73b82ffa6397",
+      "kind": "docx",
+      "category": "letters",
+      "templateSha256": "a2290723173a7aaeb9d88ae2ff87d41e6ca30852c414356f198c35c7eb401c77",
+      "pageCount": 1,
+      "layoutLines": 33,
+      "layoutCells": 1,
+      "complete": true,
+      "outputSha256": {
+        "pages.json": "e7922dd150ff77546d971d0be029a7816f76e57b115b9f6144cdb74fa5e9de59",
+        "layout.json": "2fd470be924e178e6a6d43c857bee4a2d73d79f0f7907e065139ddf1d9c4b442"
+      }
+    },
+    {
+      "id": "eab22234-d811-47a9-aeb3-45a0291477c9",
+      "kind": "docx",
+      "category": "reports",
+      "templateSha256": "9ec1319144f6ae2ff45e45fdc230e1da9a7d6dd0ce3e6cfdc79ddd1f9ef7f89d",
+      "pageCount": 4,
+      "layoutLines": 208,
+      "layoutCells": 80,
+      "complete": true,
+      "outputSha256": {
+        "pages.json": "2ade78a3113a3d0dcd18ef2bb5cc5571994cc13799f751eb396f2b6f4297d286",
+        "layout.json": "5079b2ee6fb5bc049647206a6293d92be3d3111a6381d6b1bcf364304e6d202b"
+      }
+    },
+    {
+      "id": "ebcaa05b-2f6c-4bb7-8e88-d33225dc8ec7",
+      "kind": "xlsx",
+      "category": "trackers",
+      "templateSha256": "b182b4225fa04db56e3adc580131a9a05a39296e443642ebbd348bd4286769b7",
+      "sheets": 5,
+      "cells": 173,
+      "formulaCells": 5,
+      "truncatedSheets": 0,
+      "complete": true,
+      "outputSha256": {
+        "values.json": "cfbf960abf56b1c28998a7b6fb477a0ccb896bbead3ce62de6baccab2f9b1337"
+      }
+    },
+    {
+      "id": "ee25c76b-4333-436f-852e-d7e17c6b0f01",
+      "kind": "docx",
+      "category": "planners",
+      "templateSha256": "d2ea5fd3de96601a8bdd3308b0e18c69d08790b646ad755c5f80a0a6010d69bd",
+      "pageCount": 2,
+      "layoutLines": 51,
+      "layoutCells": 12,
+      "complete": true,
+      "outputSha256": {
+        "pages.json": "649eb8c6ecfdbc7ebe771d9a96023a1a109963191a0cd9f1cca512864b808c4c",
+        "layout.json": "d8984ecc1b85a458f166515a061c24d1daf076763cb058041b05a40d1e71b60b"
+      }
+    },
+    {
+      "id": "ee8d0c24-0878-4e72-bbbc-172b9f8bd443",
+      "kind": "docx",
+      "category": "planners",
+      "templateSha256": "5a2f7b1639040d6be636d2d6bece7af82b23dbf74433e793642af1d3f7afc4d6",
+      "pageCount": 6,
+      "layoutLines": 35,
+      "layoutCells": 9,
+      "complete": true,
+      "outputSha256": {
+        "pages.json": "1d28281ec9ee43091b82a1d435f84d5703c501cf930ea7c49b05390d88869fed",
+        "layout.json": "4e30632c5b86607d159a4c021c07f39046804e549dd88b0a7cce6e8db3df342c"
+      }
+    },
+    {
+      "id": "f4999261-76bc-4806-a05c-0120522311a2",
+      "kind": "xlsx",
+      "category": "schedules",
+      "templateSha256": "96b9476f7fb25773af5d5c248c33b28aa2be5f05be1b77c10f801994b45dfcea",
+      "sheets": 3,
+      "cells": 57,
+      "formulaCells": 2,
+      "truncatedSheets": 0,
+      "complete": true,
+      "outputSha256": {
+        "values.json": "b6873d29134a2398959e96a37acf9a4a2b3250a0a07c4cf707b30dc01548cc58"
+      }
+    },
+    {
+      "id": "f5b49e76-2031-4fce-852f-1185a53ea762",
+      "kind": "docx",
+      "category": "newsletters",
+      "templateSha256": "118f2a2854a5536fad173f9051dcf28e4e5d7562cf30546b8cd4279a6201e266",
+      "pageCount": 2,
+      "layoutLines": 59,
+      "layoutCells": 17,
+      "complete": true,
+      "outputSha256": {
+        "pages.json": "e1ee91808fd3022ab11acb36652f8168739d611aba899e6acdeb38298bca3c35",
+        "layout.json": "01b8775747cb214aed0e41f05eb6d88243d665364c6e837ff1fccc59ccaf367b"
+      }
+    },
+    {
+      "id": "f5e29f68-524f-4e52-9b09-e68871fc720b",
+      "kind": "xlsx",
+      "category": "calendars",
+      "templateSha256": "e3dddf4b4107b3c80c8d5c504d6b616d10bac4e2a627cafa4b7282b7a3bebdb1",
+      "sheets": 12,
+      "cells": 1131,
+      "formulaCells": 576,
+      "truncatedSheets": 0,
+      "complete": true,
+      "outputSha256": {
+        "values.json": "5bc7d6847263bca82315df948e9d3f3153cdb4c8d746e2478744a1686544eadc"
+      }
+    },
+    {
+      "id": "f79af0fb-8ddb-4dfa-aae1-22f8ae7de1e3",
+      "kind": "xlsx",
+      "category": "charts",
+      "templateSha256": "7db5ef692b118cc795f2f2592a9520b4edc2be1584b4192588f68a1288b419c7",
+      "sheets": 1,
+      "cells": 51,
+      "formulaCells": 22,
+      "truncatedSheets": 0,
+      "complete": true,
+      "outputSha256": {
+        "values.json": "0f65c9997f95fc27aa70e0604c1929bf42ee05d1da04703934489eebfc331277"
+      }
+    },
+    {
+      "id": "f81d6387-e06d-4719-9d92-8189f7582b1f",
+      "kind": "docx",
+      "category": "resumes",
+      "templateSha256": "695793abe6115c1e898c098a88d369409d0de1a15be25b6e12a58992de2fb6b6",
+      "pageCount": 1,
+      "layoutLines": 31,
+      "layoutCells": 9,
+      "complete": true,
+      "outputSha256": {
+        "pages.json": "fa535d5b43b6e808df2346acae99bc629d8905419e08e897fb3459ac7373fcf6",
+        "layout.json": "73beefe8bded912a06cadb8e26f37583d86de1732220b6041388e77937378431"
+      }
+    },
+    {
+      "id": "fd5e4022-7fee-46b1-b7bd-65f6f26bdbd4",
+      "kind": "docx",
+      "category": "newsletters",
+      "templateSha256": "11fd9bfbacea76279d9eaf307cb5ed87a130c06371b566c9620ff5a23d88b7ae",
+      "pageCount": 4,
+      "layoutLines": 112,
+      "layoutCells": 34,
+      "complete": true,
+      "outputSha256": {
+        "pages.json": "5db120271266b9d2dccf5b64751b82688a0de870b992d955d4a6d533286cd168",
+        "layout.json": "f65d08eeb23c683a2806164f6850c3adcf9b41faaa70f83f7a46d1f8a72f687c"
+      }
+    }
+  ]
+}

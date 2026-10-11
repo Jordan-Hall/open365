@@ -55,16 +55,20 @@ $word = $null; $excel = $null; $wordPids = @(); $excelPids = @()
 function Get-Word {
   if ($null -eq $script:word) {
     $script:word = New-Object -ComObject Word.Application
-    $script:word.Visible = $false; $script:word.DisplayAlerts = 0
     $script:wordPids = @(Get-Pids 'WINWORD' | Where-Object { $_ -notin $wordBefore })
+    if ($script:wordPids.Count -eq 0) { throw 'COM attached to an Office instance this script did not start; refusing to touch it' }
+    $script:word.Visible = $false; $script:word.DisplayAlerts = 0
+    $script:word.AutomationSecurity = 3  # msoAutomationSecurityForceDisable: macros never run
   }
   $script:word
 }
 function Get-Excel {
   if ($null -eq $script:excel) {
     $script:excel = New-Object -ComObject Excel.Application
-    $script:excel.Visible = $false; $script:excel.DisplayAlerts = $false
     $script:excelPids = @(Get-Pids 'EXCEL' | Where-Object { $_ -notin $excelBefore })
+    if ($script:excelPids.Count -eq 0) { throw 'COM attached to an Office instance this script did not start; refusing to touch it' }
+    $script:excel.Visible = $false; $script:excel.DisplayAlerts = $false
+    $script:excel.AutomationSecurity = 3  # msoAutomationSecurityForceDisable: macros never run
   }
   $script:excel
 }
