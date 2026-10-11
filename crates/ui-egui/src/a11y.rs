@@ -6,6 +6,7 @@
 //! through its widget or `Ui` stack.
 
 use egui::{Context, Id, Rect, Sense, Ui, UiBuilder, accesskit};
+use open365_layout::ParaRole;
 
 /// AccessKit stores `word_starts` as `u8`, so one text run holds at most this many characters.
 pub const MAX_CHARS_PER_RUN: usize = 255;
@@ -91,6 +92,7 @@ pub fn publish_paragraph(
     para: usize,
     lines: &[LineData],
     label: Option<&str>,
+    role: ParaRole,
 ) -> Vec<RunEntry> {
     let para_id = paragraph_id(doc, para);
     let bounds = lines
@@ -100,7 +102,14 @@ pub fn publish_paragraph(
         .unwrap_or(Rect::NOTHING);
     parent_ui.interact(bounds, para_id, Sense::hover());
     parent_ui.ctx().accesskit_node_builder(para_id, |b| {
-        b.set_role(accesskit::Role::Paragraph);
+        match role {
+            ParaRole::Plain => b.set_role(accesskit::Role::Paragraph),
+            ParaRole::Heading(level) => {
+                b.set_role(accesskit::Role::Heading);
+                b.set_level(usize::from(level));
+            }
+            ParaRole::ListItem => b.set_role(accesskit::Role::ListItem),
+        }
         b.set_bounds(to_ak_rect(bounds));
         if let Some(label) = label {
             b.set_label(label.to_owned());

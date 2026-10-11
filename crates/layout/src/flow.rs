@@ -9,8 +9,28 @@ use crate::float::{Float, Frame, dynamic_lines};
 use crate::furniture::{Furniture, NoteStore};
 use crate::para::{AtomClass, LineBox, ParaLayout};
 use crate::props::SectionProps;
-use crate::table::{CellLayout, FlowLine, RowLayout, TableLayout};
-use crate::{CellBox, GlyphRun, ImagePlacement, Line, NoteSlot, Page, PlacedGlyph, StoryKind};
+use crate::table::{CellLayout, CellMeta, FlowLine, RowLayout, TableLayout};
+use crate::{
+    CellBox, Cluster, ClusterKind, GlyphRun, ImagePlacement, ImageSource, Line, NoteSlot, Page,
+    PlacedGlyph, StoryKind,
+};
+
+fn cell_box(x: f64, y: f64, width: f64, height: f64, meta: CellMeta, table_base: usize) -> CellBox {
+    CellBox {
+        x,
+        y,
+        width,
+        height,
+        table: table_base + meta.table,
+        row: meta.row,
+        col: meta.col,
+        col_span: meta.col_span,
+        row_span: meta.row_span,
+        header_row: meta.header_row,
+        fill: meta.fill,
+        borders: meta.borders,
+    }
+}
 
 /// What pagination needs besides the items: section geometry, header and footer sizes, notes.
 pub(crate) struct Env<'a> {
@@ -30,6 +50,8 @@ pub(crate) struct FlowItem {
     pub para_base: usize,
     /// Story offset of the unit's first character.
     pub story_base: usize,
+    /// Document-order id of the unit's first table.
+    pub table_base: usize,
     /// The story the unit belongs to (the main story, or the endnotes after it).
     pub story: StoryKind,
 }
@@ -51,6 +73,7 @@ impl FlowItem {
         Base {
             para: self.para_base,
             story: self.story_base,
+            table: self.table_base,
         }
     }
 
@@ -72,6 +95,7 @@ impl FlowItem {
 pub(crate) struct Base {
     pub para: usize,
     pub story: usize,
+    pub table: usize,
 }
 
 #[derive(Debug, Clone, PartialEq, Default)]
@@ -198,7 +222,7 @@ impl PageBuild {
     }
 
     fn finish(self, env: &Env<'_>) -> Page {
-        let notes = env.notes.page_lines(
+        let (notes, note_images) = env.notes.page_lines(
             self.section_index,
             &self.slots,
             self.section.margin_left + self.section.gutter,
@@ -219,6 +243,9 @@ impl PageBuild {
             notes,
             header: Vec::new(),
             footer: Vec::new(),
+            header_images: Vec::new(),
+            footer_images: Vec::new(),
+            note_images,
         }
     }
 }
@@ -453,6 +480,7 @@ pub(crate) fn build_line(
     let left_origin = origin_x;
     let mut runs: Vec<GlyphRun> = Vec::new();
     let mut cur_style: Option<usize> = None;
+    let mut label_text: Option<std::sync::Arc<str>> = None;
     if lb.atoms.start == 0
         && let Some(label) = &para.label
     {
@@ -461,18 +489,35 @@ pub(crate) fn build_line(
         let glyphs = label
             .glyphs
             .iter()
-            .map(|g| {
+            .enumerate()
+            .map(|(k, g)| {
+                // The text runs from this glyph's cluster to the next cluster; later glyphs of
+                // one cluster carry no text.
+                let first = k == 0 || label.glyphs[k - 1].cluster != g.cluster;
+                let end = label.glyphs[k + 1..]
+                    .iter()
+                    .map(|n| n.cluster)
+                    .find(|c| *c != g.cluster)
+                    .unwrap_or(label.text.len() as u32);
                 let placed = PlacedGlyph {
                     face: g.face,
                     glyph_id: g.glyph_id,
                     x: x + g.x_offset,
                     y_offset: g.y_offset,
                     advance: g.adv,
+                    cluster: Cluster {
+                        kind: ClusterKind::Label,
+                        start: 0,
+                        end: 0,
+                        text_start: g.cluster,
+                        text_end: if first { end } else { g.cluster },
+                    },
                 };
                 x += g.adv;
                 placed
             })
             .collect();
+        label_text = Some(label.text.clone());
         runs.push(GlyphRun {
             face: st.face,
             size: st.size,
@@ -505,15 +550,35 @@ pub(crate) fn build_line(
             });
             cur_style = Some(atom.style);
         }
+        // The cluster: the atom's characters, and the story range up to the next atom.
+        let text_end = para
+            .atoms
+            .get(ai + 1)
+            .map_or(para.text.len(), |n| n.byte_start);
+        let story = &para.fill.story_of;
+        let rel = |u: usize| u.saturating_sub(lb.start) as u32;
+        // Story offsets of atoms are not monotonic around a note's own mark.
+        let (c_start, c_end) = (rel(story[ai]), rel(story[ai + 1]).max(rel(story[ai])));
         let mut x = left_origin + lb.xs[k];
         if let Some(run) = runs.last_mut() {
-            for g in &para.glyphs[atom.glyphs.clone()] {
+            for (gi, g) in para.glyphs[atom.glyphs.clone()].iter().enumerate() {
                 run.glyphs.push(PlacedGlyph {
                     face: g.face,
                     glyph_id: g.glyph_id,
                     x: x + g.x_offset,
                     y_offset: g.y_offset,
                     advance: g.adv,
+                    cluster: Cluster {
+                        kind: ClusterKind::Text,
+                        start: c_start,
+                        end: c_end,
+                        text_start: atom.byte_start as u32,
+                        text_end: if gi == 0 {
+                            text_end as u32
+                        } else {
+                            atom.byte_start as u32
+                        },
+                    },
                 });
                 x += g.adv;
             }
@@ -541,6 +606,13 @@ pub(crate) fn build_line(
                     x: left_origin + crate::para::SEPARATOR_WIDTH,
                     y_offset: 0.0,
                     advance: 0.0,
+                    cluster: Cluster {
+                        kind: ClusterKind::Other,
+                        start: 0,
+                        end: 0,
+                        text_start: 0,
+                        text_end: 0,
+                    },
                 }],
             },
         );
@@ -556,6 +628,9 @@ pub(crate) fn build_line(
         left: left_origin + lb.left,
         last_x: left_origin + lb.last_x,
         runs,
+        text: para.text.clone(),
+        label: label_text,
+        role: para.role,
     }
 }
 
@@ -589,6 +664,7 @@ pub(crate) fn line_images(
             paragraph: base.para + para.index,
             anchored: false,
             behind_text: false,
+            source: ImageSource::Main,
         });
     }
     out
@@ -677,12 +753,14 @@ impl Paginator<'_> {
             if abs < lo || abs >= hi {
                 continue;
             }
-            self.page.cells.push(CellBox {
-                x: origin + bx.dx,
-                y: y + (abs - row.top),
-                width: bx.w,
-                height: bx.h,
-            });
+            self.page.cells.push(cell_box(
+                origin + bx.dx,
+                y + (abs - row.top),
+                bx.w,
+                bx.h,
+                bx.meta,
+                self.cur.map_or(0, |c| c.1.table),
+            ));
         }
     }
 
@@ -717,12 +795,14 @@ impl Paginator<'_> {
                         b.height = y + row.height - row.below - b.y;
                     }
                     None => {
-                        self.page.cells.push(CellBox {
-                            x: origin + cell.x + cell.inset_l,
+                        self.page.cells.push(cell_box(
+                            origin + cell.x + cell.inset_l,
                             y,
-                            width: cell.w - cell.inset_l - cell.inset_r,
-                            height: row.height - row.below,
-                        });
+                            cell.w - cell.inset_l - cell.inset_r,
+                            row.height - row.below,
+                            cell.meta,
+                            self.cur.map_or(0, |c| c.1.table),
+                        ));
                         s.box_idx = Some(self.page.cells.len() - 1);
                     }
                 }
@@ -732,12 +812,14 @@ impl Paginator<'_> {
             if cell.row_span == 0 {
                 continue;
             }
-            self.page.cells.push(CellBox {
-                x: origin + cell.x + cell.inset_l,
-                y: y + row.above,
-                width: cell.w - cell.inset_l - cell.inset_r,
-                height: row.height - row.above - row.below,
-            });
+            self.page.cells.push(cell_box(
+                origin + cell.x + cell.inset_l,
+                y + row.above,
+                cell.w - cell.inset_l - cell.inset_r,
+                row.height - row.above - row.below,
+                cell.meta,
+                self.cur.map_or(0, |c| c.1.table),
+            ));
             if cell.row_span > 1 && !repeated {
                 active.push(ActiveSpan {
                     start_row: r,
@@ -832,12 +914,14 @@ impl Paginator<'_> {
         let row = &table.rows[r];
         let origin = self.page.origin_x() + table.x;
         for (ci, cell) in row.cells.iter().enumerate() {
-            self.page.cells.push(CellBox {
-                x: origin + cell.x + cell.inset_l,
+            self.page.cells.push(cell_box(
+                origin + cell.x + cell.inset_l,
                 y,
-                width: cell.w - cell.inset_l - cell.inset_r,
+                cell.w - cell.inset_l - cell.inset_r,
                 height,
-            });
+                cell.meta,
+                self.cur.map_or(0, |c| c.1.table),
+            ));
             let base = if from[ci] == 0 {
                 0.0
             } else {

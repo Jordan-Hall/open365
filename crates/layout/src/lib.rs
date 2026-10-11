@@ -16,7 +16,14 @@
 //! other field keeps its cached result. Inline pictures are boxes on the baseline that set the
 //! line height; floating pictures that wrap top and bottom or square displace text; both are
 //! reported in [`Page::images`]. Not supported yet (reported in [`Layout::notes`]): columns,
-//! right-to-left text, bidi, tight wrap polygons and pictures in headers, footers and notes.
+//! right-to-left text, bidi and tight wrap polygons. Pictures in headers, footers and footnotes
+//! are reported in [`Page::header_images`], [`Page::footer_images`] and [`Page::note_images`];
+//! floating ones are positioned against the page but do not displace the text of those stories.
+//!
+//! Every glyph carries a [`Cluster`]: the characters it stands for (ligatures included), as
+//! story offsets and as text of the paragraph ([`Line::cluster_text`]). Cells carry their table,
+//! row and column ids and the borders and shading resolved for them. Lines carry the paragraph's
+//! [`ParaRole`].
 
 mod build;
 mod float;
@@ -28,6 +35,9 @@ mod numbering;
 mod para;
 mod props;
 mod table;
+
+use std::ops::Range;
+use std::sync::Arc;
 
 use open365_docx::{Block, Document, Paragraph};
 use open365_text::{FaceId, FontLibrary, FontMatch};
@@ -60,6 +70,46 @@ pub struct PlacedGlyph {
     pub x: f64,
     pub y_offset: f64,
     pub advance: f64,
+    /// The source characters of the glyph.
+    pub cluster: Cluster,
+}
+
+/// What a glyph's source characters are.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ClusterKind {
+    /// Characters of the paragraph: `text_start..text_end` indexes [`Line::text`].
+    Text,
+    /// Characters of the list label: `text_start..text_end` indexes [`Line::label`]. The story
+    /// range is empty.
+    Label,
+    /// A drawn rule with no characters of its own (the note separator).
+    Other,
+}
+
+/// The characters a glyph was shaped from. A ligature is one glyph with a cluster of several
+/// characters; when one cluster shapes to several glyphs, the first carries the text and the
+/// others have an empty text range (and the same story range).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Cluster {
+    pub kind: ClusterKind,
+    /// Story offsets (UTF-16 units) relative to [`Line::start`], so that moving a line moves its
+    /// clusters.
+    pub start: u32,
+    pub end: u32,
+    /// Byte range in [`Line::text`] (or [`Line::label`]).
+    pub text_start: u32,
+    pub text_end: u32,
+}
+
+/// What a paragraph is, for accessibility and tagged PDF.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum ParaRole {
+    #[default]
+    Plain,
+    /// A heading of level 1 to 6 (style `heading N`, through `basedOn`).
+    Heading(u8),
+    /// A numbered or bulleted paragraph.
+    ListItem,
 }
 
 /// Consecutive glyphs of one face, size and style on a line.
@@ -134,9 +184,33 @@ pub struct Line {
     /// X of the last character's left edge.
     pub last_x: f64,
     pub runs: Vec<GlyphRun>,
+    /// Text of the paragraph the line belongs to (list label excluded, paragraph mark
+    /// included); [`Cluster::text_start`] indexes it. Shared by the lines of a paragraph.
+    pub text: Arc<str>,
+    /// The list label text, on the first line of a numbered paragraph.
+    pub label: Option<Arc<str>>,
+    pub role: ParaRole,
 }
 
 impl Line {
+    /// The story offsets (UTF-16 units) the glyph's cluster covers.
+    pub fn cluster_story(&self, g: &PlacedGlyph) -> Range<usize> {
+        self.start + g.cluster.start as usize..self.start + g.cluster.end as usize
+    }
+
+    /// The characters the glyph's cluster stands for; empty for a glyph that continues the
+    /// previous glyph's cluster or has no characters.
+    pub fn cluster_text(&self, g: &PlacedGlyph) -> &str {
+        let c = g.cluster;
+        let src: &str = match c.kind {
+            ClusterKind::Text => &self.text,
+            ClusterKind::Label => self.label.as_deref().unwrap_or(""),
+            ClusterKind::Other => "",
+        };
+        src.get(c.text_start as usize..c.text_end as usize)
+            .unwrap_or("")
+    }
+
     /// X of the first drawn glyph's origin, or of the last character (the paragraph mark Word
     /// draws) when the line has no glyph, as a line of pictures only. A note reference mark is
     /// not counted: Word's PDF draws it as a row of its own.
@@ -149,14 +223,56 @@ impl Line {
     }
 }
 
+/// How a cell border is drawn.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BorderStyle {
+    Solid,
+    /// `double`, `triple` and the thin/thick pairs: two lines with a gap.
+    Double,
+    /// `dashed`, `dotDash` and the like.
+    Dashed,
+    Dotted,
+}
+
+/// A resolved border: the cell's own, else its table style's, else the table's.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct BorderLine {
+    /// Line width in points.
+    pub width: f64,
+    pub color: [u8; 3],
+    pub style: BorderStyle,
+}
+
+/// The four borders of a cell; `None` where nothing is drawn.
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+pub struct CellBorders {
+    pub top: Option<BorderLine>,
+    pub bottom: Option<BorderLine>,
+    pub left: Option<BorderLine>,
+    pub right: Option<BorderLine>,
+}
+
 /// The rectangle of a table cell (or a cell fragment, when its row continues on another
-/// page) in page coordinates.
+/// page) in page coordinates, with the cell's identity and look.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct CellBox {
     pub x: f64,
     pub y: f64,
     pub width: f64,
     pub height: f64,
+    /// Document-order id of the table (a nested table follows its parent), counting the tables
+    /// of the main story.
+    pub table: usize,
+    /// Row index in the table, and first grid column.
+    pub row: usize,
+    pub col: usize,
+    pub col_span: usize,
+    pub row_span: usize,
+    /// The row is a header row (`w:tblHeader`).
+    pub header_row: bool,
+    /// Fill colour (shading resolved to a solid colour), `None` for no fill.
+    pub fill: Option<[u8; 3]>,
+    pub borders: CellBorders,
 }
 
 /// Lines `from..to` of footnote `id`, placed on one page. A footnote that does not fit goes on
@@ -187,6 +303,20 @@ pub struct ImagePlacement {
     pub anchored: bool,
     /// A floating picture drawn behind the text.
     pub behind_text: bool,
+    /// Which part's relationships `embed` belongs to.
+    pub source: ImageSource,
+}
+
+/// The package part whose relationship table resolves a picture's `embed` id.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub enum ImageSource {
+    /// The main document part (`Document::image_part`).
+    #[default]
+    Main,
+    /// The header or footer part that relationship `rel_id` of the main part names.
+    HeaderFooter(String),
+    Footnotes,
+    Endnotes,
 }
 
 /// One page of the main story.
@@ -217,6 +347,10 @@ pub struct Page {
     pub header: Vec<Line>,
     /// Footer lines, bottom of the page.
     pub footer: Vec<Line>,
+    /// Inline pictures of the header, footer and footnote lines, in page coordinates.
+    pub header_images: Vec<ImagePlacement>,
+    pub footer_images: Vec<ImagePlacement>,
+    pub note_images: Vec<ImagePlacement>,
 }
 
 /// A font family the document asked for and how the library satisfied it.

@@ -10,13 +10,13 @@ publish.workspace = true
 [dependencies]
 open365-docx.workspace = true
 open365-layout.workspace = true
+open365-opc.workspace = true
 open365-text.workspace = true
 flate2.workspace = true
 image.workspace = true
 skrifa.workspace = true
 
 [dev-dependencies]
-open365-opc.workspace = true
 serde_json.workspace = true
 zip = { version = "9.0.1", default-features = false, features = ["deflate"] }
 

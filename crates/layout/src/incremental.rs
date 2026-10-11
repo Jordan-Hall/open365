@@ -235,7 +235,7 @@ impl IncrementalLayout {
         let mut new_blocks: Vec<Block> = Vec::with_capacity(n);
         // Old index each item reuses, when its unit and section are unchanged.
         let mut same: Vec<Option<usize>> = Vec::with_capacity(n);
-        let (mut section, mut para, mut story) = (0usize, 0usize, 0usize);
+        let (mut section, mut para, mut story, mut tables) = (0usize, 0usize, 0usize, 0usize);
         let mut story_kind = StoryKind::Main;
         for (i, block) in blocks.iter().enumerate() {
             let (kind, mark) = if i < body_n {
@@ -279,11 +279,13 @@ impl IncrementalLayout {
             }));
             let count = unit.arena.len();
             let story_len = unit.story_len;
+            let table_count = unit.tables;
             items.push(FlowItem {
                 unit,
                 section,
                 para_base: para,
                 story_base: story,
+                table_base: tables,
                 story: kind,
             });
             new_blocks.push(
@@ -299,6 +301,7 @@ impl IncrementalLayout {
             }
             para += count;
             story += story_len;
+            tables += table_count;
         }
         drop(old_blocks);
 
@@ -353,6 +356,9 @@ impl IncrementalLayout {
                     notes: Vec::new(),
                     header: Vec::new(),
                     footer: Vec::new(),
+                    header_images: Vec::new(),
+                    footer_images: Vec::new(),
+                    note_images: Vec::new(),
                     ..pg.clone()
                 });
                 let Some(current) = current else {
@@ -402,9 +408,11 @@ impl IncrementalLayout {
                         let mut old_page = rest.swap_remove(at.min(rest.len().saturating_sub(1)));
                         let d_para = items[c].para_base as isize - p.items[o].para_base as isize;
                         let d_story = items[c].story_base as isize - p.items[o].story_base as isize;
+                        let d_table = items[c].table_base as isize - p.items[o].table_base as isize;
                         let d_page = out.pages.len() as isize - old_ck.pages_done as isize;
                         let mut moved_lines = old_page.lines.split_off(old_ck.lines);
-                        let moved_cells = old_page.cells.split_off(old_ck.cells);
+                        let mut moved_cells = old_page.cells.split_off(old_ck.cells);
+                        shift_cells(&mut moved_cells, d_table);
                         let mut moved_images = old_page
                             .images
                             .split_off(old_ck.images.min(old_page.images.len()));
@@ -423,7 +431,7 @@ impl IncrementalLayout {
                         open.images.extend(moved_images);
                         open.floats.extend(moved_floats);
                         open.note_slots.extend(moved_notes);
-                        open.notes = note_store.page_lines(
+                        (open.notes, open.note_images) = note_store.page_lines(
                             open.section_index,
                             &open.note_slots,
                             open.section.margin_left + open.section.gutter,
@@ -431,6 +439,7 @@ impl IncrementalLayout {
                         );
                         for pg in &mut tail_pages {
                             shift_lines(&mut pg.lines, d_para, d_story);
+                            shift_cells(&mut pg.cells, d_table);
                             for im in &mut pg.images {
                                 im.paragraph = im.paragraph.saturating_add_signed(d_para);
                             }
@@ -471,6 +480,16 @@ impl IncrementalLayout {
         self.labels = labels;
         self.stats = stats;
         &self.layout
+    }
+}
+
+/// Moves the table ids of reused cell boxes.
+fn shift_cells(cells: &mut [crate::CellBox], d_table: isize) {
+    if d_table == 0 {
+        return;
+    }
+    for c in cells {
+        c.table = c.table.saturating_add_signed(d_table);
     }
 }
 

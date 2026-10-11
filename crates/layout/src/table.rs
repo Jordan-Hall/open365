@@ -5,12 +5,71 @@
 //! `docs/architecture/word-layout.md`.
 
 use open365_docx::{
-    Block, Border, Cell, CellMargins, CellPosition, HeightRule, Table, TableJustification,
+    Block, Border, Cell, CellMargins, CellPosition, HeightRule, Shading, Table, TableJustification,
     TableProps, VerticalAlign,
 };
 
 use crate::build::Builder;
 use crate::para::AtomClass;
+use crate::{BorderLine, BorderStyle, CellBorders};
+
+/// The identity and look of a cell, as `CellBox` reports it. `table` counts the tables of the
+/// unit; the paginator adds the unit's first table id.
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct CellMeta {
+    pub table: usize,
+    pub row: usize,
+    pub col: usize,
+    pub col_span: usize,
+    pub row_span: usize,
+    pub header_row: bool,
+    pub fill: Option<[u8; 3]>,
+    pub borders: CellBorders,
+}
+
+/// The border drawn at a cell edge: the first level that states one decides.
+fn resolve_border(
+    a: &Option<Border>,
+    b: &Option<Border>,
+    t: &Option<Border>,
+) -> Option<BorderLine> {
+    let found = a.as_ref().or(b.as_ref()).or(t.as_ref())?;
+    if !found.is_visible() || found.width <= 0.0 {
+        return None;
+    }
+    let style = match found.style.as_str() {
+        "double" | "triple" | "thinThickSmallGap" | "thickThinSmallGap" => BorderStyle::Double,
+        "dotted" => BorderStyle::Dotted,
+        "dashed" | "dotDash" | "dotDotDash" | "dashSmallGap" => BorderStyle::Dashed,
+        _ => BorderStyle::Solid,
+    };
+    Some(BorderLine {
+        width: found.width,
+        color: found.color.unwrap_or([0, 0, 0]),
+        style,
+    })
+}
+
+/// A shading as a solid colour: `pctNN` patterns mix the foreground into the fill.
+fn shading_fill(s: &Shading) -> Option<[u8; 3]> {
+    let pattern = s.pattern.as_str();
+    match pattern {
+        "nil" | "none" => None,
+        "solid" => s.color.or(s.fill),
+        p => {
+            if let Some(pct) = p.strip_prefix("pct").and_then(|n| n.parse::<f64>().ok()) {
+                let t = (pct / 100.0).clamp(0.0, 1.0);
+                let fg = s.color.unwrap_or([0, 0, 0]);
+                let bg = s.fill.unwrap_or([255, 255, 255]);
+                let mix =
+                    |i: usize| (f64::from(fg[i]) * t + f64::from(bg[i]) * (1.0 - t)).round() as u8;
+                Some([mix(0), mix(1), mix(2)])
+            } else {
+                s.fill
+            }
+        }
+    }
+}
 
 /// Word's default cell margins when neither the table, its style nor the cell state one.
 const DEFAULT_MARGIN_X: f64 = 5.4;
@@ -36,6 +95,7 @@ pub(crate) struct FlowBox {
     pub dy: f64,
     pub w: f64,
     pub h: f64,
+    pub meta: CellMeta,
 }
 
 #[derive(Debug, Clone, Copy, Default)]
@@ -65,6 +125,7 @@ pub(crate) struct CellLayout {
     /// cell between the borders, so it starts and ends this far inside `x` and `x + w`.
     pub inset_l: f64,
     pub inset_r: f64,
+    pub meta: CellMeta,
     /// Widths of the borders on the cell's four sides, as resolved for the table.
     border_top: f64,
     border_bottom: f64,
@@ -214,6 +275,7 @@ impl TableLayout {
                     dy: dy + row.top + row.above,
                     w: cell.w - cell.inset_l - cell.inset_r,
                     h,
+                    meta: cell.meta,
                 });
                 for bx in &cell.boxes {
                     boxes.push(FlowBox {
@@ -250,6 +312,8 @@ impl TableLayout {
 /// Lays out `table` in a text area `avail` wide.
 pub(crate) fn layout_table(b: &mut Builder<'_>, table: &Table, avail: f64) -> TableLayout {
     let view = table.view();
+    let table_id = b.tables;
+    b.tables += 1;
     let styles = b.ctx.styles;
     let props: TableProps = match styles {
         Some(s) => s.table_props(&view.props),
@@ -312,6 +376,7 @@ pub(crate) fn layout_table(b: &mut Builder<'_>, table: &Table, avail: f64) -> Ta
     let nrows = view.rows.len();
     let mut rows: Vec<RowLayout> = Vec::with_capacity(nrows);
     for (r, row) in view.rows.iter().enumerate() {
+        let header_row = row.props.is_header;
         let row_margins = row
             .exceptions
             .as_ref()
@@ -377,6 +442,47 @@ pub(crate) fn layout_table(b: &mut Builder<'_>, table: &Table, avail: f64) -> Ta
                 &sty.right,
                 if last_col { &tb.right } else { &tb.inside_v },
             );
+            let top = resolve_border(
+                &own.top,
+                &sty.top,
+                if r == 0 { &tb.top } else { &tb.inside_h },
+            );
+            let bottom = resolve_border(
+                &own.bottom,
+                &sty.bottom,
+                if last_row { &tb.bottom } else { &tb.inside_h },
+            );
+            let left = resolve_border(
+                &own.left,
+                &sty.left,
+                if c.col == 0 { &tb.left } else { &tb.inside_v },
+            );
+            let right = resolve_border(
+                &own.right,
+                &sty.right,
+                if last_col { &tb.right } else { &tb.inside_v },
+            );
+            let fill = c
+                .props
+                .shading
+                .as_ref()
+                .or(fmt.cell.shading.as_ref())
+                .and_then(shading_fill);
+            let meta = CellMeta {
+                table: table_id,
+                row: r,
+                col: c.col,
+                col_span: c.span,
+                row_span: c.row_span,
+                header_row,
+                fill,
+                borders: CellBorders {
+                    top,
+                    bottom,
+                    left,
+                    right,
+                },
+            };
             let valign = c
                 .props
                 .v_align
@@ -394,6 +500,7 @@ pub(crate) fn layout_table(b: &mut Builder<'_>, table: &Table, avail: f64) -> Ta
                 valign,
                 inset_l: 0.0,
                 inset_r: 0.0,
+                meta,
                 border_top,
                 border_bottom,
                 border_left,

@@ -390,3 +390,40 @@ fn pictures_are_laid_out_and_published_as_image_nodes() {
     let images: Vec<_> = h.query_all_by_role(Role::Image).collect();
     assert_eq!(images.len(), 1, "one image node");
 }
+
+#[test]
+fn export_pdf_writes_a_tagged_pdf_of_the_laid_out_document() {
+    let mut h = open("docx/plain-paragraphs.docx");
+    let State { view, target } = h.state_mut();
+    let out = view
+        .export_pdf(target, &open365_pdf::PdfMetadata::default())
+        .expect("export");
+    assert!(out.bytes.starts_with(b"%PDF-1.7"), "not a PDF");
+    assert!(
+        out.bytes.windows(15).any(|w| w == b"/StructTreeRoot"),
+        "not tagged"
+    );
+}
+
+#[test]
+fn print_hands_the_pdf_to_the_operating_system_by_path_not_script_text() {
+    let path = PathBuf::from("C:/tmp/a b; calc.pdf");
+    let cmd = open365_ui_egui::print_command(&path);
+    let args: Vec<String> = cmd
+        .get_args()
+        .map(|a| a.to_string_lossy().into_owned())
+        .collect();
+    if cfg!(windows) {
+        assert!(
+            !args.iter().any(|a| a.contains("calc.pdf")),
+            "path leaked into the script: {args:?}"
+        );
+        assert_eq!(cmd.get_program().to_string_lossy(), "powershell");
+        assert!(
+            cmd.get_envs()
+                .any(|(k, v)| k == "OPEN365_PRINT_FILE" && v == Some(path.as_os_str()))
+        );
+    } else {
+        assert_eq!(cmd.get_program().to_string_lossy(), "lp");
+    }
+}

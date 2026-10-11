@@ -139,6 +139,7 @@ pub(crate) fn place(
             paragraph,
             anchored: true,
             behind_text: d.behind_text,
+            source: crate::ImageSource::Main,
         },
     }
 }

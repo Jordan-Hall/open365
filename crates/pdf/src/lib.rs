@@ -16,12 +16,16 @@ mod writer;
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::fmt;
 
-use open365_docx::{Border, Document, Shading};
-use open365_layout::{CellBox, GlyphRun, Layout, Line, Page, StoryKind, list_labels};
+use open365_docx::Document;
+use open365_layout::{
+    BorderLine, BorderStyle, ClusterKind, GlyphRun, ImagePlacement, ImageSource, Layout, Line,
+    Page, ParaRole, StoryKind,
+};
+use open365_opc::{PartName, Relationships, TargetMode, rels_part_name, resolve_target};
 use open365_text::FontLibrary;
 
 use font::FaceDraw;
-use structure::{DocStructure, Edge, Node};
+use structure::{DocStructure, Node};
 use writer::{Pdf, digest, num, text_string, xml_escape};
 
 pub use image::{MAX_BYTES as MAX_IMAGE_BYTES, MAX_PIXELS as MAX_IMAGE_PIXELS};
@@ -115,6 +119,8 @@ struct Export<'a> {
     images: HashMap<String, Option<(String, u32)>>,
     /// Main-story lines already drawn: (paragraph, first offset).
     drawn: std::collections::HashSet<(usize, usize)>,
+    /// Glyph (face, id) to the text the font's ToUnicode CMap gives it.
+    to_unicode: BTreeMap<(usize, u32), String>,
     warnings: Vec<String>,
     pdf: Pdf,
 }
@@ -156,7 +162,7 @@ pub fn export_pdf(
             }
         }
     }
-    let learned = learn_ligatures(doc, layout, fonts, &used);
+    let (learned, to_unicode) = cluster_text(layout, fonts, &used);
     let no_extra = BTreeMap::new();
     let mut face_draw = BTreeMap::new();
     let mut font_objects = Vec::new();
@@ -176,7 +182,13 @@ pub fn export_pdf(
         face_draw.insert(*index, draw);
     }
 
-    let st = structure::analyse(doc, list_labels(doc), &mut pdf);
+    let mut roles: HashMap<usize, ParaRole> = HashMap::new();
+    for (_, line) in layout.lines() {
+        if line.story == StoryKind::Main {
+            roles.entry(line.paragraph).or_insert(line.role);
+        }
+    }
+    let st = structure::analyse(doc, &roles, &mut pdf);
     let resources_id = pdf.reserve();
     let pages_id = pdf.reserve();
     let page_ids: Vec<u32> = layout.pages.iter().map(|_| pdf.reserve()).collect();
@@ -192,6 +204,7 @@ pub fn export_pdf(
         extra_keys: HashMap::new(),
         images: HashMap::new(),
         drawn: std::collections::HashSet::new(),
+        to_unicode,
         warnings,
         pdf,
     };
@@ -270,15 +283,19 @@ pub fn export_pdf(
     Ok(PdfOutput { bytes, warnings })
 }
 
-/// Glyphs that no character maps to (ligatures such as "ft" or "tti") are not described by the
-/// font's cmap. The layout does not keep clusters, so the text they stand for is recovered by
-/// lining each paragraph's glyphs up with the paragraph's text.
-fn learn_ligatures(
-    doc: &Document,
+/// The text each glyph stands for, from the layout's clusters. A glyph whose cluster is several
+/// characters (a ligature) or that the font's cmap does not describe gets an entry of its own
+/// for the ToUnicode CMap; the second map is what the CMap will say for every glyph, to find the
+/// glyphs that need `ActualText`.
+#[allow(clippy::type_complexity)]
+fn cluster_text(
     layout: &Layout,
     fonts: &FontLibrary,
     used: &BTreeMap<usize, BTreeSet<u32>>,
-) -> BTreeMap<usize, BTreeMap<u32, String>> {
+) -> (
+    BTreeMap<usize, BTreeMap<u32, String>>,
+    BTreeMap<(usize, u32), String>,
+) {
     let rev: BTreeMap<usize, BTreeMap<u32, char>> = used
         .keys()
         .filter_map(|i| {
@@ -286,78 +303,42 @@ fn learn_ligatures(
             Some((*i, font::reverse_map(face)))
         })
         .collect();
-    let mut glyphs: BTreeMap<usize, Vec<(usize, u32)>> = BTreeMap::new();
-    for (_, line) in layout.lines() {
-        for run in line.runs.iter().filter(|r| !r.superscript) {
-            glyphs
-                .entry(line.paragraph)
-                .or_default()
-                .extend(run.glyphs.iter().map(|g| (g.face.index(), g.glyph_id)));
-        }
-    }
-    let paragraphs = doc.body().paragraphs();
-    let mut out: BTreeMap<usize, BTreeMap<u32, String>> = BTreeMap::new();
-    for (index, g) in &glyphs {
-        let Some(p) = paragraphs.get(*index) else {
-            continue;
-        };
-        let text: Vec<char> = p
-            .text()
-            .chars()
-            .filter(|c| !c.is_whitespace() && !c.is_control())
-            .collect();
-        // A list label comes first among the glyphs; try a few starting points.
-        let found = (0..g.len().min(8)).find_map(|skip| align(&text, &g[skip..], &rev));
-        for ((face, gid), s) in found.into_iter().flatten() {
-            out.entry(face).or_default().entry(gid).or_insert(s);
-        }
-    }
-    out
-}
-
-type GlyphKey = (usize, u32);
-
-fn align(
-    text: &[char],
-    glyphs: &[GlyphKey],
-    rev: &BTreeMap<usize, BTreeMap<u32, char>>,
-) -> Option<Vec<(GlyphKey, String)>> {
-    let char_of = |k: &GlyphKey| rev.get(&k.0).and_then(|m| m.get(&k.1)).copied();
-    let (mut i, mut j) = (0, 0);
-    let mut found = Vec::new();
-    while j < text.len() {
-        let key = *glyphs.get(i)?;
-        match char_of(&key) {
-            Some(c) if c.is_whitespace() => i += 1,
-            Some(c) => {
-                let s: Vec<char> = font::expand(c).chars().collect();
-                if !text[j..].starts_with(&s) {
-                    return None;
-                }
-                i += 1;
-                j += s.len();
+    let mut extra: BTreeMap<usize, BTreeMap<u32, String>> = BTreeMap::new();
+    for (_, line) in layout.all_lines() {
+        for g in line.runs.iter().flat_map(|r| &r.glyphs) {
+            let text = line.cluster_text(g);
+            if text.is_empty() || text.chars().all(|c| c.is_control()) {
+                continue;
             }
-            None => {
-                // The next glyph that has a character tells where the ligature ends.
-                let next: Vec<char> = glyphs[i + 1..]
-                    .iter()
-                    .filter_map(char_of)
-                    .find(|c| !c.is_whitespace())
-                    .map(|c| font::expand(c).chars().collect())
-                    .unwrap_or_default();
-                let k = (2..=4).find(|k| {
-                    j + k <= text.len()
-                        && (j + k == text.len()
-                            || next.is_empty()
-                            || text[j + k..].starts_with(&next))
-                })?;
-                found.push((key, text[j..j + k].iter().collect()));
-                i += 1;
-                j += k;
+            let face = g.face.index();
+            let described = rev.get(&face).and_then(|m| m.get(&g.glyph_id));
+            if described.is_none() || text.chars().nth(1).is_some() {
+                extra
+                    .entry(face)
+                    .or_default()
+                    .entry(g.glyph_id)
+                    .or_insert_with(|| text.to_owned());
             }
         }
     }
-    Some(found)
+    let mut table: BTreeMap<(usize, u32), String> = BTreeMap::new();
+    for (face, gids) in used {
+        for gid in gids {
+            let text = extra
+                .get(face)
+                .and_then(|m| m.get(gid))
+                .cloned()
+                .or_else(|| {
+                    rev.get(face)
+                        .and_then(|m| m.get(gid))
+                        .map(|c| font::expand(*c))
+                });
+            if let Some(t) = text {
+                table.insert((*face, *gid), t);
+            }
+        }
+    }
+    (extra, table)
 }
 
 fn write_info(pdf: &mut Pdf, meta: &PdfMetadata) -> u32 {
@@ -401,26 +382,6 @@ fn write_xmp(pdf: &mut Pdf, meta: &PdfMetadata) -> u32 {
     pdf.add_stream("/Type /Metadata /Subtype /XML", x.as_bytes(), false)
 }
 
-fn shading_fill(s: &Shading) -> Option<[u8; 3]> {
-    let pattern = s.pattern.as_str();
-    match pattern {
-        "nil" | "none" => None,
-        "solid" => s.color.or(s.fill),
-        p => {
-            if let Some(pct) = p.strip_prefix("pct").and_then(|n| n.parse::<f64>().ok()) {
-                let t = (pct / 100.0).clamp(0.0, 1.0);
-                let fg = s.color.unwrap_or([0, 0, 0]);
-                let bg = s.fill.unwrap_or([255, 255, 255]);
-                let mix =
-                    |i: usize| (f64::from(fg[i]) * t + f64::from(bg[i]) * (1.0 - t)).round() as u8;
-                Some([mix(0), mix(1), mix(2)])
-            } else {
-                s.fill
-            }
-        }
-    }
-}
-
 impl Export<'_> {
     fn render_page(&mut self, index: usize, page: &Page) -> (String, Vec<u32>) {
         let mut buf = PageBuf {
@@ -431,7 +392,7 @@ impl Export<'_> {
         };
         self.draw_cells(&mut buf, page);
         for img in page.images.iter().filter(|i| !i.anchored || i.behind_text) {
-            self.draw_image(&mut buf, img);
+            self.draw_image(&mut buf, img, true);
         }
         self.draw_borders(&mut buf, page);
         for line in page
@@ -444,7 +405,16 @@ impl Export<'_> {
             self.draw_line(&mut buf, line);
         }
         for img in page.images.iter().filter(|i| i.anchored && !i.behind_text) {
-            self.draw_image(&mut buf, img);
+            self.draw_image(&mut buf, img, true);
+        }
+        // Pictures of headers, footers and notes are not part of the reading order.
+        for img in page
+            .header_images
+            .iter()
+            .chain(&page.note_images)
+            .chain(&page.footer_images)
+        {
+            self.draw_image(&mut buf, img, false);
         }
         (buf.content, buf.owners)
     }
@@ -494,10 +464,47 @@ impl Export<'_> {
         }
         let owner = self.owner_of(line);
         self.begin(buf, &owner);
+        let actual = self.actual_text(line);
+        if let Some(t) = &actual {
+            buf.content
+                .push_str(&format!("/Span << /ActualText {} >> BDC\n", text_string(t)));
+        }
         for run in &line.runs {
             self.draw_run(buf, line, run);
         }
+        if actual.is_some() {
+            buf.content.push_str("EMC\n");
+        }
         buf.content.push_str("EMC\n");
+    }
+
+    /// The text of the line when the ToUnicode CMap cannot say it glyph by glyph: a glyph that
+    /// stands for other characters than the CMap gives it (a character the font draws with the
+    /// glyph of another, an accent merged into its base). `None` when the CMap is enough.
+    fn actual_text(&self, line: &Line) -> Option<String> {
+        let private = |c: char| ('\u{e000}'..='\u{f8ff}').contains(&c);
+        let mut text = String::new();
+        let mut differs = false;
+        for g in line.runs.iter().flat_map(|r| &r.glyphs) {
+            if g.cluster.kind != ClusterKind::Text {
+                continue;
+            }
+            let t = line.cluster_text(g);
+            if t.is_empty() {
+                continue;
+            }
+            text.push_str(t);
+            if !t.chars().any(private)
+                && self
+                    .to_unicode
+                    .get(&(g.face.index(), g.glyph_id))
+                    .is_none_or(|u| u != t)
+                && !t.chars().all(|c| c.is_control())
+            {
+                differs = true;
+            }
+        }
+        differs.then_some(text)
     }
 
     fn draw_run(&mut self, buf: &mut PageBuf, line: &Line, run: &GlyphRun) {
@@ -593,14 +600,7 @@ impl Export<'_> {
     fn draw_cells(&mut self, buf: &mut PageBuf, page: &Page) {
         let mut shaded = false;
         for cell in &page.cells {
-            let Some((ti, r, ci)) = self.cell_of(page, cell) else {
-                continue;
-            };
-            let Some(sh) = self.st.tables[ti].rows[r][ci]
-                .shading
-                .as_ref()
-                .and_then(shading_fill)
-            else {
+            let Some(fill) = cell.fill else {
                 continue;
             };
             if !shaded {
@@ -609,7 +609,7 @@ impl Export<'_> {
             }
             buf.content.push_str(&format!(
                 "{} rg {} {} {} {} re f\n",
-                pdf_color(sh),
+                pdf_color(fill),
                 num(cell.x, 4),
                 num(buf.y(cell.y + cell.height), 4),
                 num(cell.width, 4),
@@ -624,47 +624,29 @@ impl Export<'_> {
     fn draw_borders(&mut self, buf: &mut PageBuf, page: &Page) {
         let mut open = false;
         for cell in &page.cells {
-            let Some((ti, r, ci)) = self.cell_of(page, cell) else {
-                continue;
-            };
-            let t = &self.st.tables[ti];
-            let edges = [
-                (Edge::Top, t.border(r, ci, Edge::Top)),
-                (Edge::Bottom, t.border(r, ci, Edge::Bottom)),
-                (Edge::Left, t.border(r, ci, Edge::Left)),
-                (Edge::Right, t.border(r, ci, Edge::Right)),
-            ];
-            let width_of = |e: Edge| {
-                edges
-                    .iter()
-                    .find(|(k, _)| std::mem::discriminant(k) == std::mem::discriminant(&e))
-                    .and_then(|(_, b)| b.as_ref())
-                    .map_or(0.0, |b: &Border| b.width)
-            };
+            let b = &cell.borders;
+            let width = |l: &Option<BorderLine>| l.as_ref().map_or(0.0, |l| l.width);
             let (wl, wr, wt, wb) = (
-                width_of(Edge::Left),
-                width_of(Edge::Right),
-                width_of(Edge::Top),
-                width_of(Edge::Bottom),
+                width(&b.left),
+                width(&b.right),
+                width(&b.top),
+                width(&b.bottom),
             );
-            for (edge, border) in &edges {
-                let Some(b) = border else { continue };
-                if b.width <= 0.0 {
-                    continue;
-                }
+            let (x, y, w, h) = (cell.x, cell.y, cell.width, cell.height);
+            // Rectangle of each strip in page coordinates (y down), corners included.
+            let strips = [
+                (&b.top, true, (x - wl, y - wt, w + wl + wr, wt)),
+                (&b.bottom, true, (x - wl, y + h, w + wl + wr, wb)),
+                (&b.left, false, (x - wl, y - wt, wl, h + wt + wb)),
+                (&b.right, false, (x + w, y - wt, wr, h + wt + wb)),
+            ];
+            for (line, horizontal, rect) in strips {
+                let Some(line) = line else { continue };
                 if !open {
                     buf.content.push_str("/Artifact BMC\n");
                     open = true;
                 }
-                let (x, y, w, h) = (cell.x, cell.y, cell.width, cell.height);
-                // Rectangle of the strip in page coordinates (y down), corners included.
-                let rect = match edge {
-                    Edge::Top => (x - wl, y - b.width, w + wl + wr, b.width),
-                    Edge::Bottom => (x - wl, y + h, w + wl + wr, b.width),
-                    Edge::Left => (x - b.width, y - wt, b.width, h + wt + wb),
-                    Edge::Right => (x + w, y - wt, b.width, h + wt + wb),
-                };
-                draw_border_strip(&mut buf.content, buf.height, b, *edge, rect);
+                draw_border_strip(&mut buf.content, buf.height, line, horizontal, rect);
             }
         }
         if open {
@@ -672,53 +654,39 @@ impl Export<'_> {
         }
     }
 
-    /// The table cell a page rectangle belongs to: found through the text inside it.
-    fn cell_of(&self, page: &Page, cell: &CellBox) -> Option<(usize, usize, usize)> {
-        let mut best: Option<(usize, usize, usize, usize)> = None;
-        for line in &page.lines {
-            if line.top + 0.5 < cell.y
-                || line.top > cell.y + cell.height + 0.5
-                || line.left + 0.5 < cell.x
-                || line.left > cell.x + cell.width + 0.5
-            {
-                continue;
-            }
-            if let Some((t, r, c, depth)) = self.st.paras.get(line.paragraph).and_then(|p| p.cell)
-                && best.is_none_or(|b| depth < b.3)
-            {
-                best = Some((t, r, c, depth));
-            }
-        }
-        best.map(|(t, r, c, _)| (t, r, c))
-    }
-
-    fn draw_image(&mut self, buf: &mut PageBuf, img: &open365_layout::ImagePlacement) {
+    /// Draws a picture; `tagged` pictures of the main story become Figure elements.
+    fn draw_image(&mut self, buf: &mut PageBuf, img: &ImagePlacement, tagged: bool) {
         let Some(embed) = img.embed.as_deref() else {
             return;
         };
-        if !self.images.contains_key(embed) {
-            let entry = match self.doc.image_part(embed) {
+        let key = format!("{:?}|{embed}", img.source);
+        if !self.images.contains_key(&key) {
+            let entry = match image_part(self.doc, &img.source, embed) {
                 None => {
                     self.warnings
                         .push(format!("picture {embed}: image part not found"));
                     None
                 }
-                Some(part) => match image::embed(&mut self.pdf, part.bytes) {
+                Some((part_name, bytes)) => match image::embed(&mut self.pdf, bytes) {
                     Ok(id) => Some((format!("Im{}", self.images.len()), id)),
                     Err(e) => {
                         self.warnings
-                            .push(format!("picture {embed} ({}): {e}", part.name));
+                            .push(format!("picture {embed} ({part_name}): {e}"));
                         None
                     }
                 },
             };
-            self.images.insert(embed.to_owned(), entry);
+            self.images.insert(key.clone(), entry);
         }
-        let Some(Some((name, _))) = self.images.get(embed) else {
+        let Some(Some((name, _))) = self.images.get(&key) else {
             return;
         };
         let name = name.clone();
-        let parent = self.st.paras.get(img.paragraph).map(|p| p.node);
+        let parent = if tagged {
+            self.st.paras.get(img.paragraph).map(|p| p.node)
+        } else {
+            None
+        };
         let alt = img.description.clone().filter(|d| !d.trim().is_empty());
         match parent {
             Some(parent) => {
@@ -848,16 +816,58 @@ impl Export<'_> {
     }
 }
 
+/// The part and bytes a picture's `embed` id names, through the relationships of the part the
+/// layout says it belongs to.
+fn image_part<'a>(
+    doc: &'a Document,
+    source: &ImageSource,
+    embed: &str,
+) -> Option<(String, &'a [u8])> {
+    let owner = match source {
+        ImageSource::Main => return doc.image_part(embed).map(|p| (p.name, p.bytes)),
+        ImageSource::HeaderFooter(rel) => related(doc, doc.main_part(), |r| r.id == *rel)?,
+        ImageSource::Footnotes => {
+            related(doc, doc.main_part(), |r| r.rel_type.ends_with("/footnotes"))?
+        }
+        ImageSource::Endnotes => {
+            related(doc, doc.main_part(), |r| r.rel_type.ends_with("/endnotes"))?
+        }
+    };
+    let rel = relationships(doc, &owner)?.get(embed).cloned()?;
+    if rel.target_mode != TargetMode::Internal {
+        return None;
+    }
+    let name = resolve_target(Some(&owner), &rel.target).ok()?;
+    let part = doc.package().part(name.as_str())?;
+    Some((name.as_str().to_owned(), part.data()))
+}
+
+fn relationships(doc: &Document, part: &PartName) -> Option<Relationships> {
+    let rels = doc.package().part(rels_part_name(Some(part)).as_str())?;
+    Relationships::parse(rels.data()).ok()
+}
+
+fn related(
+    doc: &Document,
+    from: &PartName,
+    pick: impl Fn(&open365_opc::Relationship) -> bool,
+) -> Option<PartName> {
+    let rels = relationships(doc, from)?;
+    let rel = rels
+        .iter()
+        .find(|r| r.target_mode == TargetMode::Internal && pick(r))?;
+    resolve_target(Some(from), &rel.target).ok()
+}
+
 fn draw_border_strip(
     out: &mut String,
     page_h: f64,
-    b: &Border,
-    edge: Edge,
+    b: &BorderLine,
+    horizontal: bool,
     rect: (f64, f64, f64, f64),
 ) {
-    let color = pdf_color(b.color.unwrap_or([0, 0, 0]));
+    let color = pdf_color(b.color);
     let (x, y, w, h) = rect;
-    let horizontal = matches!(edge, Edge::Top | Edge::Bottom);
     let fill = |out: &mut String, x: f64, y: f64, w: f64, h: f64| {
         out.push_str(&format!(
             "{color} rg {} {} {} {} re f\n",
@@ -867,8 +877,8 @@ fn draw_border_strip(
             num(h, 4)
         ));
     };
-    match b.style.as_str() {
-        "double" | "triple" | "thinThickSmallGap" | "thickThinSmallGap" => {
+    match b.style {
+        BorderStyle::Double => {
             let third = if horizontal { h / 3.0 } else { w / 3.0 };
             if horizontal {
                 fill(out, x, y, w, third);
@@ -878,9 +888,9 @@ fn draw_border_strip(
                 fill(out, x + 2.0 * third, y, third, h);
             }
         }
-        "dotted" | "dashed" | "dotDash" | "dotDotDash" | "dashSmallGap" => {
+        BorderStyle::Dotted | BorderStyle::Dashed => {
             let thick = if horizontal { h } else { w };
-            let on = if b.style == "dotted" {
+            let on = if b.style == BorderStyle::Dotted {
                 thick
             } else {
                 thick * 3.0
@@ -901,6 +911,6 @@ fn draw_border_strip(
                 num(page_h - y2, 4)
             ));
         }
-        _ => fill(out, x, y, w, h),
+        BorderStyle::Solid => fill(out, x, y, w, h),
     }
 }

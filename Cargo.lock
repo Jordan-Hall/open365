@@ -2871,6 +2871,7 @@ dependencies = [
  "open365-docx",
  "open365-layout",
  "open365-opc",
+ "open365-pdf",
  "open365-text",
  "open365-xlsx",
  "rfd",

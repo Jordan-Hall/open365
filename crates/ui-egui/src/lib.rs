@@ -14,7 +14,7 @@ mod grid_view;
 
 use std::path::PathBuf;
 
-pub use app::App;
+pub use app::{App, print_command};
 pub use doc_view::{DocPos, DocView, Toggle};
 pub use grid_view::{GridView, PaintedCell};
 

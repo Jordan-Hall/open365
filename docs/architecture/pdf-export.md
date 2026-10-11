@@ -21,13 +21,13 @@ PDF 1.7, classic xref table, own writer on `flate2` (already in the dependency g
 | Feature | How |
 |---|---|
 | Fonts | Type0 / Identity-H. TrueType: glyf subset (glyph ids unchanged, unused outlines emptied, composite closure, `loca` rebuilt, checksums fixed). CFF/OpenType: embedded whole as FontFile3. Fonts with the OS/2 `fsType` restricted-licence bit are refused; the no-subsetting bit embeds the whole font. |
-| Text copy | ToUnicode CMap per font. Reverse `cmap` first; ligature glyphs the cmap does not describe ("ft", "tti") are recovered by lining a paragraph's glyphs up with its text. |
+| Text copy | ToUnicode CMap per font from the layout's glyph clusters (`Line::cluster_text`): a ligature glyph ("ft", "tti") or a glyph the font's `cmap` does not describe gets the characters it was shaped from; other glyphs use the reverse `cmap`. A line where some glyph stands for other characters than the CMap gives it (accent merged into its base, NBSP drawn with the space glyph) is wrapped in a `Span` with `/ActualText`. List labels with private-use symbol characters keep the reverse-`cmap` mapping. |
 | Placement | One `BT .. Tm .. TJ .. ET` per run segment (split where face or vertical offset changes). TJ adjustments are computed from the cursor the PDF will have, so rounding never accumulates. |
 | Decoration | Underline and strike from the font's `post`/`OS/2` metrics. |
-| Tables | Cell shading (`w:shd`, including `pctNN` mixes) and borders (cell, then table style, then table; solid, double, dashed/dotted) as artifacts. Cells are found from the layout's cell boxes through the text inside them. |
-| Images | JPEG: header validated, DCTDecode pass-through (CMYK Adobe inverted handled). Others: decoded with `image` under limits, Flate RGB plus an `SMask` when any alpha is not 255. |
+| Tables | `CellBox` carries the resolved fill (`w:shd`, `pctNN` mixes mixed) and the four borders (cell, then table style, then table; solid, double, dashed, dotted). The PDF draws them as artifacts straight from the layout; it does not read the DOCX for them. Table, row and column ids are in `CellBox` too. |
+| Images | Body pictures, and the inline and floating pictures of headers, footers and footnotes (`Page::header_images`, `footer_images`, `note_images`). A picture's `embed` id is resolved through the relationships of the part the layout names (`ImageSource`), so a header picture is found through the header part. Header, footer and note pictures are artifacts. JPEG: header validated, DCTDecode pass-through (CMYK Adobe inverted handled). Others: decoded with `image` under limits, Flate RGB plus an `SMask` when any alpha is not 255. |
 | Pages | MediaBox from each page's section. |
-| Tagging | `MarkInfo`, `StructTreeRoot`, `ParentTree`, `/Tabs /S`. Elements: Document, P, H1-H6 (style name `heading N`, through `basedOn`), L/LI/LBody (consecutive list paragraphs), Table/TR/TH/TD (header rows are TH with Scope, spans as attributes), Figure with `/Alt` from the picture description. Footnote lines become P elements at the end; headers, footers, shading, borders and repeated table header rows are artifacts. |
+| Tagging | `MarkInfo`, `StructTreeRoot`, `ParentTree`, `/Tabs /S`. Elements: Document, P, H1-H6 and L/LI/LBody (consecutive list paragraphs), both from the layout's `ParaRole` of the paragraph (heading level from the style name `heading N` through `basedOn`; a numbered heading is a list item as before), Table/TR/TH/TD (header rows are TH with Scope, spans as attributes), Figure with `/Alt` from the picture description. Footnote lines become P elements at the end; headers, footers, shading, borders and repeated table header rows are artifacts. |
 | Metadata | Info dictionary and XMP from `PdfMetadata`; `DisplayDocTitle` only with a title. |
 
 The file is deterministic (the `/ID` is a digest of metadata and layout size, no clock).
@@ -65,12 +65,45 @@ caller's library, not from the document.
   are untested.
 - Text reading order follows the layout (lines), not Word's story order for floats; notes are
   appended to the Document element.
-- Glyphs with no cmap entry and no alignable paragraph text (fields, hidden text, symbols) get no
-  ToUnicode entry.
+- A glyph that stands for no characters (the note separator rule) gets no ToUnicode entry.
 - CFF fonts are embedded whole. Variable fonts are embedded at their default instance only.
-- No hyperlinks or bookmarks (no `Link` annotations or outline), no pictures in headers, footers
-  or notes (the layout does not report them), no EMF/WMF/SVG pictures (warning), no tiling
+- No hyperlinks or bookmarks (no `Link` annotations or outline); pictures of headers, footers and
+  notes are artifacts without alternative text in the structure tree; floating pictures there do
+  not displace text; no EMF/WMF/SVG pictures (warning), no tiling
   patterns for stripe shading (fill colour only), no text rendering modes for outline/shadow.
 - Colour is DeviceRGB, no output intent, no encryption.
-- Layout gives no per-glyph source text; a cluster map from `open365-text` would replace the
-  alignment heuristic and enable `ActualText`.
+- `ActualText` is per line, not per glyph run, and compares against the CMap only; it is not
+  validated with an external checker.
+
+## Layout API the export and the desktop use
+
+`open365-layout` reports, so that no consumer has to guess:
+
+- `PlacedGlyph::cluster` (`Cluster`): story range (relative to `Line::start`) and byte range in
+  `Line::text` / `Line::label` of the characters a glyph was shaped from; a ligature is one glyph
+  with a multi-character cluster, the later glyphs of a cluster carry an empty text range.
+  `Line::cluster_story` and `Line::cluster_text` resolve them.
+- `CellBox`: `table` (document-order id, stable under incremental update), `row`, `col`, spans,
+  `header_row`, `fill` and `borders` (`CellBorders` of `BorderLine`).
+- `Line::role` (`ParaRole`: plain, heading level, list item).
+- `Page::header_images`, `footer_images`, `note_images` with `ImagePlacement::source`.
+
+The desktop view uses the cluster map for caret, selection and accessibility character positions
+(tab characters have no glyph and sit at the pen; a ligature is shared out by UTF-16 units), draws
+cell shading and borders from `CellBox`, and publishes heading and list-item roles.
+
+## Desktop: Export PDF and Print
+
+`File > Export PDF...` (rfd save dialog) and `File > Print...` (Ctrl+P) render the open Word
+document through `DocView::export_pdf`, which lays the document out if an edit is pending and uses
+the library the screen layout used (installed fonts first), so the PDF has the pages the user sees.
+
+| Part | Native? |
+|---|---|
+| Save dialog | Native (rfd: Win32/GTK/portal). |
+| PDF production | Ours (this crate); fonts whose licence forbids embedding fail the export with a message in the status bar. |
+| Print | Not native. The PDF goes to a temp file `open365-print-<pid>-<name>.pdf` and the OS print path runs on it: Windows `Start-Process -Verb Print` through PowerShell (the shell `print` verb of the default PDF handler, falling back to opening the file when the handler has no print verb); elsewhere `lp`. The path is passed in an environment variable, never in script text. |
+| Print dialog, printer choice, page range, duplex | Whatever the PDF handler offers (none for the Windows `print` verb, which prints to the default printer). We have no print dialog or print preview of our own. |
+| Temp file | Left in the temp directory (the handler reads it after we return). |
+
+Untested: actual printing (a test asserts the command shape only), macOS, and Linux without CUPS.

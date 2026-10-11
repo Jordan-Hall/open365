@@ -21,7 +21,10 @@ use egui::{
 };
 use open365_commands::{Command, Outcome, Target};
 use open365_docx::{Alignment, RunPropsPatch};
-use open365_layout::{IncrementalLayout, Layout, LayoutOptions, Line, PlacedGlyph};
+use open365_layout::{
+    BorderLine, BorderStyle, ClusterKind, IncrementalLayout, Layout, LayoutOptions, Line, ParaRole,
+    PlacedGlyph,
+};
 use open365_text::{FaceId, FontStyle, ShapeFeatures, shape_run};
 
 use self::glyphs::{Atlas, FontSet, GlyphBatch};
@@ -312,6 +315,21 @@ impl DocView {
     }
 
     /// The laid-out document the view draws.
+    /// Writes the document as a tagged PDF from the layout on screen (the print path, ADR-004):
+    /// the same pages, glyph positions and fonts the view draws.
+    pub fn export_pdf(
+        &mut self,
+        target: &Target,
+        meta: &open365_pdf::PdfMetadata,
+    ) -> Result<open365_pdf::PdfOutput, String> {
+        self.ensure_layout(target);
+        let doc = target
+            .docx()
+            .ok_or_else(|| "only Word documents can be exported to PDF".to_owned())?;
+        open365_pdf::export_pdf(doc, self.engine.layout(), &self.fonts.library, meta)
+            .map_err(|e| e.to_string())
+    }
+
     pub fn layout(&self) -> &Layout {
         self.engine.layout()
     }
@@ -583,10 +601,9 @@ impl DocView {
         Some(hit.unwrap_or(fallback))
     }
 
-    /// Where each character of a line starts. Layout gives glyph origins, not characters, so
-    /// characters are matched to glyphs in order: a tab or break has no glyph, and a ligature
-    /// (one glyph for several characters) is detected by the glyph not being the character's
-    /// own and shared out evenly.
+    /// Where each character of a line starts, from the layout's cluster map: every glyph says
+    /// which story range it stands for, so a tab (no glyph) falls back to the pen and a
+    /// ligature (one glyph, several characters) is shared out by UTF-16 units.
     fn line_geom(&self, ri: usize) -> LineGeom {
         let line = self.line(ri);
         let para = line.paragraph.min(self.models.len().saturating_sub(1));
@@ -596,57 +613,41 @@ impl DocView {
             .get(para)
             .map(|m| m.text.chars().skip(cs).take(ce - cs).collect())
             .unwrap_or_default();
-        let skip_label =
-            self.index.para_first.get(para) == Some(&ri) && self.engine.list_label(para).is_some();
-        let glyphs: Vec<(FaceId, &PlacedGlyph)> = line
-            .runs
-            .iter()
-            .skip(usize::from(skip_label))
-            .flat_map(|r| r.glyphs.iter().map(|g| (g.face, g)))
-            .collect();
-        let no_glyph = |c: char| matches!(c, '\t' | '\n' | '\u{b}' | '\u{c}' | '\u{e}' | '\r');
-        let wanted = chars.iter().filter(|c| !no_glyph(**c)).count();
-        let exact = wanted == glyphs.len();
-        let mut xs = Vec::with_capacity(chars.len() + 1);
-        let mut pen = line.left;
-        let (mut gi, mut i) = (0usize, 0usize);
-        while i < chars.len() {
-            let c = chars[i];
-            if no_glyph(c) || gi >= glyphs.len() {
-                xs.push(pen);
-                i += 1;
+        // Clusters in story order: (start, end, left x, right x). Glyphs of one cluster merge.
+        let mut spans: Vec<(usize, usize, f64, f64)> = Vec::new();
+        for g in line.runs.iter().flat_map(|r| &r.glyphs) {
+            if g.cluster.kind != ClusterKind::Text {
                 continue;
             }
-            let (face, g) = glyphs[gi];
-            let mut span = 1usize;
-            if !exact && g.glyph_id != self.fonts.nominal_glyph(face, c) {
-                match glyphs.get(gi + 1) {
-                    Some((nf, next)) => {
-                        for k in 2..=4usize {
-                            if i + k < chars.len()
-                                && self.fonts.nominal_glyph(*nf, chars[i + k]) == next.glyph_id
-                            {
-                                span = k;
-                                break;
-                            }
-                        }
-                    }
-                    None => {
-                        let rest = &chars[i..];
-                        if rest.len() <= 4 && !rest.iter().any(|c| no_glyph(*c)) {
-                            span = rest.len();
-                        }
-                    }
+            let r = line.cluster_story(g);
+            if r.is_empty() {
+                continue;
+            }
+            match spans.last_mut() {
+                Some(last) if last.0 == r.start && last.1 == r.end => {
+                    last.3 = last.3.max(g.x + g.advance);
                 }
+                _ => spans.push((r.start, r.end, g.x, g.x + g.advance)),
             }
-            for j in 0..span {
-                xs.push(g.x + g.advance * j as f64 / span as f64);
-            }
-            pen = g.x + g.advance;
-            gi += 1;
-            i += span;
         }
-        xs.truncate(chars.len());
+        let mut xs = Vec::with_capacity(chars.len() + 1);
+        let mut pen = line.left;
+        let (mut u, mut si) = (line.start, 0usize);
+        for c in &chars {
+            let n = c.len_utf16();
+            while si < spans.len() && spans[si].1 <= u {
+                si += 1;
+            }
+            match spans.get(si) {
+                Some(&(start, end, x0, x1)) if start <= u => {
+                    let w = (end - start) as f64;
+                    xs.push(x0 + (x1 - x0) * (u - start) as f64 / w);
+                    pen = x0 + (x1 - x0) * ((u + n).min(end) - start) as f64 / w;
+                }
+                _ => xs.push(pen),
+            }
+            u += n;
+        }
         xs.push(pen);
         LineGeom { cs, ce, xs }
     }
@@ -1652,6 +1653,96 @@ impl DocView {
         }
     }
 
+    /// Cell shading and borders from the layout's cell boxes (`CellBox::fill`, `borders`).
+    fn paint_cells(&self, painter: &egui::Painter, origin: Pos2, page: usize, clip: Rect) {
+        let s = self.scale;
+        let at = |x: f64, y: f64| origin + vec2(x as f32, y as f32) * s;
+        let color = |c: [u8; 3]| Color32::from_rgb(c[0], c[1], c[2]);
+        let rect_of = |x: f64, y: f64, w: f64, h: f64| {
+            Rect::from_min_size(at(x, y), vec2(w as f32, h as f32) * s)
+        };
+        let cells = &self.engine.layout().pages[page].cells;
+        for cell in cells {
+            let bounds = rect_of(cell.x, cell.y, cell.width, cell.height).expand(8.0 * s);
+            if !bounds.intersects(clip) {
+                continue;
+            }
+            if let Some(fill) = cell.fill {
+                painter.rect_filled(
+                    rect_of(cell.x, cell.y, cell.width, cell.height),
+                    0.0,
+                    color(fill),
+                );
+            }
+        }
+        for cell in cells {
+            let bounds = rect_of(cell.x, cell.y, cell.width, cell.height).expand(8.0 * s);
+            if !bounds.intersects(clip) {
+                continue;
+            }
+            let b = &cell.borders;
+            let width = |l: &Option<BorderLine>| l.as_ref().map_or(0.0, |l| l.width);
+            let (wl, wr, wt, wb) = (
+                width(&b.left),
+                width(&b.right),
+                width(&b.top),
+                width(&b.bottom),
+            );
+            let (x, y, w, h) = (cell.x, cell.y, cell.width, cell.height);
+            // Strip rectangles in page points, corners included (as in the PDF export).
+            let strips = [
+                (&b.top, true, (x - wl, y - wt, w + wl + wr, wt)),
+                (&b.bottom, true, (x - wl, y + h, w + wl + wr, wb)),
+                (&b.left, false, (x - wl, y - wt, wl, h + wt + wb)),
+                (&b.right, false, (x + w, y - wt, wr, h + wt + wb)),
+            ];
+            for (line, horizontal, (sx, sy, sw, sh)) in strips {
+                let Some(line) = line else { continue };
+                let c = color(line.color);
+                match line.style {
+                    BorderStyle::Solid => {
+                        painter.rect_filled(rect_of(sx, sy, sw, sh), 0.0, c);
+                    }
+                    BorderStyle::Double => {
+                        let third = if horizontal { sh / 3.0 } else { sw / 3.0 };
+                        let (a, z) = if horizontal {
+                            (
+                                rect_of(sx, sy, sw, third),
+                                rect_of(sx, sy + 2.0 * third, sw, third),
+                            )
+                        } else {
+                            (
+                                rect_of(sx, sy, third, sh),
+                                rect_of(sx + 2.0 * third, sy, third, sh),
+                            )
+                        };
+                        painter.rect_filled(a, 0.0, c);
+                        painter.rect_filled(z, 0.0, c);
+                    }
+                    BorderStyle::Dashed | BorderStyle::Dotted => {
+                        let thick = line.width as f32 * s;
+                        let on = if line.style == BorderStyle::Dotted {
+                            thick
+                        } else {
+                            thick * 3.0
+                        };
+                        let (p0, p1) = if horizontal {
+                            (at(sx, sy + sh / 2.0), at(sx + sw, sy + sh / 2.0))
+                        } else {
+                            (at(sx + sw / 2.0, sy), at(sx + sw / 2.0, sy + sh))
+                        };
+                        painter.extend(Shape::dashed_line(
+                            &[p0, p1],
+                            Stroke::new(thick, c),
+                            on,
+                            on,
+                        ));
+                    }
+                }
+            }
+        }
+    }
+
     fn paint_page(
         &mut self,
         ctx: &Context,
@@ -1696,6 +1787,8 @@ impl DocView {
             painter.line_segment([Pos2::new(x, y), Pos2::new(x + dx * arm, y)], mark);
             painter.line_segment([Pos2::new(x, y), Pos2::new(x, y + dy * arm)], mark);
         }
+
+        self.paint_cells(painter, origin, page, clip);
 
         let first_ri = self.index.page_first[page];
         let line_count = self.engine.layout().pages[page].lines.len();
@@ -2036,12 +2129,19 @@ impl DocView {
         for para in paras {
             let lines = self.a11y_lines(para, canvas);
             let label = self.engine.list_label(para).map(list_label_text);
+            let range = self.line_range_of(para);
+            let role = if range.is_empty() {
+                ParaRole::Plain
+            } else {
+                self.line(range.start).role
+            };
             entries.extend(a11y::publish_paragraph(
                 &mut run_ui,
                 doc_id,
                 para,
                 &lines,
                 label.as_deref(),
+                role,
             ));
         }
         self.runs = entries;

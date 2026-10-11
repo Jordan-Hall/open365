@@ -19,6 +19,8 @@ pub(crate) struct Builder<'a> {
     labels: &'a [Option<ListLabel>],
     /// Document-order index of the next paragraph.
     next: usize,
+    /// Tables started so far in this unit (the next table's local id).
+    pub tables: usize,
 }
 
 impl<'a> Builder<'a> {
@@ -33,6 +35,7 @@ impl<'a> Builder<'a> {
             story: 0,
             labels,
             next: first_paragraph,
+            tables: 0,
         }
     }
 
@@ -63,6 +66,8 @@ pub(crate) struct UnitLayout {
     pub table: Option<TableLayout>,
     /// Characters of the story the unit covers (row end marks included).
     pub story_len: usize,
+    /// Tables in the unit, nested ones included.
+    pub tables: usize,
     /// The list labels the unit was laid out with.
     pub labels: Vec<Option<ListLabel>>,
     /// Requested font families, sorted and unique.
@@ -108,6 +113,7 @@ pub(crate) fn build_unit(
         Block::Raw(_) => None,
     };
     let story_len = b.story;
+    let tables = b.tables;
     let arena = b.arena;
     let mut fonts: Vec<String> = arena
         .iter()
@@ -122,6 +128,7 @@ pub(crate) fn build_unit(
         arena,
         table,
         story_len,
+        tables,
         labels: if used.iter().any(Option::is_some) {
             used.to_vec()
         } else {

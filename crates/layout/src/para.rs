@@ -2,6 +2,7 @@
 
 use std::collections::HashMap;
 use std::ops::Range;
+use std::sync::Arc;
 
 use open365_docx::{
     Alignment, Drawing, EffectiveParagraph, EffectiveRun, IndentOverride, Inline, Paragraph,
@@ -12,6 +13,7 @@ use open365_text::{
     shape_run,
 };
 
+use crate::ParaRole;
 use crate::metrics::{LineMetricModel, PictureLine, line_height};
 use crate::numbering::{LabelAlign, ListLabel, Suffix};
 use crate::props::{TabKind, TabLeader, TabStop};
@@ -100,6 +102,8 @@ pub(crate) struct PlacedGlyphRaw {
     pub x_offset: f64,
     pub y_offset: f64,
     pub adv: f64,
+    /// Byte offset of the glyph's cluster in the shaped text.
+    pub cluster: u32,
 }
 
 /// A line of a paragraph, positioned horizontally in text-area coordinates.
@@ -163,6 +167,8 @@ pub(crate) struct LabelLayout {
     /// Index into [`ParaLayout::styles`].
     pub style: usize,
     pub glyphs: Vec<PlacedGlyphRaw>,
+    /// The label text its glyphs were shaped from.
+    pub text: Arc<str>,
     /// X of the label's first glyph, text-area coordinates.
     pub x: f64,
 }
@@ -191,6 +197,9 @@ pub(crate) struct ParaLayout {
     /// The paragraph is a note separator: Word draws a rule of [`SEPARATOR_WIDTH`] where the
     /// separator character stands.
     pub separator: bool,
+    /// The collected text of the paragraph (hidden field codes left out, mark included).
+    pub text: Arc<str>,
+    pub role: ParaRole,
 }
 
 /// Length of the footnote and endnote separator rule in points (measured: the paragraph mark
@@ -723,6 +732,7 @@ pub(crate) fn layout_paragraph(
                         x_offset: f64::from(g.x_offset) * st.size / upem * st.scale,
                         y_offset: f64::from(g.y_offset) * st.size / upem,
                         adv,
+                        cluster: g.cluster,
                     });
                     adv_total += adv;
                 }
@@ -831,6 +841,7 @@ pub(crate) fn layout_paragraph(
         label_layout = Some(LabelLayout {
             style: ls,
             glyphs,
+            text: Arc::from(l.text.as_str()),
             x,
         });
     }
@@ -842,6 +853,11 @@ pub(crate) fn layout_paragraph(
         fd: &fd,
     }
     .build();
+    let role = if label_layout.is_some() {
+        ParaRole::ListItem
+    } else {
+        heading_level(ctx.styles, para.style_id()).map_or(ParaRole::Plain, ParaRole::Heading)
+    };
 
     ParaLayout {
         index,
@@ -858,7 +874,27 @@ pub(crate) fn layout_paragraph(
         story_end,
         foot_refs,
         separator,
+        text: Arc::from(text.as_str()),
+        role,
     }
+}
+
+/// The level of a `heading N` style, looked up through `basedOn`.
+fn heading_level(styles: Option<&Styles>, style_id: Option<&str>) -> Option<u8> {
+    let styles = styles?;
+    let mut id = style_id?.to_owned();
+    for _ in 0..8 {
+        let info = styles.style(&id)?;
+        let name = info.name.to_lowercase();
+        if let Some(rest) = name.strip_prefix("heading ")
+            && let Ok(n) = rest.trim().parse::<u8>()
+            && n >= 1
+        {
+            return Some(n.min(6));
+        }
+        id = info.based_on.clone()?;
+    }
+    None
 }
 
 pub(crate) struct LineBuilder<'a> {
@@ -1254,6 +1290,7 @@ fn shape_glyphs(ctx: &Context<'_>, st: &RunStyle, text: &str) -> (Vec<PlacedGlyp
                 x_offset: f64::from(g.x_offset) * st.size / upem * st.scale,
                 y_offset: f64::from(g.y_offset) * st.size / upem,
                 adv,
+                cluster: g.cluster,
             }
         })
         .collect();

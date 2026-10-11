@@ -80,13 +80,6 @@ impl FontSet {
     pub fn resolve(&self, family: &str, bold: bool, italic: bool) -> Option<FaceId> {
         self.library.resolve(family, FontStyle { bold, italic })
     }
-
-    /// The glyph the face's cmap gives `c`, 0 when it has none.
-    pub fn nominal_glyph(&self, face: FaceId, c: char) -> u32 {
-        self.font(face)
-            .and_then(|f| f.charmap().map(c))
-            .map_or(0, |g| g.to_u32())
-    }
 }
 
 /// Where a glyph's bitmap sits in an atlas page and relative to the glyph origin.
@@ -495,9 +488,9 @@ mod tests {
     fn bundled_glyph_has_ink() {
         let fonts = FontSet::bundled();
         let face = fonts.resolve("Calibri", false, false).expect("face");
-        let g = fonts.nominal_glyph(face, 'H');
-        assert_ne!(g, 0);
         let font = fonts.font(face).expect("font");
+        let g = font.charmap().map('H').map_or(0, |g| g.to_u32());
+        assert_ne!(g, 0);
         let mut pen = Collector::default();
         font.outline_glyphs()
             .get(GlyphId::new(g))

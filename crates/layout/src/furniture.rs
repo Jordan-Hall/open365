@@ -20,11 +20,12 @@ use std::sync::Arc;
 use open365_docx::{Block, Document, HeaderFooterType, Inline, NoteKind, RawXml, RunContent};
 
 use crate::build::Builder;
-use crate::flow::{Base, build_line};
+use crate::float::{self, Frame as FloatFrame};
+use crate::flow::{Base, build_line, line_images};
 use crate::numbering::ListLabel;
 use crate::para::{Context, FieldEnv, NoteOrder, ParaLayout};
 use crate::props::SectionProps;
-use crate::{Line, NoteSlot, Page, StoryKind};
+use crate::{ImagePlacement, ImageSource, Line, NoteSlot, Page, StoryKind};
 
 /// Where the body goes on a page.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -43,6 +44,8 @@ pub(crate) struct Furniture {
     even_odd: bool,
     /// `[section][footer][kind]`, kind 0 default, 1 first, 2 even; inheritance resolved.
     stories: Vec<[[Blocks; 3]; 2]>,
+    /// The relationship id of each story's part, parallel to `stories`.
+    rels: Vec<[[Option<String>; 3]; 2]>,
     heights: Vec<[[f64; 3]; 2]>,
 }
 
@@ -66,27 +69,66 @@ fn layout_blocks(ctx: &Context<'_>, blocks: &[Block], width: f64) -> Vec<ParaLay
     b.arena
 }
 
+/// Lines placed in a furniture story, the inline pictures on them (with the index of their
+/// line) and the height used.
+struct Placed {
+    lines: Vec<Line>,
+    images: Vec<(usize, ImagePlacement)>,
+    height: f64,
+}
+
 /// Places paragraphs one below the other from `top`: the lines and the height used, the last
 /// paragraph's space after included.
-fn place(paras: &[ParaLayout], origin_x: f64, top: f64, story: StoryKind) -> (Vec<Line>, f64) {
+fn place(
+    paras: &[ParaLayout],
+    origin_x: f64,
+    top: f64,
+    story: StoryKind,
+    source: &ImageSource,
+    section: Option<&SectionProps>,
+) -> Placed {
     let mut y = top;
     let mut after = 0.0f64;
     let mut lines = Vec::new();
+    let mut images = Vec::new();
+    let base = Base {
+        para: 0,
+        story: 0,
+        table: 0,
+    };
     for pl in paras {
         y += after.max(f64::from(pl.props.space_before_pt));
+        // Floating pictures sit against the page; they do not displace the text of a furniture
+        // story.
+        if let Some(sp) = section {
+            let frame = FloatFrame { section: *sp };
+            for o in pl.objects.iter().filter(|o| !o.inline()) {
+                let mut im = float::place(&o.drawing, o.atom, &frame, y, 0).image;
+                im.source = source.clone();
+                images.push((lines.len(), im));
+            }
+        }
         for lb in &pl.lines {
-            let mut line = build_line(pl, lb, origin_x, y, Base { para: 0, story: 0 });
+            let mut line = build_line(pl, lb, origin_x, y, base);
             line.story = story;
+            for mut im in line_images(pl, lb, origin_x, y, base) {
+                im.source = source.clone();
+                images.push((lines.len(), im));
+            }
             lines.push(line);
             y += lb.height;
         }
         after = f64::from(pl.props.space_after_pt);
     }
-    (lines, y + after - top)
+    Placed {
+        lines,
+        images,
+        height: y + after - top,
+    }
 }
 
 fn height_of(paras: &[ParaLayout]) -> f64 {
-    place(paras, 0.0, 0.0, StoryKind::Main).1
+    place(paras, 0.0, 0.0, StoryKind::Main, &ImageSource::Main, None).height
 }
 
 impl Furniture {
@@ -98,12 +140,16 @@ impl Furniture {
     ) -> Self {
         let mut stories: Vec<[[Blocks; 3]; 2]> = Vec::new();
         let mut current: [[Blocks; 3]; 2] = Default::default();
+        let mut rels: Vec<[[Option<String>; 3]; 2]> = Vec::new();
+        let mut current_rels: [[Option<String>; 3]; 2] = Default::default();
         for s in doc_sections {
             for r in &s.header_footer_refs {
                 let blocks = doc.header_footer_blocks(&r.rel_id).map(Arc::new);
                 current[usize::from(r.footer)][kind_index(r.kind)] = blocks;
+                current_rels[usize::from(r.footer)][kind_index(r.kind)] = Some(r.rel_id.clone());
             }
             stories.push(current.clone());
+            rels.push(current_rels.clone());
         }
         let mut heights = Vec::new();
         for (i, st) in stories.iter().enumerate() {
@@ -123,6 +169,7 @@ impl Furniture {
             title_pg: doc_sections.iter().map(|s| s.title_pg).collect(),
             even_odd: doc.settings().even_and_odd_headers,
             stories,
+            rels,
             heights,
         }
     }
@@ -182,6 +229,14 @@ impl Furniture {
             let width = sp.text_width();
             page.header.clear();
             page.footer.clear();
+            page.header_images.clear();
+            page.footer_images.clear();
+            let source = |footer: usize| {
+                self.rels
+                    .get(sec)
+                    .and_then(|r| r[footer][k].clone())
+                    .map_or(ImageSource::Main, ImageSource::HeaderFooter)
+            };
             if let Some(blocks) = &stories[0][k] {
                 let paras = layout_blocks(&ctx, blocks, width);
                 let story = [
@@ -189,7 +244,16 @@ impl Furniture {
                     StoryKind::FirstHeader,
                     StoryKind::EvenHeader,
                 ][k];
-                page.header = place(&paras, origin, sp.header_distance, story).0;
+                let placed = place(
+                    &paras,
+                    origin,
+                    sp.header_distance,
+                    story,
+                    &source(0),
+                    Some(&sp),
+                );
+                page.header = placed.lines;
+                page.header_images = placed.images.into_iter().map(|i| i.1).collect();
             }
             if let Some(blocks) = &stories[1][k] {
                 let paras = layout_blocks(&ctx, blocks, width);
@@ -199,13 +263,16 @@ impl Furniture {
                     StoryKind::EvenFooter,
                 ][k];
                 let h = height_of(&paras);
-                page.footer = place(
+                let placed = place(
                     &paras,
                     origin,
                     sp.page_height - sp.footer_distance - h,
                     story,
-                )
-                .0;
+                    &source(1),
+                    Some(&sp),
+                );
+                page.footer = placed.lines;
+                page.footer_images = placed.images.into_iter().map(|i| i.1).collect();
             }
         }
     }
@@ -214,6 +281,7 @@ impl Furniture {
 /// The footnotes of one section width, laid out.
 #[derive(Debug, Default)]
 struct SectionNotes {
+    props: SectionProps,
     sep: Vec<ParaLayout>,
     sep_h: f64,
     paras: Vec<ParaLayout>,
@@ -287,6 +355,7 @@ impl NoteStore {
                 })
                 .collect();
             out.push(SectionNotes {
+                props: *sp,
                 sep,
                 sep_h,
                 paras,
@@ -339,12 +408,12 @@ impl NoteStore {
         slots: &[NoteSlot],
         origin_x: f64,
         bottom: f64,
-    ) -> Vec<Line> {
+    ) -> (Vec<Line>, Vec<ImagePlacement>) {
         let Some(s) = self.sections.get(section) else {
-            return Vec::new();
+            return (Vec::new(), Vec::new());
         };
         if slots.is_empty() {
-            return Vec::new();
+            return (Vec::new(), Vec::new());
         }
         let total: f64 = s.sep_h
             + slots
@@ -352,32 +421,53 @@ impl NoteStore {
                 .map(|sl| self.slot_height(section, *sl))
                 .sum::<f64>();
         let mut y = bottom - total;
-        let (mut lines, h) = place(&s.sep, origin_x, y, StoryKind::FootnoteSeparator);
-        y += h;
+        let src = ImageSource::Footnotes;
+        let sep = place(
+            &s.sep,
+            origin_x,
+            y,
+            StoryKind::FootnoteSeparator,
+            &src,
+            Some(&s.props),
+        );
+        y += sep.height;
+        let mut lines = sep.lines;
+        let mut images: Vec<ImagePlacement> = sep.images.into_iter().map(|i| i.1).collect();
         for sl in slots {
             let Some(r) = s.ranges.get(&sl.id) else {
                 continue;
             };
-            let (mut l, h) = place(&s.paras[r.clone()], origin_x, 0.0, StoryKind::Footnotes);
+            let placed = place(
+                &s.paras[r.clone()],
+                origin_x,
+                0.0,
+                StoryKind::Footnotes,
+                &src,
+                Some(&s.props),
+            );
+            let (mut l, mut ims) = (placed.lines, placed.images);
             let n = self.line_count(section, sl.id);
+            let shift;
             if sl.from > 0 || sl.to < n {
-                let shift = y - l.get(sl.from).map_or(0.0, |x| x.top);
-                l = l.drain(sl.from.min(n)..sl.to.min(n)).collect();
-                for line in &mut l {
-                    line.top += shift;
-                    line.baseline += shift;
-                }
+                shift = y - l.get(sl.from).map_or(0.0, |x| x.top);
+                let (from, to) = (sl.from.min(n), sl.to.min(n));
+                l = l.drain(from..to).collect();
+                ims.retain(|(li, _)| (from..to).contains(li));
             } else {
-                for line in &mut l {
-                    line.top += y;
-                    line.baseline += y;
-                }
-                let _ = h;
+                shift = y;
             }
+            for line in &mut l {
+                line.top += shift;
+                line.baseline += shift;
+            }
+            images.extend(ims.into_iter().map(|(_, mut im)| {
+                im.y += shift;
+                im
+            }));
             y += self.slot_height(section, *sl);
             lines.extend(l);
         }
-        lines
+        (lines, images)
     }
 }
 
