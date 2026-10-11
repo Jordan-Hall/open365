@@ -2,6 +2,7 @@
 
 use std::collections::BTreeMap;
 use std::env;
+use std::path::{Path, PathBuf};
 use std::process::{Command, ExitCode};
 
 use cargo_metadata::{DependencyKind, MetadataCommand};
@@ -33,7 +34,8 @@ fn main() -> ExitCode {
     let result = match task.as_deref() {
         Some("ci") => ci(),
         Some("layers") => check_layers(),
-        _ => Err("usage: cargo xtask <ci|layers>".to_owned()),
+        Some("corpus-roundtrip") => corpus_roundtrip(),
+        _ => Err("usage: cargo xtask <ci|layers|corpus-roundtrip>".to_owned()),
     };
     match result {
         Ok(()) => ExitCode::SUCCESS,
@@ -57,6 +59,78 @@ fn ci() -> Result<(), String> {
     cargo(&["test", "--workspace"])?;
     check_layers()?;
     deny()
+}
+
+/// Round-trips the local Microsoft template corpus (skips when it is absent), then opens every
+/// output in Word or Excel through `tools/office/office-oracle.ps1 -Mode verify`. A repair
+/// prompt or open failure counts as a failure. Needs Windows with Office and PowerShell 7.
+fn corpus_roundtrip() -> Result<(), String> {
+    const STAGES: [&str; 4] = ["unchanged", "edited", "template", "instantiated"];
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
+    let out = env::var_os("OPEN365_CORPUS_OUT").map_or_else(
+        || root.join("fixtures/external/roundtrip-out"),
+        PathBuf::from,
+    );
+    cargo(&[
+        "test",
+        "-p",
+        "open365-testkit",
+        "--test",
+        "corpus_roundtrip",
+        "--release",
+        "--",
+        "--nocapture",
+    ])?;
+    if !out.join("report.txt").exists() {
+        println!("==> no corpus present: nothing to verify in Office");
+        return Ok(());
+    }
+    let (mut passed, mut failed) = (0usize, Vec::new());
+    for stage in STAGES {
+        let dir = out.join(stage);
+        if !dir.is_dir() {
+            continue;
+        }
+        println!("==> office-oracle verify {stage}");
+        let output = Command::new("pwsh")
+            .args(["-NoProfile", "-File"])
+            .arg(root.join("tools/office/office-oracle.ps1"))
+            .args(["-Mode", "verify", "-InputDir"])
+            .arg(&dir)
+            .output()
+            .map_err(|e| format!("failed to run pwsh (PowerShell 7 is required): {e}"))?;
+        for line in String::from_utf8_lossy(&output.stdout).lines() {
+            if line.starts_with("PASS") {
+                passed += 1;
+            } else if line.starts_with("FAIL") {
+                println!("{line}");
+                failed.push(format!("{stage}: {line}"));
+            }
+        }
+        if !output.status.success() && !failed.iter().any(|f| f.starts_with(stage)) {
+            failed.push(format!(
+                "{stage}: oracle exited {:?}: {}",
+                output.status.code(),
+                String::from_utf8_lossy(&output.stderr).trim()
+            ));
+        }
+    }
+    println!(
+        "==> Office verified {passed} file(s), {} failure(s)",
+        failed.len()
+    );
+    if failed.is_empty() {
+        Ok(())
+    } else {
+        Err(format!(
+            "Office verification failed:
+{}",
+            failed.join(
+                "
+"
+            )
+        ))
+    }
 }
 
 fn cargo(args: &[&str]) -> Result<(), String> {

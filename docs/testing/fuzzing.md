@@ -10,6 +10,7 @@ cover this.
 
 What it does:
 
+- Seeds include template and macro-enabled kinds: the real `.dotx`/`.dotm`/`.xltx`/`.xltm` fixtures, plus `.dotx`, `.dotm`, `.docm`, `.xltx`, `.xltm` and `.xlsm` variants built from every third small plain fixture (`tests/fuzz/seeds.rs`: content type swapped; macro kinds get a made-up `vbaProject.bin` and its relationship). VBA is preserved and never executed.
 - Takes every fixture in `fixtures/docx` and `fixtures/xlsx` as a seed (debug builds skip fixtures over 512 KiB, such as `large-sheet.xlsx`, to keep the 60 s budget; release runs include them).
 - Mutates it, then runs open -> save -> reopen through `opc`, `docx` or `xlsx`, plus
   `inspect`, `inspect --hidden`, and a few edits, undo and redo through `open365-commands`.

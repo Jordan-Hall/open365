@@ -16,6 +16,7 @@ use fuzz::harness::{
     run_formula, run_package, save_repro,
 };
 use fuzz::mutate::{Case, Rng, formula, unzip, xml_level, zip_level};
+use fuzz::seeds::{docx_variants, xlsx_variants};
 
 fn env_u64(name: &str, default: u64) -> u64 {
     std::env::var(name)
@@ -34,13 +35,48 @@ fn fixtures() -> Vec<(PathBuf, Kind, Vec<u8>)> {
             .filter(|p| p.extension().is_some_and(|x| x == dir))
             .collect();
         paths.sort();
-        for p in paths {
+        for (index, p) in paths.into_iter().enumerate() {
             let bytes = std::fs::read(&p).expect("read fixture");
             // Debug builds are ~20x slower: leave the multi-megabyte stress fixture to
             // release runs so the default budget is honoured.
             if cfg!(debug_assertions) && bytes.len() > 512 * 1024 {
                 continue;
             }
+            // Template and macro-enabled kinds built from the smaller fixtures: every third
+            // one (the others add little), all three variants of each. The real `.dotx`, `.dotm`, `.xltx`
+            // and `.xltm` fixtures are added below.
+            if bytes.len() <= 64 * 1024 && index % 3 == 0 {
+                let variants = match kind {
+                    Kind::Docx => docx_variants(&bytes),
+                    Kind::Xlsx => xlsx_variants(&bytes),
+                };
+                for (ext, data) in variants {
+                    out.push((p.with_extension(ext), kind, data));
+                }
+            }
+            out.push((p, kind, bytes));
+        }
+        // Real template and macro-enabled fixtures (Office lock files excluded).
+        let exts: &[&str] = match kind {
+            Kind::Docx => &["dotx", "dotm", "docm"],
+            Kind::Xlsx => &["xltx", "xltm", "xlsm"],
+        };
+        let mut extra: Vec<PathBuf> = std::fs::read_dir(root.join(dir))
+            .expect("read fixture dir")
+            .filter_map(|e| e.ok().map(|e| e.path()))
+            .filter(|p| {
+                p.extension()
+                    .and_then(|x| x.to_str())
+                    .is_some_and(|x| exts.contains(&x))
+                    && !p
+                        .file_name()
+                        .and_then(|n| n.to_str())
+                        .is_some_and(|n| n.starts_with("~$"))
+            })
+            .collect();
+        extra.sort();
+        for p in extra {
+            let bytes = std::fs::read(&p).expect("read fixture");
             out.push((p, kind, bytes));
         }
     }
@@ -102,6 +138,14 @@ fn fuzz_smoke() {
     let max_iters = env_u64("OPEN365_FUZZ_ITERS", u64::MAX);
     let fixtures = fixtures();
     assert!(fixtures.len() >= 20, "fixtures missing");
+    for ext in ["dotx", "dotm", "docm", "xltx", "xltm", "xlsm"] {
+        let n = fixtures
+            .iter()
+            .filter(|(p, _, _)| p.extension().is_some_and(|e| e == ext))
+            .count();
+        assert!(n > 0, "no .{ext} seed");
+        eprintln!("seed kind .{ext}: {n}");
+    }
     let formulas = formula_seeds();
     // Writing a file per case is slow on hosts with real-time scanning, so it is opt-in: set
     // OPEN365_FUZZ_LAST_CASE=<path> to keep the case being run for crash (abort) triage.
@@ -127,6 +171,19 @@ fn fuzz_smoke() {
         });
         assert!(f.is_none(), "{}: {f:?}", path.display());
         assert!(!unzip(bytes).is_empty(), "{}", path.display());
+        // Macro-enabled seeds must really carry a VBA project, or they test nothing new.
+        if path
+            .extension()
+            .is_some_and(|e| matches!(e.to_str(), Some("dotm" | "docm" | "xltm" | "xlsm")))
+        {
+            let has_vba = match kind {
+                Kind::Docx => open365_docx::Document::open(bytes, &open365_opc::Limits::default())
+                    .is_ok_and(|d| d.has_vba_project()),
+                Kind::Xlsx => open365_xlsx::Workbook::open(bytes, &open365_opc::Limits::default())
+                    .is_ok_and(|w| w.has_vba_project()),
+            };
+            assert!(has_vba, "{} has no VBA project", path.display());
+        }
     }
 
     let start = Instant::now();
@@ -242,7 +299,11 @@ fn fuzz_smoke() {
                 min.len(),
                 case.bytes.len()
             );
-            if let Some(p) = save_repro(&f, kind.ext(), &min, &note) {
+            let ext = path
+                .extension()
+                .and_then(|e| e.to_str())
+                .unwrap_or(kind.ext());
+            if let Some(p) = save_repro(&f, ext, &min, &note) {
                 new_repros.push(p);
             }
         }

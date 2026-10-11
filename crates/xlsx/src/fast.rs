@@ -298,6 +298,7 @@ fn scan_cell(
             style,
             t_src,
             attrs: Vec::new(),
+            v_attrs: Vec::new(),
             formula,
             has_v,
             inline: None,

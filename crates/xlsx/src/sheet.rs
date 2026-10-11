@@ -168,6 +168,8 @@ struct CellExtra {
     attrs: Vec<Attr>,
     /// The `v` text when it is not what the value would be written as (`3.1415899999999999`).
     raw_v: Option<Box<str>>,
+    /// Attributes of the `v` element (`xml:space="preserve"` on text with edge spaces).
+    v_attrs: Vec<Attr>,
     /// A `t` attribute the value would not produce (`n`, or a type on a valueless cell).
     t_override: Option<Box<str>>,
     /// The inline string element, rich text included.
@@ -450,6 +452,7 @@ fn parse_cell(
 
     let mut formula: Option<Formula> = None;
     let mut has_v = false;
+    let mut v_attrs: Vec<Attr> = Vec::new();
     let mut inline: Option<XmlElement> = None;
     let mut children: Vec<RawXml> = Vec::new();
     cx.text.clear();
@@ -489,10 +492,24 @@ fn parse_cell(
                 }
                 "v" if is_main => {
                     p.push_scope()?;
-                    if ch.attributes().next().is_some() {
-                        cx.dropped
-                            .push(format!("attributes on v in row {row}, column {col}"));
+                    let mut raw_attrs: Vec<(String, String)> = Vec::new();
+                    for attr in ch.attributes() {
+                        let attr = attr.map_err(xml_err)?;
+                        let key = attr.key.as_ref();
+                        let value = attr
+                            .normalized_value(XmlVersion::Explicit1_0)
+                            .map_err(xml_err)?;
+                        p.declare(key, &value);
+                        raw_attrs.push((key.to_owned(), value.into_owned()));
                     }
+                    v_attrs = raw_attrs
+                        .into_iter()
+                        .map(|(name, value)| Attr {
+                            ns: p.resolve_attr(&name),
+                            name,
+                            value,
+                        })
+                        .collect();
                     if !child_empty {
                         read_text(p, &mut cx.text)?;
                     }
@@ -520,6 +537,7 @@ fn parse_cell(
             style,
             t_src,
             attrs,
+            v_attrs,
             formula,
             has_v,
             inline,
@@ -537,6 +555,7 @@ pub(crate) struct CellParts {
     pub(crate) style: Option<u32>,
     pub(crate) t_src: TAttr,
     pub(crate) attrs: Vec<Attr>,
+    pub(crate) v_attrs: Vec<Attr>,
     pub(crate) formula: Option<Formula>,
     pub(crate) has_v: bool,
     pub(crate) inline: Option<XmlElement>,
@@ -596,6 +615,7 @@ pub(crate) fn finish_cell(
         style,
         t_src,
         attrs,
+        v_attrs,
         formula,
         has_v,
         inline,
@@ -705,6 +725,7 @@ pub(crate) fn finish_cell(
         (None, _) => None,
     };
     let extra = if attrs.is_empty()
+        && v_attrs.is_empty()
         && raw_v.is_none()
         && t_override.is_none()
         && inline.is_none()
@@ -715,6 +736,7 @@ pub(crate) fn finish_cell(
         Some(Box::new(CellExtra {
             attrs,
             raw_v,
+            v_attrs,
             t_override,
             inline,
             children,
@@ -941,6 +963,9 @@ fn write_cell(cell: &Cell, row: u32, names: &Names, out: &mut String) {
     if has_v {
         out.push('<');
         out.push_str(&names.v);
+        if let Some(extra) = extra {
+            write_attrs(&extra.v_attrs, out);
+        }
         let before = out.len();
         out.push('>');
         if let Some(raw) = raw_v {
@@ -1420,11 +1445,16 @@ impl Worksheet {
         cell.formula = formula.map(Box::new);
         if let Some(extra) = cell.extra.as_deref_mut() {
             extra.raw_v = None;
+            extra.v_attrs.clear();
             extra.t_override = None;
             extra.inline = None;
         }
         if cell.extra.as_deref().is_some_and(|e| {
-            e.attrs.is_empty() && e.children.is_empty() && e.raw_v.is_none() && e.inline.is_none()
+            e.attrs.is_empty()
+                && e.children.is_empty()
+                && e.raw_v.is_none()
+                && e.v_attrs.is_empty()
+                && e.inline.is_none()
         }) {
             cell.extra = None;
         }
