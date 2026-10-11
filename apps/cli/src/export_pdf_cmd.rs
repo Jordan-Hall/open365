@@ -3,11 +3,7 @@
 use std::path::PathBuf;
 
 use clap::Args as ClapArgs;
-use open365_docx::Document;
-use open365_layout::{LayoutOptions, layout_document};
-use open365_opc::Limits;
-use open365_pdf::{PdfMetadata, export_pdf};
-use open365_text::{FontLibrary, FontMatch};
+use open365_commands::{Command, CommandError, PdfMetadata, PdfOptions, Target};
 
 use crate::{CliError, read};
 
@@ -35,56 +31,49 @@ pub(crate) struct Args {
     /// The result then depends on the machine.
     #[arg(long)]
     system_fonts: bool,
+    /// Replace the output file if it exists. Without this an existing file is an error.
+    #[arg(long)]
+    overwrite: bool,
 }
 
 pub(crate) fn run(args: &Args) -> Result<(), CliError> {
     let bytes = read(&args.file)?;
-    let doc = Document::open(&bytes, &Limits::default())
+    let mut target = Target::open_docx(&bytes)
         .map_err(|e| CliError::Other(format!("{}: {e}", args.file.display())))?;
-    let mut fonts = FontLibrary::bundled();
-    let mut layout = layout_document(&doc, &fonts, LayoutOptions::default());
-    if args.system_fonts {
-        let missing: Vec<String> = layout
-            .fonts
-            .iter()
-            .filter(|f| f.matched == FontMatch::Fallback)
-            .map(|f| f.requested.clone())
-            .collect();
-        if !missing.is_empty() {
-            let names: Vec<&str> = missing.iter().map(String::as_str).collect();
-            fonts.add_system_families(&names, &[]);
-            layout = layout_document(&doc, &fonts, LayoutOptions::default());
-        }
-    }
-    for f in layout
-        .fonts
-        .iter()
-        .filter(|f| f.matched == FontMatch::Fallback)
-    {
-        eprintln!(
-            "warning: font \"{}\" is not available; the default font is used",
-            f.requested
-        );
-    }
-    let meta = PdfMetadata {
-        title: args.title.clone(),
-        author: args.author.clone(),
-        subject: args.subject.clone(),
-        keywords: args.keywords.clone(),
-        language: args.language.clone(),
-        ..PdfMetadata::default()
-    };
-    let out = export_pdf(&doc, &layout, &fonts, &meta)
-        .map_err(|e| CliError::Other(format!("{}: {e}", args.file.display())))?;
-    for w in &out.warnings {
+    target.set_pdf_options(PdfOptions {
+        metadata: PdfMetadata {
+            title: args.title.clone(),
+            author: args.author.clone(),
+            subject: args.subject.clone(),
+            keywords: args.keywords.clone(),
+            language: args.language.clone(),
+            ..PdfMetadata::default()
+        },
+        system_fonts: args.system_fonts,
+        ..PdfOptions::default()
+    });
+    // The export is the `export_pdf` command (effect export): without --overwrite the output
+    // is created exclusively and an existing file is an error.
+    let out = target
+        .apply(Command::ExportPdf {
+            path: args.output.clone(),
+            overwrite: args.overwrite,
+        })
+        .map_err(|e| match e {
+            CommandError::Exists { .. } => CliError::Other(format!(
+                "{} exists; pass --overwrite to replace it",
+                args.output.display()
+            )),
+            e => CliError::Other(format!("{}: {e}", args.file.display())),
+        })?;
+    for w in &out.notes {
         eprintln!("warning: {w}");
     }
-    std::fs::write(&args.output, &out.bytes).map_err(|e| CliError::Io(args.output.clone(), e))?;
     println!(
         "wrote {} ({} pages, {} bytes)",
         args.output.display(),
-        layout.pages.len(),
-        out.bytes.len()
+        out.pages,
+        out.bytes_written
     );
     Ok(())
 }

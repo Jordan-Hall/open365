@@ -120,6 +120,11 @@ enum Command {
         /// Include hidden text, hidden sheets, rows and columns, and hidden-content findings.
         #[arg(long)]
         include_hidden: bool,
+        /// Longest a layout_summary, export_pdf or evaluate_formula call may run, in seconds.
+        /// The work cannot be interrupted, so a call that times out may still finish in the
+        /// background; an export that timed out does not write its file.
+        #[arg(long, default_value_t = 30, value_parser = clap::value_parser!(u64).range(1..=3600))]
+        timeout_secs: u64,
     },
     /// Verify that files survive read -> write -> read unchanged.
     Roundtrip {
@@ -267,12 +272,14 @@ fn main() -> ExitCode {
             allow_edit,
             allow_destructive,
             include_hidden,
+            timeout_secs,
         } => finish(mcp_cmd::run(mcp_cmd::Options {
             roots,
             audit_log,
             allow_edit,
             allow_destructive,
             include_hidden,
+            deadline: std::time::Duration::from_secs(timeout_secs),
         })),
         Command::Roundtrip { files, .. } => {
             let results: Vec<bool> = files.iter().map(|f| check_file(f)).collect();

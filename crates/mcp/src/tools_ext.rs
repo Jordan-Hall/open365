@@ -3,19 +3,21 @@
 //! is audited by the caller, effects go through `policy`, and output has a size cap.
 
 use std::collections::{BTreeMap, HashSet};
-use std::io::Write;
-use std::path::{Path, PathBuf};
+use std::path::Path;
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use open365_commands::{
-    Command, EffectClass, Target, evaluate_formula as eval_formula, template_output_extension,
+    Command, CommandError, EffectClass, PdfOptions, Target, template_output_extension,
 };
+use open365_docx::Document;
 use open365_layout::{LayoutOptions, ParaRole, layout_document};
-use open365_pdf::{PdfMetadata, export_pdf};
 use open365_text::{FontLibrary, FontMatch};
 use open365_xlsx::parse_cell_ref;
 use serde_json::{Value, json};
 
-use crate::server::{MAX_DOCUMENT_BYTES, Server};
+use crate::bounded::{self, BoundedError, EvalWorker, Stamp};
+use crate::server::{MAX_DOCUMENT_BYTES, Server, Session};
 use crate::tools::{Detail, NOTICE, ToolError, display, policy, str_arg};
 use crate::views;
 
@@ -87,27 +89,55 @@ impl Server {
         if extension(&path) != "pdf" {
             return Err(ToolError::invalid("the file extension must be .pdf"));
         }
-        let s = self.session(args, detail)?;
-        let doc = s
-            .target
-            .docx()
-            .ok_or_else(|| ToolError::invalid("export_pdf needs a DOCX document"))?;
-        let fonts = FontLibrary::bundled();
-        let layout = layout_document(doc, &fonts, LayoutOptions::default());
-        let out = export_pdf(doc, &layout, &fonts, &PdfMetadata::default())
-            .map_err(|e| ToolError::failed(e.to_string()))?;
-        if out.bytes.len() > MAX_EXPORT_BYTES {
-            return Err(ToolError::refused(format!(
-                "the PDF is larger than {MAX_EXPORT_BYTES} bytes"
-            )));
+        let deadline = self.config.deadline;
+        let s = self.session_mut(args, detail)?;
+        if s.target.docx().is_none() {
+            return Err(ToolError::invalid("export_pdf needs a DOCX document"));
         }
-        write_new(&path, &out.bytes, overwrite)?;
-        detail.insert("bytes_written".to_owned(), json!(out.bytes.len()));
-        let warnings: Vec<&String> = out.warnings.iter().take(MAX_NOTES).collect();
+        let bytes = snapshot(s)?;
+        let cancel = Arc::new(AtomicBool::new(false));
+        let options = PdfOptions {
+            max_bytes: Some(MAX_EXPORT_BYTES),
+            cancel: Some(Arc::clone(&cancel)),
+            ..PdfOptions::default()
+        };
+        let target_path = path.clone();
+        // The export is the `export_pdf` command on a private copy of the document, so the
+        // open document is not borrowed while the layout runs.
+        let done = bounded::run(deadline, move || {
+            let mut copy = Target::open_docx(&bytes)?;
+            copy.set_pdf_options(options);
+            copy.apply(Command::ExportPdf {
+                path: target_path,
+                overwrite,
+            })
+        });
+        let out = match done {
+            Ok(Ok(out)) => out,
+            Ok(Err(CommandError::Exists { .. })) => {
+                return Err(ToolError::refused(
+                    "the target exists; pass overwrite: true to replace it",
+                ));
+            }
+            Ok(Err(e @ CommandError::TooLarge { .. })) => {
+                return Err(ToolError::refused(e.to_string()));
+            }
+            Ok(Err(e)) => return Err(ToolError::failed(e.to_string())),
+            Err(BoundedError::TimedOut) => {
+                // The worker checks this before it creates the file.
+                cancel.store(true, Ordering::Relaxed);
+                return Err(ToolError::timeout("export_pdf", deadline));
+            }
+            Err(BoundedError::Failed) => {
+                return Err(ToolError::failed("the export worker stopped unexpectedly"));
+            }
+        };
+        detail.insert("bytes_written".to_owned(), json!(out.bytes_written));
+        let warnings: Vec<&String> = out.notes.iter().take(MAX_NOTES).collect();
         Ok(json!({
             "exported_to": display(&path),
-            "bytes_written": out.bytes.len(),
-            "pages": layout.pages.len(),
+            "bytes_written": out.bytes_written,
+            "pages": out.pages,
             "warnings": warnings,
             "effect": "export",
         }))
@@ -180,85 +210,25 @@ impl Server {
     ) -> Result<Value, ToolError> {
         detail.insert("effect".to_owned(), json!("read"));
         let hidden = self.config.include_hidden;
-        let s = self.session(args, detail)?;
-        let doc = s
-            .target
-            .docx()
-            .ok_or_else(|| ToolError::invalid("layout_summary needs a DOCX document"))?;
-        let fonts = FontLibrary::bundled();
-        let layout = layout_document(doc, &fonts, LayoutOptions::default());
-        let page_lines: Vec<usize> = layout
-            .pages
-            .iter()
-            .take(MAX_SUMMARY_PAGES)
-            .map(|p| p.lines.len())
-            .collect();
-        let mut headings = Vec::new();
-        let mut headings_cut = false;
-        let mut seen = HashSet::new();
-        // table id -> (first page, last page, rows, columns)
-        let mut tables: BTreeMap<usize, (usize, usize, usize, usize)> = BTreeMap::new();
-        for page in &layout.pages {
-            for line in &page.lines {
-                let ParaRole::Heading(level) = line.role else {
-                    continue;
-                };
-                if !seen.insert(line.paragraph) {
-                    continue;
-                }
-                let text = doc
-                    .paragraph(line.paragraph)
-                    .map(|p| views::visible_text(p, hidden).0)
-                    .unwrap_or_default();
-                if text.trim().is_empty() {
-                    continue;
-                }
-                if headings.len() >= MAX_SUMMARY_HEADINGS {
-                    headings_cut = true;
-                    continue;
-                }
-                headings.push(json!({
-                    "page": page.number,
-                    "paragraph": line.paragraph,
-                    "level": level,
-                    "text": clip_chars(text.trim(), MAX_HEADING_CHARS),
-                }));
-            }
-            for c in &page.cells {
-                let e = tables
-                    .entry(c.table)
-                    .or_insert((page.number, page.number, 0, 0));
-                e.1 = page.number;
-                e.2 = e.2.max(c.row + c.row_span.max(1));
-                e.3 = e.3.max(c.col + c.col_span.max(1));
+        let deadline = self.config.deadline;
+        let s = self.session_mut(args, detail)?;
+        if s.target.docx().is_none() {
+            return Err(ToolError::invalid("layout_summary needs a DOCX document"));
+        }
+        let bytes = snapshot(s)?;
+        let summary = bounded::run(deadline, move || {
+            let copy = Target::open_docx(&bytes).map_err(|e| e.to_string())?;
+            let doc = copy.docx().ok_or("not a DOCX document")?;
+            Ok::<Value, String>(summarize(doc, hidden))
+        });
+        match summary {
+            Ok(Ok(v)) => Ok(v),
+            Ok(Err(e)) => Err(ToolError::failed(e)),
+            Err(BoundedError::TimedOut) => Err(ToolError::timeout("layout_summary", deadline)),
+            Err(BoundedError::Failed) => {
+                Err(ToolError::failed("the layout worker stopped unexpectedly"))
             }
         }
-        let tables_cut = tables.len() > MAX_SUMMARY_TABLES;
-        let table_list: Vec<Value> = tables
-            .iter()
-            .take(MAX_SUMMARY_TABLES)
-            .map(|(id, (first, last, rows, cols))| {
-                json!({"table": id, "first_page": first, "last_page": last, "rows": rows, "columns": cols})
-            })
-            .collect();
-        let notes: Vec<&String> = layout.notes.iter().take(MAX_NOTES).collect();
-        let fallback_fonts = layout
-            .fonts
-            .iter()
-            .filter(|f| f.matched == FontMatch::Fallback)
-            .count();
-        Ok(json!({
-            "page_count": layout.pages.len(),
-            "page_lines": page_lines,
-            "pages_truncated": layout.pages.len() > MAX_SUMMARY_PAGES,
-            "headings": headings,
-            "headings_truncated": headings_cut,
-            "tables": table_list,
-            "tables_truncated": tables_cut,
-            "layout_notes": notes,
-            "fallback_fonts": fallback_fonts,
-            "notice": NOTICE,
-        }))
     }
 
     pub(crate) fn evaluate_formula(
@@ -283,15 +253,48 @@ impl Server {
         let (row, col) =
             parse_cell_ref(&cell).ok_or_else(|| ToolError::invalid("cell must look like B2"))?;
         let sheet = args.get("sheet").cloned().unwrap_or(Value::Null);
-        let s = self.session(args, detail)?;
+        let deadline = self.config.deadline;
+        let s = self.session_mut(args, detail)?;
         let wb = s
             .target
             .xlsx()
             .ok_or_else(|| ToolError::invalid("evaluate_formula needs an XLSX document"))?;
         let index = views::resolve_sheet(wb, &sheet, hidden).map_err(ToolError::invalid)?;
-        let keep = views::visibility_filter(wb, hidden);
-        let out = eval_formula(wb, index, row, col, formula, &keep)
-            .map_err(|e| ToolError::invalid(e.to_string()))?;
+        // One engine per open workbook, rebuilt when the document or its file changes.
+        let stamp = Stamp::of(&s.target);
+        let reuse = s.eval.as_ref().is_some_and(|w| w.stamp == stamp);
+        detail.insert(
+            "engine".to_owned(),
+            json!(if reuse { "reused" } else { "built" }),
+        );
+        if !reuse {
+            s.eval = None;
+            let bytes = snapshot(s)?;
+            let worker = EvalWorker::spawn(bytes, hidden, stamp)
+                .map_err(|_| ToolError::failed("the evaluation worker could not start"))?;
+            s.eval = Some(worker);
+        }
+        let worker = s
+            .eval
+            .as_ref()
+            .ok_or_else(|| ToolError::failed("no evaluation worker"))?;
+        let answer = worker.evaluate(deadline, index, row, col, formula.map(str::to_owned));
+        let out = match answer {
+            Ok(Ok(out)) => out,
+            Ok(Err(e)) => return Err(ToolError::invalid(e)),
+            Err(BoundedError::TimedOut) => {
+                // Drop the worker: the next call builds a fresh engine instead of queueing
+                // behind a job that may never end.
+                s.eval = None;
+                return Err(ToolError::timeout("evaluate_formula", deadline));
+            }
+            Err(BoundedError::Failed) => {
+                s.eval = None;
+                return Err(ToolError::failed(
+                    "the evaluation worker stopped unexpectedly",
+                ));
+            }
+        };
         let mut v = serde_json::to_value(&out).map_err(|e| ToolError::failed(e.to_string()))?;
         v["sheet"] = json!(index);
         v["cell"] = json!(cell);
@@ -302,33 +305,91 @@ impl Server {
     }
 }
 
-/// Writes a new file. Without `overwrite` the file must not exist (`create_new`); with it the
-/// bytes go to a sibling temporary file that replaces the target.
-fn write_new(path: &Path, bytes: &[u8], overwrite: bool) -> Result<(), ToolError> {
-    if overwrite {
-        let mut tmp = path.as_os_str().to_owned();
-        tmp.push(".open365-tmp");
-        let tmp = PathBuf::from(tmp);
-        std::fs::write(&tmp, bytes).map_err(|e| ToolError::failed(e.to_string()))?;
-        return std::fs::rename(&tmp, path).map_err(|e| {
-            let _ = std::fs::remove_file(&tmp);
-            ToolError::failed(e.to_string())
-        });
+/// The bytes of the session's document as it is now: the file as opened while nothing was
+/// edited, otherwise a fresh serialisation. Worker threads reopen their own copy from them.
+fn snapshot(s: &mut Session) -> Result<Vec<u8>, ToolError> {
+    if s.target.revision() == 0 {
+        return Ok(s.original.clone());
     }
-    let mut file = std::fs::OpenOptions::new()
-        .write(true)
-        .create_new(true)
-        .open(path)
-        .map_err(|e| {
-            if e.kind() == std::io::ErrorKind::AlreadyExists {
-                ToolError::refused("the target exists; pass overwrite: true to replace it")
-            } else {
-                ToolError::failed(e.to_string())
+    s.target
+        .snapshot_bytes()
+        .map_err(|e| ToolError::failed(format!("the edited document cannot be copied: {e}")))
+}
+
+/// The `layout_summary` result for a document. Runs on a worker thread.
+fn summarize(doc: &Document, hidden: bool) -> Value {
+    let fonts = FontLibrary::bundled();
+    let layout = layout_document(doc, &fonts, LayoutOptions::default());
+    let page_lines: Vec<usize> = layout
+        .pages
+        .iter()
+        .take(MAX_SUMMARY_PAGES)
+        .map(|p| p.lines.len())
+        .collect();
+    let mut headings = Vec::new();
+    let mut headings_cut = false;
+    let mut seen = HashSet::new();
+    // table id -> (first page, last page, rows, columns)
+    let mut tables: BTreeMap<usize, (usize, usize, usize, usize)> = BTreeMap::new();
+    for page in &layout.pages {
+        for line in &page.lines {
+            let ParaRole::Heading(level) = line.role else {
+                continue;
+            };
+            if !seen.insert(line.paragraph) {
+                continue;
             }
-        })?;
-    if let Err(e) = file.write_all(bytes).and_then(|()| file.flush()) {
-        let _ = std::fs::remove_file(path);
-        return Err(ToolError::failed(e.to_string()));
+            let text = doc
+                .paragraph(line.paragraph)
+                .map(|p| views::visible_text(p, hidden).0)
+                .unwrap_or_default();
+            if text.trim().is_empty() {
+                continue;
+            }
+            if headings.len() >= MAX_SUMMARY_HEADINGS {
+                headings_cut = true;
+                continue;
+            }
+            headings.push(json!({
+                "page": page.number,
+                "paragraph": line.paragraph,
+                "level": level,
+                "text": clip_chars(text.trim(), MAX_HEADING_CHARS),
+            }));
+        }
+        for c in &page.cells {
+            let e = tables
+                .entry(c.table)
+                .or_insert((page.number, page.number, 0, 0));
+            e.1 = page.number;
+            e.2 = e.2.max(c.row + c.row_span.max(1));
+            e.3 = e.3.max(c.col + c.col_span.max(1));
+        }
     }
-    Ok(())
+    let tables_cut = tables.len() > MAX_SUMMARY_TABLES;
+    let table_list: Vec<Value> = tables
+            .iter()
+            .take(MAX_SUMMARY_TABLES)
+            .map(|(id, (first, last, rows, cols))| {
+                json!({"table": id, "first_page": first, "last_page": last, "rows": rows, "columns": cols})
+            })
+            .collect();
+    let notes: Vec<&String> = layout.notes.iter().take(MAX_NOTES).collect();
+    let fallback_fonts = layout
+        .fonts
+        .iter()
+        .filter(|f| f.matched == FontMatch::Fallback)
+        .count();
+    json!({
+        "page_count": layout.pages.len(),
+        "page_lines": page_lines,
+        "pages_truncated": layout.pages.len() > MAX_SUMMARY_PAGES,
+        "headings": headings,
+        "headings_truncated": headings_cut,
+        "tables": table_list,
+        "tables_truncated": tables_cut,
+        "layout_notes": notes,
+        "fallback_fonts": fallback_fonts,
+        "notice": NOTICE,
+    })
 }

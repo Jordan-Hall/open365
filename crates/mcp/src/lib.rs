@@ -7,6 +7,7 @@
 //! JSON line to the audit log; request, document and response sizes are limited.
 
 mod audit;
+mod bounded;
 mod fence;
 mod server;
 mod tools;
@@ -15,7 +16,7 @@ mod views;
 
 pub use fence::{Denied, Fence};
 pub use server::{
-    Config, MAX_COMMANDS, MAX_DOCUMENT_BYTES, MAX_OPEN_DOCUMENTS, MAX_REQUEST_BYTES,
-    MAX_RESPONSE_BYTES, Server,
+    Config, DEFAULT_DEADLINE, MAX_COMMANDS, MAX_DOCUMENT_BYTES, MAX_OPEN_DOCUMENTS,
+    MAX_REQUEST_BYTES, MAX_RESPONSE_BYTES, Server,
 };
 pub use tools::definitions as tool_definitions;

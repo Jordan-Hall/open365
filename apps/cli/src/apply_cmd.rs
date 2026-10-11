@@ -85,14 +85,14 @@ pub fn run(opts: &Options) -> Result<Outcome, CliError> {
             command.name(),
             effect_name(effect)
         );
-        let save = matches!(command, Command::Save { .. });
+        let save = matches!(command, Command::Save { .. } | Command::ExportPdf { .. });
         let blocked = save
             || (!opts.allow_destructive
                 && matches!(effect, EffectClass::Destructive | EffectClass::Egress));
         if blocked {
             refused = true;
             let reason = if save {
-                "save is not allowed in a command file; the output path is set with -o"
+                "save and export_pdf are not allowed in a command file; the output path is set with -o (use docx export-pdf for a PDF)"
             } else {
                 "refused: destructive/egress command needs --allow-destructive"
             };

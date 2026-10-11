@@ -12,6 +12,7 @@ pub struct Options {
     pub allow_edit: bool,
     pub allow_destructive: bool,
     pub include_hidden: bool,
+    pub deadline: std::time::Duration,
 }
 
 pub fn run(opts: Options) -> Result<(), CliError> {
@@ -25,6 +26,7 @@ pub fn run(opts: Options) -> Result<(), CliError> {
         allow_edit: opts.allow_edit,
         allow_destructive: opts.allow_destructive,
         include_hidden: opts.include_hidden,
+        deadline: opts.deadline,
     };
     let mut server = Server::new(config, Box::new(audit)).map_err(CliError::Other)?;
     let stdin = std::io::stdin().lock();

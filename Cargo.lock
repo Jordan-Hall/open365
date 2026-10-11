@@ -2743,7 +2743,10 @@ version = "0.1.0"
 dependencies = [
  "open365-calc",
  "open365-docx",
+ "open365-layout",
  "open365-opc",
+ "open365-pdf",
+ "open365-text",
  "open365-xlsx",
  "serde",
  "serde_json",

@@ -4,7 +4,7 @@
 //! so the open workbook and its file are never touched. Read-only, so the effect class is
 //! `Read`.
 
-use open365_calc::Value;
+use open365_calc::{Engine, Value};
 use open365_xlsx::Workbook;
 use serde::Serialize;
 
@@ -92,6 +92,52 @@ pub fn evaluate_formula(
     formula: Option<&str>,
     keep: &dyn Fn(usize, u32, u32) -> bool,
 ) -> Result<Evaluated, CommandError> {
+    FormulaEngine::build(wb, keep).evaluate(wb, sheet, row, col, formula, keep)
+}
+
+/// A calculation engine built once from a workbook and reused for many evaluations. Each
+/// evaluation puts the formula into a cell, reads the result and puts the cell back, so the
+/// engine stays equal to the workbook it was built from. Build a new one when the workbook
+/// changes. It is not `Send` (the engine holds a clock); keep it on the thread that built it.
+#[derive(Debug)]
+pub struct FormulaEngine {
+    engine: Engine,
+}
+
+impl FormulaEngine {
+    pub fn build(wb: &Workbook, keep: &dyn Fn(usize, u32, u32) -> bool) -> Self {
+        Self {
+            engine: build_engine(wb, keep),
+        }
+    }
+
+    /// As [`evaluate_formula`], on this engine. `wb` and `keep` must be the ones the engine
+    /// was built from.
+    ///
+    /// # Errors
+    /// As [`evaluate_formula`].
+    pub fn evaluate(
+        &mut self,
+        wb: &Workbook,
+        sheet: usize,
+        row: u32,
+        col: u32,
+        formula: Option<&str>,
+        keep: &dyn Fn(usize, u32, u32) -> bool,
+    ) -> Result<Evaluated, CommandError> {
+        evaluate_on(&mut self.engine, wb, sheet, row, col, formula, keep)
+    }
+}
+
+fn evaluate_on(
+    engine: &mut Engine,
+    wb: &Workbook,
+    sheet: usize,
+    row: u32,
+    col: u32,
+    formula: Option<&str>,
+    keep: &dyn Fn(usize, u32, u32) -> bool,
+) -> Result<Evaluated, CommandError> {
     let info = wb
         .sheets()
         .get(sheet)
@@ -114,13 +160,33 @@ pub fn evaluate_formula(
             "formula is longer than {MAX_FORMULA_CHARS} characters"
         )));
     }
-    let mut engine = build_engine(wb, keep);
-    engine
-        .set_formula(&info.name, row, col, &text)
-        .map_err(|e| CommandError::Formula(e.to_string()))?;
+    let prior_formula = engine
+        .get_formula(&info.name, row, col)
+        .map(|f| f.trim_start_matches('=').to_owned());
+    let prior_value = engine.get_full(&info.name, row, col);
+    let set = engine.set_formula(&info.name, row, col, &text);
+    let result = if set.is_ok() {
+        engine.recalc_dirty();
+        Some(engine.get_full(&info.name, row, col))
+    } else {
+        None
+    };
+    // Put the cell back, so the next evaluation starts from the workbook's own state.
+    match prior_formula {
+        Some(f) => {
+            let _ = engine.set_formula(&info.name, row, col, &f);
+        }
+        None if prior_value == Value::Empty => engine.clear(&info.name, row, col),
+        None => engine.set_value(&info.name, row, col, prior_value),
+    }
     engine.recalc_dirty();
+    let value = match (set, result) {
+        (Err(e), _) => return Err(CommandError::Formula(e.to_string())),
+        (Ok(()), Some(v)) => v,
+        (Ok(()), None) => Value::Empty,
+    };
     let mut truncated = false;
-    let result = convert(&engine.get_full(&info.name, row, col), &mut truncated);
+    let result = convert(&value, &mut truncated);
     Ok(Evaluated {
         formula: text,
         result,

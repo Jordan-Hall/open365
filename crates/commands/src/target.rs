@@ -6,6 +6,7 @@ use open365_xlsx::Workbook;
 
 use crate::command::{CellRef, Command, CommandLog, EffectClass, Outcome};
 use crate::error::CommandError;
+use crate::pdf::PdfOptions;
 use crate::xlsx_state::{CellSnapshot, XlsxState};
 
 #[derive(Debug)]
@@ -61,6 +62,7 @@ pub struct Target {
     revision: u64,
     /// Edit-log entries the last edit added, taken by `apply`.
     notes: Vec<String>,
+    pdf_options: PdfOptions,
 }
 
 impl Target {
@@ -76,7 +78,13 @@ impl Target {
             saved_state: 0,
             revision: 0,
             notes: Vec::new(),
+            pdf_options: PdfOptions::default(),
         }
+    }
+
+    /// Sets the metadata, font policy and size limit `ExportPdf` uses. Not a document edit.
+    pub fn set_pdf_options(&mut self, options: PdfOptions) {
+        self.pdf_options = options;
     }
 
     pub fn open_docx(bytes: &[u8]) -> Result<Self, CommandError> {
@@ -95,7 +103,9 @@ impl Target {
         Ok(Self::new(Content::Xlsx(Box::new(XlsxState::new(wb))), None))
     }
 
-    /// Reads `path` and opens it as DOCX or XLSX by extension (case-insensitive).
+    /// Reads `path` and opens it as DOCX or XLSX by extension (case-insensitive): `.xlsx`,
+    /// `.xlsm`, `.xltx` and `.xltm` are workbooks, anything else a Word document (`.docx`,
+    /// `.docm`, `.dotx`, `.dotm`). A VBA project is kept byte for byte and never run.
     pub fn open_path(path: &Path) -> Result<Self, CommandError> {
         let bytes = std::fs::read(path).map_err(|source| CommandError::Io {
             op: "read",
@@ -107,11 +117,23 @@ impl Target {
             .and_then(|e| e.to_str())
             .map(str::to_ascii_lowercase);
         let mut target = match ext.as_deref() {
-            Some("xlsx" | "xlsm") => Self::open_xlsx(&bytes)?,
+            Some("xlsx" | "xlsm" | "xltx" | "xltm") => Self::open_xlsx(&bytes)?,
             _ => Self::open_docx(&bytes)?,
         };
         target.path = Some(path.to_path_buf());
         Ok(target)
+    }
+
+    /// The document's current content as package bytes, without touching its path, undo
+    /// history or saved state. A copy to read from another thread can be reopened from them.
+    ///
+    /// # Errors
+    /// The package cannot be written (for example an edit dropped content it cannot keep).
+    pub fn snapshot_bytes(&mut self) -> Result<Vec<u8>, CommandError> {
+        Ok(match &mut self.content {
+            Content::Docx(s) => s.doc.save()?,
+            Content::Xlsx(x) => x.workbook.save()?,
+        })
     }
 
     pub fn docx(&self) -> Option<&Document> {
@@ -168,6 +190,8 @@ impl Target {
         let effect = command.effect(self.path.as_deref());
         let outcome = if let Command::Save { path } = &command {
             self.save_to(path, effect)?
+        } else if let Command::ExportPdf { path, overwrite } = &command {
+            self.export_pdf_to(path, *overwrite, effect)?
         } else {
             self.notes.clear();
             let (inverse, changed_cells) = self.run_edit(&command)?;
@@ -187,6 +211,7 @@ impl Target {
                 changed_cells,
                 saved_to: None,
                 bytes_written: 0,
+                pages: 0,
                 notes: std::mem::take(&mut self.notes),
             }
         };
@@ -342,7 +367,32 @@ impl Target {
             changed_cells: Vec::new(),
             saved_to: Some(path.to_path_buf()),
             bytes_written: bytes.len(),
+            pages: 0,
             notes: Vec::new(),
+        })
+    }
+
+    fn export_pdf_to(
+        &self,
+        path: &Path,
+        overwrite: bool,
+        effect: EffectClass,
+    ) -> Result<Outcome, CommandError> {
+        let Content::Docx(s) = &self.content else {
+            return Err(CommandError::WrongTarget {
+                command: "export_pdf",
+                target: "XLSX",
+            });
+        };
+        let rendered = crate::pdf::render(&s.doc, &self.pdf_options)?;
+        crate::pdf::write_pdf(path, &rendered.bytes, overwrite)?;
+        Ok(Outcome {
+            effect,
+            changed_cells: Vec::new(),
+            saved_to: Some(path.to_path_buf()),
+            bytes_written: rendered.bytes.len(),
+            pages: rendered.pages,
+            notes: rendered.warnings,
         })
     }
 }
@@ -353,6 +403,7 @@ fn edit_outcome(changed_cells: Vec<CellRef>) -> Outcome {
         changed_cells,
         saved_to: None,
         bytes_written: 0,
+        pages: 0,
         notes: Vec::new(),
     }
 }
@@ -430,7 +481,7 @@ fn replay_docx(doc: &mut Document, command: &Command) -> Result<(), CommandError
 
 /// Writes to a sibling temporary file, then renames over `path`, so a failed write never
 /// leaves a truncated document.
-fn write_atomic(path: &Path, bytes: &[u8]) -> Result<(), CommandError> {
+pub(crate) fn write_atomic(path: &Path, bytes: &[u8]) -> Result<(), CommandError> {
     let io = |op: &'static str, source| CommandError::Io {
         op,
         path: path.display().to_string(),

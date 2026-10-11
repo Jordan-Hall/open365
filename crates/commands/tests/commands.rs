@@ -697,3 +697,68 @@ mod docx_edits {
         assert_eq!(main_xml(&t), original);
     }
 }
+
+#[test]
+fn export_pdf_is_an_export_command_that_creates_exclusively() {
+    let command = |path: &PathBuf, overwrite| Command::ExportPdf {
+        path: path.clone(),
+        overwrite,
+    };
+    let out = scratch("export.pdf");
+    let _ = std::fs::remove_file(&out);
+    let mut t = plain();
+    assert_eq!(command(&out, false).effect(None), EffectClass::Export);
+    assert_eq!(command(&out, true).name(), "export_pdf");
+    let outcome = t.apply(command(&out, false)).expect("export");
+    assert_eq!(outcome.effect, EffectClass::Export);
+    assert_eq!(outcome.saved_to.as_deref(), Some(out.as_path()));
+    assert!(outcome.pages >= 1);
+    let pdf = std::fs::read(&out).expect("pdf");
+    assert_eq!(pdf.len(), outcome.bytes_written);
+    assert!(pdf.starts_with(b"%PDF-"));
+    // The export is not an edit: nothing to undo, nothing unsaved, the revision stays.
+    assert!(!t.is_dirty() && !t.can_undo());
+    assert_eq!(t.revision(), 0);
+    assert_eq!(t.audit_log().commands().len(), 1);
+
+    // An existing file is never replaced without overwrite, and is left as it was.
+    std::fs::write(&out, b"keep").expect("write");
+    let err = t.apply(command(&out, false)).expect_err("exists");
+    assert!(matches!(err, CommandError::Exists { .. }), "{err}");
+    assert_eq!(std::fs::read(&out).expect("read"), b"keep");
+    t.apply(command(&out, true)).expect("overwrite");
+    assert!(std::fs::read(&out).expect("pdf").starts_with(b"%PDF-"));
+
+    // A workbook has no PDF export.
+    let err = basic().apply(command(&out, true)).expect_err("xlsx");
+    assert!(matches!(err, CommandError::WrongTarget { .. }), "{err}");
+    let _ = std::fs::remove_file(&out);
+}
+
+#[test]
+fn export_pdf_honours_cancellation_and_the_size_limit() {
+    use std::sync::Arc;
+    use std::sync::atomic::AtomicBool;
+
+    let out = scratch("cancelled.pdf");
+    let _ = std::fs::remove_file(&out);
+    let mut t = plain();
+    t.set_pdf_options(open365_commands::PdfOptions {
+        cancel: Some(Arc::new(AtomicBool::new(true))),
+        ..Default::default()
+    });
+    let export = Command::ExportPdf {
+        path: out.clone(),
+        overwrite: false,
+    };
+    let err = t.apply(export.clone()).expect_err("cancelled");
+    assert!(matches!(err, CommandError::Cancelled), "{err}");
+    assert!(!out.exists());
+    t.set_pdf_options(open365_commands::PdfOptions {
+        max_bytes: Some(10),
+        ..Default::default()
+    });
+    let err = t.apply(export).expect_err("too large");
+    assert!(matches!(err, CommandError::TooLarge { limit: 10 }), "{err}");
+    assert!(!out.exists());
+}

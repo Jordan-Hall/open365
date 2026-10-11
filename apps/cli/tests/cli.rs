@@ -619,3 +619,24 @@ fn new_from_template_checks_kinds_and_extensions() {
     assert!(!o.status.success());
     assert!(!out.exists() && !scratch.path("n.docm").exists());
 }
+
+#[test]
+fn docx_export_pdf_never_overwrites_without_the_flag() {
+    let scratch = Scratch::new("export-pdf-overwrite");
+    let out = scratch.write("out.pdf", "keep");
+    let input = fixture("docx/styles-headings.docx");
+    let o = run(&[s("docx"), s("export-pdf"), &input, s("-o"), &out]);
+    assert!(!o.status.success());
+    assert!(stderr(&o).contains("--overwrite"), "{}", stderr(&o));
+    assert_eq!(std::fs::read(&out).expect("read"), b"keep");
+    let o = run(&[
+        s("docx"),
+        s("export-pdf"),
+        &input,
+        s("-o"),
+        &out,
+        s("--overwrite"),
+    ]);
+    assert!(o.status.success(), "{}", stderr(&o));
+    assert!(std::fs::read(&out).expect("pdf").starts_with(b"%PDF-"));
+}

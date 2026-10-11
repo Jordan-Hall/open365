@@ -32,6 +32,7 @@ enum ErrorKind {
     Refused,
     Invalid,
     Failed,
+    Timeout,
 }
 
 #[derive(Debug)]
@@ -59,11 +60,22 @@ impl ToolError {
             message: m.into(),
         }
     }
+    /// The call ran past the configured deadline.
+    pub(crate) fn timeout(what: &str, deadline: std::time::Duration) -> Self {
+        Self {
+            kind: ErrorKind::Timeout,
+            message: format!(
+                "{what} did not finish within {} s and was abandoned; its worker thread may still finish in the background. Nothing was written.",
+                deadline.as_secs_f64()
+            ),
+        }
+    }
     pub fn status(&self) -> &'static str {
         match self.kind {
             ErrorKind::Refused => "refused",
             ErrorKind::Invalid => "invalid",
             ErrorKind::Failed => "error",
+            ErrorKind::Timeout => "timeout",
         }
     }
 }
@@ -75,7 +87,7 @@ pub fn definitions() -> Value {
     json!([
         {
             "name": "open_document",
-            "description": "Open a .docx, .xlsx or .xlsm file inside the allowed folders. Returns a document id.",
+            "description": "Open a .docx, .docm, .dotx, .dotm, .xlsx, .xlsm, .xltx or .xltm file inside the allowed folders. Returns a document id. A VBA project is kept byte for byte and never run. A macro-enabled file or template can only be saved back with the same extension.",
             "inputSchema": {"type": "object", "properties": {
                 "path": {"type": "string", "description": "Absolute path, or relative to the first allowed folder."}
             }, "required": ["path"]},
@@ -218,14 +230,35 @@ fn uint_arg(args: &Value, key: &str, default: usize) -> Result<usize, ToolError>
     }
 }
 
-fn ext_ok(kind: Kind, path: &Path) -> bool {
-    let ext = path
-        .extension()
+fn lower_ext(path: &Path) -> String {
+    path.extension()
         .and_then(|e| e.to_str())
-        .map(str::to_ascii_lowercase);
+        .map(str::to_ascii_lowercase)
+        .unwrap_or_default()
+}
+
+/// Extensions `open_document` accepts. Macro-enabled files and templates are opened as the
+/// plain document type; the VBA project and the template content type are left as they are.
+fn open_ext_ok(kind: Kind, path: &Path) -> bool {
+    let ext = lower_ext(path);
     match kind {
-        Kind::Docx => ext.as_deref() == Some("docx"),
-        Kind::Xlsx => matches!(ext.as_deref(), Some("xlsx" | "xlsm")),
+        Kind::Docx => matches!(ext.as_str(), "docx" | "docm" | "dotx" | "dotm"),
+        Kind::Xlsx => matches!(ext.as_str(), "xlsx" | "xlsm" | "xltx" | "xltm"),
+    }
+}
+
+/// Extensions `save_as` accepts. A file opened as anything but a plain `.docx` or `.xlsx`
+/// (macro-enabled or a template) keeps its extension, because the package's content type says
+/// what it is and Office rejects a mismatch.
+fn save_ext_ok(kind: Kind, opened_ext: &str, path: &Path) -> bool {
+    let ext = lower_ext(path);
+    if !open_ext_ok(kind, path) {
+        return false;
+    }
+    match opened_ext {
+        "docx" => ext == "docx",
+        "xlsx" => matches!(ext.as_str(), "xlsx" | "xlsm"),
+        other => ext == other,
     }
 }
 
@@ -279,7 +312,7 @@ impl Server {
             .ok_or_else(|| ToolError::invalid("no such open document"))
     }
 
-    fn session_mut(
+    pub(crate) fn session_mut(
         &mut self,
         args: &Value,
         detail: &mut Detail,
@@ -330,8 +363,12 @@ impl Server {
         }
         let kind = [Kind::Docx, Kind::Xlsx]
             .into_iter()
-            .find(|k| ext_ok(*k, &path))
-            .ok_or_else(|| ToolError::invalid("only .docx, .xlsx and .xlsm files can be opened"))?;
+            .find(|k| open_ext_ok(*k, &path))
+            .ok_or_else(|| {
+                ToolError::invalid(
+                    "only .docx, .docm, .dotx, .dotm, .xlsx, .xlsm, .xltx and .xltm files can be opened",
+                )
+            })?;
         let len = std::fs::metadata(&path)
             .map_err(|e| ToolError::failed(e.to_string()))?
             .len();
@@ -358,6 +395,8 @@ impl Server {
                 target,
                 kind,
                 original,
+                ext: lower_ext(&path),
+                eval: None,
             },
         );
         Ok(
@@ -458,6 +497,11 @@ impl Server {
                     "save is not allowed in apply_commands; use save_as",
                 ));
             }
+            if matches!(c, Command::ExportPdf { .. }) {
+                return Err(ToolError::refused(
+                    "export_pdf is not allowed in apply_commands; use the export_pdf tool",
+                ));
+            }
             let effect = c.effect(s.target.path());
             if !dry_run
                 && refusal.is_none()
@@ -541,9 +585,9 @@ impl Server {
         let allow_destructive = self.config.allow_destructive;
         let allow_edit = self.config.allow_edit;
         let s = self.session_mut(args, detail)?;
-        if !ext_ok(s.kind, &path) {
+        if !save_ext_ok(s.kind, &s.ext, &path) {
             return Err(ToolError::invalid(
-                "the file extension must match the document type",
+                "the file extension must match the document type (a macro-enabled file or template keeps its own extension)",
             ));
         }
         let command = Command::Save { path: path.clone() };

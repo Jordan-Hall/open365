@@ -255,12 +255,38 @@ impl App {
 
     /// Writes the PDF of the open document to `path`.
     pub fn export_pdf_to(&mut self, path: &Path) {
-        self.status = match self.render_pdf().and_then(|bytes| {
-            std::fs::write(path, &bytes)
-                .map(|()| bytes.len())
-                .map_err(|e| e.to_string())
-        }) {
-            Ok(n) => format!("Exported {} ({n} bytes)", path.display()),
+        let Some(target) = self.target.as_mut() else {
+            self.status = "Export PDF failed: no document is open".to_owned();
+            return;
+        };
+        let title = target
+            .path()
+            .and_then(|p| p.file_stem())
+            .map(|s| s.to_string_lossy().into_owned());
+        target.set_pdf_options(open365_commands::PdfOptions {
+            metadata: PdfMetadata {
+                title,
+                ..PdfMetadata::default()
+            },
+            // The view draws with installed fonts, so the PDF may too.
+            system_fonts: true,
+            ..open365_commands::PdfOptions::default()
+        });
+        // The file dialog already asked about replacing an existing file.
+        let command = Command::ExportPdf {
+            path: path.to_path_buf(),
+            overwrite: true,
+        };
+        self.status = match target.apply(command) {
+            Ok(out) if out.notes.is_empty() => {
+                format!("Exported {} ({} bytes)", path.display(), out.bytes_written)
+            }
+            Ok(out) => format!(
+                "Exported {} ({} bytes). PDF warnings: {}",
+                path.display(),
+                out.bytes_written,
+                out.notes.join("; ")
+            ),
             Err(e) => format!("Export PDF failed: {e}"),
         };
     }

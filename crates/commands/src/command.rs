@@ -118,6 +118,15 @@ pub enum Command {
     Save {
         path: PathBuf,
     },
+    /// Lays the DOCX out and writes a PDF to `path` (effect `Export`). Without `overwrite` the
+    /// file is created exclusively and an existing file is an error; the document, its undo
+    /// history and its saved state are untouched. Metadata and fonts come from the target's
+    /// [`crate::PdfOptions`].
+    ExportPdf {
+        path: PathBuf,
+        #[serde(default)]
+        overwrite: bool,
+    },
 }
 
 impl Command {
@@ -155,6 +164,7 @@ impl Command {
             Self::XlsxSetCellValue { .. } => "xlsx_set_cell_value",
             Self::XlsxSetCellFormula { .. } => "xlsx_set_cell_formula",
             Self::Save { .. } => "save",
+            Self::ExportPdf { .. } => "export_pdf",
         }
     }
 
@@ -165,7 +175,7 @@ impl Command {
     pub fn effect(&self, current_path: Option<&Path>) -> EffectClass {
         match self {
             Self::Save { path } if current_path == Some(path.as_path()) => EffectClass::Edit,
-            Self::Save { .. } => EffectClass::Export,
+            Self::Save { .. } | Self::ExportPdf { .. } => EffectClass::Export,
             Self::DocxDeleteRange { start, end } | Self::DocxReplaceRange { start, end, .. }
                 if start != end =>
             {
@@ -193,9 +203,16 @@ pub struct Outcome {
     /// Set by `Save`: where the file was written.
     pub saved_to: Option<PathBuf>,
     pub bytes_written: usize,
+    /// Set by `ExportPdf`: the number of pages written.
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub pages: usize,
     /// Content the edit removed besides plain text (drawings, fields, section breaks).
     #[serde(default)]
     pub notes: Vec<String>,
+}
+
+fn is_zero(n: &usize) -> bool {
+    *n == 0
 }
 
 /// The audit log of applied commands, in order. Replaying it on a fresh target reproduces

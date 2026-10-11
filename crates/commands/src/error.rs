@@ -21,6 +21,14 @@ pub enum CommandError {
         path: String,
         source: std::io::Error,
     },
+    #[error("PDF export failed: {0}")]
+    Pdf(String),
+    #[error("{path} exists; pass overwrite to replace it")]
+    Exists { path: String },
+    #[error("the PDF is larger than {limit} bytes")]
+    TooLarge { limit: usize },
+    #[error("the export was cancelled")]
+    Cancelled,
     #[error("nothing to undo")]
     NothingToUndo,
     #[error("nothing to redo")]

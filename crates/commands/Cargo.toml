@@ -10,7 +10,10 @@ publish.workspace = true
 [dependencies]
 open365-calc.workspace = true
 open365-docx.workspace = true
+open365-layout.workspace = true
 open365-opc.workspace = true
+open365-pdf.workspace = true
+open365-text.workspace = true
 open365-xlsx.workspace = true
 serde.workspace = true
 serde_json.workspace = true

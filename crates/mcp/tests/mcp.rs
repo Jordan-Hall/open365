@@ -85,6 +85,7 @@ fn rig(scratch: &Scratch, edit: bool, destructive: bool, hidden: bool) -> Rig {
             allow_edit: edit,
             allow_destructive: destructive,
             include_hidden: hidden,
+            ..Config::default()
         },
         Box::new(audit.clone()),
     )
@@ -454,8 +455,17 @@ fn symlink_dir(target: &Path, link: &Path) -> bool {
     symlink(target, link)
 }
 
+/// File symlinks need a privilege on Windows (Developer Mode or elevation), so the tests that
+/// need one are ignored there with that reason and run with `--ignored` where it is held. They
+/// assert that the link was made: a refused link is a failure, never a silent pass. Folder
+/// links use a junction on Windows (`mklink /J`), which needs no privilege, so those run
+/// everywhere.
 #[test]
-fn symlinks_that_leave_the_root_are_refused() {
+#[cfg_attr(
+    windows,
+    ignore = "creating a file symlink on Windows needs Developer Mode or elevation; run with --ignored"
+)]
+fn file_symlinks_that_leave_the_root_are_refused() {
     let scratch = Scratch::new("symlink");
     let outside = scratch.outside().join("secret.docx");
     std::fs::copy(fixture("docx/plain-paragraphs.docx"), &outside).expect("copy");
@@ -463,27 +473,36 @@ fn symlinks_that_leave_the_root_are_refused() {
     let inside = scratch.put("docx/plain-paragraphs.docx");
     let mut r = rig(&scratch, true, true, false);
     let id = r.open(&inside);
-    if symlink(&outside, &link) {
-        r.refused("open_document", json!({"path": s(&link)}));
-        // Saving through a symlink target is refused as well.
-        r.refused("save_as", json!({"document": id, "path": s(&link)}));
-    } else {
-        eprintln!("file symlinks unavailable on this machine");
-    }
-    // A linked folder that leaves the root is refused too.
+    assert!(
+        symlink(&outside, &link),
+        "the file symlink was refused by the operating system"
+    );
+    r.refused("open_document", json!({"path": s(&link)}));
+    // Saving through a symlink target is refused as well.
+    r.refused("save_as", json!({"document": id, "path": s(&link)}));
+}
+
+#[test]
+fn directory_links_that_leave_the_root_are_refused() {
+    let scratch = Scratch::new("dirlink");
+    let outside = scratch.outside().join("secret.docx");
+    std::fs::copy(fixture("docx/plain-paragraphs.docx"), &outside).expect("copy");
+    let inside = scratch.put("docx/plain-paragraphs.docx");
+    let mut r = rig(&scratch, true, true, false);
+    let id = r.open(&inside);
     let dir_link = scratch.root().join("dir");
-    if !symlink_dir(&scratch.outside(), &dir_link) {
-        eprintln!("directory links unavailable on this machine");
-    } else {
-        r.refused(
-            "open_document",
-            json!({"path": s(&dir_link.join("secret.docx"))}),
-        );
-        r.refused(
-            "save_as",
-            json!({"document": id, "path": s(&dir_link.join("new.docx"))}),
-        );
-    }
+    assert!(
+        symlink_dir(&scratch.outside(), &dir_link),
+        "neither a directory symlink nor a junction could be created"
+    );
+    r.refused(
+        "open_document",
+        json!({"path": s(&dir_link.join("secret.docx"))}),
+    );
+    r.refused(
+        "save_as",
+        json!({"document": id, "path": s(&dir_link.join("new.docx"))}),
+    );
 }
 
 #[test]
@@ -853,15 +872,20 @@ fn export_pdf_is_fenced_and_checks_the_extension_and_document() {
 }
 
 #[test]
+#[cfg_attr(
+    windows,
+    ignore = "creating a file symlink on Windows needs Developer Mode or elevation; run with --ignored"
+)]
 fn export_pdf_refuses_a_symlink_target() {
     let scratch = Scratch::new("pdf-link");
     let docx = scratch.put("docx/plain-paragraphs.docx");
     let victim = scratch.outside().join("victim.pdf");
     std::fs::write(&victim, b"keep").expect("write");
     let link = scratch.root().join("link.pdf");
-    if !symlink(&victim, &link) {
-        return; // symlinks need privileges on some Windows set-ups
-    }
+    assert!(
+        symlink(&victim, &link),
+        "the file symlink was refused by the operating system"
+    );
     let mut r = rig(&scratch, true, true, false);
     let id = r.open(&docx);
     r.refused(
@@ -1135,4 +1159,188 @@ fn evaluate_formula_cannot_reach_hidden_sheets() {
             "hidden sheet {name} leaked: {v}"
         );
     }
+}
+
+fn zip_part(path: &Path, name: &str) -> Option<Vec<u8>> {
+    use std::io::Read;
+    let file = std::fs::File::open(path).expect("open zip");
+    let mut zip = zip::ZipArchive::new(file).expect("zip");
+    let mut part = zip.by_name(name).ok()?;
+    let mut data = Vec::new();
+    part.read_to_end(&mut data).expect("read part");
+    Some(data)
+}
+
+#[test]
+fn macro_enabled_files_and_templates_open_and_keep_their_vba_project() {
+    let scratch = Scratch::new("macros");
+    put_as(&scratch, "docx/template-macro.dotm", "m.dotm");
+    put_as(&scratch, "docx/template-basic.dotx", "t.dotx");
+    put_as(&scratch, "xlsx/template-macro.xltm", "m.xltm");
+    put_as(&scratch, "xlsx/template-basic.xltx", "t.xltx");
+    let mut r = rig(&scratch, true, false, false);
+    for (t, o) in [("m.dotm", "m.docm"), ("m.xltm", "m.xlsm")] {
+        let (v, err) = r.call("new_from_template", json!({"path": t, "output": o}));
+        assert!(!err, "{v}");
+    }
+    let cases = [
+        ("m.dotm", "word/vbaProject.bin", true),
+        ("m.docm", "word/vbaProject.bin", true),
+        ("m.xltm", "xl/vbaProject.bin", false),
+        ("m.xlsm", "xl/vbaProject.bin", false),
+    ];
+    for (name, part, docx) in cases {
+        let path = scratch.root().join(name);
+        let vba = zip_part(&path, part).unwrap_or_else(|| panic!("{name} has no {part}"));
+        let id = r.open(&path);
+        let (v, err) = r.call("get_outline", json!({"document": id}));
+        assert!(!err, "{name}: {v}");
+        // An edit and a save keep the VBA project byte for byte; nothing is run.
+        let command = if docx {
+            json!([{"command": "docx_insert_text", "para": 0, "offset": 0, "text": "X"}])
+        } else {
+            json!([{"command": "xlsx_set_cell_value", "sheet": 0, "row": 1, "col": 1,
+                    "value": {"type": "number", "value": 7.0}}])
+        };
+        let (v, err) = r.call(
+            "apply_commands",
+            json!({"document": id, "commands": command}),
+        );
+        assert!(!err, "{name}: {v}");
+        let saved = format!("saved-{name}");
+        let (v, err) = r.call("save_as", json!({"document": id, "path": saved}));
+        assert!(!err, "{name}: {v}");
+        let out = scratch.root().join(&saved);
+        assert_eq!(zip_part(&out, part), Some(vba), "{name}: VBA part changed");
+        // Saving under another extension would mislabel the package.
+        let other = if docx { "other.docx" } else { "other.xlsx" };
+        let (v, err) = r.call("save_as", json!({"document": id, "path": other}));
+        assert!(err && v["status"] == "invalid", "{name}: {v}");
+        assert!(!scratch.root().join(other).exists());
+    }
+    // Plain templates open too, and keep their extension on save.
+    for name in ["t.dotx", "t.xltx"] {
+        let id = r.open(&scratch.root().join(name));
+        let (v, err) = r.call("get_outline", json!({"document": id}));
+        assert!(!err, "{name}: {v}");
+    }
+    // Other extensions still do not.
+    let junk = scratch.root().join("x.dotm.txt");
+    std::fs::write(&junk, b"x").expect("write");
+    let (v, err) = r.call("open_document", json!({"path": s(&junk)}));
+    assert!(err && v["status"] == "invalid", "{v}");
+}
+
+#[test]
+fn slow_tools_report_a_timeout_and_a_late_export_writes_nothing() {
+    let scratch = Scratch::new("deadline");
+    let docx = scratch.put("docx/styles-headings.docx");
+    let xlsx = scratch.put("xlsx/formulas-basic.xlsx");
+    let mut config_rig = rig(&scratch, true, false, false);
+    config_rig.server = Server::new(
+        Config {
+            roots: vec![scratch.root()],
+            allow_edit: true,
+            deadline: std::time::Duration::ZERO,
+            ..Config::default()
+        },
+        Box::new(config_rig.audit.clone()),
+    )
+    .expect("server");
+    let r = &mut config_rig;
+    let d = r.open(&docx);
+    let x = r.open(&xlsx);
+    let (v, err) = r.call("layout_summary", json!({"document": d}));
+    assert!(err && v["status"] == "timeout", "{v}");
+    assert!(
+        v["error"]
+            .as_str()
+            .is_some_and(|e| e.contains("background"))
+    );
+    let (v, err) = r.call("export_pdf", json!({"document": d, "path": "late.pdf"}));
+    assert!(err && v["status"] == "timeout", "{v}");
+    let (v, err) = r.call(
+        "evaluate_formula",
+        json!({"document": x, "sheet": 0, "cell": "Z1", "formula": "1+2"}),
+    );
+    assert!(err && v["status"] == "timeout", "{v}");
+    // The abandoned export saw the cancellation flag and never created the file.
+    std::thread::sleep(std::time::Duration::from_millis(1500));
+    assert!(!scratch.root().join("late.pdf").exists());
+    assert!(!scratch.root().join("late.pdf.open365-tmp").exists());
+    let lines = r.audit.lines();
+    assert!(lines.iter().any(|l| l["status"] == "timeout"));
+
+    // The same documents still work with a sensible deadline.
+    let mut ok = rig(&scratch, true, false, false);
+    let d = ok.open(&docx);
+    let (v, err) = ok.call("layout_summary", json!({"document": d}));
+    assert!(!err, "{v}");
+}
+
+#[test]
+fn the_formula_engine_is_cached_per_workbook_and_rebuilt_when_things_change() {
+    let scratch = Scratch::new("engine");
+    let xlsx = scratch.put("xlsx/formulas-basic.xlsx");
+    let mut r = rig(&scratch, true, false, false);
+    let id = r.open(&xlsx);
+    let eval = |r: &mut Rig, formula: &str| {
+        let (v, err) = r.call(
+            "evaluate_formula",
+            json!({"document": id, "sheet": 0, "cell": "Z1", "formula": formula}),
+        );
+        assert!(!err, "{v}");
+        v
+    };
+    let engines = |r: &Rig| -> Vec<String> {
+        r.audit
+            .lines()
+            .iter()
+            .filter(|l| l["tool"] == "evaluate_formula")
+            .map(|l| l["engine"].as_str().expect("engine").to_owned())
+            .collect()
+    };
+    assert_eq!(eval(&mut r, "A1+1")["result"]["type"], "number");
+    eval(&mut r, "A1+2");
+    // A scratch formula never lingers in the cached engine.
+    let (v, _) = r.call(
+        "evaluate_formula",
+        json!({"document": id, "sheet": 0, "cell": "Z1"}),
+    );
+    assert_eq!(v["status"], "invalid", "Z1 has no formula of its own: {v}");
+    assert_eq!(engines(&r), ["built", "reused", "reused"]);
+
+    // An edit changes the document: the engine is rebuilt and sees the new value.
+    let edit = json!([{"command": "xlsx_set_cell_value", "sheet": 0, "row": 1, "col": 1,
+                       "value": {"type": "number", "value": 40.0}}]);
+    let (v, err) = r.call("apply_commands", json!({"document": id, "commands": edit}));
+    assert!(!err, "{v}");
+    assert_eq!(
+        eval(&mut r, "A1+2")["result"],
+        json!({"type": "number", "value": 42.0})
+    );
+    eval(&mut r, "A1+2");
+    // The file changing on disk invalidates it too.
+    let mut bytes = std::fs::read(&xlsx).expect("read");
+    bytes.push(0);
+    std::fs::write(&xlsx, bytes).expect("write");
+    eval(&mut r, "A1+2");
+    assert_eq!(
+        engines(&r),
+        ["built", "reused", "reused", "built", "reused", "built"]
+    );
+}
+
+#[test]
+fn apply_commands_cannot_smuggle_an_export() {
+    let scratch = Scratch::new("smuggle");
+    let docx = scratch.put("docx/plain-paragraphs.docx");
+    let mut r = rig(&scratch, true, true, false);
+    let id = r.open(&docx);
+    let why = r.refused(
+        "apply_commands",
+        json!({"document": id, "commands": [{"command": "export_pdf", "path": "../outside/x.pdf", "overwrite": true}]}),
+    );
+    assert!(why.contains("export_pdf tool"), "{why}");
+    assert!(!scratch.outside().join("x.pdf").exists());
 }

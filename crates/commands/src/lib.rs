@@ -13,6 +13,7 @@
 mod command;
 mod error;
 mod eval;
+mod pdf;
 mod target;
 mod template;
 mod xlsx_state;
@@ -20,8 +21,11 @@ mod xlsx_state;
 pub use command::{CellEntry, CellRef, Command, CommandLog, EffectClass, Outcome};
 pub use error::CommandError;
 pub use eval::{
-    EvalValue, Evaluated, MAX_FORMULA_CHARS, MAX_RESULT_DIM, MAX_RESULT_TEXT, evaluate_formula,
+    EvalValue, Evaluated, FormulaEngine, MAX_FORMULA_CHARS, MAX_RESULT_DIM, MAX_RESULT_TEXT,
+    evaluate_formula,
 };
 pub use open365_docx::{Alignment, DocPos, RunPropsPatch};
+pub use open365_pdf::PdfMetadata;
+pub use pdf::PdfOptions;
 pub use target::{Target, apply};
 pub use template::template_output_extension;

@@ -3,11 +3,13 @@
 use std::collections::BTreeMap;
 use std::io::{BufRead, Read, Write};
 use std::path::PathBuf;
+use std::time::Duration;
 
 use open365_commands::Target;
 use serde_json::{Map, Value, json};
 
 use crate::audit::Audit;
+use crate::bounded::EvalWorker;
 use crate::fence::Fence;
 use crate::tools;
 
@@ -30,13 +32,32 @@ started with --allow-edit; destructive effects need --allow-destructive. Hidden 
 returned.";
 
 /// Server policy, fixed at start-up.
-#[derive(Debug, Clone, Default)]
+/// Longest a layout, PDF export or formula evaluation may run unless configured otherwise.
+pub const DEFAULT_DEADLINE: Duration = Duration::from_secs(30);
+
+#[derive(Debug, Clone)]
 pub struct Config {
     /// Folders agents may touch. Relative paths resolve against the first.
     pub roots: Vec<PathBuf>,
     pub allow_edit: bool,
     pub allow_destructive: bool,
     pub include_hidden: bool,
+    /// How long `layout_summary`, `export_pdf` and `evaluate_formula` may run before the call
+    /// reports a timeout. The work cannot be interrupted, so its thread may still finish in the
+    /// background (see `docs/agents/mcp.md`).
+    pub deadline: Duration,
+}
+
+impl Default for Config {
+    fn default() -> Self {
+        Self {
+            roots: Vec::new(),
+            allow_edit: false,
+            allow_destructive: false,
+            include_hidden: false,
+            deadline: DEFAULT_DEADLINE,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -51,6 +72,11 @@ pub(crate) struct Session {
     pub kind: Kind,
     /// The bytes as opened; used for inspection and for dry runs.
     pub original: Vec<u8>,
+    /// Lower-case extension of the file as opened, without the dot.
+    pub ext: String,
+    /// The formula engine for this workbook, built on first use and rebuilt when the document
+    /// or its file changes.
+    pub eval: Option<EvalWorker>,
 }
 
 #[derive(Debug)]

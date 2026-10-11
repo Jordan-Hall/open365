@@ -16,9 +16,9 @@ Exit codes: 0 success, 1 error (message on stderr, nothing on stdout), 3 `apply`
 
 ## PDF export
 
-`open365 docx export-pdf <in.docx> -o <out.pdf> [--title --author --subject --keywords --language --system-fonts]`
+`open365 docx export-pdf <in.docx> -o <out.pdf> [--overwrite --title --author --subject --keywords --language --system-fonts]`
 
-Lays the document out and writes a tagged PDF 1.7. Bundled fonts unless `--system-fonts`. No author or date unless given. Effect: export. The CLI writes the output path it is given, like `apply -o`; the MCP tool is stricter (see `mcp.md`).
+Lays the document out and writes a tagged PDF 1.7. Bundled fonts unless `--system-fonts`. No author or date unless given. Effect: export. The CLI runs the `export_pdf` command (`{"command": "export_pdf", "path": ..., "overwrite": false}`), the same one the desktop's File, Export PDF and the MCP `export_pdf` tool use. Without `--overwrite` the output is created exclusively and an existing file is an error (exit 1, file untouched). `export_pdf` is refused inside an `apply` command file, like `save`; the MCP tool adds the fence and the `--allow-destructive` rule (see `mcp.md`).
 
 ## New document from a template
 
