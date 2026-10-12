@@ -388,12 +388,23 @@ pub(crate) fn regenerate(
     data: &Dataset,
     grid: &PivotGrid,
     refreshed_date: f64,
+    groups: &crate::model::CacheDefinition,
 ) -> Option<Regenerated> {
     let cache = &p.cache;
     let table = &p.table;
     let old_records = p.records.as_ref()?;
     if !matches!(cache.source, CacheSource::Worksheet { .. })
-        || cache.fields.iter().any(|f| f.group.is_some())
+        // A group Excel drops on this refresh changes the field list: not regenerated here.
+        || cache
+            .fields
+            .iter()
+            .zip(&groups.fields)
+            .any(|(old, new)| {
+                // Only a numeric group on a source field can be dropped in place; a date
+                // group that goes takes its derived fields along.
+                old.group.is_some() != new.group.is_some()
+                    && !(old.database_field && old.group.as_ref().is_some_and(|g| g.group_by.is_none()))
+            })
         || data.columns.len() != cache.fields.len()
         || table.fields.len() != cache.fields.len()
     {
@@ -474,7 +485,7 @@ pub(crate) fn regenerate(
                     plan.items.push((v.clone(), false));
                 }
             }
-            if !plan.date {
+            if !plan.date && cf.group.is_none() {
                 for v in &cf.shared {
                     let k = ItemKey::of(v);
                     if !plan.index.contains_key(&k) {
@@ -556,6 +567,67 @@ pub(crate) fn regenerate(
                 None => cf.children.insert(0, RawXml::Element(si)),
             }
             fi += 1;
+        }
+    }
+
+    // Grouped fields: bounds and items of the regrouped data.
+    if let Some(fields) = cache_xml
+        .root
+        .children
+        .iter_mut()
+        .filter_map(RawXml::as_element_mut)
+        .find(|e| e.head.is_main("cacheFields"))
+    {
+        for (fi, cf) in fields
+            .children
+            .iter_mut()
+            .filter_map(RawXml::as_element_mut)
+            .filter(|e| e.head.is_main("cacheField"))
+            .enumerate()
+        {
+            let g = groups.fields.get(fi).and_then(|f| f.group.as_ref());
+            if g.is_none() && cache.fields[fi].group.is_some() {
+                cf.children
+                    .retain(|c| c.as_element().is_none_or(|e| !e.head.is_main("fieldGroup")));
+            }
+            let Some(g) = g.filter(|g| !g.items.is_empty()) else {
+                continue;
+            };
+            let Some(fg) = cf
+                .children
+                .iter_mut()
+                .filter_map(RawXml::as_element_mut)
+                .find(|e| e.head.is_main("fieldGroup"))
+            else {
+                continue;
+            };
+            for node in &mut fg.children {
+                let Some(e) = node.as_element_mut() else {
+                    continue;
+                };
+                if e.head.is_main("rangePr") {
+                    if let Some(d) = g.start_date {
+                        e.head.set_attr("startDate", &serial_to_iso(d, false));
+                    }
+                    if let Some(d) = g.end_date {
+                        e.head.set_attr("endDate", &serial_to_iso(d, false));
+                    }
+                    if let Some(n) = g.start_num {
+                        e.head.set_attr("startNum", &num_text(n));
+                    }
+                    if let Some(n) = g.end_num {
+                        e.head.set_attr("endNum", &num_text(n));
+                    }
+                } else if e.head.is_main("groupItems") {
+                    let proto = e.sibling("s");
+                    e.head.set_attr("count", &g.items.len().to_string());
+                    e.children = g
+                        .items
+                        .iter()
+                        .map(|v| RawXml::Element(value_element(&proto, v, false, false)))
+                        .collect();
+                }
+            }
         }
     }
 
@@ -672,11 +744,72 @@ pub(crate) fn regenerate(
             let pf = &table.fields[fi];
             let cf = &cache.fields[fi];
             let plan = &plans[fi];
+            if groups.fields[fi].group.is_none() && cf.group.is_some() {
+                // The group is gone: the items are the shared items again, in stored order.
+                if let Some(list) = pf_el
+                    .children
+                    .iter_mut()
+                    .filter_map(RawXml::as_element_mut)
+                    .find(|e| e.head.is_main("items"))
+                {
+                    let mut items: Vec<RawXml> = (0..cf.shared.len())
+                        .map(|k| RawXml::Element(plain(&proto, "item", &[("x", k.to_string())])))
+                        .collect();
+                    items.extend(
+                        list.children
+                            .iter()
+                            .filter(|c| c.as_element().is_some_and(|e| e.head.attr("x").is_none()))
+                            .cloned(),
+                    );
+                    list.head.set_attr("count", &items.len().to_string());
+                    list.children = items;
+                }
+            }
             let idx = pf_el
                 .children
                 .iter()
                 .position(|c| c.as_element().is_some_and(|e| e.head.is_main("items")));
             let on_axis = matches!(pf.axis, Some(Axis::Row | Axis::Col | Axis::Page));
+            if let Some(g) = groups.fields[fi]
+                .group
+                .as_ref()
+                .filter(|g| !g.items.is_empty())
+            {
+                // The items of a grouped field are its group items: the stored order of the
+                // items that are still there (same label), then the new ones in index order.
+                // Months are always in calendar order.
+                if let Some(i) = idx
+                    && let Some(list) = pf_el.children[i].as_element_mut()
+                {
+                    let old_items = cf.group.as_ref().map_or(&[][..], |o| o.items.as_slice());
+                    let old_x: Vec<usize> = list
+                        .elements()
+                        .filter(|e| e.head.is_main("item"))
+                        .filter_map(|e| e.head.attr("x").and_then(|x| x.parse().ok()))
+                        .collect();
+                    let order = crate::grouping::item_order(
+                        old_items,
+                        &old_x,
+                        &g.items,
+                        g.group_by.as_deref() == Some("months"),
+                    );
+                    let tail: Vec<RawXml> = list
+                        .children
+                        .iter()
+                        .filter(|c| c.as_element().is_some_and(|e| e.head.attr("x").is_none()))
+                        .cloned()
+                        .collect();
+                    let mut items: Vec<RawXml> = order
+                        .iter()
+                        .map(|k| RawXml::Element(plain(&proto, "item", &[("x", k.to_string())])))
+                        .collect();
+                    items.extend(tail);
+                    list.head.set_attr("count", &items.len().to_string());
+                    list.children = items;
+                }
+                fi += 1;
+                continue;
+            }
             if !plan.shared || (idx.is_none() && !on_axis) {
                 fi += 1;
                 continue;
@@ -701,7 +834,30 @@ pub(crate) fn regenerate(
                     }
                 }
             }
-            let order = grid.item_order.get(fi).cloned().unwrap_or_default();
+            let mut order = grid.item_order.get(fi).cloned().unwrap_or_default();
+            if order.is_empty() && !on_axis {
+                // A field with items off the axes (the base of a group): the stored order of the
+                // items still in the source, then the new ones as they appear.
+                let used: HashMap<ItemKey, &Value> = plan
+                    .items
+                    .iter()
+                    .filter(|(_, u)| !*u)
+                    .map(|(v, _)| (ItemKey::of(v), v))
+                    .collect();
+                let mut seen: std::collections::HashSet<ItemKey> = std::collections::HashSet::new();
+                for k in old_positions.iter().flatten() {
+                    if let Some(v) = used.get(k)
+                        && seen.insert(k.clone())
+                    {
+                        order.push((*v).clone());
+                    }
+                }
+                for (v, u) in &plan.items {
+                    if !*u && seen.insert(ItemKey::of(v)) {
+                        order.push(v.clone());
+                    }
+                }
+            }
             // (value, position in the computed order); retained items of a sorted field are
             // placed by the sort, those of a field sorted by a data field or by hand go last.
             let mut merged: Vec<(Value, Option<usize>)> = order

@@ -1,0 +1,16 @@
+{
+  "oracle": "Microsoft Excel via COM; TableRange2 cells and DisplayFormat after editing the source and refreshing",
+  "excel_build": "20430",
+  "pivots": [
+    {"sheet":"P1","name":"PT1","case":"date by months, a blank date","range":"B4:B5",
+     "cells":[
+      {"a":"B4","v":"Sum of Revenue","nf":"General","t":"Sum of Revenue","f":16115392,"b":1,"i":0,"c":0,"bd":["","","1:2:14791492",""]},
+      {"a":"B5","v":157990.99,"nf":"General","t":"157990.99","f":-1,"b":0,"i":0,"c":0,"bd":["","1:2:14791492","",""]}
+     ]},
+    {"sheet":"P2","name":"PT2","case":"date by years and months, a blank date","range":"B4:B5",
+     "cells":[
+      {"a":"B4","v":"Sum of Units","nf":"General","t":"Sum of Units","f":16115392,"b":1,"i":0,"c":0,"bd":["","","1:2:14791492",""]},
+      {"a":"B5","v":3130,"nf":"General","t":"3130","f":-1,"b":0,"i":0,"c":0,"bd":["","1:2:14791492","",""]}
+     ]}
+  ]
+}

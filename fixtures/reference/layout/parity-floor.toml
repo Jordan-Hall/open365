@@ -141,11 +141,11 @@ matched = 44
 total = 44
 
 [fixtures.layout-float-anchor-bottom]
-matched = 41
+matched = 67
 total = 67
 
 [fixtures.layout-float-anchor-nextpage]
-matched = 41
+matched = 69
 total = 69
 
 [fixtures.layout-float-collide]
@@ -657,11 +657,11 @@ matched = 44
 total = 44
 
 [system.layout-float-anchor-bottom]
-matched = 41
+matched = 67
 total = 67
 
 [system.layout-float-anchor-nextpage]
-matched = 41
+matched = 69
 total = 69
 
 [system.layout-float-collide]

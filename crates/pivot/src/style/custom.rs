@@ -148,13 +148,7 @@ impl CustomStyles {
             let Some(name) = st.head.attr("name") else {
                 continue;
             };
-            if st
-                .head
-                .attr("pivot")
-                .is_some_and(|p| matches!(p.trim(), "0" | "false"))
-            {
-                continue;
-            }
+            // `pivot="0"` (a style for tables) still applies to a pivot that names it.
             let mut def: StyleDef = vec![None; element::COUNT];
             for el in st
                 .elements()
@@ -182,7 +176,8 @@ impl CustomStyles {
                     .unwrap_or(1);
                 def[idx] = Some(dxf_element(dxf, stripe));
             }
-            out.styles.insert(name.to_owned(), def);
+            // Names compare without case; the first style of a name is the one Excel uses.
+            out.styles.entry(name.to_lowercase()).or_insert(def);
         }
         out
     }
@@ -196,7 +191,7 @@ impl CustomStyles {
     }
 
     pub(super) fn get(&self, name: &str) -> Option<&StyleDef> {
-        self.styles.get(name)
+        self.styles.get(&name.to_lowercase())
     }
 
     /// Names of the custom pivot styles.

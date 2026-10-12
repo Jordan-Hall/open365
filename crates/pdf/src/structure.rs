@@ -39,6 +39,9 @@ pub enum Kind {
     Td,
     /// A text box (Word's `Textbox`, role-mapped to `Sect`): the paragraphs of the box.
     Textbox,
+    /// A table of contents field's paragraphs (`TOC > TOCI`).
+    Toc,
+    Toci,
 }
 
 impl Kind {
@@ -58,6 +61,8 @@ impl Kind {
             Self::Th => "TH".into(),
             Self::Td => "TD".into(),
             Self::Textbox => "Textbox".into(),
+            Self::Toc => "TOC".into(),
+            Self::Toci => "TOCI".into(),
         }
     }
 }
@@ -93,6 +98,9 @@ pub struct ParaMeta {
     pub style: Option<String>,
     /// First paragraph of its container (the body, a table cell): nothing above it.
     pub first: bool,
+    /// The marked content of the paragraph sits in `Span` elements under it (Word's `TOCI` with
+    /// a page number link).
+    pub spans: bool,
 }
 
 /// Where a hyperlink goes.
@@ -109,6 +117,22 @@ pub enum LinkTarget {
 pub struct LinkSpec {
     pub text: String,
     pub target: LinkTarget,
+    pub kind: LinkKind,
+    /// The paragraph mark lies inside the link (a field result that goes on in the next
+    /// paragraph): Word draws the paragraph's blank in the link's own `Span`.
+    pub includes_mark: bool,
+}
+
+/// What made a link.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LinkKind {
+    /// A `w:hyperlink`.
+    Hyperlink,
+    /// A `REF \h` field: Word writes two annotations, one of them a zero-size one at the top
+    /// left of the page (evidence: `fields`).
+    Ref,
+    /// A `PAGEREF \h` field: a `Link` element without an annotation.
+    PageRef,
 }
 
 /// What the model says about the text of a paragraph: the text itself (cached field results
@@ -122,6 +146,14 @@ pub struct ParaText {
     /// Byte offsets in `text` where a footnote or endnote reference mark stands (the model
     /// holds no text for it; the layout draws the number there).
     pub note_marks: Vec<(usize, bool)>,
+    /// The paragraph is part of a table of contents field.
+    pub toc: bool,
+    /// Language of the paragraph mark when it differs from the document's (the blank Word draws
+    /// for the mark gets its own `Span /Lang`).
+    pub mark_lang: Option<String>,
+    /// The paragraph holds a comment reference: Word puts the paragraph mark's blank in a
+    /// `CommentAnchor` element.
+    pub comment_ref: bool,
 }
 
 #[derive(Debug)]
@@ -158,6 +190,41 @@ struct TextReader<'a> {
     base: Option<&'a str>,
     dropped_links: usize,
     bookmarks: Vec<String>,
+    /// Complex fields open at this point of the body (they span paragraphs).
+    fields: Vec<OpenField>,
+    /// Depth of `w:hyperlink` groups being read.
+    in_hyperlink: usize,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum FieldKind {
+    Toc,
+    Ref,
+    PageRef,
+    Other,
+}
+
+struct OpenField {
+    kind: FieldKind,
+    instr: String,
+    in_result: bool,
+    /// Byte offset in the paragraph text where the result starts.
+    start: usize,
+    /// Bookmark a `REF` or `PAGEREF` field with `\h` points at.
+    target: Option<String>,
+}
+
+fn field_link(kind: FieldKind, text: String, target: String, includes_mark: bool) -> LinkSpec {
+    LinkSpec {
+        text,
+        target: LinkTarget::Anchor(target),
+        kind: if kind == FieldKind::PageRef {
+            LinkKind::PageRef
+        } else {
+            LinkKind::Ref
+        },
+        includes_mark,
+    }
 }
 
 /// External targets a PDF viewer may be sent to; anything else (`javascript:`, `file:`, ...) is
@@ -171,16 +238,105 @@ fn safe_uri(url: &str) -> bool {
 
 impl TextReader<'_> {
     fn paragraph(&mut self, para: &Paragraph) -> (ParaText, Vec<LinkSpec>) {
-        let mut out = ParaText::default();
+        let mut out = ParaText {
+            toc: self
+                .fields
+                .iter()
+                .any(|f| f.kind == FieldKind::Toc && f.in_result),
+            ..ParaText::default()
+        };
+        out.mark_lang = self
+            .langs
+            .of_paragraph(para)
+            .and_then(primary)
+            .filter(|l| Some(l.as_str()) != self.base);
         let mut links = Vec::new();
         self.inlines(para, &para.content, &mut out, &mut links);
+        // A field whose result goes on in the next paragraph: the mark is inside the link.
+        let end = out.text.len();
+        for f in &mut self.fields {
+            if f.in_result
+                && let Some(target) = f.target.clone()
+                && end > f.start
+                && self.in_hyperlink == 0
+            {
+                let text = out.text[f.start..end].to_owned();
+                out.links.push(f.start..end);
+                links.push(field_link(f.kind, text, target, true));
+            }
+            f.start = 0;
+        }
         (out, links)
     }
 
-    fn run(&self, para: &Paragraph, run: &Run, out: &mut ParaText) {
+    fn field_char(&mut self, kind: &str, out: &mut ParaText, links: &mut Vec<LinkSpec>) {
+        match kind {
+            "begin" => self.fields.push(OpenField {
+                kind: FieldKind::Other,
+                instr: String::new(),
+                in_result: false,
+                start: 0,
+                target: None,
+            }),
+            "separate" => {
+                let at = out.text.len();
+                if let Some(f) = self.fields.last_mut() {
+                    let words: Vec<&str> = f.instr.split_whitespace().collect();
+                    f.kind = match words.first().map(|w| w.to_ascii_uppercase()).as_deref() {
+                        Some("TOC") => FieldKind::Toc,
+                        Some("REF") => FieldKind::Ref,
+                        Some("PAGEREF") => FieldKind::PageRef,
+                        _ => FieldKind::Other,
+                    };
+                    if matches!(f.kind, FieldKind::Ref | FieldKind::PageRef)
+                        && words.iter().any(|w| w.eq_ignore_ascii_case("\\h"))
+                    {
+                        f.target = words.get(1).map(|w| (*w).to_owned());
+                    }
+                    f.in_result = true;
+                    f.start = at;
+                    if f.kind == FieldKind::Toc {
+                        out.toc = true;
+                    }
+                }
+            }
+            "end" => {
+                let Some(f) = self.fields.pop() else { return };
+                let end = out.text.len();
+                if f.in_result
+                    && let Some(target) = f.target
+                    && end > f.start
+                    && self.in_hyperlink == 0
+                {
+                    let text = out.text[f.start..end].to_owned();
+                    out.links.push(f.start..end);
+                    links.push(field_link(f.kind, text, target, false));
+                }
+            }
+            _ => {}
+        }
+    }
+
+    fn run(&mut self, para: &Paragraph, run: &Run, out: &mut ParaText, links: &mut Vec<LinkSpec>) {
         let start = out.text.len();
         for c in &run.content {
             match c {
+                RunContent::Raw(RawXml::Element(e)) if e.head.is_w("fldChar") => {
+                    let kind = e.head.attr_w("fldCharType").unwrap_or("").to_owned();
+                    self.field_char(&kind, out, links);
+                }
+                RunContent::Raw(RawXml::Element(e)) if e.head.is_w("commentReference") => {
+                    out.comment_ref = true;
+                }
+                RunContent::Raw(RawXml::Element(e)) if e.head.is_w("instrText") => {
+                    if let Some(f) = self.fields.last_mut().filter(|f| !f.in_result) {
+                        for child in &e.children {
+                            if let RawXml::Text(t) = child {
+                                f.instr.push_str(t);
+                            }
+                        }
+                    }
+                }
                 RunContent::Text { text, .. } => out.text.push_str(text),
                 RunContent::Tab => out.text.push('\t'),
                 RunContent::Break(b) => out.text.push(match b.kind() {
@@ -222,10 +378,12 @@ impl TextReader<'_> {
     ) {
         for inline in content {
             match inline {
-                Inline::Run(r) => self.run(para, r, out),
+                Inline::Run(r) => self.run(para, r, out, links),
                 Inline::Group(g) if g.head.is_w("hyperlink") => {
                     let start = out.text.len();
+                    self.in_hyperlink += 1;
                     self.inlines(para, &g.content, out, links);
+                    self.in_hyperlink -= 1;
                     let end = out.text.len();
                     let text = out.text[start..end].to_owned();
                     let anchor = g.head.attr_w("anchor").map(str::to_owned);
@@ -255,7 +413,12 @@ impl TextReader<'_> {
                     match target {
                         Some(target) if !text.trim().is_empty() => {
                             out.links.push(start..end);
-                            links.push(LinkSpec { text, target });
+                            links.push(LinkSpec {
+                                text,
+                                target,
+                                kind: LinkKind::Hyperlink,
+                                includes_mark: false,
+                            });
                         }
                         _ => self.dropped_links += 1,
                     }
@@ -442,7 +605,9 @@ impl Walker<'_> {
                     let by_style = heading_level(self.styles, p);
                     // A numbered heading is a heading (the label is part of its content), not a
                     // list item.
+                    let toc = self.texts[&index].toc;
                     let (kind, labeled, heading) = match (role, by_style) {
+                        _ if toc => (Kind::Toci, false, None),
                         (ParaRole::Heading(n), _) => (Kind::H(n), false, Some(n)),
                         (_, Some(n)) => (Kind::H(n), false, Some(n)),
                         (ParaRole::ListItem, None) => (Kind::LBody, true, None),
@@ -459,7 +624,12 @@ impl Walker<'_> {
                     self.paras.push(ParaMeta {
                         node: leaf.id,
                         label: lbl.as_ref().map(|l| l.id),
-                        tag: kind.name(),
+                        tag: if kind == Kind::Toci {
+                            "Span".to_owned()
+                        } else {
+                            kind.name()
+                        },
+                        spans: kind == Kind::Toci && self.links.contains_key(&index),
                         heading,
                         after: self
                             .styles
@@ -511,6 +681,14 @@ impl Walker<'_> {
                         } else {
                             deepest(&mut out, open.len()).kids.push(li);
                         }
+                    } else if kind == Kind::Toci {
+                        match out.last_mut() {
+                            Some(t) if t.kind == Kind::Toc => t.kids.push(leaf),
+                            _ => {
+                                let t = self.node(Kind::Toc, vec![leaf]);
+                                out.push(t);
+                            }
+                        }
                     } else {
                         out.push(leaf);
                     }
@@ -560,7 +738,9 @@ impl Walker<'_> {
         let look = view.props.look.unwrap_or_default();
         let mut head_rows = 0;
         for (r, row) in view.rows.iter().enumerate() {
-            if (r == 0 && look.first_row) || (r == head_rows && row.props.is_header) {
+            // Word ignores the header row flag when the look turns the first row off
+            // (evidence: `p-thead`, case I).
+            if look.first_row && (r == 0 || (r == head_rows && row.props.is_header)) {
                 head_rows += 1;
             } else {
                 break;
@@ -571,7 +751,7 @@ impl Walker<'_> {
         let mut head_nodes = Vec::new();
         let mut body_nodes = Vec::new();
         for (r, row) in view.rows.iter().enumerate() {
-            let in_head = r < head_rows && !nested;
+            let in_head = r < head_rows;
             let row_head_id = (!in_head && look.first_column)
                 .then(|| row.cells.iter().find(|c| c.col == 0))
                 .flatten()
@@ -587,7 +767,7 @@ impl Walker<'_> {
                 if c.row_span == 0 {
                     continue;
                 }
-                let is_row_head = !nested && !in_head && look.first_column && c.col == 0;
+                let is_row_head = !in_head && look.first_column && c.col == 0;
                 let th = in_head || is_row_head;
                 let mut entries: Vec<String> = Vec::new();
                 let mut attrs = String::new();
@@ -640,7 +820,9 @@ impl Walker<'_> {
         }
         let mut sections = Vec::new();
         if nested {
-            sections = body_nodes;
+            // Rows directly under a nested table, its header cells still TH (`p-thead-nest`).
+            sections = head_nodes;
+            sections.extend(body_nodes);
         } else {
             if !head_nodes.is_empty() {
                 sections.push(self.node(Kind::THead, head_nodes));
@@ -702,6 +884,8 @@ pub fn analyse(
             base,
             dropped_links: 0,
             bookmarks: Vec::new(),
+            fields: Vec::new(),
+            in_hyperlink: 0,
         },
         next_para: 0,
         paras: Vec::new(),
@@ -777,6 +961,8 @@ pub fn story_texts(
         base,
         dropped_links: 0,
         bookmarks: Vec::new(),
+        fields: Vec::new(),
+        in_hyperlink: 0,
     };
     let mut out = Vec::new();
     walk(blocks, &mut reader, &mut out);

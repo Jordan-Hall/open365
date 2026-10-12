@@ -80,6 +80,10 @@ fn external_hyperlink_is_an_annotation_owned_by_a_link_element() {
     let mut objr = 0;
     for k in kids.arr() {
         let k = r.resolve(k);
+        if matches!(k, Obj::Int(_)) {
+            mcr += 1;
+            continue;
+        }
         match k.dict().get("Type") {
             Some(Obj::Name(t)) if t == "MCR" => mcr += 1,
             Some(Obj::Name(t)) if t == "OBJR" => {
@@ -90,7 +94,11 @@ fn external_hyperlink_is_an_annotation_owned_by_a_link_element() {
                 assert!(is_name(k.dict().get("S"), "Span"));
                 for m in r.key(&k, "K").expect("span K").arr() {
                     let m = r.resolve(m);
-                    assert!(matches!(m.dict().get("Type"), Some(Obj::Name(t)) if t == "MCR"));
+                    // Marked content on the element's own /Pg page is a bare MCID, as in Word's.
+                    assert!(
+                        matches!(m, Obj::Int(_))
+                            || matches!(m.dict().get("Type"), Some(Obj::Name(t)) if t == "MCR")
+                    );
                     mcr += 1;
                 }
             }

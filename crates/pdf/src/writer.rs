@@ -37,6 +37,16 @@ impl Pdf {
         self.objects[id as usize - 1] = Some(body.into());
     }
 
+    /// The number of objects.
+    pub fn len(&self) -> usize {
+        self.objects.len()
+    }
+
+    /// The body of object `id`, when it is set.
+    pub fn body(&self, id: u32) -> Option<&[u8]> {
+        self.objects.get(id as usize - 1)?.as_deref()
+    }
+
     pub fn add(&mut self, body: impl Into<Vec<u8>>) -> u32 {
         let id = self.reserve();
         self.set(id, body);

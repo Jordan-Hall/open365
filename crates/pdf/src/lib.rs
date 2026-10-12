@@ -33,7 +33,7 @@ use open365_text::FontLibrary;
 use font::FaceDraw;
 use lang::Languages;
 use meta::{write_info, write_xmp};
-use structure::{DocStructure, LinkSpec, LinkTarget, Node, ParaText};
+use structure::{DocStructure, LinkKind, LinkSpec, LinkTarget, Node, ParaText};
 use writer::{Pdf, digest, num, text_string};
 
 pub use image::{MAX_BYTES as MAX_IMAGE_BYTES, MAX_PIXELS as MAX_IMAGE_PIXELS};
@@ -219,6 +219,10 @@ struct Heading {
 }
 
 struct Export<'a> {
+    fonts: &'a FontLibrary,
+    /// Characters drawn with a face's simple TrueType font (blanks, leaders, note marks).
+    simple_used: BTreeMap<usize, BTreeSet<char>>,
+    simple_cache: HashMap<(usize, char), Option<(u32, i64)>>,
     layout: &'a Layout,
     doc: &'a Document,
     st: DocStructure,
@@ -270,6 +274,9 @@ struct Export<'a> {
     link_elems: HashMap<(usize, usize), LinkElem>,
     /// `Link` element -> the `Span` inside it that holds the link text.
     link_span: HashMap<u32, u32>,
+    /// `CommentAnchor` elements (id, parent) holding a paragraph mark's blank.
+    comment_anchors: Vec<(u32, u32)>,
+    comment_made: HashMap<usize, u32>,
     /// Counter for link elements of annotations that have no paragraph element (header, footer).
     free_links: usize,
     /// Section of the page being drawn (the header and footer parts differ per section).
@@ -522,6 +529,9 @@ pub fn export_pdf_with(
         }
     }
     let mut ex = Export {
+        fonts,
+        simple_used: BTreeMap::new(),
+        simple_cache: HashMap::new(),
         layout,
         doc,
         st,
@@ -571,6 +581,8 @@ pub fn export_pdf_with(
         box_kids: HashMap::new(),
         to_unicode,
         link_span: HashMap::new(),
+        comment_anchors: Vec::new(),
+        comment_made: HashMap::new(),
         para_first,
         link_spans,
         lang_spans,
@@ -620,6 +632,15 @@ pub fn export_pdf_with(
             xobjects.push_str(&format!("/{name} {id} 0 R "));
         }
     }
+    let simple_fonts: Vec<(usize, BTreeSet<char>)> =
+        std::mem::take(&mut ex.simple_used).into_iter().collect();
+    for (index, chars) in simple_fonts {
+        let face = fonts
+            .try_face(open365_text::FaceId::from_index(index))
+            .ok_or(PdfError::MissingFace(index))?;
+        let id = font::embed_simple(&mut ex.pdf, face, &chars)?;
+        font_objects.push((format!("FS{index}"), id));
+    }
     let fonts_dict: String = font_objects
         .iter()
         .map(|(n, id)| format!("/{n} {id} 0 R "))
@@ -655,6 +676,7 @@ pub fn export_pdf_with(
         ));
         meta.title = Some(title.to_owned());
     }
+    add_struct_pages(&mut ex.pdf);
     let info = write_info(&mut ex.pdf, &meta);
     let xmp = write_xmp(&mut ex.pdf, &meta, options.conformance, options.ua);
     let catalog = ex.pdf.reserve();
@@ -697,12 +719,32 @@ pub fn export_pdf_with(
     Ok(PdfOutput { bytes, warnings })
 }
 
+/// Paragraph key and offset -> the notes whose reference marks stand there: (endnote, number, sequence).
+type MarkNotes = HashMap<(usize, usize), Vec<(bool, usize, usize)>>;
+
 type MainIndex = (
     HashMap<usize, (usize, f64, f64)>,
     HashMap<usize, Vec<Span>>,
     HashMap<usize, Vec<LangSpan>>,
     Vec<Heading>,
 );
+
+/// Whether the line ends with a text-wrapping break (the paragraph's text goes on after it).
+fn ends_with_break(line: &Line) -> bool {
+    let last = line
+        .runs
+        .iter()
+        .flat_map(|r| r.glyphs.iter())
+        .filter(|g| g.cluster.kind == ClusterKind::Text)
+        .max_by_key(|g| g.cluster.text_end);
+    last.is_some_and(|g| {
+        line.cluster_text(g).ends_with('\u{b}')
+            || line
+                .text
+                .get(g.cluster.text_end as usize..)
+                .is_some_and(|t| t.starts_with('\u{b}'))
+    })
+}
 
 /// The key of a paragraph in the maps of links and languages: the paragraph index for the main
 /// story, a composite for the other stories (headers and footers per section).
@@ -748,7 +790,7 @@ fn index_main_story(layout: &Layout, st: &DocStructure, end_base: usize) -> Main
     let mut headings = Vec::new();
     // The notes in the order of their reference marks: the number among the notes of the kind
     // and among all notes.
-    let mut mark_note: HashMap<(usize, usize), (bool, usize, usize)> = HashMap::new();
+    let mut mark_note: MarkNotes = HashMap::new();
     let (mut counts, mut seq) = ([0usize; 2], 0usize);
     let mut text_keys: Vec<usize> = st.texts.keys().copied().collect();
     text_keys.sort_unstable();
@@ -756,8 +798,34 @@ fn index_main_story(layout: &Layout, st: &DocStructure, end_base: usize) -> Main
         for (at, end) in &st.texts[&key].note_marks {
             seq += 1;
             let n = &mut counts[usize::from(*end)];
-            mark_note.insert((key, *at), (*end, *n, seq));
+            mark_note
+                .entry((key, *at))
+                .or_default()
+                .push((*end, *n, seq));
             *n += 1;
+        }
+    }
+    // The text ranges of the note reference marks (superscript runs) of each paragraph.
+    let mut sup_ranges: HashMap<usize, Vec<std::ops::Range<usize>>> = HashMap::new();
+    for (_, line) in layout.all_lines().filter(|(_, l)| {
+        matches!(
+            l.story,
+            StoryKind::Main | StoryKind::Footnotes | StoryKind::Endnotes
+        )
+    }) {
+        for r in line.runs.iter().filter(|r| r.superscript) {
+            let spans = r
+                .glyphs
+                .iter()
+                .map(|x| &x.cluster)
+                .filter(|c| c.kind == ClusterKind::Text && c.text_end > c.text_start);
+            if let (Some(a), Some(b)) = (
+                spans.clone().map(|c| c.text_start as usize).min(),
+                spans.map(|c| c.text_end as usize).max(),
+            ) {
+                let key = line_key(line, 0, end_base);
+                sup_ranges.entry(key).or_default().push(a..b);
+            }
         }
     }
     for (pi, page) in layout.pages.iter().enumerate() {
@@ -815,21 +883,48 @@ fn index_main_story(layout: &Layout, st: &DocStructure, end_base: usize) -> Main
                 .iter()
                 .filter_map(|(r, l)| al.map(r.clone()).map(|m| (m.start, m.end, l.clone())))
                 .collect();
-            // A reference mark is a short run of digits or letters the model has no text for.
+            // A reference mark is a short run of digits or letters the model has no text for. Two
+            // marks at one offset (a footnote and an endnote) are two runs and get a link each.
+            let mut done = std::collections::HashSet::new();
             for (at, _) in &pt.note_marks {
-                let Some((end, no, seq)) = mark_note.get(&(key, *at)).copied() else {
+                if !done.insert(*at) {
+                    continue;
+                }
+                let Some(marks) = mark_note.get(&(key, *at)) else {
                     continue;
                 };
-                if let Some(g) = al.gap_at(*at) {
-                    // Without the paragraph mark or other control characters at its end.
-                    let shown = line.text[g.clone()].trim_end_matches(char::is_control);
-                    if !shown.is_empty()
-                        && shown.len() <= 8
-                        && shown.chars().all(char::is_alphanumeric)
-                    {
-                        let tag = format!("{NOTE_REF}{}{no}:{seq}", if end { 'E' } else { 'F' });
-                        found.push((g.start, g.start + shown.len(), tag));
-                    }
+                let Some(g) = al.gap_at(*at) else {
+                    continue;
+                };
+                // Without the paragraph mark or other control characters at its end.
+                let shown = line.text[g.clone()].trim_end_matches(char::is_control);
+                if shown.is_empty() || shown.len() > 8 || !shown.chars().all(char::is_alphanumeric)
+                {
+                    continue;
+                }
+                let whole = g.start..g.start + shown.len();
+                let mut parts: Vec<std::ops::Range<usize>> = sup_ranges
+                    .get(&key)
+                    .into_iter()
+                    .flatten()
+                    .filter(|r| r.start >= whole.start && r.end <= whole.end)
+                    .cloned()
+                    .collect();
+                parts.sort_by_key(|r| r.start);
+                parts.dedup();
+                let pieces: Vec<(std::ops::Range<usize>, (bool, usize, usize))> =
+                    if marks.len() > 1 && parts.len() == marks.len() {
+                        parts.into_iter().zip(marks.iter().copied()).collect()
+                    } else {
+                        marks
+                            .last()
+                            .map(|m| (whole.clone(), *m))
+                            .into_iter()
+                            .collect()
+                    };
+                for (r, (end, no, seq)) in pieces {
+                    let tag = format!("{NOTE_REF}{}{no}:{seq}", if end { 'E' } else { 'F' });
+                    found.push((r.start, r.end, tag));
                 }
             }
             found.sort_unstable_by_key(|f| f.0);
@@ -1094,7 +1189,7 @@ impl Export<'_> {
                 // continuation `Span` of the original paragraph (`layout-table-pages`).
                 Some(p) => {
                     let first = *self.para_page.entry(line.paragraph).or_insert(page);
-                    if first == page {
+                    if first == page && !p.spans {
                         Owner::Struct(p.node, p.tag.clone())
                     } else {
                         let node = p.node;
@@ -1253,6 +1348,21 @@ impl Export<'_> {
             if line.story == StoryKind::Main {
                 self.para_page.entry(line.paragraph).or_insert(buf.index);
             }
+            // An empty paragraph still has its paragraph mark: Word draws the blank.
+            let last = self.last_line.get(&(
+                line.story.word_code(),
+                line.frame.unwrap_or(0),
+                note_paragraph(line, self.end_base),
+            )) == Some(&line.start);
+            if last && line.runs.iter().any(|r| r.size > 0.0) {
+                let owner = self.owner_of(line, buf.index);
+                self.begin(buf, &owner);
+                self.draw_blank(buf, line, line.last_x);
+                buf.content.push_str(
+                    "EMC
+",
+                );
+            }
             return;
         }
         let owner = self.owner_of(line, buf.index);
@@ -1271,7 +1381,31 @@ impl Export<'_> {
         // Links and languages are looked for in the main story, the notes and (links only, they
         // are artifacts) the header and footer.
         let tagged = structured || self.link_spans.contains_key(&key);
-        for (seg, pieces) in self.segments(line, key, tagged, label_owner.is_some()) {
+        let segs = self.segments(line, key, tagged, label_owner.is_some());
+        // Word draws a blank at each paragraph mark and line break.
+        let last_of_paragraph = self.last_line.get(&(
+            line.story.word_code(),
+            line.frame.unwrap_or(0),
+            note_paragraph(line, self.end_base),
+        )) == Some(&line.start);
+        let mut blank_at = if last_of_paragraph {
+            Some(line.last_x)
+        } else if ends_with_break(line) {
+            line.runs
+                .iter()
+                .flat_map(|r| r.glyphs.iter())
+                .filter(|g| !line.cluster_text(g).contains('\u{b}'))
+                .map(|g| g.x + g.advance)
+                .reduce(f64::max)
+        } else {
+            None
+        };
+        let seg_count = segs.len();
+        let last_seg = segs.last().map(|s| s.0);
+        let mark_lang = self.st.texts.get(&key).and_then(|t| t.mark_lang.clone());
+        let comment =
+            line.story == StoryKind::Main && self.st.texts.get(&key).is_some_and(|t| t.comment_ref);
+        for (si, (seg, pieces)) in segs.into_iter().enumerate() {
             // Links and language runs hang under the paragraph, also on a continuation page.
             let parent_of = |this: &Self, id: u32| -> u32 {
                 if line.story == StoryKind::Main {
@@ -1311,13 +1445,30 @@ impl Export<'_> {
             if actual.is_some() {
                 buf.content.push_str("EMC\n");
             }
+            let mark_inside = matches!(seg, Seg::Link(k)
+                if self.st.links.get(&key).and_then(|l| l.get(k)).is_some_and(|l| l.includes_mark));
+            if si + 1 == seg_count
+                && ((matches!(seg, Seg::Text) && mark_lang.is_none() && !comment) || mark_inside)
+                && let Some(x) = blank_at.take()
+            {
+                self.draw_blank(buf, line, x);
+            }
             buf.content.push_str("EMC\n");
             if let Seg::Link(k) = seg {
                 let x0 = glyphs.iter().map(|g| g.x).fold(f64::INFINITY, f64::min);
-                let x1 = glyphs
+                let mut x1 = glyphs
                     .iter()
                     .map(|g| g.x + g.advance)
                     .fold(f64::NEG_INFINITY, f64::max);
+                if mark_inside && last_of_paragraph {
+                    // The link covers the paragraph mark, which Word measures as a pilcrow.
+                    let run = line.runs.iter().rev().find(|r| !r.glyphs.is_empty());
+                    if let Some(run) = run
+                        && let Some((_, w)) = self.simple_glyph(run.face.index(), '\u{b6}')
+                    {
+                        x1 = x1.max(line.last_x + w as f64 * run.size / 1000.0);
+                    }
+                }
                 if x0.is_finite() && x1.is_finite() {
                     self.add_link(buf, line, key, k, (x0, x1));
                 }
@@ -1332,6 +1483,67 @@ impl Export<'_> {
                     self.add_note_link(buf, line, key, i, (x0, x1));
                 }
             }
+        }
+        // The blank after a link or a note mark is in a marked-content sequence of its own, under
+        // the paragraph.
+        if let Some(x) = blank_at {
+            // The blank has the language of the paragraph mark: in the `Span` of the last run when
+            // that is the same language, else in a `Span` of its own.
+            let same_run = match (last_seg, &mark_lang) {
+                (Some(Seg::Lang(i)), Some(m)) => self
+                    .lang_spans
+                    .get(&key)
+                    .and_then(|l| l.get(i))
+                    .is_some_and(|l| note_ref(&l.2).is_none() && l.2 == *m)
+                    .then_some(i),
+                _ => None,
+            };
+            let owner = match (&owner, same_run, mark_lang) {
+                (Owner::Struct(base, _), None, _) if comment => {
+                    let parent = self.st.paras.get(line.paragraph).map_or(*base, |p| p.node);
+                    let id = match self.comment_made.get(&key) {
+                        Some(id) => *id,
+                        None => {
+                            let id = self.pdf.reserve();
+                            self.kids.entry(parent).or_default().push(Kid::Elem(id));
+                            self.comment_anchors.push((id, parent));
+                            self.comment_made.insert(key, id);
+                            id
+                        }
+                    };
+                    Owner::Struct(id, "Span".to_owned())
+                }
+                (Owner::Struct(base, _), Some(i), _) => {
+                    let parent = if line.story == StoryKind::Main {
+                        self.st.paras.get(line.paragraph).map_or(*base, |p| p.node)
+                    } else {
+                        *base
+                    };
+                    self.lang_owner(key, i, parent)
+                }
+                (Owner::Struct(base, _), None, Some(lang)) => {
+                    let parent = if line.story == StoryKind::Main {
+                        self.st.paras.get(line.paragraph).map_or(*base, |p| p.node)
+                    } else {
+                        *base
+                    };
+                    let slot = (key, usize::MAX / 4);
+                    let id = match self.lang_elems.get(&slot) {
+                        Some(l) => l.id,
+                        None => {
+                            let id = self.pdf.reserve();
+                            self.kids.entry(parent).or_default().push(Kid::Elem(id));
+                            self.lang_elems.insert(slot, LangElem { id, parent, lang });
+                            id
+                        }
+                    };
+                    Owner::Struct(id, "Span".to_owned())
+                }
+                _ => self.owner_of(line, buf.index),
+            };
+            self.begin(buf, &owner);
+            self.draw_blank(buf, line, x);
+            buf.content.push_str("EMC\n");
         }
     }
 
@@ -1354,6 +1566,16 @@ impl Export<'_> {
                 id
             }
         };
+        // A page number link holds its marked content directly.
+        let kind = self
+            .st
+            .links
+            .get(&paragraph)
+            .and_then(|l| l.get(k))
+            .map(|l| l.kind);
+        if kind == Some(LinkKind::PageRef) {
+            return Owner::Struct(id, "Span".to_owned());
+        }
         // Word puts the text of a link in a `Span` inside the `Link`.
         let span = match self.link_span.get(&id) {
             Some(s) => *s,
@@ -1499,7 +1721,7 @@ impl Export<'_> {
         self.pdf.set(
             annot,
             format!(
-                "<< /Type /Annot /Subtype /Link /Rect [{} {} {} {}] /Border [0 0 0] /F 4 /Dest [{} 0 R /XYZ {} {} 0] /StructParent {sp} >>",
+                "<< /Type /Annot /Subtype /Link /Rect [{} {} {} {}] /BS << /W 0 >> /F 4 /Dest [{} 0 R /XYZ {} {} 0] /StructParent {sp} >>",
                 num(r[0], 3),
                 num(r[1], 3),
                 num(r[2], 3),
@@ -1519,7 +1741,9 @@ impl Export<'_> {
             return;
         };
         let action = match &spec.target {
-            LinkTarget::Uri(u) => format!("/A << /S /URI /URI ({}) >>", uri_string(u)),
+            LinkTarget::Uri(u) => {
+                format!("/A << /Type /Action /S /URI /URI ({}) >>", uri_string(u))
+            }
             LinkTarget::Anchor(name) => {
                 let dest = self
                     .st
@@ -1545,6 +1769,10 @@ impl Export<'_> {
                 }
             }
         };
+        if spec.kind == LinkKind::PageRef {
+            // Word's page number link has no annotation.
+            return;
+        }
         let annot = self.pdf.reserve();
         let mut parent_key = self.link_elems.get_mut(&(key, k)).map(|l| {
             l.annots.push((buf.index, annot));
@@ -1574,18 +1802,42 @@ impl Export<'_> {
         });
         let sp = struct_parent.map_or(String::new(), |k| format!(" /StructParent {k}"));
         let r = self.link_rect(buf, line, x, LINK_PAD);
+        // Word writes /Contents only for a tooltip; PDF/UA needs a description of every link.
+        let contents = if self.ua {
+            format!(" /Contents {}", text_string(&spec.text))
+        } else {
+            String::new()
+        };
         self.pdf.set(
             annot,
             format!(
-                "<< /Type /Annot /Subtype /Link /Rect [{} {} {} {}] /Border [0 0 0] /F 4 {action} /Contents {}{sp} >>",
+                "<< /Type /Annot /Subtype /Link /Rect [{} {} {} {}] /BS << /W 0 >> /F 4 {action}{contents}{sp} >>",
                 num(r[0], 3),
                 num(r[1], 3),
                 num(r[2], 3),
                 num(r[3], 3),
-                text_string(&spec.text)
             ),
         );
         self.page_annots[buf.index].push(annot);
+        if spec.kind == LinkKind::Ref
+            && let Some(id) = parent_key
+        {
+            // The second annotation of a REF field: no size, at the top left of the page.
+            let hidden = self.pdf.reserve();
+            if let Some(l) = self.link_elems.get_mut(&(key, k)) {
+                l.annots.push((buf.index, hidden));
+            }
+            self.struct_parents.push(id);
+            let sp = self.layout.pages.len() + self.struct_parents.len() - 1;
+            self.pdf.set(
+                hidden,
+                format!(
+                    "<< /Type /Annot /Subtype /Link /Rect [0 {h} 0 {h}] /BS << /W 0 >> /F 4 {action} /StructParent {sp} >>",
+                    h = num(buf.height, 3)
+                ),
+            );
+            self.page_annots[buf.index].push(hidden);
+        }
     }
 
     /// The text of the glyphs when the ToUnicode CMap cannot say it glyph by glyph: a glyph that
@@ -1624,6 +1876,67 @@ impl Export<'_> {
         differs.then_some(text)
     }
 
+    /// The glyph `c` has in face `face` and its width, from the face (cached).
+    fn simple_glyph(&mut self, face: usize, c: char) -> Option<(u32, i64)> {
+        if let Some(r) = self.simple_cache.get(&(face, c)) {
+            return *r;
+        }
+        let r = self
+            .fonts
+            .try_face(open365_text::FaceId::from_index(face))
+            .and_then(|f| font::char_glyph(f, c));
+        self.simple_cache.insert((face, c), r);
+        r
+    }
+
+    /// The character of a glyph Word draws with a simple TrueType font: a tab leader or a note
+    /// mark. `None` for everything else.
+    fn simple_char(&mut self, run: &GlyphRun, line: &Line, g: &PlacedGlyph) -> Option<char> {
+        let c = if let Some(l) = line.leader_char(g) {
+            l
+        } else if run.superscript {
+            let t = self.to_unicode.get(&(g.face.index(), g.glyph_id))?;
+            let mut it = t.chars();
+            match (it.next(), it.next()) {
+                (Some(c), None) => c,
+                _ => return None,
+            }
+        } else {
+            return None;
+        };
+        if !(' '..='~').contains(&c) {
+            return None;
+        }
+        let (gid, _) = self.simple_glyph(g.face.index(), c)?;
+        (gid == g.glyph_id).then_some(c)
+    }
+
+    /// The blank Word draws for a paragraph mark or a line break, at `x` on the line's baseline.
+    fn draw_blank(&mut self, buf: &mut PageBuf, line: &Line, x: f64) {
+        let run = line
+            .runs
+            .iter()
+            .rev()
+            .find(|r| !r.superscript && !r.glyphs.is_empty())
+            .or_else(|| line.runs.iter().rev().find(|r| !r.glyphs.is_empty()))
+            .or_else(|| line.runs.last());
+        let Some(run) = run else { return };
+        if run.size.is_nan() || run.size <= 0.0 {
+            return;
+        }
+        let face = run.glyphs.last().map_or(run.face, |g| g.face).index();
+        if self.simple_glyph(face, ' ').is_none() || !self.faces.contains_key(&face) {
+            return;
+        }
+        self.simple_used.entry(face).or_default().insert(' ');
+        buf.content.push_str(&format!(
+            "0 0 0 rg\nBT /FS{face} {} Tf 1 0 0 1 {} {} Tm [( )] TJ ET\n",
+            num(run.size, 3),
+            num((x * 1e4).round() / 1e4, 4),
+            num(buf.y(line.baseline), 4)
+        ));
+    }
+
     /// Draws glyphs `range` of `run`.
     fn draw_run(
         &mut self,
@@ -1648,17 +1961,37 @@ impl Export<'_> {
                 start += 1;
                 continue;
             }
+            let simple = self.simple_char(run, line, &g0);
             let mut end = start + 1;
             while end < glyphs.len()
                 && glyphs[end].face == g0.face
                 && !(self.skip_notdef && glyphs[end].glyph_id == 0)
                 && (glyphs[end].y_offset - g0.y_offset).abs() < 1e-6
+                && self.simple_char(run, line, &glyphs[end]).is_some() == simple.is_some()
             {
                 end += 1;
             }
-            let Some(fd) = self.faces.get(&g0.face.index()) else {
+            if !self.faces.contains_key(&g0.face.index()) {
                 start = end;
                 continue;
+            }
+            let mut simple_widths = Vec::new();
+            if simple.is_some() {
+                for g in &glyphs[start..end] {
+                    let c = self.simple_char(run, line, g).unwrap_or(' ');
+                    self.simple_used
+                        .entry(g.face.index())
+                        .or_default()
+                        .insert(c);
+                    let w = self.simple_glyph(g.face.index(), c).map_or(0, |x| x.1);
+                    simple_widths.push((c, w));
+                }
+            }
+            let fd = &self.faces[&g0.face.index()];
+            let resource = if simple.is_some() {
+                format!("FS{}", g0.face.index())
+            } else {
+                fd.resource.clone()
             };
             let size = run.size;
             let x0 = (g0.x * 1e4).round() / 1e4;
@@ -1682,8 +2015,14 @@ impl Export<'_> {
                     parts.push('<');
                     in_string = true;
                 }
-                parts.push_str(&format!("{:04X}", g.glyph_id & 0xFFFF));
-                let w = fd.widths.get(&g.glyph_id).copied().unwrap_or(0) as f64;
+                let w = if simple.is_some() {
+                    let (c, w) = simple_widths[k];
+                    parts.push_str(&format!("{:02X}", c as u8));
+                    w as f64
+                } else {
+                    parts.push_str(&format!("{:04X}", g.glyph_id & 0xFFFF));
+                    fd.widths.get(&g.glyph_id).copied().unwrap_or(0) as f64
+                };
                 cursor += w * size / 1000.0;
             }
             if in_string {
@@ -1691,7 +2030,7 @@ impl Export<'_> {
             }
             buf.content.push_str(&format!(
                 "BT /{} {} Tf 1 0 0 1 {} {} Tm [{parts}] TJ ET\n",
-                fd.resource,
+                resource,
                 num(size, 3),
                 num(x0, 4),
                 num(y, 4)
@@ -2000,6 +2339,13 @@ impl Export<'_> {
                 format!("<< /Type /StructElem /S /Span /P {parent} 0 R /K [{k}] >>"),
             );
         }
+        for (id, parent) in std::mem::take(&mut self.comment_anchors) {
+            let k = self.kid_list(id);
+            self.pdf.set(
+                id,
+                format!("<< /Type /StructElem /S /CommentAnchor /P {parent} 0 R /K [{k}] >>"),
+            );
+        }
         let mut nums = String::new();
         for (i, owners) in page_owners.iter().enumerate() {
             let refs: String = owners.iter().map(|id| format!("{id} 0 R ")).collect();
@@ -2178,7 +2524,7 @@ impl Export<'_> {
     fn is_empty_leaf(&self, node: &Node) -> bool {
         match node.kind {
             structure::Kind::Textbox => !self.box_kids.contains_key(&node.id),
-            structure::Kind::P | structure::Kind::H(_) => {
+            structure::Kind::P | structure::Kind::H(_) | structure::Kind::Toci => {
                 self.st.section_breaks.contains(&node.id)
                     && self.kids.get(&node.id).is_none_or(Vec::is_empty)
                     && !self.figures.contains_key(&node.id)
@@ -2330,6 +2676,122 @@ fn draw_border_strip(
             ));
         }
         BorderStyle::Solid => fill(out, x, y, w, h),
+    }
+}
+
+/// One child in the `/K` array of a structure element.
+enum KidRef {
+    /// Marked content (page object number, MCID).
+    Mcr(u32, u32),
+    /// An object reference to a link annotation (page object number).
+    Objr(u32, String),
+    /// A child element.
+    Elem(u32),
+}
+
+fn num_after(s: &str, key: &str) -> Option<u32> {
+    let at = s.find(key)? + key.len();
+    s[at..].split_whitespace().next()?.parse().ok()
+}
+
+fn parse_kids(k: &str) -> Vec<KidRef> {
+    let mut out = Vec::new();
+    let mut rest = k.trim_start();
+    while !rest.is_empty() {
+        if let Some(body) = rest.strip_prefix("<<") {
+            let Some(end) = body.find(">>") else { break };
+            let d = &body[..end];
+            let pg = num_after(d, "/Pg ").unwrap_or(0);
+            if d.contains("/MCR") {
+                out.push(KidRef::Mcr(pg, num_after(d, "/MCID ").unwrap_or(0)));
+            } else {
+                out.push(KidRef::Objr(pg, d.to_owned()));
+            }
+            rest = body[end + 2..].trim_start();
+        } else {
+            let mut it = rest.splitn(4, char::is_whitespace);
+            let n = it.next().and_then(|x| x.parse::<u32>().ok());
+            let _ = it.next();
+            let _ = it.next();
+            match n {
+                Some(n) => out.push(KidRef::Elem(n)),
+                None => break,
+            }
+            rest = it.next().unwrap_or("").trim_start();
+        }
+    }
+    out
+}
+
+/// Gives every structure element the `/Pg` of its first content, as Word's does, and writes the
+/// marked content on that page as a bare MCID.
+fn add_struct_pages(pdf: &mut Pdf) {
+    const HEAD: &str = "<< /Type /StructElem";
+    let n = pdf.len() as u32;
+    let mut elems: HashMap<u32, (String, usize, Vec<KidRef>)> = HashMap::new();
+    for id in 1..=n {
+        let Some(body) = pdf.body(id).and_then(|b| std::str::from_utf8(b).ok()) else {
+            continue;
+        };
+        if !body.starts_with(HEAD) || body.starts_with("<< /Type /StructElem /S /Document ") {
+            continue;
+        }
+        let Some(ks) = body.rfind("/K [") else {
+            continue;
+        };
+        let inner = &body[ks + 4..];
+        let Some(close) = inner.rfind(']') else {
+            continue;
+        };
+        let kids = parse_kids(&inner[..close]);
+        elems.insert(id, (body.to_owned(), ks + 4, kids));
+    }
+    fn page_of(
+        id: u32,
+        elems: &HashMap<u32, (String, usize, Vec<KidRef>)>,
+        depth: usize,
+    ) -> Option<u32> {
+        if depth > 64 {
+            return None;
+        }
+        for k in &elems.get(&id)?.2 {
+            match k {
+                KidRef::Mcr(pg, _) | KidRef::Objr(pg, _) if *pg != 0 => return Some(*pg),
+                KidRef::Elem(e) => {
+                    if let Some(p) = page_of(*e, elems, depth + 1) {
+                        return Some(p);
+                    }
+                }
+                _ => {}
+            }
+        }
+        None
+    }
+    let mut out: Vec<(u32, String)> = Vec::new();
+    for (id, (body, k_at, kids)) in &elems {
+        let Some(pg) = page_of(*id, &elems, 0) else {
+            continue;
+        };
+        let inner = &body[*k_at..];
+        let close = inner.rfind(']').unwrap_or(inner.len());
+        let mut k = String::new();
+        for kid in kids {
+            match kid {
+                KidRef::Mcr(p, m) if *p == pg => k.push_str(&format!("{m} ")),
+                KidRef::Mcr(p, m) => {
+                    k.push_str(&format!("<< /Type /MCR /Pg {p} 0 R /MCID {m} >> "))
+                }
+                KidRef::Objr(_, d) => k.push_str(&format!("<<{d}>> ")),
+                KidRef::Elem(e) => k.push_str(&format!("{e} 0 R ")),
+            }
+        }
+        let mut new = format!("{HEAD} /Pg {pg} 0 R{}", &body[HEAD.len()..*k_at]);
+        new.push_str(&k);
+        new.push_str(&inner[close..]);
+        out.push((*id, new));
+    }
+    for (id, body) in out {
+        pdf.set(id, body);
     }
 }
 

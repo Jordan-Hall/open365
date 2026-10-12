@@ -140,11 +140,11 @@ agree = 2505
 total = 2535
 
 [fixtures.layout-float-anchor-bottom]
-agree = 2932
+agree = 4748
 total = 4808
 
 [fixtures.layout-float-anchor-nextpage]
-agree = 3088
+agree = 4768
 total = 4808
 
 [fixtures.layout-float-collide]
@@ -652,11 +652,11 @@ agree = 2505
 total = 2535
 
 [system.layout-float-anchor-bottom]
-agree = 2932
+agree = 4748
 total = 4808
 
 [system.layout-float-anchor-nextpage]
-agree = 3088
+agree = 4768
 total = 4808
 
 [system.layout-float-collide]

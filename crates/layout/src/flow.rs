@@ -2306,6 +2306,18 @@ impl<'a> Paginator<'a> {
                     };
                 }
             }
+            if place.take > 0
+                && !at_top
+                && first_segment
+                && dynamic.as_ref().is_some_and(|d| {
+                    let end = lines[place.take - 1].atoms.end;
+                    d.anchors.iter().any(|a| a.overflows && a.atom < end)
+                })
+            {
+                // A wrapping float that cannot stand below its anchor on this page takes the
+                // whole paragraph to the next one.
+                place.take = 0;
+            }
             if place.take == 0 {
                 // Nothing of this paragraph goes here: move to the next column or a fresh page
                 // and retry.

@@ -21,6 +21,7 @@ mod model;
 mod regen;
 mod showas;
 pub mod style;
+mod survive;
 mod value;
 mod xmlutil;
 
@@ -110,48 +111,87 @@ impl SheetPivot {
         strings: &PivotStrings,
     ) -> Result<PivotGrid, PivotError> {
         let data = Dataset::from_workbook(wb, &self.cache)?;
-        let cache = self.cache_with_refreshed_bounds(&data);
-        compute(&self.table, &cache, &data, strings, OrderMode::Refresh)
+        let mut cache = self.cache_with_refreshed_groups(&data);
+        // Grouped fields list their items in the stored order of those still there.
+        let mut table = self.table.clone();
+        for fi in 0..cache.fields.len() {
+            let cf = &cache.fields[fi];
+            if cf.group.is_none()
+                && self.cache.fields[fi].group.is_some()
+                && !self.cache.fields[fi].database_field
+            {
+                // A date group Excel drops takes its derived field off the axes.
+                table.row_fields.retain(|f| *f as usize != fi);
+                table.col_fields.retain(|f| *f as usize != fi);
+                if let Some(pf) = table.fields.get_mut(fi) {
+                    pf.axis = None;
+                }
+                continue;
+            }
+            if cf.group.is_none() && self.cache.fields[fi].group.is_some() {
+                // The group is gone: the field lists its values in order of first appearance.
+                let mut seen = std::collections::HashSet::new();
+                let uniq: Vec<Value> = data
+                    .columns
+                    .get(fi)
+                    .into_iter()
+                    .flatten()
+                    .filter(|v| seen.insert(ItemKey::of(v)))
+                    .cloned()
+                    .collect();
+                if let Some(pf) = table.fields.get_mut(fi) {
+                    pf.items = (0..uniq.len())
+                        .map(|k| model::FieldItem {
+                            x: Some(k as u32),
+                            hidden: false,
+                        })
+                        .collect();
+                }
+                cache.fields[fi].shared = uniq;
+                continue;
+            }
+            let (Some(g), Some(old)) = (
+                cf.group.as_ref().filter(|g| !g.items.is_empty()),
+                self.cache.fields[fi].group.as_ref(),
+            ) else {
+                continue;
+            };
+            let Some(pf) = table.fields.get_mut(fi) else {
+                continue;
+            };
+            let old_x: Vec<usize> = pf
+                .items
+                .iter()
+                .filter_map(|i| i.x.map(|x| x as usize))
+                .collect();
+            if old_x.is_empty() {
+                continue;
+            }
+            let order = grouping::item_order(
+                &old.items,
+                &old_x,
+                &g.items,
+                g.group_by.as_deref() == Some("months"),
+            );
+            pf.items = order
+                .into_iter()
+                .map(|n| model::FieldItem {
+                    x: Some(n as u32),
+                    hidden: false,
+                })
+                .collect();
+        }
+        compute(&table, &cache, &data, strings, OrderMode::Refresh)
     }
 
-    /// The cache with the automatic bounds of month and quarter groups moved to the refreshed
-    /// data (Excel regroups from the first to the last date; a bound set by hand stays). The
-    /// item lists of those groups do not depend on the bounds.
-    fn cache_with_refreshed_bounds(&self, data: &Dataset) -> CacheDefinition {
+    /// The cache as a refresh leaves it for `data`: grouped fields regrouped (automatic bounds
+    /// follow the data, the group items are rebuilt) and a group the data cannot take dropped.
+    pub(crate) fn cache_with_refreshed_groups(&self, data: &Dataset) -> CacheDefinition {
         let mut cache = self.cache.clone();
-        for fi in 0..cache.fields.len() {
-            let Some(g) = cache.fields[fi].group.as_ref() else {
-                continue;
-            };
-            if !matches!(g.group_by.as_deref(), Some("months" | "quarters"))
-                || (!g.auto_start && !g.auto_end)
-            {
-                continue;
-            }
-            let base = if cache.fields[fi].database_field {
-                fi
-            } else {
-                g.base.map_or(fi, |b| b as usize)
-            };
-            let dates = data
-                .columns
-                .get(base)
-                .into_iter()
-                .flatten()
-                .filter_map(Value::number);
-            let (min, max) = dates.fold((f64::INFINITY, f64::NEG_INFINITY), |(lo, hi), x| {
-                (lo.min(x), hi.max(x))
-            });
-            if min > max {
-                continue;
-            }
-            if let Some(g) = cache.fields[fi].group.as_mut() {
-                if g.auto_start {
-                    g.start_date = Some(min.floor());
-                }
-                if g.auto_end {
-                    g.end_date = Some(max.floor());
-                }
+        for (fi, r) in grouping::regroup(&self.cache, &data.columns) {
+            match r {
+                grouping::Regrouped::Group(g) => cache.fields[fi].group = Some(g),
+                grouping::Regrouped::Ungroup => cache.fields[fi].group = None,
             }
         }
         cache
@@ -205,7 +245,13 @@ pub fn refresh_sheet(
         let regenerated = if shared_cache {
             None
         } else {
-            regen::regenerate(p, &data, &grid, now_serial())
+            regen::regenerate(
+                p,
+                &data,
+                &grid,
+                now_serial(),
+                &p.cache_with_refreshed_groups(&data),
+            )
         };
         match (regenerated, &p.records_part) {
             (Some(r), Some(records_part)) => {
@@ -216,6 +262,25 @@ pub fn refresh_sheet(
                 ] {
                     wb.replace_part(name, bytes)
                         .map_err(|e| PivotError::Write(e.to_string()))?;
+                }
+                // The user formats go over the new layout from the regenerated table.
+                if let Some(now) = sheet_pivots(wb, sheet)
+                    .into_iter()
+                    .find(|q| q.part == p.part)
+                    && let Ok(laid) = now.grid_from_cache(strings)
+                {
+                    survive::reapply_user_formats(wb, sheet, &now.table, &laid);
+                    // Cells the table left lose the formats it had given them.
+                    if let Some((r1, c1, r2, c2)) = parse_ref(&p.table.reference) {
+                        let (top, left, bottom, right) = laid.range;
+                        for r in r1..=r2 {
+                            for c in c1..=c2 {
+                                if r < top || r > bottom || c < left || c > right {
+                                    let _ = wb.clear_formats(sheet, (r, c, r, c));
+                                }
+                            }
+                        }
+                    }
                 }
             }
             _ => {

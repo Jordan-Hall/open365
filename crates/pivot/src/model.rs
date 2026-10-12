@@ -552,6 +552,14 @@ impl PivotTable {
 
     /// Writes `loc` into the `location` element (and the typed fields). Page counts of 0 are
     /// omitted, as Excel does.
+    /// Drops the table style (`pivotTableStyleInfo`), for the formatting of the user formats alone.
+    pub(crate) fn remove_style_info(&mut self) {
+        self.xml_mut().root.children.retain(|c| {
+            c.as_element()
+                .is_none_or(|e| !e.head.is_main("pivotTableStyleInfo"))
+        });
+    }
+
     pub fn set_location(&mut self, loc: &Location) {
         for node in &mut self.xml.root.children {
             let Some(e) = node.as_element_mut().filter(|e| e.head.is_main("location")) else {

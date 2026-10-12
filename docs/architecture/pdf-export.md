@@ -29,7 +29,7 @@ PDF 1.7, classic xref table, own writer on `flate2` (already in the dependency g
 
 | Feature | How |
 |---|---|
-| Fonts | Type0 / Identity-H for every font (so complex-script clusters need no encoding tricks; glyph ids are CIDs). TrueType: glyf subset (glyph ids unchanged, unused outlines emptied, composite closure, `loca` rebuilt, checksums fixed). CFF/OpenType: `cff.rs` writes a bare CFF with the used charstrings only (unused glyphs shrink to `endchar`, ids unchanged; local and global subroutines are kept whole; a CID-keyed font gets an identity charset so CID = glyph id), embedded as `FontFile3 /CIDFontType0C`. Fonts with the OS/2 `fsType` restricted-licence bit are refused; the no-subsetting bit embeds the whole font; CFF2 or an unreadable CFF is embedded whole with a warning. |
+| Fonts | Type0 / Identity-H for the text (blanks, tab leaders and note marks use a simple TrueType subset as in Word) (so complex-script clusters need no encoding tricks; glyph ids are CIDs). TrueType: glyf subset (glyph ids unchanged, unused outlines emptied, composite closure, `loca` rebuilt, checksums fixed). CFF/OpenType: `cff.rs` writes a bare CFF with the used charstrings only (unused glyphs shrink to `endchar`, ids unchanged; local and global subroutines are kept whole; a CID-keyed font gets an identity charset so CID = glyph id), embedded as `FontFile3 /CIDFontType0C`. Fonts with the OS/2 `fsType` restricted-licence bit are refused; the no-subsetting bit embeds the whole font; CFF2 or an unreadable CFF is embedded whole with a warning. |
 | Text copy | ToUnicode CMap per font from the layout's glyph clusters (`Line::cluster_text`): a ligature glyph ("ft", "tti") or a glyph the font's `cmap` does not describe gets the characters it was shaped from; other glyphs use the reverse `cmap`. A line where some glyph stands for other characters than the CMap gives it (accent merged into its base, NBSP drawn with the space glyph) is wrapped in a `Span` with `/ActualText`. List labels with private-use symbol characters keep the reverse-`cmap` mapping. |
 | Placement | One `BT .. Tm .. TJ .. ET` per run segment (split where face or vertical offset changes). TJ adjustments are computed from the cursor the PDF will have, so rounding never accumulates. |
 | Decoration | Underline and strike from the font's `post`/`OS/2` metrics. |
@@ -292,15 +292,39 @@ exported for this by `tools/office/make-pdf-refs.ps1 -DocxDir`). `O365_STRUCT_RE
   hang under the box `P`; no Word probe yet), nested `L` in `LBody` with `ListNumbering` from the
   number format, no `P` for an empty section-break paragraph, a vertical-merge continuation cell
   or a text paragraph that drew nothing, a table inside a layout table is a normal table.
-- Differences that remain: TOC entries (`TOC > TOCI > Span, Link, Span`; Word's PAGEREF Links have
-  no annotation) and the hidden zero-size link of a REF field (`fields`); `CommentAnchor`; two
-  adjacent note marks give one link (`layout-fn-mixed`); the blank `( )` Word draws after a note
-  mark or a paragraph (trailing `Span`, also after a foreign-language run in `probe-lang`);
-  `THead` for a first row of a table with direct borders and no `tblLook` (`p-rect`, `p-tnest`:
-  rule not found, needs probes); floating `Figure` count (`layout-float-wrap-tight`); no `/Pg` on
-  struct elements; simple TrueType subsets for blanks and leaders (still Type0 + ToUnicode, the
-  one deliberate difference); P/Span counts that follow layout differences (`trh-*`,
-  `float-anchor-*`, `frame-dropcap`, `fn-long`). No text-box probe was made.
+- Now also matching Word (element tree equal in `word_structure::element_trees_equal_words_for_the_matched_fixtures`):
+  - The blank: Word draws a blank (`( )`, a simple TrueType font) at each paragraph mark and each
+    text-wrapping line break, in the paragraph's marked content (same MCID when the text before it is
+    plain text; its own MCID under the `P`, or a continuation `Span`, after a link or a note mark;
+    inside the `Span /Lang` of the last run when the paragraph mark has that language, else in a
+    `Span` of the mark's language; inside the link's `Span` when a REF field's result goes on past the
+    mark; in a `CommentAnchor` when the paragraph holds a comment reference). Evidence:
+    `layout-fn-basic`, `layout-fn-endnotes`, `probe-lang`, `fields`, `comments`, `p-rect`.
+  - Blanks, tab leaders and note marks use a simple TrueType subset per face (`FS<face>`,
+    WinAnsiEncoding, no ToUnicode, a (3,1) cmap), as Word's; the text uses Type0 as before.
+  - TOC: `TOC > TOCI > Span, Link, Span`; a `PAGEREF \h` field is a `Link` holding its marked content
+    directly and no annotation; a `REF \h` field's `Link` has two annotations, the second a
+    zero-size one at the page's top left (`fields`). The link rectangle of a result that includes the
+    paragraph mark ends one pilcrow width after the mark.
+  - Adjacent note marks (a footnote and an endnote at one offset) get a link each (`layout-fn-mixed`).
+  - `THead` rule (probes `p-thead`, `p-thead-nest`, `p-thead-nest2`, made through
+    `tools/office/make-pdf-refs.ps1 -DocxDir`): the `tblLook` first-row bit decides (absent = on) and
+    the header-row flag only extends it (`w:tblLook 0000` plus `w:tblHeader` gives no `THead`); direct
+    borders, shading and the number of sides do not matter; a table nested in a cell has `TH` for its
+    first row and column and rows directly under its `Table`. The first `p-rect` and `p-tnest`
+    references had no `THead`; re-exporting the same files gave `THead` in 4 of 5 runs, so Word is not
+    deterministic there (the references were replaced by an export with `THead`).
+  - A link in a text box hangs under the box's `P` (`p-txbx-link`).
+  - `/Pg` on every element but `Document`, marked content on that page as a bare MCID.
+  - Link annotations: `/BS << /W 0 >>`, `/A << /Type /Action ... >>`, `/Contents` only with PDF/UA.
+- Differences that remain: `Figure` for DrawingML shapes (`layout-float-wrap-tight`: Word tags the
+  three `wps` shapes, we draw none) and Word's `/A` (BBox, Placement) on every `Figure`; the blank of
+  an empty paragraph whose line has no run (no face to draw it with); a link rectangle in a text box
+  is 6 pt shorter than Word's at the bottom and 0.25 pt off in x (`p-txbx-link`); Word's blank after a
+  tab character (once, twice with a leader: before and after the leader) is not drawn; Word's single
+  marked-content sequence per paragraph (we write one per line); the `Pagination` artifact
+  properties of headers and footers; P/Span counts that follow layout differences (`trh-*`,
+  `float-anchor-*`, `frame-dropcap`, `fn-long`, `table-pages`, `table-merged-cells`).
 - Footnote marks over 8 characters or with symbols are skipped. Footnote marks over 8 characters or with symbols are skipped.
 - Language: only `w:lang w:val` is read (not `w:eastAsia` or `w:bidi` by script; Word picks by
   script).

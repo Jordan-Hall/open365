@@ -1,6 +1,7 @@
 //! Date and time sections.
 
 use super::Out;
+use super::hijri;
 use super::parse::{Section, Tok};
 use crate::fmtlocale::FormatLocale;
 use crate::functions::serial_to_ymd;
@@ -78,7 +79,13 @@ pub(super) fn render_date(
     if limited && days > max {
         return false;
     }
-    let ymd = if calendar {
+    let hijri = sec.calendar == 6 || sec.calendar == 23;
+    let ymd = if calendar && hijri {
+        match hijri::from_serial(days as i64, date1904, sec.calendar == 23) {
+            Some(x) => x,
+            None => return false,
+        }
+    } else if calendar {
         match serial_to_ymd(days, date1904) {
             Some(x) => x,
             None => return false,
@@ -97,6 +104,41 @@ pub(super) fn render_date(
     let minute = ((secs_total - hour24 * 3600.0) / 60.0).floor();
     let second = secs_total - hour24 * 3600.0 - minute * 60.0;
     let elapsed_secs = days * 86_400.0 + secs_total;
+    let hijri_names = hijri::names_for(sec.lcid);
+    // Without a language tag a weekday name that comes before the first `mmmm` replaces that month name (measured).
+    let weekday_first = sec.lcid.is_none()
+        && sec
+            .toks
+            .iter()
+            .find_map(|t| match t {
+                Tok::Day(n) => Some(*n >= 3),
+                Tok::Month(_) | Tok::Year(_) | Tok::BuddhistYear(_) => Some(false),
+                _ => None,
+            })
+            .unwrap_or(false);
+    // ... and a weekday name after a first `mmmm` shows the weekday numbered like the month (counted from 0, at most 6).
+    let month_first = sec.lcid.is_none()
+        && sec
+            .toks
+            .iter()
+            .find_map(|t| match t {
+                Tok::Month(n) => Some(*n >= 4),
+                Tok::Day(_) | Tok::Year(_) | Tok::BuddhistYear(_) => Some(false),
+                _ => None,
+            })
+            .unwrap_or(false);
+    let weekday_name = |abbr: bool| -> String {
+        let weekday = if month_first {
+            (ymd.1.clamp(1, 12) - 1).min(6) as usize
+        } else {
+            weekday
+        };
+        match hijri::weekday(hijri_names, weekday) {
+            Some(n) => n.to_string(),
+            None if abbr => loc.day_abbr[weekday].clone(),
+            None => loc.day_full[weekday].clone(),
+        }
+    };
     for tok in &sec.toks {
         match tok {
             Tok::Lit(s) => out.push_lit(s),
@@ -116,6 +158,24 @@ pub(super) fn render_date(
             }
             Tok::Month(n) => {
                 let m = (ymd.1.clamp(1, 12) - 1) as usize;
+                if hijri && *n >= 3 {
+                    let name = if *n == 3 {
+                        Some(hijri::arabic_month(m, false))
+                    } else if weekday_first && *n >= 4 {
+                        out.push_lit(&weekday_name(false));
+                        continue;
+                    } else {
+                        hijri::month_full(hijri_names, sec.lcid, m)
+                    };
+                    if let Some(name) = name {
+                        if *n == 5 {
+                            out.push_lit(&name.chars().take(1).collect::<String>());
+                        } else {
+                            out.push_lit(&name);
+                        }
+                        continue;
+                    }
+                }
                 match n {
                     1 => out.push_unpadded(ymd.1),
                     2 => out.push_padded(ymd.1),
@@ -124,6 +184,7 @@ pub(super) fn render_date(
                     _ => out.push_lit(&loc.month_full[m]),
                 }
             }
+            Tok::Day(n) if hijri && *n >= 3 => out.push_lit(&weekday_name(*n == 3)),
             Tok::Day(n) => match n {
                 1 => out.push_unpadded(ymd.2),
                 2 => out.push_padded(ymd.2),

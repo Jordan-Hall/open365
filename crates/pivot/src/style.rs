@@ -114,6 +114,20 @@ fn parse_edge(s: &str) -> Option<EdgeDef> {
     })
 }
 
+/// `PivotStyleLight16`, `PivotStyleMedium9`, `TableStyleDark3` ...: the names of the styles
+/// Excel ships (no case, digits at the end).
+fn is_builtin_style_name(name: &str) -> bool {
+    let lower = name.to_ascii_lowercase();
+    ["pivotstyle", "tablestyle"].iter().any(|p| {
+        lower.strip_prefix(p).is_some_and(|rest| {
+            ["light", "medium", "dark"].iter().any(|w| {
+                rest.strip_prefix(w)
+                    .is_some_and(|d| !d.is_empty() && d.bytes().all(|b| b.is_ascii_digit()))
+            })
+        })
+    })
+}
+
 fn builtin_table() -> &'static HashMap<String, StyleDef> {
     static TABLE: OnceLock<HashMap<String, StyleDef>> = OnceLock::new();
     TABLE.get_or_init(|| {
@@ -395,9 +409,12 @@ pub fn style_cells_with(
     custom: &CustomStyles,
 ) -> Option<StyledGrid> {
     let info = table.style_info()?;
-    let def = custom
-        .get(&info.name)
-        .or_else(|| builtin_table().get(&info.name))?;
+    // Excel's own style names win over a custom style of the same name (in any case).
+    let def = if is_builtin_style_name(&info.name) {
+        builtin_table().get(&info.name)?
+    } else {
+        custom.get(&info.name)?
+    };
     let page_rows = (grid.body.0 - grid.range.0) as usize;
     let np = table.page_fields.len().min(page_rows);
     let rows = grid.header_rows + grid.row_lines.len();

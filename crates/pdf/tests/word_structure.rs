@@ -341,3 +341,31 @@ fn header_and_footer_links_are_untagged_as_in_words() {
     assert_eq!(untagged(&w), 2);
     assert_eq!(untagged(&w), untagged(&o));
 }
+
+/// Fixtures whose element tree (roles and nesting) equals Word's: blanks after paragraphs and note
+/// marks, adjacent note marks, tables of contents and REF links, the table header rule
+/// (`p-thead*`) and a link in a text box.
+#[test]
+fn element_trees_equal_words_for_the_matched_fixtures() {
+    let fonts = FontLibrary::bundled();
+    for name in [
+        "layout-fn-basic",
+        "layout-fn-endnotes",
+        "layout-fn-mixed",
+        "fields",
+        "probes/p-thead",
+        "probes/p-thead-nest",
+        "probes/p-thead-nest2",
+        "probes/p-txbx-link",
+        "probes/p-rect",
+        "probes/p-tnest",
+        "probes/probe-lang",
+        "comments",
+        "layout-lists-multilevel",
+    ] {
+        let (Some(w), Some(o)) = (word(name), ours(name, &fonts)) else {
+            panic!("{name}: no reference or no layout");
+        };
+        assert_eq!(roles(&w), roles(&o), "{name}");
+    }
+}

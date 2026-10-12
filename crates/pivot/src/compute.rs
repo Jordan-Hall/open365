@@ -803,6 +803,10 @@ pub fn compute(
             if pf.sort_type == "descending" {
                 items.reverse();
             }
+            if mode == OrderMode::Refresh && pf.sort_type == "manual" && stored.len() == items.len()
+            {
+                items = stored;
+            }
             order[fi] = items;
             continue;
         }

@@ -77,3 +77,196 @@ pub(crate) fn grouped_column(
             .collect(),
     )
 }
+
+fn fmt_date(x: f64) -> String {
+    let (y, m, d) = serial_to_ymd(x, false);
+    format!("{d:02}/{m:02}/{y}")
+}
+
+fn fmt_num(n: f64) -> String {
+    format!("{n}")
+}
+
+/// What a refresh does to the group of one cache field.
+#[derive(Debug, Clone, PartialEq)]
+pub(crate) enum Regrouped {
+    /// The group with bounds and items for the new data.
+    Group(FieldGroup),
+    /// Excel drops the group: the data holds something the group cannot place.
+    Ungroup,
+}
+
+const MONTHS: [&str; 12] = [
+    "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+];
+
+fn text(s: String) -> Value {
+    Value::Text(s)
+}
+
+/// The group a refresh gives a date or number group: automatic bounds follow the data (first
+/// to last value; the end date is the day after the last), the items are rebuilt for the
+/// bounds. `None` when the group is of a kind this does not rebuild (hours, minutes, seconds,
+/// or items it cannot reproduce): it stays as stored.
+fn regroup_one(g: &FieldGroup, src: &[Value]) -> Option<Regrouped> {
+    let mut nums: Vec<f64> = Vec::new();
+    let mut blanks = false;
+    for v in src {
+        match v {
+            Value::Number(n) => nums.push(*n),
+            Value::Blank => blanks = true,
+            _ => return Some(Regrouped::Ungroup),
+        }
+    }
+    let (min, max) = nums
+        .iter()
+        .fold((f64::INFINITY, f64::NEG_INFINITY), |(lo, hi), x| {
+            (lo.min(*x), hi.max(*x))
+        });
+    if nums.is_empty() {
+        return None;
+    }
+    let mut out = g.clone();
+    match g.group_by.as_deref() {
+        None => {
+            // A number group made without blanks cannot take one.
+            let had_blank = g
+                .items
+                .first()
+                .is_some_and(|v| matches!(v, Value::Text(t) if t.contains("(blank)")));
+            if blanks && !had_blank {
+                return Some(Regrouped::Ungroup);
+            }
+            let step = g.interval.filter(|i| *i > 0.0)?;
+            if nums.iter().any(|n| n.fract() != 0.0) || step.fract() != 0.0 {
+                return None;
+            }
+            let start = if g.auto_start { min } else { g.start_num? };
+            let end = if g.auto_end { max } else { g.end_num? };
+            out.start_num = Some(start);
+            out.end_num = Some(end);
+            let mut items = vec![text(if blanks {
+                format!("<{} or (blank)", fmt_num(start))
+            } else {
+                format!("<{}", fmt_num(start))
+            })];
+            let mut lower = start;
+            loop {
+                let upper = if lower + step == end {
+                    end
+                } else {
+                    lower + step - 1.0
+                };
+                items.push(text(format!("{}-{}", fmt_num(lower), fmt_num(upper))));
+                lower += step;
+                if lower >= end {
+                    break;
+                }
+            }
+            items.push(text(format!(">{}", fmt_num(lower))));
+            out.items = items;
+        }
+        Some(by) => {
+            if blanks {
+                return Some(Regrouped::Ungroup);
+            }
+            let start = if g.auto_start {
+                min.floor()
+            } else {
+                g.start_date?
+            };
+            let end = if g.auto_end {
+                max.floor() + 1.0
+            } else {
+                g.end_date?
+            };
+            out.start_date = Some(start);
+            out.end_date = Some(end);
+            let body: Vec<Value> = match by {
+                "months" => MONTHS.iter().map(|m| text((*m).to_owned())).collect(),
+                "quarters" => (1..=4).map(|q| text(format!("Qtr{q}"))).collect(),
+                "years" => {
+                    let (sy, _, _) = serial_to_ymd(start, false);
+                    let (ey, _, _) = serial_to_ymd(end, false);
+                    (sy..=ey).map(|y| text(y.to_string())).collect()
+                }
+                "days" => {
+                    let n = g.interval.filter(|i| *i >= 1.0)?;
+                    let mut v = Vec::new();
+                    let mut lower = start.floor();
+                    while lower <= end {
+                        let upper = (lower + n - 1.0).min(end);
+                        v.push(text(format!("{} - {}", fmt_date(lower), fmt_date(upper))));
+                        lower += n;
+                    }
+                    v
+                }
+                _ => return None,
+            };
+            let mut items = vec![text(format!("<{}", fmt_date(start)))];
+            items.extend(body);
+            items.push(text(format!(">{}", fmt_date(end))));
+            out.items = items;
+        }
+    }
+    Some(Regrouped::Group(out))
+}
+
+/// The refreshed group of every grouped cache field, by field index.
+pub(crate) fn regroup(
+    cache: &crate::model::CacheDefinition,
+    columns: &[Vec<Value>],
+) -> Vec<(usize, Regrouped)> {
+    let mut out = Vec::new();
+    for (fi, cf) in cache.fields.iter().enumerate() {
+        let Some(g) = cf.group.as_ref() else {
+            continue;
+        };
+        if g.items.is_empty() {
+            continue;
+        }
+        let base = if cf.database_field {
+            fi
+        } else {
+            g.base.map_or(fi, |b| b as usize)
+        };
+        let Some(src) = columns.get(base) else {
+            continue;
+        };
+        if let Some(r) = regroup_one(g, src) {
+            out.push((fi, r));
+        }
+    }
+    out
+}
+
+/// The order of a grouped field's items after a refresh: the stored order of the items still
+/// there (same label), then the new ones in index order. Months stay in calendar order.
+/// `old_x` is the stored item list (indices into `old_items`); the result lists indices into
+/// `new_items`.
+pub(crate) fn item_order(
+    old_items: &[Value],
+    old_x: &[usize],
+    new_items: &[Value],
+    months: bool,
+) -> Vec<usize> {
+    let mut order: Vec<usize> = Vec::new();
+    if !months {
+        for x in old_x {
+            if let Some(v) = old_items.get(*x)
+                && let Some(n) = new_items
+                    .iter()
+                    .position(|w| crate::value::ItemKey::of(w) == crate::value::ItemKey::of(v))
+                && !order.contains(&n)
+            {
+                order.push(n);
+            }
+        }
+    }
+    for n in 0..new_items.len() {
+        if !order.contains(&n) {
+            order.push(n);
+        }
+    }
+    order
+}

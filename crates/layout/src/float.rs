@@ -177,6 +177,9 @@ pub(crate) struct Anchored {
     pub atom: usize,
     pub float: Option<Float>,
     pub image: ImagePlacement,
+    /// A wrapping float that cannot stand between its anchor and the bottom margin: its
+    /// paragraph moves to the next page (`layout-float-anchor-nextpage`).
+    pub overflows: bool,
 }
 
 /// Page geometry the anchors are positioned against.
@@ -336,13 +339,37 @@ pub(crate) fn place(
     let vb = vertical_base(d.vertical.0, s, para_top, at);
     let [el, et, er, eb] = d.effect_extent_pt();
     let x = along(d.horizontal.1, hb, w, er);
-    let y = along(d.vertical.1, vb, h, eb);
+    let mut y = along(d.vertical.1, vb, h, eb);
     let [dt, db, dl, dr] = d.distance_pt();
     let kind = match d.wrap {
         WrapType::TopAndBottom => Some(FloatKind::TopBottom),
         WrapType::Square | WrapType::Tight | WrapType::Through => Some(FloatKind::Square),
         WrapType::None | WrapType::Inline => None,
     };
+    // Measured (layout-float-anchor-bottom, -anchor-nextpage): a wrapping float placed from its
+    // paragraph or line whose bottom would pass the bottom margin is moved up until the bottom
+    // meets the margin (a +120 top-and-bottom and a +200 square picture of 60 pt stand at
+    // 660 = 720 - 60). It never rises above its anchor: when it would, the anchor's paragraph
+    // goes to the next page instead. Floats in front of the text, and those placed from the
+    // page or margin, are not moved.
+    let mut overflows = false;
+    if kind.is_some()
+        && matches!(
+            d.vertical.0,
+            VerticalRelativeFrom::Paragraph | VerticalRelativeFrom::Line
+        )
+        && matches!(d.vertical.1, Position::Offset(_))
+    {
+        let limit = s.page_height - s.margin_bottom;
+        if y + h + eb > limit {
+            let clamped = limit - h - eb;
+            if clamped < vb.0 - 0.01 {
+                overflows = true;
+            } else {
+                y = clamped;
+            }
+        }
+    }
     // A tight or through wrap follows its polygon (a rectangle for a picture): the polygon's
     // bounding box in the 21600-unit square over the extent, with no effect extent (measured).
     let outline: Option<Outline> = match (d.wrap, polygon) {
@@ -378,6 +405,7 @@ pub(crate) fn place(
         _ => (x - el, y - et, x + w + er, y + h + eb),
     };
     Anchored {
+        overflows,
         atom,
         float: kind.map(|kind| Float {
             x0: bx0 - dl,

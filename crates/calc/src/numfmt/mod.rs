@@ -12,6 +12,7 @@
 mod cellcode;
 mod date;
 mod decimal;
+mod hijri;
 mod layout;
 mod parse;
 

@@ -24,6 +24,15 @@ Modes (any combination, default is all four):
              (column) and widths (bar) from 80 to 640 pt: how many major intervals Excel allows at each plot
              size. Output: fixtures/reference/xlsx/chart-axes/sweep.json
 
+  -Labels    opens every fixtures/xlsx/chart-*.xlsx read-only (never saved) and, per chart, records the
+             TickLabels.NumberFormat / NumberFormatLinked of each axis, the tick values Excel chooses (linear:
+             min + k*major; log: min*base^k) with the text Excel's number formatter gives each, and DataLabel
+             Left/Top/Width/Height of every point at every valid label position for the chart type (column, bar,
+             line, scatter, pie; stacked variants have fewer). Output: fixtures/reference/xlsx/<fixture>/labels.json
+             The rendered tick text itself is not in the object model; tick_texts come from a scratch cell's .Text.
+             -Count N limits the number of fixtures (trial runs). Large randomised sets live in
+             tools/office/make-chart-corpus.ps1 (-Set labels, -Set dates).
+
 Process safety: starts its own Excel instance with AutomationSecurity = 3 (disable macros), remembers its process id
 and only ever stops that process (in a finally block). Other EXCEL processes are never touched.
 
@@ -34,11 +43,13 @@ param(
   [switch]$Layout,
   [switch]$Axes,
   [switch]$Sweep,
+  [switch]$Labels,
+  [int]$Count = 0,
   [string]$Only,
   [int]$Seed = 365
 )
 $ErrorActionPreference = 'Stop'
-if (-not ($Fixtures -or $Layout -or $Axes -or $Sweep)) { $Fixtures = $true; $Layout = $true; $Axes = $true; $Sweep = $true }
+if (-not ($Fixtures -or $Layout -or $Axes -or $Sweep -or $Labels)) { $Fixtures = $true; $Layout = $true; $Axes = $true; $Sweep = $true }
 $root = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 $fixtureDir = Join-Path $root 'fixtures/xlsx'
 $refDir = Join-Path $root 'fixtures/reference/xlsx'
@@ -64,6 +75,7 @@ function Start-Excel {
   [void][ChWin]::GetWindowThreadProcessId([IntPtr]$app.Hwnd, [ref]$procId)
   $script:xl = $app
   $script:xlPid = [int]$procId
+  Write-Output "Excel PID $procId (started by this script)"
 }
 
 function Stop-Excel {
@@ -226,6 +238,128 @@ function Invoke-Layout {
 }
 
 # ---------------------------------------------------------------------------------------------------------
+# Labels
+# ---------------------------------------------------------------------------------------------------------
+function Arr($a) { return '[' + (($a | ForEach-Object { Num $_ }) -join ',') + ']' }
+function Js($s) {
+  if ($null -eq $s) { return 'null' }
+  $sb = New-Object Text.StringBuilder
+  [void]$sb.Append('"')
+  foreach ($c in ([string]$s).ToCharArray()) {
+    $n = [int]$c
+    if ($n -eq 34) { [void]$sb.Append('\"') }
+    elseif ($n -eq 92) { [void]$sb.Append('\\') }
+    elseif ($n -lt 32 -or $n -gt 126) { [void]$sb.Append(('\u{0:x4}' -f $n)) }
+    else { [void]$sb.Append($c) }
+  }
+  [void]$sb.Append('"')
+  return $sb.ToString()
+}
+function Jb($b) { if ($b) { return 'true' } else { return 'false' } }
+function R12($v) { return [double]::Parse(([double]$v).ToString('G12', $inv), $inv) }
+
+# A scratch worksheet whose cell A1 formats a number with a number format: the text Excel's formatter produces
+# (the rendered tick label itself is not exposed by the object model).
+function Init-FmtSheet {
+  $wb = $script:xl.Workbooks.Add()
+  $ws = $wb.Worksheets.Item(1)
+  $ws.Columns.Item(1).ColumnWidth = 100
+  $script:fmtWs = $ws
+}
+function Fmt-Text($v, [string]$fmt) {
+  try { $c = $script:fmtWs.Cells.Item(1, 1); $c.NumberFormat = $fmt; $c.Value2 = [double]$v; return [string]$c.Text } catch { return $null }
+}
+
+# Tick values of a value axis: min + k*major (linear) or min*base^k (log).
+function Value-Ticks($ax) {
+  $min = [double]$ax.MinimumScale; $max = [double]$ax.MaximumScale
+  $vals = New-Object System.Collections.ArrayList
+  $log = $false; try { $log = ($ax.ScaleType -eq -4133) } catch {}
+  if ($log) {
+    $b = [double]$ax.LogBase; $v = $min; $k = 0
+    while ($v -le $max * (1 + 1e-9) -and $k -lt 60) { [void]$vals.Add((R12 $v)); $v = $v * $b; $k++ }
+  } else {
+    $mu = [double]$ax.MajorUnit
+    if ($mu -gt 0) { for ($k = 0; $k -lt 400; $k++) { $v = $min + $k * $mu; if ($v -gt $max + $mu * 1e-9) { break }; [void]$vals.Add((R12 $v)) } }
+  }
+  return , $vals.ToArray()
+}
+
+# {"number_format","linked","scale","min","max","major","tick_values":[],"tick_texts":[]} for a value axis.
+function ValueAxis-Json($ax) {
+  $tl = $ax.TickLabels
+  $log = $false; try { $log = ($ax.ScaleType -eq -4133) } catch {}
+  $fmt = [string]$tl.NumberFormat
+  $vals = Value-Ticks $ax
+  $texts = $vals | ForEach-Object { Js (Fmt-Text $_ $fmt) }
+  $rec = '{"number_format":' + (Js $fmt) + ',"linked":' + (Jb ([bool]$tl.NumberFormatLinked)) + ',"scale":"' + $(if ($log) { 'log' } else { 'linear' }) + '"'
+  $rec += ',"min":' + (Num $ax.MinimumScale) + ',"max":' + (Num $ax.MaximumScale) + ',"major":' + (Num $ax.MajorUnit)
+  if ($log) { $rec += ',"log_base":' + (Num $ax.LogBase) }
+  $rec += ',"tick_values":' + (Arr $vals) + ',"tick_texts":[' + ($texts -join ',') + ']}'
+  return $rec
+}
+
+# One rectangle per point for every series: DataLabel.Left/Top/Width/Height in chart points plus its text.
+function DataLabels-Json($ch) {
+  $all = New-Object System.Collections.ArrayList
+  $ns = $ch.SeriesCollection().Count
+  for ($s = 1; $s -le $ns; $s++) {
+    $sr = $ch.SeriesCollection($s)
+    $vals = @($sr.Values)
+    $np = $vals.Count
+    $pts = New-Object System.Collections.ArrayList
+    for ($p = 1; $p -le $np; $p++) {
+      try {
+        $dl = $sr.Points($p).DataLabel
+        [void]$pts.Add(('{{"value":{0},"text":{1},"left":{2},"top":{3},"width":{4},"height":{5}}}' -f (Num $vals[$p - 1]), (Js $dl.Text), (Num $dl.Left), (Num $dl.Top), (Num $dl.Width), (Num $dl.Height)))
+      } catch { [void]$pts.Add('null') }
+    }
+    [void]$all.Add('[' + ($pts -join ',') + ']')
+  }
+  return '[' + ($all -join ',') + ']'
+}
+
+
+function Invoke-Labels {
+  Init-FmtSheet
+  $files = Get-ChildItem $fixtureDir -Filter 'chart-*.xlsx' | Sort-Object Name
+  if ($Only) { $files = $files | Where-Object { $_.BaseName -match $Only } }
+  if ($Count -gt 0) { $files = $files | Select-Object -First $Count }
+  $posNames = @{ '-4108' = 'center'; '3' = 'inside_end'; '4' = 'inside_base'; '2' = 'outside_end'; '0' = 'above'; '1' = 'below'; '-4131' = 'left'; '-4152' = 'right'; '5' = 'best_fit' }
+  foreach ($f in $files) {
+    $wb = $script:xl.Workbooks.Open($f.FullName, 0, $true)
+    try {
+      $ch = $wb.Worksheets.Item(1).ChartObjects(1).Chart
+      $ch.Refresh()
+      $t = [int]$ch.ChartType
+      $positions = switch ($t) {
+        { $_ -in 51, 57 } { @(-4108, 3, 4, 2) }
+        { $_ -in 52, 53, 58 } { @(-4108, 3, 4) }
+        { $_ -in 4, 65, -4169 } { @(-4108, -4131, -4152, 0, 1) }
+        5 { @(-4108, 3, 2, 5) }
+        default { @() }
+      }
+      $rec = "{`n  `"source`": `"fixtures/xlsx/$($f.Name)`",`n  `"oracle`": `"Microsoft Excel via COM, points, origin at the chart area top left; tick_texts are Excel's number-format output for each tick value, not the rendered text`",`n  `"excel_build`": `"$($script:xl.Build)`",`n  `"chart_type`": $t"
+      if ($t -notin 5, -4120) {
+        $rec += ",`n  `"value_axis`": " + (ValueAxis-Json $ch.Axes(2))
+        if ($t -eq -4169) { $rec += ",`n  `"x_axis`": " + (ValueAxis-Json $ch.Axes(1)) }
+        else { $cx = $ch.Axes(1); $rec += ",`n  `"category_axis`": {`"number_format`": " + (Js $cx.TickLabels.NumberFormat) + ",`"linked`": " + (Jb ([bool]$cx.TickLabels.NumberFormatLinked)) + "}" }
+      }
+      $per = New-Object System.Collections.ArrayList
+      foreach ($pos in $positions) {
+        $ns = $ch.SeriesCollection().Count
+        for ($s = 1; $s -le $ns; $s++) { $sr = $ch.SeriesCollection($s); $sr.HasDataLabels = $true; $sr.DataLabels().Position = $pos }
+        $ch.Refresh()
+        [void]$per.Add(('{{"position":"{0}","position_code":{1},"position_read_back":{2},"data_labels":{3}}}' -f $posNames[[string]$pos], $pos, [int]$ch.SeriesCollection(1).DataLabels().Position, (DataLabels-Json $ch)))
+      }
+      $rec += ",`n  `"label_positions`": [`n    " + ($per -join ",`n    ") + "`n  ]`n}`n"
+      Write-Lf (Join-Path $refDir "$($f.BaseName)/labels.json") $rec
+      Write-Output "labels $($f.BaseName)"
+    } finally { $wb.Saved = $true; $wb.Close($false) }
+  }
+}
+
+# ---------------------------------------------------------------------------------------------------------
 # Axes
 # ---------------------------------------------------------------------------------------------------------
 function Round-To($v, $dec) { [Math]::Round($v, $dec, [MidpointRounding]::AwayFromZero) }
@@ -366,6 +500,7 @@ try {
   Start-Excel
   if ($Fixtures) { Invoke-Fixtures }
   if ($Layout) { Invoke-Layout }
+  if ($Labels) { Invoke-Labels }
   if ($Axes) { Invoke-Axes }
   if ($Sweep) { Invoke-Sweep }
 } finally {

@@ -505,7 +505,11 @@ impl<'a> Tokenizer<'a> {
             {
                 self.lcid = Some(code & 0xFFFF);
                 self.shape = ((code >> 24) & 0xFF) as u8;
-                self.calendar = ((code >> 16) & 0xFF) as u8;
+                // A tag without a calendar byte keeps the calendar of a `B1`/`B2` prefix (measured: `B2[$-409]` is Hijri).
+                let calendar = ((code >> 16) & 0xFF) as u8;
+                if calendar != 0 {
+                    self.calendar = calendar;
+                }
             }
             let text = currency_text(&body);
             self.lit(&text);

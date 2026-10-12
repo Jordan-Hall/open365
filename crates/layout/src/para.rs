@@ -673,7 +673,18 @@ impl Collector<'_, '_> {
         self.fields.iter().any(|f| f.in_result && f.suppress)
     }
 
-    fn mark(&mut self, text: &str, style_of: &RunStyle) {
+    fn mark(&mut self, text: &str, style_of: &RunStyle, style_idx: usize) {
+        // Measured (probes/probe-links): a note reference whose run has no superscript style is
+        // plain text in Word, drawn at the run's size on the baseline with the digit's own
+        // advance (5.52 pt at 11.04 pt, where the shrunk mark gave 3.55).
+        if style_of.vert_align == VertAlign::Baseline {
+            self.push(text, style_idx);
+            let extra = text.chars().count() as isize - 1;
+            if extra > 0 {
+                self.hidden.push((self.text.len(), -extra));
+            }
+            return;
+        }
         let mut st = style_of.clone();
         // A reference style that already says `w:vertAlign` has shrunk `size`; start from the full one.
         let full = if st.vert_align == VertAlign::Baseline {
@@ -750,7 +761,7 @@ impl Collector<'_, '_> {
             let label = self.ctx.order.map(|o| o.label(end, id)).unwrap_or_default();
             self.refs.push((self.text.len(), end, id));
             let base = self.styles[style].clone();
-            self.mark(&label, &base);
+            self.mark(&label, &base, style);
         } else if h.is_w("footnoteRef") || h.is_w("endnoteRef") {
             let label = self
                 .ctx
@@ -758,7 +769,7 @@ impl Collector<'_, '_> {
                 .map(|(end, n)| mark_text(end, n))
                 .unwrap_or_default();
             let base = self.styles[style].clone();
-            self.mark(&label, &base);
+            self.mark(&label, &base, style);
         } else if h.is_w("separator") || h.is_w("continuationSeparator") {
             self.separator = true;
             self.hide(1);

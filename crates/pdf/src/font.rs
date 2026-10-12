@@ -159,7 +159,11 @@ fn glyph_slice<'a>(loca: &[u8], glyf: &'a [u8], long: bool, gid: usize) -> Optio
 
 /// Rebuilds the font with outlines only for `keep` and the glyphs its composites need. Glyph
 /// ids stay the same, so the PDF can use them as CIDs with an identity CIDToGIDMap.
-fn subset_truetype(sfnt: &Sfnt<'_>, keep: &BTreeSet<u32>) -> Option<Vec<u8>> {
+fn subset_truetype(
+    sfnt: &Sfnt<'_>,
+    keep: &BTreeSet<u32>,
+    cmap: Option<Vec<u8>>,
+) -> Option<Vec<u8>> {
     let head = sfnt.get(b"head")?;
     let loca = sfnt.get(b"loca")?;
     let glyf = sfnt.get(b"glyf")?;
@@ -203,6 +207,9 @@ fn subset_truetype(sfnt: &Sfnt<'_>, keep: &BTreeSet<u32>) -> Option<Vec<u8>> {
             }
             _ => {}
         }
+    }
+    if let Some(c) = cmap {
+        tables.push((*b"cmap", c));
     }
     Some(build_sfnt(tables, false))
 }
@@ -401,36 +408,13 @@ pub fn embed(
         let data = if no_subset {
             Some(whole_font(&sfnt, false))
         } else {
-            subset_truetype(&sfnt, &gids)
+            subset_truetype(&sfnt, &gids, None)
         }
         .ok_or_else(|| PdfError::Font(format!("{name}: cannot subset glyf table")))?;
         let id = pdf.add_stream(&format!("/Length1 {}", data.len()), &data, true);
         (id, "CIDFontType2")
     };
 
-    let head = font
-        .head()
-        .map_err(|e| PdfError::Font(format!("{name}: {e}")))?;
-    let hhea = font.hhea().ok();
-    let post = font.post().ok();
-    let ascent = hhea
-        .as_ref()
-        .map_or(upem * 0.8, |h| f64::from(h.ascender().to_i16()));
-    let descent = hhea
-        .as_ref()
-        .map_or(-upem * 0.2, |h| f64::from(h.descender().to_i16()));
-    let cap = os2
-        .as_ref()
-        .and_then(|t| t.s_cap_height())
-        .map_or(ascent, f64::from);
-    let angle = post.as_ref().map_or(0.0, |p| p.italic_angle().to_f64());
-    let flags = 32 | if face.is_italic() { 64 } else { 0 };
-    let bbox = [
-        f64::from(head.x_min()) * scale,
-        f64::from(head.y_min()) * scale,
-        f64::from(head.x_max()) * scale,
-        f64::from(head.y_max()) * scale,
-    ];
     let file_key = if is_cff { "FontFile3" } else { "FontFile2" };
     // CIDSet (PDF/A-1 needs it, and only there is it exact): one bit per CID in the subset, CID 0
     // the most significant bit of the first byte.
@@ -444,18 +428,8 @@ pub fn embed(
     } else {
         String::new()
     };
-    let desc = pdf.add(format!(
-        "<< /Type /FontDescriptor /FontName /{ps} /Flags {flags} /FontBBox [{} {} {} {}] /ItalicAngle {} /Ascent {} /Descent {} /CapHeight {} /StemV {} /{file_key} {file_id} 0 R{cid_set_entry} >>",
-        num(bbox[0], 0),
-        num(bbox[1], 0),
-        num(bbox[2], 0),
-        num(bbox[3], 0),
-        num(angle, 2),
-        num(ascent * scale, 0),
-        num(descent * scale, 0),
-        num(cap * scale, 0),
-        if face.is_bold() { 140 } else { 80 },
-    ));
+    let desc = font_descriptor(pdf, face, &font, &ps, file_key, file_id, &cid_set_entry)?;
+    let post = font.post().ok();
 
     let mut w = String::from("[");
     for (g, width) in &widths {
@@ -500,4 +474,169 @@ pub fn embed(
             strike_thickness: (s_thick / upem).max(0.02),
         },
     ))
+}
+
+/// The `FontDescriptor` of an embedded font.
+fn font_descriptor(
+    pdf: &mut Pdf,
+    face: &FontFace,
+    font: &FontRef<'_>,
+    ps: &str,
+    file_key: &str,
+    file_id: u32,
+    extra: &str,
+) -> Result<u32, PdfError> {
+    let name = face.family();
+    let upem = f64::from(face.units_per_em());
+    let scale = 1000.0 / upem;
+    let os2 = font.os2().ok();
+    let head = font
+        .head()
+        .map_err(|e| PdfError::Font(format!("{name}: {e}")))?;
+    let hhea = font.hhea().ok();
+    let post = font.post().ok();
+    let ascent = hhea
+        .as_ref()
+        .map_or(upem * 0.8, |h| f64::from(h.ascender().to_i16()));
+    let descent = hhea
+        .as_ref()
+        .map_or(-upem * 0.2, |h| f64::from(h.descender().to_i16()));
+    let cap = os2
+        .as_ref()
+        .and_then(|t| t.s_cap_height())
+        .map_or(ascent, f64::from);
+    let angle = post.as_ref().map_or(0.0, |p| p.italic_angle().to_f64());
+    let flags = 32 | if face.is_italic() { 64 } else { 0 };
+    let bbox = [
+        f64::from(head.x_min()) * scale,
+        f64::from(head.y_min()) * scale,
+        f64::from(head.x_max()) * scale,
+        f64::from(head.y_max()) * scale,
+    ];
+    Ok(pdf.add(format!(
+        "<< /Type /FontDescriptor /FontName /{ps} /Flags {flags} /FontBBox [{} {} {} {}] /ItalicAngle {} /Ascent {} /Descent {} /CapHeight {} /StemV {} /{file_key} {file_id} 0 R{extra} >>",
+        num(bbox[0], 0),
+        num(bbox[1], 0),
+        num(bbox[2], 0),
+        num(bbox[3], 0),
+        num(angle, 2),
+        num(ascent * scale, 0),
+        num(descent * scale, 0),
+        num(cap * scale, 0),
+        if face.is_bold() { 140 } else { 80 },
+    )))
+}
+
+/// The glyph `c` has in `face` and its advance in 1/1000 em.
+pub fn char_glyph(face: &FontFace, c: char) -> Option<(u32, i64)> {
+    let font = FontRef::from_index(face.bytes(), face.index()).ok()?;
+    let gid = font.charmap().map(c)?;
+    let adv = font
+        .glyph_metrics(
+            skrifa::instance::Size::unscaled(),
+            skrifa::instance::LocationRef::default(),
+        )
+        .advance_width(gid)?;
+    let w = (f64::from(adv) * 1000.0 / f64::from(face.units_per_em())).round() as i64;
+    Some((gid.to_u32(), w))
+}
+
+/// A `(3,1)` cmap, format 4, with one segment per code.
+fn simple_cmap(codes: &BTreeMap<u8, u32>) -> Vec<u8> {
+    let mut segs: Vec<(u16, u16)> = codes
+        .iter()
+        .map(|(c, g)| (u16::from(*c), (*g as u16).wrapping_sub(u16::from(*c))))
+        .collect();
+    segs.push((0xFFFF, 1));
+    let n = segs.len() as u16;
+    let mut pow = 1u16;
+    let mut log = 0u16;
+    while pow * 2 <= n {
+        pow *= 2;
+        log += 1;
+    }
+    let search = pow * 2;
+    let mut sub = Vec::new();
+    for v in [4u16, 0, 0, n * 2, search, log, n * 2 - search] {
+        sub.extend_from_slice(&v.to_be_bytes());
+    }
+    for (c, _) in &segs {
+        sub.extend_from_slice(&c.to_be_bytes());
+    }
+    sub.extend_from_slice(&0u16.to_be_bytes());
+    for (c, _) in &segs {
+        sub.extend_from_slice(&c.to_be_bytes());
+    }
+    for (_, d) in &segs {
+        sub.extend_from_slice(&d.to_be_bytes());
+    }
+    for _ in &segs {
+        sub.extend_from_slice(&0u16.to_be_bytes());
+    }
+    let len = sub.len() as u16;
+    sub[2..4].copy_from_slice(&len.to_be_bytes());
+    let mut out = Vec::new();
+    for v in [0u16, 1, 3, 1] {
+        out.extend_from_slice(&v.to_be_bytes());
+    }
+    out.extend_from_slice(&12u32.to_be_bytes());
+    out.extend_from_slice(&sub);
+    out
+}
+
+/// Embeds the characters `chars` (printable ASCII) of `face` as a simple TrueType font with
+/// WinAnsiEncoding and no ToUnicode CMap, as Word writes blanks, tab leaders and note marks.
+pub fn embed_simple(
+    pdf: &mut Pdf,
+    face: &FontFace,
+    chars: &BTreeSet<char>,
+) -> Result<u32, PdfError> {
+    let name = face.family().to_owned();
+    let font = FontRef::from_index(face.bytes(), face.index())
+        .map_err(|e| PdfError::Font(format!("{name}: {e}")))?;
+    let sfnt = Sfnt::parse(face.bytes(), face.index())
+        .ok_or_else(|| PdfError::Font(format!("{name}: unreadable table directory")))?;
+    let fs_type = font.os2().ok().map_or(0, |t| t.fs_type());
+    if fs_type & 0x000E == 0x0002 {
+        return Err(PdfError::FontEmbeddingForbidden(name));
+    }
+    let mut codes: BTreeMap<u8, u32> = BTreeMap::new();
+    let mut widths: BTreeMap<u8, i64> = BTreeMap::new();
+    for c in chars {
+        if let Some((g, w)) = char_glyph(face, *c) {
+            codes.insert(*c as u8, g);
+            widths.insert(*c as u8, w);
+        }
+    }
+    let mut gids: BTreeSet<u32> = codes.values().copied().collect();
+    gids.insert(0);
+    let tag: String = {
+        let mut bytes = name.as_bytes().to_vec();
+        bytes.push(b's');
+        for g in &gids {
+            bytes.extend_from_slice(&g.to_be_bytes());
+        }
+        digest(&bytes)[..6]
+            .iter()
+            .map(|b| char::from(b'A' + b % 26))
+            .collect()
+    };
+    let ps = ps_name(face, &tag);
+    let data = if fs_type & 0x0100 != 0 {
+        whole_font(&sfnt, false)
+    } else {
+        subset_truetype(&sfnt, &gids, Some(simple_cmap(&codes)))
+            .ok_or_else(|| PdfError::Font(format!("{name}: cannot subset glyf table")))?
+    };
+    let file = pdf.add_stream(&format!("/Length1 {}", data.len()), &data, true);
+    let desc = font_descriptor(pdf, face, &font, &ps, "FontFile2", file, "")?;
+    let first = codes.keys().next().copied().unwrap_or(32);
+    let last = codes.keys().next_back().copied().unwrap_or(32);
+    let w: String = (first..=last)
+        .map(|c| format!("{} ", widths.get(&c).copied().unwrap_or(0)))
+        .collect();
+    let widths_id = pdf.add(format!("[{w}]"));
+    Ok(pdf.add(format!(
+        "<< /Type /Font /Subtype /TrueType /BaseFont /{ps} /Encoding /WinAnsiEncoding /FontDescriptor {desc} 0 R /FirstChar {first} /LastChar {last} /Widths {widths_id} 0 R >>"
+    )))
 }

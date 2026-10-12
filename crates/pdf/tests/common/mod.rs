@@ -434,9 +434,48 @@ pub struct PdfLine {
 pub struct FontInfo {
     pub widths: BTreeMap<u32, f64>,
     pub to_unicode: BTreeMap<u32, String>,
+    /// A simple TrueType font (one byte per code, no ToUnicode): code to glyph id.
+    pub simple: Option<BTreeMap<u32, u32>>,
+}
+
+/// A simple TrueType font as Word writes blanks, leaders and note marks: widths by code and the
+/// glyph each code stands for, read from the embedded font's cmap.
+fn simple_font_info(r: &Reader<'_>, font: &Obj) -> FontInfo {
+    use skrifa::MetadataProvider as _;
+    let first = r.key(font, "FirstChar").expect("FirstChar").num() as u32;
+    let widths_obj = r.key(font, "Widths").expect("Widths");
+    let widths = widths_obj
+        .arr()
+        .iter()
+        .enumerate()
+        .map(|(k, w)| (first + k as u32, r.resolve(w).num()))
+        .collect();
+    let fd = r.key(font, "FontDescriptor").expect("descriptor");
+    let file = r.key(&fd, "FontFile2").expect("FontFile2");
+    let data = r.stream(&file);
+    let parsed = skrifa::FontRef::new(&data).expect("simple font parses");
+    let simple = widths_keys(&widths)
+        .into_iter()
+        .filter_map(|code| {
+            let gid = parsed.charmap().map(char::from_u32(code)?)?;
+            Some((code, gid.to_u32()))
+        })
+        .collect();
+    FontInfo {
+        widths,
+        to_unicode: BTreeMap::new(),
+        simple: Some(simple),
+    }
+}
+
+fn widths_keys(w: &BTreeMap<u32, f64>) -> Vec<u32> {
+    w.keys().copied().collect()
 }
 
 pub fn font_info(r: &Reader<'_>, font: &Obj) -> FontInfo {
+    if matches!(r.key(font, "Subtype"), Some(Obj::Name(n)) if n == "TrueType") {
+        return simple_font_info(r, font);
+    }
     let desc = r.resolve(&font.dict()["DescendantFonts"].arr()[0]);
     let w = r.key(&desc, "W").expect("W");
     let w = w.arr();
@@ -469,7 +508,11 @@ pub fn font_info(r: &Reader<'_>, font: &Obj) -> FontInfo {
             to_unicode.insert(gid, String::from_utf16(&units).expect("utf16"));
         }
     }
-    FontInfo { widths, to_unicode }
+    FontInfo {
+        widths,
+        to_unicode,
+        simple: None,
+    }
 }
 
 /// Interprets a page's content stream: text sequences with the position of every glyph.
@@ -533,6 +576,22 @@ pub fn read_text(content: &[u8], fonts: &BTreeMap<String, FontInfo>) -> Vec<PdfL
                 for it in items {
                     match it {
                         Obj::Str(bytes) => {
+                            if let Some(map) = &info.simple {
+                                for &code in bytes {
+                                    let code = u32::from(code);
+                                    // The blank at a paragraph mark is not a glyph of the layout.
+                                    if code != 32 {
+                                        line.glyphs.push(PdfGlyph {
+                                            font: name.clone(),
+                                            gid: map[&code],
+                                            x: tx,
+                                            y: ty,
+                                        });
+                                    }
+                                    tx += info.widths[&code] * size / 1000.0;
+                                }
+                                continue;
+                            }
                             for ch in bytes.chunks(2) {
                                 let gid = u32::from(ch[0]) << 8 | u32::from(ch[1]);
                                 line.glyphs.push(PdfGlyph {

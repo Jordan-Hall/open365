@@ -78,7 +78,8 @@ fn glyph_positions_and_text_round_trip() {
                     let (dx, dy) = ((g.x - p.x).abs(), (y - p.y).abs());
                     worst = worst.max(dx).max(dy);
                     if g.glyph_id != p.gid
-                        || p.font != resources[&g.face.index()]
+                        || (p.font != resources[&g.face.index()]
+                            && p.font != format!("FS{}", g.face.index()))
                         || dx > TOLERANCE
                         || dy > TOLERANCE
                     {
@@ -171,7 +172,9 @@ fn struct_names(r: &Reader<'_>, elem: &Obj, out: &mut Vec<String>, mcrs: &mut us
         Some(Obj::Arr(kids)) => {
             for k in kids {
                 let k = r.resolve(k);
-                if matches!(&k, Obj::Dict(d) if matches!(d.get("Type"), Some(Obj::Name(t)) if t == "MCR"))
+                // A bare integer is marked content on the element's /Pg page.
+                if matches!(&k, Obj::Int(_))
+                    || matches!(&k, Obj::Dict(d) if matches!(d.get("Type"), Some(Obj::Name(t)) if t == "MCR"))
                 {
                     *mcrs += 1;
                 } else {
@@ -314,8 +317,12 @@ fn fonts_are_subset_and_parse() {
     let font_dict = reader.key(&res, "Font").expect("fonts");
     for f in font_dict.dict().values() {
         let font = reader.resolve(f);
-        let desc = reader.resolve(&font.dict()["DescendantFonts"].arr()[0]);
-        let fd = reader.key(&desc, "FontDescriptor").expect("descriptor");
+        let fd = if font.dict().contains_key("DescendantFonts") {
+            let desc = reader.resolve(&font.dict()["DescendantFonts"].arr()[0]);
+            reader.key(&desc, "FontDescriptor").expect("descriptor")
+        } else {
+            reader.key(&font, "FontDescriptor").expect("descriptor")
+        };
         let file = reader.key(&fd, "FontFile2").expect("FontFile2");
         let data = reader.stream(&file);
         let parsed = skrifa::FontRef::new(&data).expect("subset font parses");

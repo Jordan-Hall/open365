@@ -22,12 +22,12 @@ The generator `make-numfmt-locale-refs.ps1 -Nls` should then write to `crates/lo
   Bengali, Gurmukhi, Gujarati, Oriya; 9 Tamil (no zero); A to C Telugu, Kannada, Malayalam; D Thai; E Lao; F Tibetan; 10 Myanmar; 11 Ethiopic (no zero);
   12 Khmer; 13 Mongolian; 1B to 27 CJK numeral sets and full-width; the rest ASCII. Implemented (`shape_digits`).
 * Calendar byte (bits 16 to 23): 7 is the Thai Buddhist calendar (year + 543, Thai names under every language), 2 English names. Implemented.
-  Measured but not implemented: 3 (era year), 4, 5, 6 (Hijri), 8 (Hebrew), 9 to 12, 14 to 23 (UmAlQura 23, Persian 22, Saka 16, lunisolar).
+  Measured but not implemented: 3 (era year), 4, 5, 8 (Hebrew), 9 to 12, 14 to 22 (Persian 22, Saka 16, lunisolar). Implemented: 6 (Hijri) and 23 (UmAlQura).
 * Thai date letters ว ด ป ช น ท (day, month, Buddhist year, hour, minute, second): without a tag Thai digits, Thai names and a Buddhist year; with a tag
   they follow the tag (`[$-41E]` gives Gregorian ASCII). Implemented for a whole section; Excel applies the Thai digits per Thai letter only
   (`h ว` gives `18 ๑๕`) and prints nothing for ช next to `AM/PM` (known differences).
 * `b`/`bb`/`bbbb` without a tag are Buddhist years, with a tag Gregorian (existing behaviour, measured again).
-* `B1` (Gregorian) and `B2` (Hijri) prefix, upper or lower case; `B0`, `B3` to `B9` are refused (implemented as a format error). `B2` renders Gregorian: Hijri is open.
+* `B1` (Gregorian) and `B2` (Hijri) prefix, upper or lower case; `B0`, `B3` to `B9` are refused (implemented as a format error). `B2` and calendar byte 6 render the Hijri calendar (`numfmt/hijri.rs`): tabular civil calendar with the Kuwaiti leap pattern, measured on 1,990 serials (all match); serial 60 is `#VALUE!`, serial 0 shows serial 1. Month names: Arabic (no tag or an Arabic language), English transliteration for most other tags, own tables for fr, tr, id, fa; `mmm` is always Arabic. Quirks reproduced: without a tag a weekday token before `mmmm` replaces it, and a weekday after a first `mmmm` shows weekday number min(month-1, 6). UmAlQura (calendar byte 23) uses a month-length table measured for 1318 to 1450 (2,226 serials, all match) and the tabular calendar outside it. Open: the month/weekday tables of about 25 other languages (`hj5.*` probes in known.txt).
 * `[DBNum1..4]`: only CJK language tags change digits (existing tables); DBNum4 and all other languages leave them. New: under DBNum1 and DBNum2 a
   two-digit part of 10 or more (`dd`, `hh`) is also written in tens (`十八`, `壱拾八`).
 

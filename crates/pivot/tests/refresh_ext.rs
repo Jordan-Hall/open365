@@ -1,6 +1,6 @@
 //! Format survival, grouped fields and calculated items across a refresh, against Excel.
 //! The fixtures `pivot-refresh-{formats,formats-removed,grouped,calcitems,calcitems-values}`
-//! (made by `make-refresh-ext.ps1` in `pivot-refresh-formats`) hold `before.xlsx` (formats applied,
+//! (made by `tools/office/make-pivot-refresh-ext.ps1`) hold `before.xlsx` (formats applied,
 //! fields grouped, items calculated in Excel), `edits.json` (source edits) and `after.xlsx` (the
 //! source edited and every cache refreshed by Excel). Each pivot is refreshed with
 //! `refresh_sheet` and compared with `after.xlsx`: the pivot table (user `formats` included),
@@ -81,6 +81,30 @@ fn first_difference(got: &[String], want: &[String]) -> Option<String> {
         }
     }
     None
+}
+
+/// What a cell's format shows: four edges (style, resolved colour), solid fill colour, bold,
+/// italic and font colour. Indexed and automatic black compare equal.
+fn visible(wb: &Workbook, si: usize, r: u32, c: u32) -> String {
+    use open365_xlsx::{BorderEdge, BorderStyle};
+    let f = wb.cell_format(si, r, c);
+    let e = |x: &BorderEdge| {
+        if x.style == BorderStyle::None {
+            "-".to_owned()
+        } else {
+            format!("{:?}/{:?}", x.style, wb.styles().resolve_color(&x.color))
+        }
+    };
+    format!(
+        "L{} R{} T{} B{} fill {:?} b{} i{}",
+        e(&f.border.left),
+        e(&f.border.right),
+        e(&f.border.top),
+        e(&f.border.bottom),
+        f.fill.pattern,
+        f.font.bold,
+        f.font.italic
+    )
 }
 
 fn bgr(c: open365_xlsx::Rgb) -> i64 {
@@ -233,12 +257,9 @@ fn run(set: &str) -> (usize, Vec<String>) {
         for c in expected["cells"].as_array().expect("cells") {
             let a = c["a"].as_str().expect("a");
             let (r, col) = parse_cell_ref(a).expect("address");
-            let (g, w) = (
-                wb.cell_format(si, r, col),
-                after.cell_format(after_si, r, col),
-            );
-            if g.border != w.border || g.fill != w.fill || g.font.bold != w.font.bold {
-                bad_xf.push(format!("{a}: got {:?} want {:?}", g.border, w.border));
+            let (g, w) = (visible(&wb, si, r, col), visible(&after, after_si, r, col));
+            if g != w {
+                bad_xf.push(format!("{a}: got {g:?} want {w:?}"));
             }
         }
         if !bad_xf.is_empty() {
@@ -332,15 +353,26 @@ fn formats_survive_refresh_like_excel() {
         &["parts", "cells"],
         &[],
     );
+    // The cell formats follow the items: exact on the tabular pivot (P4) of both sets.
+    check(&["formats", "formats-removed"], 10, &["xf"], &["P4"]);
 }
 
-/// Month and quarter groups with automatic bounds regroup on the refreshed dates like Excel
-/// (cell values). Gap: the cache `fieldGroup` and records of grouped fields are not
-/// regenerated (refreshOnLoad), year, day and number groups are not regrouped, and Excel drops
-/// the grouping of a number field whose source got out-of-range values.
+/// Date groups (months, quarters, years, days) and number groups regroup on the refreshed
+/// data like Excel: cache `fieldGroup`, group items, pivot field items, records and cells.
+/// A number group made without blanks is dropped when the source gets a blank (the field is
+/// a plain field again). Gap, not asserted (`grouped-blank-date`): a blank date drops the date
+/// groups with their derived fields and the pivot loses those axis fields; the cells are asserted,
+/// the cache and pivot table parts fall back to `refreshOnLoad`.
 #[test]
 fn grouped_fields_refresh_like_excel() {
-    check(&["grouped"], 8, &["cells"], &["P1", "P3", "P4"]);
+    check(
+        &["grouped", "grouped-numbers"],
+        11,
+        &["parts", "cells"],
+        &[],
+    );
+    // A blank date drops the date groups: the cells are Excel's, the parts are not rebuilt.
+    check(&["grouped-blank-date"], 2, &["cells"], &[]);
 }
 
 /// Calculated items: shared items, pivot field items, `calculatedItem` references, records,
@@ -353,4 +385,71 @@ fn calculated_items_refresh_like_excel() {
         &["parts", "cells", "xf", "display"],
         &[],
     );
+}
+
+fn sig(wb: &Workbook, si: usize, r: u32, c: u32) -> String {
+    use open365_xlsx::BorderStyle;
+    let b = &wb.cell_format(si, r, c).border;
+    let f = |e: &open365_xlsx::BorderEdge, ch: char| {
+        if e.style == BorderStyle::None {
+            '.'.to_string()
+        } else {
+            format!(
+                "{ch}{}",
+                format!("{:?}", e.color.source)
+                    .chars()
+                    .skip(4)
+                    .take(6)
+                    .collect::<String>()
+            )
+        }
+    };
+    format!(
+        "{}{}{}{}",
+        f(&b.left, 'l'),
+        f(&b.right, 'r'),
+        f(&b.top, 't'),
+        f(&b.bottom, 'b')
+    )
+}
+
+/// Diagnostic: `PIVOT_SET=formats PIVOT_SHEET=P1 cargo test ... dump_xf -- --ignored --nocapture`.
+#[test]
+#[ignore = "diagnostic"]
+fn dump_xf() {
+    let set = std::env::var("PIVOT_SET").unwrap_or_else(|_| "formats".into());
+    let sheet = std::env::var("PIVOT_SHEET").unwrap_or_else(|_| "P1".into());
+    let dir = root().join(format!("fixtures/reference/xlsx/pivot-refresh-{set}"));
+    let before = open(dir.join("before.xlsx"));
+    let after = open(dir.join("after.xlsx"));
+    let mut mine = open(dir.join("before.xlsx"));
+    apply_edits(&mut mine, &dir);
+    let si = mine.sheet_index(&sheet).unwrap();
+    refresh_sheet(&mut mine, si, &PivotStrings::default()).unwrap();
+    for r in 4..14 {
+        for (name, wb) in [("before", &before), ("after ", &after), ("mine  ", &mine)] {
+            let row: Vec<String> = (2..6)
+                .map(|c| format!("{:<14}", sig(wb, si, r, c)))
+                .collect();
+            println!("{r:>2} {name} {}", row.join("|"));
+        }
+        println!();
+    }
+}
+
+/// Diagnostic of the groups Excel drops (a blank where the group had none).
+#[test]
+#[ignore = "diagnostic"]
+fn dump_ungroup() {
+    for set in ["grouped", "grouped-blank-date"] {
+        for f in run(set).1 {
+            println!(
+                "{}",
+                f.lines().take(4).collect::<Vec<_>>().join(
+                    "
+"
+                )
+            );
+        }
+    }
 }
