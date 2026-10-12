@@ -39,6 +39,33 @@ pub struct BuildSeries {
     pub sizes: Vec<f64>,
 }
 
+/// Dates on the category axis: a time-scale (`c:dateAx`) axis over numeric categories.
+#[derive(Debug, Clone)]
+pub struct BuildDates {
+    /// Date serials, one per category.
+    pub serials: Vec<f64>,
+    /// Number format of the category cells.
+    pub cell_format: String,
+    /// Tick label format; `None` follows the cells.
+    pub axis_format: Option<String>,
+    /// `c:baseTimeUnit` days; `false` leaves the base unit automatic.
+    pub base_unit_days: bool,
+}
+
+/// Data labels of every series.
+#[derive(Debug, Clone, Default)]
+pub struct BuildLabels {
+    /// `c:dLblPos` value, for example `outEnd`; `None` leaves Excel's default.
+    pub position: Option<String>,
+    pub show_value: bool,
+    pub show_category: bool,
+    pub show_percent: bool,
+    /// Label text size in points.
+    pub font_pt: Option<f64>,
+    /// Label number format; `None` follows the cells.
+    pub number_format: Option<String>,
+}
+
 /// Everything needed to make a chart part.
 #[derive(Debug, Clone)]
 pub struct ChartBuilder {
@@ -56,6 +83,18 @@ pub struct ChartBuilder {
     /// Chart text size in points and font family.
     pub font_pt: f64,
     pub font_family: String,
+    /// Number format of the value cells (`c:formatCode` of the value cache).
+    pub cell_format: Option<String>,
+    /// Number format of the value axis; `None` follows the cells.
+    pub value_axis_format: Option<String>,
+    pub labels: Option<BuildLabels>,
+    pub dates: Option<BuildDates>,
+    /// Fixed inner plot rectangle as fractions `[x, y, w, h]` of the chart area
+    /// (`c:layout` with `layoutTarget` inner).
+    pub inner_layout: Option<[f64; 4]>,
+    /// Horizontal bar charts list the first category at the top (`c:orientation` maxMin).
+    /// Excel's own default puts it at the bottom.
+    pub bar_first_at_top: bool,
 }
 
 impl ChartBuilder {
@@ -72,6 +111,12 @@ impl ChartBuilder {
             sheet: "Sheet1".to_owned(),
             font_pt: 10.0,
             font_family: "Calibri".to_owned(),
+            cell_format: None,
+            value_axis_format: None,
+            labels: None,
+            dates: None,
+            inner_layout: None,
+            bar_first_at_top: true,
         }
     }
 
@@ -95,7 +140,15 @@ impl ChartBuilder {
             }
             None => x.push_str("<c:autoTitleDeleted val=\"1\"/>"),
         }
-        x.push_str("<c:plotArea><c:layout/>");
+        match self.inner_layout {
+            Some([lx, ly, lw, lh]) => {
+                let _ = write!(
+                    x,
+                    "<c:plotArea><c:layout><c:manualLayout><c:layoutTarget val=\"inner\"/><c:xMode val=\"edge\"/><c:yMode val=\"edge\"/><c:x val=\"{lx}\"/><c:y val=\"{ly}\"/><c:w val=\"{lw}\"/><c:h val=\"{lh}\"/></c:manualLayout></c:layout>"
+                );
+            }
+            None => x.push_str("<c:plotArea><c:layout/>"),
+        }
         self.plot(&mut x);
         x.push_str("</c:plotArea>");
         if let Some(l) = self.legend {
@@ -230,6 +283,9 @@ impl ChartBuilder {
             if self.kind == K::Line {
                 x.push_str("<c:marker><c:symbol val=\"none\"/></c:marker>");
             }
+            if let Some(l) = &self.labels {
+                x.push_str(&dlbls(l));
+            }
             if xy {
                 let xs = if s.xs.is_empty() {
                     (1..=n).map(|v| v as f64).collect()
@@ -240,7 +296,12 @@ impl ChartBuilder {
                 let _ = write!(
                     x,
                     "<c:yVal>{}</c:yVal>",
-                    num_ref(&self.sheet, &col, &s.values)
+                    num_ref_fmt(
+                        &self.sheet,
+                        &col,
+                        &s.values,
+                        self.cell_format.as_deref().unwrap_or("General")
+                    )
                 );
                 if self.kind == K::Bubble {
                     let sz = if s.sizes.is_empty() {
@@ -255,7 +316,13 @@ impl ChartBuilder {
                     );
                 }
             } else {
-                if !self.categories.is_empty() {
+                if let Some(d) = &self.dates {
+                    let _ = write!(
+                        x,
+                        "<c:cat>{}</c:cat>",
+                        num_ref_fmt(&self.sheet, "A", &d.serials, &d.cell_format)
+                    );
+                } else if !self.categories.is_empty() {
                     let _ = write!(
                         x,
                         "<c:cat>{}</c:cat>",
@@ -265,7 +332,12 @@ impl ChartBuilder {
                 let _ = write!(
                     x,
                     "<c:val>{}</c:val>",
-                    num_ref(&self.sheet, &col, &s.values)
+                    num_ref_fmt(
+                        &self.sheet,
+                        &col,
+                        &s.values,
+                        self.cell_format.as_deref().unwrap_or("General")
+                    )
                 );
             }
             if matches!(self.kind, K::Line | K::LineMarker | K::Radar) {
@@ -287,17 +359,36 @@ impl ChartBuilder {
             .map_or(String::new(), |b| format!("<c:logBase val=\"{b}\"/>"));
         match axes {
             1..=3 => {
-                let _ = write!(
-                    x,
-                    "<c:catAx><c:axId val=\"111\"/><c:scaling><c:orientation val=\"{}\"/></c:scaling><c:delete val=\"0\"/><c:axPos val=\"{cat_pos}\"/>{}<c:numFmt formatCode=\"General\" sourceLinked=\"1\"/><c:majorTickMark val=\"none\"/><c:minorTickMark val=\"none\"/><c:tickLblPos val=\"nextTo\"/><c:crossAx val=\"222\"/><c:crosses val=\"autoZero\"/><c:auto val=\"1\"/><c:lblAlgn val=\"ctr\"/><c:lblOffset val=\"100\"/><c:noMultiLvlLbl val=\"0\"/></c:catAx>",
-                    if horizontal { "maxMin" } else { "minMax" },
-                    self.category_title
-                        .as_deref()
-                        .map_or(String::new(), |t| format!(
-                            "<c:title>{}<c:overlay val=\"0\"/></c:title>",
-                            rich(t, None, false)
-                        ))
-                );
+                let title = self.category_title.as_deref().map_or(String::new(), |t| {
+                    format!(
+                        "<c:title>{}<c:overlay val=\"0\"/></c:title>",
+                        rich(t, None, false)
+                    )
+                });
+                if let Some(d) = &self.dates {
+                    let _ = write!(
+                        x,
+                        "<c:dateAx><c:axId val=\"111\"/><c:scaling><c:orientation val=\"minMax\"/></c:scaling><c:delete val=\"0\"/><c:axPos val=\"b\"/>{title}<c:numFmt formatCode=\"{}\" sourceLinked=\"{}\"/><c:majorTickMark val=\"none\"/><c:minorTickMark val=\"none\"/><c:tickLblPos val=\"nextTo\"/><c:crossAx val=\"222\"/><c:crosses val=\"autoZero\"/><c:auto val=\"1\"/><c:lblOffset val=\"100\"/>{}</c:dateAx>",
+                        escape(d.axis_format.as_deref().unwrap_or(&d.cell_format)),
+                        u8::from(d.axis_format.is_none()),
+                        if d.base_unit_days {
+                            "<c:baseTimeUnit val=\"days\"/>"
+                        } else {
+                            ""
+                        }
+                    );
+                } else {
+                    let _ = write!(
+                        x,
+                        "<c:catAx><c:axId val=\"111\"/><c:scaling><c:orientation val=\"{}\"/></c:scaling><c:delete val=\"0\"/><c:axPos val=\"{cat_pos}\"/>{}<c:numFmt formatCode=\"General\" sourceLinked=\"1\"/><c:majorTickMark val=\"none\"/><c:minorTickMark val=\"none\"/><c:tickLblPos val=\"nextTo\"/><c:crossAx val=\"222\"/><c:crosses val=\"autoZero\"/><c:auto val=\"1\"/><c:lblAlgn val=\"ctr\"/><c:lblOffset val=\"100\"/><c:noMultiLvlLbl val=\"0\"/></c:catAx>",
+                        if horizontal && self.bar_first_at_top {
+                            "maxMin"
+                        } else {
+                            "minMax"
+                        },
+                        title
+                    );
+                }
                 let _ = write!(
                     x,
                     "<c:valAx><c:axId val=\"222\"/><c:scaling>{log}<c:orientation val=\"minMax\"/></c:scaling><c:delete val=\"0\"/><c:axPos val=\"{val_pos}\"/><c:majorGridlines/>{}<c:numFmt formatCode=\"{}\" sourceLinked=\"{}\"/><c:majorTickMark val=\"none\"/><c:minorTickMark val=\"none\"/><c:tickLblPos val=\"nextTo\"/><c:crossAx val=\"111\"/><c:crosses val=\"autoZero\"/><c:crossBetween val=\"{between}\"/></c:valAx>",
@@ -307,15 +398,17 @@ impl ChartBuilder {
                             "<c:title>{}<c:overlay val=\"0\"/></c:title>",
                             rich(t, None, false)
                         )),
-                    if matches!(self.kind, K::ColumnPercent | K::BarPercent | K::AreaPercent) {
-                        "0%"
-                    } else {
-                        "General"
-                    },
-                    u8::from(!matches!(
-                        self.kind,
-                        K::ColumnPercent | K::BarPercent | K::AreaPercent
-                    )),
+                    escape(
+                        if matches!(self.kind, K::ColumnPercent | K::BarPercent | K::AreaPercent) {
+                            "0%"
+                        } else {
+                            self.value_axis_format.as_deref().unwrap_or("General")
+                        }
+                    ),
+                    u8::from(
+                        !matches!(self.kind, K::ColumnPercent | K::BarPercent | K::AreaPercent)
+                            && self.value_axis_format.is_none()
+                    ),
                 );
             }
             4 => {
@@ -331,13 +424,15 @@ impl ChartBuilder {
                 );
                 let _ = write!(
                     x,
-                    "<c:valAx><c:axId val=\"222\"/><c:scaling>{log}<c:orientation val=\"minMax\"/></c:scaling><c:delete val=\"0\"/><c:axPos val=\"l\"/><c:majorGridlines/>{}<c:numFmt formatCode=\"General\" sourceLinked=\"1\"/><c:majorTickMark val=\"none\"/><c:minorTickMark val=\"none\"/><c:tickLblPos val=\"nextTo\"/><c:crossAx val=\"111\"/><c:crosses val=\"autoZero\"/><c:crossBetween val=\"midCat\"/></c:valAx>",
+                    "<c:valAx><c:axId val=\"222\"/><c:scaling>{log}<c:orientation val=\"minMax\"/></c:scaling><c:delete val=\"0\"/><c:axPos val=\"l\"/><c:majorGridlines/>{}<c:numFmt formatCode=\"{}\" sourceLinked=\"{}\"/><c:majorTickMark val=\"none\"/><c:minorTickMark val=\"none\"/><c:tickLblPos val=\"nextTo\"/><c:crossAx val=\"111\"/><c:crosses val=\"autoZero\"/><c:crossBetween val=\"midCat\"/></c:valAx>",
                     self.value_title
                         .as_deref()
                         .map_or(String::new(), |t| format!(
                             "<c:title>{}<c:overlay val=\"0\"/></c:title>",
                             rich(t, None, false)
-                        ))
+                        )),
+                    escape(self.value_axis_format.as_deref().unwrap_or("General")),
+                    u8::from(self.value_axis_format.is_none())
                 );
             }
             _ => {}
@@ -367,9 +462,43 @@ fn col_letter(n: usize) -> String {
 }
 
 fn num_ref(sheet: &str, col: &str, v: &[f64]) -> String {
+    num_ref_fmt(sheet, col, v, "General")
+}
+
+fn dlbls(l: &BuildLabels) -> String {
+    let mut s = String::from("<c:dLbls>");
+    if let Some(f) = &l.number_format {
+        let _ = write!(
+            s,
+            "<c:numFmt formatCode=\"{}\" sourceLinked=\"0\"/>",
+            escape(f)
+        );
+    }
+    if let Some(pt) = l.font_pt {
+        let _ = write!(
+            s,
+            "<c:txPr><a:bodyPr/><a:lstStyle/><a:p><a:pPr><a:defRPr sz=\"{}\"/></a:pPr><a:endParaRPr lang=\"en-US\"/></a:p></c:txPr>",
+            (pt * 100.0).round() as i64
+        );
+    }
+    if let Some(p) = &l.position {
+        let _ = write!(s, "<c:dLblPos val=\"{p}\"/>");
+    }
+    let _ = write!(
+        s,
+        "<c:showLegendKey val=\"0\"/><c:showVal val=\"{}\"/><c:showCatName val=\"{}\"/><c:showSerName val=\"0\"/><c:showPercent val=\"{}\"/><c:showBubbleSize val=\"0\"/></c:dLbls>",
+        u8::from(l.show_value),
+        u8::from(l.show_category),
+        u8::from(l.show_percent)
+    );
+    s
+}
+
+fn num_ref_fmt(sheet: &str, col: &str, v: &[f64], format: &str) -> String {
     let mut s = format!(
-        "<c:numRef><c:f>{sheet}!${col}$2:${col}${}</c:f><c:numCache><c:formatCode>General</c:formatCode><c:ptCount val=\"{}\"/>",
+        "<c:numRef><c:f>{sheet}!${col}$2:${col}${}</c:f><c:numCache><c:formatCode>{}</c:formatCode><c:ptCount val=\"{}\"/>",
         v.len() + 1,
+        escape(format),
         v.len()
     );
     for (i, n) in v.iter().enumerate() {

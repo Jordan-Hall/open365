@@ -21,11 +21,11 @@ mod layout;
 mod model;
 mod style;
 
-pub use build::{BuildKind, BuildSeries, ChartBuilder};
+pub use build::{BuildDates, BuildKind, BuildLabels, BuildSeries, ChartBuilder};
 pub use data::{AreaRef, CellLookup, CellSource, NoCells, WorkbookCells, parse_areas, resolve};
 pub use display::{
-    ApproxMeasure, DisplayItem, DisplayList, FontSpec, PathCmd, Rect, Rgba, Stroke, TextAnchor,
-    TextMeasure, TextRun,
+    ApproxMeasure, DateTick, DisplayItem, DisplayList, FontSpec, LabelBox, PathCmd, Rect, Rgba,
+    Stroke, TextAnchor, TextMeasure, TextRun,
 };
 pub use edit::ScaleEdit;
 pub use error::ChartError;

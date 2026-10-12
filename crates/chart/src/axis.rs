@@ -389,23 +389,117 @@ fn serial_of(y: i64, m: i64, d: i64) -> i64 {
     era * 146_097 + doe - 719_468 + 25569
 }
 
+impl DateScale {
+    /// Position of `serial` in whole base units (days, months or years since a fixed origin).
+    pub fn unit_index(&self, serial: f64) -> i64 {
+        unit_index(self.base_unit, serial.floor() as i64)
+    }
+
+    /// Number of base units, and so of slots, between the first and last serial inclusive.
+    pub fn slots(&self) -> usize {
+        (self.unit_index(self.max) - self.unit_index(self.min) + 1).max(1) as usize
+    }
+
+    /// Slot (0-based) of `serial`, clamped to the axis.
+    pub fn slot(&self, serial: f64) -> usize {
+        (self.unit_index(serial) - self.unit_index(self.min)).clamp(0, self.slots() as i64 - 1)
+            as usize
+    }
+
+    /// Serials of the major ticks: the first serial plus whole major units, up to the last.
+    pub fn ticks(&self) -> Vec<f64> {
+        tick_serials(
+            self.min as i64,
+            self.max as i64,
+            self.major_unit,
+            i64::from(self.major),
+        )
+        .into_iter()
+        .map(|s| s as f64)
+        .collect()
+    }
+}
+
+fn unit_index(unit: DateUnit, serial: i64) -> i64 {
+    match unit {
+        DateUnit::Days => serial,
+        DateUnit::Months => {
+            let (y, m, _) = civil(serial);
+            y * 12 + m - 1
+        }
+        DateUnit::Years => civil(serial).0,
+    }
+}
+
+/// Serial of day `d` of a month, clamped to the month's length.
+fn month_day(y: i64, m: i64, d: i64) -> i64 {
+    let first = serial_of(y, m, 1);
+    let next = if m == 12 {
+        serial_of(y + 1, 1, 1)
+    } else {
+        serial_of(y, m + 1, 1)
+    };
+    (first + d - 1).min(next - 1)
+}
+
+/// Serials of the ticks `first, first + step, ...` (days, months or years) up to `last`.
+fn tick_serials(first: i64, last: i64, unit: DateUnit, step: i64) -> Vec<i64> {
+    let (y0, m0, d0) = civil(first);
+    let step = step.max(1);
+    let mut out = Vec::new();
+    for k in 0..10_000 {
+        let s = match unit {
+            DateUnit::Days => first + k * step,
+            DateUnit::Months => {
+                let total = y0 * 12 + (m0 - 1) + k * step;
+                month_day(total.div_euclid(12), total.rem_euclid(12) + 1, d0)
+            }
+            DateUnit::Years => month_day(y0 + k * step, m0, d0),
+        };
+        if s > last {
+            break;
+        }
+        out.push(s);
+    }
+    out
+}
+
+/// Inside height (points, at 10 pt text) under which Excel has turned the category labels.
+const ROTATED_BELOW: f64 = 176.0;
+
 /// Automatic scale of a date category axis over the given serials.
 ///
-/// Observed in Excel (`chart-scale/date-*.json`, 450 axes):
+/// Observed in Excel (`chart-dates/*.json`, 300 axes, and `chart-scale/date-*.json`, 450):
 ///
-/// 1. The base unit comes from the smallest gap between distinct dates: under 28 days it is
-///    days, under 360 days months, otherwise years.
+/// 1. The base unit comes from the smallest gap between distinct dates (under 28 days: days,
+///    under 360 days: months, otherwise years) unless the axis forces one (`forced`).
 /// 2. The axis starts at the first date (days), or the first day of its month or year, and
 ///    ends at the last date, or the first day of its month or year; the minor unit is one
 ///    unit of the major unit's kind.
-/// 3. The major unit is the smallest count of base units that leaves at most `N` intervals,
-///    `N = floor((width - 24) / 14.4)` at 10 pt. With a days base, 1 and 2 days (budget
-///    `floor((width - 30) / 14)`) and, on plots 146 to 170 pt tall, 7 days (budget
-///    `floor(width / 21)`) come first; then whole months. The 7-day step and its height
-///    condition are a fit, not an explanation.
+/// 3. The major unit is the first candidate whose tick count fits. Candidates: a days base
+///    tries 1, 2, 7 and 14 days, then 1 or 2 calendar months (any count of months when the
+///    base is forced), then whole years; a months base tries whole months, then years; a
+///    years base whole years. A candidate with `t = floor(span / step) + 1` ticks fits
+///    when, with the labels turned (plot inside height under 176 pt), `t <= (width - 12) /
+///    14.2`, and 14 days only with words of at most 36 pt; with horizontal labels when
+///    `width / t - word >= 1` pt for days (`-3` for months and years), `word` being the
+///    widest word (a label wraps at its spaces) among the candidate's tick labels, from
+///    `label_word`. The turned state is read from the inside height, which Excel decides
+///    together with the unit: the outcome is bistable on identical data and width.
+///
+/// The 7 and 14 day steps and the turned threshold are fitted, not explained; the train
+/// corpora match 96 % and the hold-out ones 96 %.
 ///
 /// `width_pt` and `height_pt` are the plot's inside size; only 10 pt labels were measured.
-pub fn date_scale(dates: &[f64], width_pt: f64, height_pt: f64, font_pt: f64) -> Option<DateScale> {
+/// `label_word` returns the width of the widest word of the label of a serial.
+pub fn date_scale(
+    dates: &[f64],
+    width_pt: f64,
+    height_pt: f64,
+    font_pt: f64,
+    forced: Option<DateUnit>,
+    label_word: &dyn Fn(f64) -> f64,
+) -> Option<DateScale> {
     let mut d: Vec<i64> = dates
         .iter()
         .filter(|v| v.is_finite() && **v >= 1.0)
@@ -415,57 +509,85 @@ pub fn date_scale(dates: &[f64], width_pt: f64, height_pt: f64, font_pt: f64) ->
     d.dedup();
     let (&first, &last) = (d.first()?, d.last()?);
     let gap = d.windows(2).map(|w| w[1] - w[0]).min().unwrap_or(1);
-    let base = if gap < 28 {
+    let base = forced.unwrap_or(if gap < 28 {
         DateUnit::Days
     } else if gap < 360 {
         DateUnit::Months
     } else {
         DateUnit::Years
-    };
+    });
     let k = if font_pt > 0.0 { font_pt / 10.0 } else { 1.0 };
-    let (w, h) = (width_pt / k, height_pt / k);
+    let (w, rotated) = (width_pt / k, height_pt / k < ROTATED_BELOW);
     let (fy, fm, _) = civil(first);
     let (ly, lm, _) = civil(last);
     let months = (ly - fy) * 12 + lm - fm;
-    let (min, max, span) = match base {
-        DateUnit::Days => (first, last, last - first),
-        DateUnit::Months => (serial_of(fy, fm, 1), serial_of(ly, lm, 1), months),
-        DateUnit::Years => (serial_of(fy, 1, 1), serial_of(ly, 1, 1), ly - fy),
+    let years = ly - fy;
+    let (min, max) = match base {
+        DateUnit::Days => (first, last),
+        DateUnit::Months => (serial_of(fy, fm, 1), serial_of(ly, lm, 1)),
+        DateUnit::Years => (serial_of(fy, 1, 1), serial_of(ly, 1, 1)),
     };
-    let budget = ((w - 24.0) / 14.4).floor().max(1.0) as i64;
-    let fewest = |span: i64| {
-        (1..=span.max(1))
-            .find(|m| (span + m - 1) / m <= budget)
-            .unwrap_or(1) as u32
+    let span_in = |u: DateUnit| match u {
+        DateUnit::Days => last - first,
+        DateUnit::Months => months,
+        DateUnit::Years => years,
     };
-    let (major, major_unit) = if base == DateUnit::Days {
-        let day_budget = ((w - 30.0) / 14.0).floor().max(1.0) as i64;
-        let week_budget = (w / 21.0).floor().max(1.0) as i64;
-        let fits = |step: i64, n: i64| (span + step - 1) / step <= n;
-        if fits(1, day_budget) {
-            (1, DateUnit::Days)
-        } else if fits(2, day_budget) {
-            (2, DateUnit::Days)
-        } else if (146.0..170.0).contains(&h) && fits(7, week_budget) {
-            (7, DateUnit::Days)
-        } else {
-            let m = (1..=months.max(1))
-                .find(|m| (months + m - 1) / m <= budget)
-                .unwrap_or(1);
-            (m as u32, DateUnit::Months)
-        }
+    let month_steps = if base == DateUnit::Days && forced.is_none() {
+        2
     } else {
-        (fewest(span), base)
+        29
     };
+    let mut candidates: Vec<(i64, DateUnit)> = Vec::new();
+    if base == DateUnit::Days {
+        candidates.extend([1, 2, 7, 14].map(|s| (s, DateUnit::Days)));
+    }
+    if base != DateUnit::Years {
+        candidates.extend((1..=month_steps).map(|s| (s, DateUnit::Months)));
+    }
+    candidates.extend((1..=years.max(1)).map(|s| (s, DateUnit::Years)));
+    let widest = |u: DateUnit, step: i64| {
+        tick_serials(min, max, u, step)
+            .into_iter()
+            .map(|t| label_word(t as f64) / k)
+            .fold(0.0, f64::max)
+    };
+    let (major, major_unit) = candidates
+        .iter()
+        .copied()
+        .find(|&(step, u)| {
+            let ticks = (span_in(u) / step + 1) as f64;
+            if rotated {
+                ticks <= (w - 12.0) / 14.2
+                    && (u != DateUnit::Days || step != 14 || widest(u, step) <= 36.0)
+            } else {
+                // Beyond about one tick per point nothing can fit.
+                let each = w / ticks;
+                each >= 1.0
+                    && each - widest(u, step) >= if u == DateUnit::Days { 1.0 } else { -3.0 }
+            }
+        })
+        .unwrap_or((1, DateUnit::Years));
     Some(DateScale {
         min: min as f64,
         max: max as f64,
         base_unit: base,
-        major,
+        major: major as u32,
         major_unit,
         minor: 1,
         minor_unit: major_unit,
     })
+}
+
+impl DateUnit {
+    /// The unit named by `c:baseTimeUnit` / `c:majorTimeUnit`.
+    pub fn from_ooxml(name: &str) -> Option<Self> {
+        match name {
+            "days" => Some(Self::Days),
+            "months" => Some(Self::Months),
+            "years" => Some(Self::Years),
+            _ => None,
+        }
+    }
 }
 
 #[cfg(test)]

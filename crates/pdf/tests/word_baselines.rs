@@ -42,20 +42,18 @@ fn pdf_baselines_agree_with_word() {
             let with_glyphs = page
                 .header
                 .iter()
+                .chain(&page.footer)
                 .chain(&page.lines)
                 .chain(page.frames.iter().flat_map(|f| f.lines.iter()))
                 .chain(&page.notes)
-                .chain(&page.footer)
-                .filter(|l| l.runs.iter().any(|r| !r.glyphs.is_empty()));
+                .filter(|l| {
+                    l.runs.iter().any(|r| !r.glyphs.is_empty()) && !common::clipped_away(page, l)
+                });
             // A line can be several marked-content sequences (list label, hyperlinks).
-            let mut next = 0;
+            let mut rest = pages[pi].iter().flat_map(|l| l.glyphs.iter().cloned());
             for line in with_glyphs {
                 let want: usize = line.runs.iter().map(|r| r.glyphs.len()).sum();
-                let mut pdf_glyphs = Vec::new();
-                while pdf_glyphs.len() < want && next < pages[pi].len() {
-                    pdf_glyphs.extend(pages[pi][next].glyphs.iter().cloned());
-                    next += 1;
-                }
+                let pdf_glyphs: Vec<_> = rest.by_ref().take(want).collect();
                 // The first glyph of a run that is not a note mark sits on the line baseline.
                 let skip: usize = line
                     .runs

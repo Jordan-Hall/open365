@@ -9,6 +9,7 @@
 //! from a table measured in Excel's default font ([`glyph_units`]), so those parts match the oracle but are an
 //! emulation of what a real column would show.
 
+mod calendars;
 mod cellcode;
 mod date;
 mod decimal;

@@ -136,6 +136,19 @@ fn report() {
         if roles(&w) != roles(&o) && diffs.is_empty() {
             diffs.push("same counts, different order/nesting".to_owned());
         }
+        if roles(&w) == roles(&o) {
+            let mc = |s: &Structure| s.elems.iter().map(|e| e.mcids).collect::<Vec<_>>();
+            let (mw, mo) = (mc(&w), mc(&o));
+            let bad = mw.iter().zip(&mo).filter(|(a, b)| a != b).count();
+            if bad > 0 {
+                diffs.push(format!(
+                    "marked content per element differs in {bad}/{} elements (word {} ours {})",
+                    mw.len(),
+                    mw.iter().sum::<usize>(),
+                    mo.iter().sum::<usize>()
+                ));
+            }
+        }
         let (aw, ao) = (w.annots.len(), o.annots.len());
         if aw != ao {
             diffs.push(format!("annots word {aw} ours {ao}"));
@@ -362,10 +375,121 @@ fn element_trees_equal_words_for_the_matched_fixtures() {
         "probes/probe-lang",
         "comments",
         "layout-lists-multilevel",
+        // Footnotes that go on over a page or into the next column, floating shapes, the
+        // order of figures behind the text, cells with an empty clip rectangle, drop caps,
+        // text frames, merged cells and the text box probes.
+        "layout-fn-long",
+        "layout-cols-fn-unequal",
+        "layout-float-wrap-tight",
+        "layout-float-wrap-behind-front",
+        "layout-img-none",
+        "layout-trh-small",
+        "layout-trh-pad",
+        "layout-frame-dropcap",
+        "layout-frame-basic",
+        "layout-frame-bdr",
+        "layout-frame-gap",
+        "layout-frame-nobdr",
+        "layout-frame-page",
+        "table-merged-cells",
+        "probes/p-vmerge",
+        "probes/p-txbx-link2",
+        "probes/p-tabs2",
     ] {
         let (Some(w), Some(o)) = (word(name), ours(name, &fonts)) else {
             panic!("{name}: no reference or no layout");
         };
         assert_eq!(roles(&w), roles(&o), "{name}");
+    }
+}
+
+/// The decompressed content stream of every page of a PDF.
+fn page_streams(data: &[u8]) -> Vec<String> {
+    let s = common::scan::Scan::parse(data);
+    s.pages()
+        .iter()
+        .map(|p| {
+            s.key(p, "Contents").map_or_else(String::new, |c| {
+                String::from_utf8_lossy(&s.stream(&c)).into_owned()
+            })
+        })
+        .collect()
+}
+
+fn our_pdf(name: &str, fonts: &FontLibrary) -> Vec<u8> {
+    if let Some(probe) = name.strip_prefix("probes/") {
+        let bytes =
+            std::fs::read(root().join(format!("fixtures/reference/pdf/probes/{probe}.docx")))
+                .expect("probe");
+        let doc =
+            open365_docx::Document::open(&bytes, &open365_opc::Limits::default()).expect("open");
+        let layout =
+            open365_layout::layout_document(&doc, fonts, open365_layout::LayoutOptions::default());
+        return export_pdf(&doc, &layout, fonts, &PdfMetadata::default())
+            .expect("export")
+            .bytes;
+    }
+    let (doc, layout) =
+        layout_fixture(name, fonts).unwrap_or_else(|| layout_with_bundled_theme(name, fonts));
+    export_pdf(&doc, &layout, fonts, &PdfMetadata::default())
+        .expect("export")
+        .bytes
+}
+
+/// Word's blank (a space in a simple font) at each paragraph mark, line break, tab, list label
+/// and tab leader end, and its marked-content sequences (one per paragraph, not per line; the
+/// header and footer as pagination artifacts), page by page.
+#[test]
+fn blanks_and_marked_content_equal_words() {
+    let fonts = FontLibrary::bundled();
+    for name in [
+        "probes/p-tabs2",
+        "layout-lists-suff",
+        "layout-lists-multilevel",
+        "layout-lists-style",
+        "layout-cols-balance",
+        "layout-cols-footnote",
+        "layout-hf-basic",
+        "layout-fn-basic",
+        "layout-fn-long",
+        "layout-sect-empty",
+        "probes/p-rect",
+        "probes/p-txbx-link2",
+        "layout-frame-basic",
+        "layout-float-wrap-tight",
+        "layout-trh-small",
+        "layout-trh-pad",
+    ] {
+        let word_pdf = std::fs::read(root().join(format!("fixtures/reference/pdf/{name}.pdf")))
+            .expect("word pdf");
+        let (w, o) = (
+            page_streams(&word_pdf),
+            page_streams(&our_pdf(name, &fonts)),
+        );
+        assert_eq!(w.len(), o.len(), "{name}: pages");
+        for (i, (a, b)) in w.iter().zip(&o).enumerate() {
+            let count = |t: &str, pat: &str| t.matches(pat).count();
+            assert_eq!(
+                count(a, "[( )] TJ"),
+                count(b, "[( )] TJ"),
+                "{name} p{}: blanks",
+                i + 1
+            );
+            assert_eq!(
+                count(a, "MCID"),
+                count(b, "MCID"),
+                "{name} p{}: MCIDs",
+                i + 1
+            );
+            let squash = |t: &str| t.replace(' ', "");
+            for pat in ["/Subtype/Header", "/Subtype/Footer"] {
+                assert_eq!(
+                    count(&squash(a), pat),
+                    count(&squash(b), pat),
+                    "{name} p{}: {pat}",
+                    i + 1
+                );
+            }
+        }
     }
 }

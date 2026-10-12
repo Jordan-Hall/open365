@@ -14,7 +14,7 @@ use std::ops::Range;
 
 use open365_docx::{
     Block, BreakKind, Document, Inline, Numbering, Paragraph, RawXml, Run, RunContent, Styles,
-    TableChild,
+    TableChild, WrapType, XmlElement,
 };
 use open365_layout::ParaRole;
 use open365_opc::{Relationships, TargetMode};
@@ -101,6 +101,150 @@ pub struct ParaMeta {
     /// The marked content of the paragraph sits in `Span` elements under it (Word's `TOCI` with
     /// a page number link).
     pub spans: bool,
+    /// The font of the paragraph mark: Word draws the paragraph's blank in it, whatever the font
+    /// of the last run.
+    pub mark: Option<MarkFont>,
+    /// The paragraph ends a section (`w:sectPr` in its properties): Word draws no blank for
+    /// its mark.
+    pub sect: bool,
+    /// The list label is followed by a tab or a space (not `w:suff` `nothing`): Word draws a
+    /// blank after the label, in the first marked content of the text.
+    pub label_blank: bool,
+    /// The paragraph is in a text frame: Word writes its element after the body and sets each
+    /// line in a marked-content sequence of its own (`layout-frame-*`).
+    pub framed: bool,
+}
+
+/// The font a paragraph mark is set in.
+#[derive(Debug, Clone)]
+pub struct MarkFont {
+    pub family: String,
+    pub size: f64,
+    pub bold: bool,
+    pub italic: bool,
+}
+
+/// A DrawingML shape (`wps:wsp`) of a paragraph: what Word draws for a floating shape.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ShapeSpec {
+    /// `a:prstGeom/@prst`.
+    pub geometry: String,
+    /// Solid fill; `None` for no fill or a fill that is not a plain RGB colour.
+    pub fill: Option<[u8; 3]>,
+    /// Outline colour and width in points.
+    pub line: Option<([u8; 3], f64)>,
+    /// The shape is a text box (the layout reports it with the text boxes).
+    pub text_box: bool,
+}
+
+fn child<'a>(e: &'a XmlElement, local: &str) -> Option<&'a XmlElement> {
+    e.children.iter().find_map(|c| match c {
+        RawXml::Element(x) if x.head.local_name() == local => Some(x),
+        _ => None,
+    })
+}
+
+fn find_deep<'a>(e: &'a XmlElement, local: &str) -> Option<&'a XmlElement> {
+    for c in &e.children {
+        if let RawXml::Element(x) = c {
+            if x.head.local_name() == local {
+                return Some(x);
+            }
+            if let Some(f) = find_deep(x, local) {
+                return Some(f);
+            }
+        }
+    }
+    None
+}
+
+fn attr<'a>(e: &'a XmlElement, name: &str) -> Option<&'a str> {
+    e.head
+        .attrs
+        .iter()
+        .find(|a| a.local_name() == name)
+        .map(|a| a.value.as_str())
+}
+
+fn hex_color(v: &str) -> Option<[u8; 3]> {
+    if v.len() != 6 {
+        return None;
+    }
+    let n = u32::from_str_radix(v, 16).ok()?;
+    Some([(n >> 16) as u8, (n >> 8) as u8, n as u8])
+}
+
+fn solid(e: &XmlElement) -> Option<[u8; 3]> {
+    let fill = child(e, "solidFill")?;
+    attr(child(fill, "srgbClr")?, "val").and_then(hex_color)
+}
+
+/// The shape of a `w:drawing` (or `mc:AlternateContent`) element, if it holds a `wps:wsp`.
+fn shape_of(e: &XmlElement) -> Option<ShapeSpec> {
+    let wsp = find_deep(e, "wsp")?;
+    let sp = child(wsp, "spPr")?;
+    let line = child(sp, "ln");
+    let line_fill = line.and_then(|l| {
+        let c = solid(l)?;
+        let w = attr(l, "w")
+            .and_then(|w| w.parse::<f64>().ok())
+            .unwrap_or(9525.0);
+        Some((c, w / 12700.0))
+    });
+    Some(ShapeSpec {
+        geometry: child(sp, "prstGeom")
+            .and_then(|g| attr(g, "prst"))
+            .unwrap_or("rect")
+            .to_owned(),
+        fill: solid(sp),
+        line: line_fill,
+        text_box: find_deep(wsp, "txbx").is_some(),
+    })
+}
+
+/// The shapes in a paragraph's runs, in order (pictures are not shapes).
+fn shapes_of(content: &[Inline], out: &mut Vec<ShapeSpec>) {
+    for inline in content {
+        match inline {
+            Inline::Run(r) => {
+                for c in &r.content {
+                    if let RunContent::Raw(RawXml::Element(e)) = c
+                        && (e.head.is_w("drawing") || e.head.local_name() == "AlternateContent")
+                        && let Some(spec) = shape_of(e)
+                    {
+                        out.push(spec);
+                    }
+                }
+            }
+            Inline::Group(g) => shapes_of(&g.content, out),
+            Inline::Raw(_) => {}
+        }
+    }
+}
+
+/// The wrapping of the anchored drawings in a paragraph's runs, in order.
+fn anchor_wraps_of(content: &[Inline], out: &mut Vec<WrapType>) {
+    for inline in content {
+        match inline {
+            Inline::Run(r) => {
+                for c in &r.content {
+                    let RunContent::Raw(RawXml::Element(e)) = c else {
+                        continue;
+                    };
+                    let drawing = if e.head.is_w("drawing") {
+                        open365_docx::Drawing::from_element(e)
+                    } else {
+                        open365_docx::Drawing::from_alternate_content(e)
+                    };
+                    if let Some(d) = drawing.filter(|d| d.anchored) {
+                        out.push(d.wrap);
+                    }
+                }
+            }
+            Inline::Group(g) => anchor_wraps_of(&g.content, out),
+            Inline::Raw(_) => {}
+        }
+    }
 }
 
 /// Where a hyperlink goes.
@@ -154,6 +298,9 @@ pub struct ParaText {
     /// The paragraph holds a comment reference: Word puts the paragraph mark's blank in a
     /// `CommentAnchor` element.
     pub comment_ref: bool,
+    /// The font of the run each tab character stands in, in order of appearance (the blank
+    /// Word draws for a tab has that run's font and size, whatever text is next to it).
+    pub tabs: Vec<MarkFont>,
 }
 
 #[derive(Debug)]
@@ -180,6 +327,10 @@ pub struct DocStructure {
     pub section_breaks: std::collections::HashSet<u32>,
     /// (story code, paragraph index in the notes story) -> index of the note it belongs to.
     pub note_of: HashMap<(u8, usize), usize>,
+    /// The shapes of each main-story paragraph, in order.
+    pub shapes: HashMap<usize, Vec<ShapeSpec>>,
+    /// The wrapping of the anchored drawings of each main-story paragraph, in order.
+    pub wraps: HashMap<usize, Vec<WrapType>>,
 }
 
 /// Reads hyperlinks, languages and text of paragraphs.
@@ -194,6 +345,7 @@ struct TextReader<'a> {
     fields: Vec<OpenField>,
     /// Depth of `w:hyperlink` groups being read.
     in_hyperlink: usize,
+    styles: Option<&'a Styles>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -338,7 +490,18 @@ impl TextReader<'_> {
                     }
                 }
                 RunContent::Text { text, .. } => out.text.push_str(text),
-                RunContent::Tab => out.text.push('\t'),
+                RunContent::Tab => {
+                    out.text.push('\t');
+                    if let Some(s) = self.styles {
+                        let er = s.effective_run_props(para, run);
+                        out.tabs.push(MarkFont {
+                            family: er.font,
+                            size: f64::from(er.size_half_points) / 2.0,
+                            bold: er.bold,
+                            italic: er.italic,
+                        });
+                    }
+                }
                 RunContent::Break(b) => out.text.push(match b.kind() {
                     BreakKind::TextWrapping => '\u{b}',
                     BreakKind::Page => '\u{c}',
@@ -459,6 +622,10 @@ struct Walker<'a> {
     boxes: Vec<(usize, std::sync::Arc<open365_docx::TextBox>)>,
     box_elems: Vec<u32>,
     section_breaks: std::collections::HashSet<u32>,
+    shapes: HashMap<usize, Vec<ShapeSpec>>,
+    wraps: HashMap<usize, Vec<WrapType>>,
+    /// Elements of paragraphs in text frames, written after the body.
+    frame_tail: Vec<Node>,
 }
 
 /// The paragraph ends a section (`w:sectPr` in its properties).
@@ -467,6 +634,26 @@ fn has_sect_pr(para: &Paragraph) -> bool {
         p.children
             .iter()
             .any(|c| matches!(c, RawXml::Element(e) if e.head.is_w("sectPr")))
+    })
+}
+
+/// The paragraph is a drop cap (`w:framePr w:dropCap`).
+fn has_drop_cap(para: &Paragraph) -> bool {
+    para.props.as_ref().is_some_and(|p| {
+        p.children.iter().any(|c| {
+            matches!(c, RawXml::Element(e) if e.head.is_w("framePr")
+                && e.head.attr_w("dropCap").is_some_and(|v| v != "none"))
+        })
+    })
+}
+
+/// The paragraph is in a text frame (`w:framePr`) that is not a drop cap.
+fn has_frame(para: &Paragraph) -> bool {
+    para.props.as_ref().is_some_and(|p| {
+        p.children.iter().any(|c| {
+            matches!(c, RawXml::Element(e) if e.head.is_w("framePr")
+                && e.head.attr_w("dropCap").is_none_or(|v| v == "none"))
+        })
     })
 }
 
@@ -563,6 +750,19 @@ impl Walker<'_> {
         (at.num_id, at.ilvl, list_numbering(fmt))
     }
 
+    /// The paragraph's list level puts a tab or a space after the label.
+    fn label_suffix_blank(&self, p: &Paragraph) -> bool {
+        let Some(n) = self.numbering else {
+            return false;
+        };
+        let Some(at) = n.paragraph_numbering(self.styles, p) else {
+            return false;
+        };
+        n.resolve(self.styles, at.num_id)
+            .and_then(|r| r.level(at.ilvl))
+            .is_some_and(|l| l.suffix != open365_docx::LevelSuffix::Nothing)
+    }
+
     fn node(&mut self, kind: Kind, kids: Vec<Node>) -> Node {
         Node {
             kind,
@@ -593,6 +793,16 @@ impl Walker<'_> {
                         self.box_elems.push(node.id);
                         box_nodes.push(node);
                         self.boxes.push((index, b));
+                    }
+                    let mut shapes = Vec::new();
+                    shapes_of(&p.content, &mut shapes);
+                    if !shapes.is_empty() {
+                        self.shapes.insert(index, shapes);
+                    }
+                    let mut wraps = Vec::new();
+                    anchor_wraps_of(&p.content, &mut wraps);
+                    if !wraps.is_empty() {
+                        self.wraps.insert(index, wraps);
                     }
                     for name in self.reader.bookmarks.drain(..) {
                         self.bookmarks.entry(name).or_insert(index);
@@ -642,6 +852,18 @@ impl Walker<'_> {
                             .is_some_and(|s| s.paragraph_flow_props(p).contextual_spacing),
                         style: pstyle(p).map(str::to_owned),
                         first: out.is_empty(),
+                        sect: has_sect_pr(p),
+                        label_blank: self.label_suffix_blank(p),
+                        framed: self.depth == 0 && has_frame(p),
+                        mark: self.styles.map(|s| {
+                            let m = s.paragraph_mark_props(p).run;
+                            MarkFont {
+                                family: m.font,
+                                size: f64::from(m.size_half_points) / 2.0,
+                                bold: m.bold,
+                                italic: m.italic,
+                            }
+                        }),
                     });
                     if let Some(lbl) = lbl {
                         let (num_id, ilvl, fmt) = self.list_info(p);
@@ -689,6 +911,13 @@ impl Walker<'_> {
                                 out.push(t);
                             }
                         }
+                    } else if kind == Kind::P && self.depth == 0 && has_frame(p) {
+                        self.frame_tail.push(leaf);
+                    } else if kind == Kind::P && has_drop_cap(p) {
+                        // Word wraps the paragraph of a drop cap in a `P` of its own
+                        // (`layout-frame-dropcap`).
+                        let outer = self.node(Kind::P, vec![leaf]);
+                        out.push(outer);
                     } else {
                         out.push(leaf);
                     }
@@ -757,6 +986,9 @@ impl Walker<'_> {
                 .flatten()
                 .map(|_| format!("t{no}r{r}c0"));
             let mut cell_nodes = Vec::new();
+            // The cells a vertical merge covers: Word writes them as empty `TD` elements in
+            // front of the other cells of the row (`p-vmerge`, `table-merged-cells`).
+            let mut covered = Vec::new();
             for c in &row.cells {
                 self.depth += 1;
                 self.vcont += usize::from(c.row_span == 0);
@@ -765,6 +997,7 @@ impl Walker<'_> {
                 self.depth -= 1;
                 // A cell covered by a vertical merge: its origin carries the RowSpan.
                 if c.row_span == 0 {
+                    covered.push(self.node(Kind::Td, Vec::new()));
                     continue;
                 }
                 let is_row_head = !in_head && look.first_column && c.col == 0;
@@ -811,7 +1044,8 @@ impl Walker<'_> {
                 }
                 cell_nodes.push(node);
             }
-            let tr = self.node(Kind::Tr, cell_nodes);
+            covered.extend(cell_nodes);
+            let tr = self.node(Kind::Tr, covered);
             if in_head {
                 head_nodes.push(tr);
             } else {
@@ -886,6 +1120,7 @@ pub fn analyse(
             bookmarks: Vec::new(),
             fields: Vec::new(),
             in_hyperlink: 0,
+            styles: doc.styles(),
         },
         next_para: 0,
         paras: Vec::new(),
@@ -901,8 +1136,16 @@ pub fn analyse(
         boxes: Vec::new(),
         box_elems: Vec::new(),
         section_breaks: std::collections::HashSet::new(),
+        shapes: HashMap::new(),
+        wraps: HashMap::new(),
+        frame_tail: Vec::new(),
     };
-    let kids = walker.blocks(&doc.body().blocks);
+    let mut kids = walker.blocks(&doc.body().blocks);
+    // Word hangs the paragraphs of text frames under the last paragraph of the body.
+    match kids.last_mut() {
+        Some(last) if last.kind == Kind::P => last.kids.append(&mut walker.frame_tail),
+        _ => kids.append(&mut walker.frame_tail),
+    }
     let root = walker.node(Kind::Document, kids);
     DocStructure {
         root,
@@ -916,6 +1159,8 @@ pub fn analyse(
         box_elems: walker.box_elems,
         section_breaks: walker.section_breaks,
         note_of: HashMap::new(),
+        shapes: walker.shapes,
+        wraps: walker.wraps,
     }
 }
 
@@ -963,8 +1208,56 @@ pub fn story_texts(
         bookmarks: Vec::new(),
         fields: Vec::new(),
         in_hyperlink: 0,
+        styles: None,
     };
     let mut out = Vec::new();
     walk(blocks, &mut reader, &mut out);
+    out
+}
+
+/// The spacing facts of the paragraphs of another story (a text box), in the order the layout
+/// numbers them, for the link rectangles. Nothing here owns marked content.
+pub fn story_spacing(styles: Option<&Styles>, blocks: &[Block]) -> Vec<ParaMeta> {
+    fn walk(styles: Option<&Styles>, blocks: &[Block], out: &mut Vec<ParaMeta>) {
+        for (at, block) in blocks.iter().enumerate() {
+            match block {
+                Block::Paragraph(p) => out.push(ParaMeta {
+                    node: 0,
+                    label: None,
+                    tag: String::new(),
+                    heading: None,
+                    after: styles
+                        .map_or(0.0, |s| f64::from(s.effective_para_props(p).space_after_pt)),
+                    before: styles.map_or(0.0, |s| {
+                        f64::from(s.effective_para_props(p).space_before_pt)
+                    }),
+                    contextual: styles
+                        .is_some_and(|s| s.paragraph_flow_props(p).contextual_spacing),
+                    style: pstyle(p).map(str::to_owned),
+                    first: at == 0,
+                    spans: false,
+                    mark: None,
+                    sect: false,
+                    label_blank: false,
+                    framed: false,
+                }),
+                Block::Table(t) => {
+                    for row in t.view().rows {
+                        for c in row.cells {
+                            walk(styles, &c.cell.blocks, out);
+                        }
+                    }
+                }
+                Block::Sdt(sdt) => {
+                    for content in sdt.content() {
+                        walk(styles, &content.blocks, out);
+                    }
+                }
+                Block::Raw(_) => {}
+            }
+        }
+    }
+    let mut out = Vec::new();
+    walk(styles, blocks, &mut out);
     out
 }

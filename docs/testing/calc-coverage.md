@@ -261,6 +261,23 @@ Per basis the old residue was concentrated in `ODDLPRICE`/`ODDLYIELD` bases 2 an
 * **FORECAST.ETS* arity** re-measured on Excel (`_xlfn.` names, own instance): `FORECAST.ETS` 3 to 6, `FORECAST.ETS.CONFINT` 3 to 7, `FORECAST.ETS.SEASONALITY` 2 to 4, `FORECAST.ETS.STAT` 3 to 6; identical to `parser_arity.rs`, no change.
 * Not started (turn budget): ETS parameter search (Nelder-Mead / hill-climb from (0.1, 0.099)) with a hold-out set, seasonal initialisation and period detection, Hijri calendar, and a new COMBIN hypothesis.
 
+## Round 19 (ODDFPRICE/ODDFYIELD day counts, Hijri calendars)
+
+Measured with the calc oracle on about 20,000 generated odd-first-period bonds (rate 0 isolates the discount exponent, yield 0 isolates the net first coupon; bases 0 to 4):
+
+* **Discount exponent** `N - 1 + tau`: `tau` counts quasi-coupon periods back from the first coupon date with the end-of-month rule. One odd period (`NC = 1`): `tau = days(settlement, first) / E`. Two or more
+  periods on bases 0 and 4: `(i - 1) + (E - days(previous quasi date, settlement)) / E`; bases 1 to 3: days to the next quasi date over `E`. **Quirk:** when the first coupon date is a month end, the odd period spans
+  two or more quasi periods, the settlement is not a month end and is not in the month of the quasi date before the first one, Excel's exponent is one whole period larger (2,348 of 2,348 on each basis).
+  Bases 2 and 3 count the odd period as two quasi periods when `days(issue, first)` exceeds the nominal period.
+* **Net first coupon** (`c1 - accrued`): the quasi dates step back from the previous date with the day carried (a 29th that fell on 28 February stays the 28th; no end-of-month rule), full periods inside the
+  odd period count 1, a period that starts exactly on the issue date counts its day count. All four bases match (4,200 of 4,200).
+* **`#NUM!`** when `days(issue, first)` equals the normal period length exactly (single-day scan of the issue date on bases 0 and 2).
+* **ODDFYIELD** with price 0 is `#NUM!`.
+* Result: 85 differences of more than 1e-9 relative on `oddfprice` (and 1,033 on `oddfyield`) are gone; what remains is last-digit noise (sum order tried: descending coupons and a different subtraction order were worse).
+* **COMBIN, still not identified:** 2,622 new Excel values (n up to 1000). Errors repeat along fixed `n - k` (the error of `COMBIN(n, k)` equals that of `COMBIN(n - 1, k - 1)`), so the value is a running
+  product over `k`, but `r * (n-k+i) / i`, `r / i * (n-k+i)`, reciprocal forms and Excel's own previous value as the start all stay at 52 to 60 % exact.
+* **Hijri:** `numfmt/hijri.rs`, see `calc-numfmt.md`.
+
 ## Missing by category
 
 **Math and trigonometry** (0): none

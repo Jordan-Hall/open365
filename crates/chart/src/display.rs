@@ -133,6 +133,26 @@ pub enum DisplayItem {
     Text(TextRun),
 }
 
+/// A data label as drawn: its text and the box Excel reports for it (`DataLabel.Left` and
+/// friends: the text plus a 3 pt margin on every side).
+#[derive(Debug, Clone, PartialEq)]
+pub struct LabelBox {
+    /// Series, counted across all chart groups.
+    pub series: usize,
+    pub point: usize,
+    pub text: String,
+    pub rect: Rect,
+}
+
+/// A major tick label of a date axis.
+#[derive(Debug, Clone, PartialEq)]
+pub struct DateTick {
+    pub serial: f64,
+    pub text: String,
+    /// Centre of the label along the axis, in chart-area points.
+    pub x: f64,
+}
+
 /// A rendered chart.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct DisplayList {
@@ -154,6 +174,17 @@ pub struct DisplayList {
     /// The automatic scale of a date category axis (`c:dateAx`) over the first series'
     /// numeric categories; the points are still laid out as evenly spaced categories.
     pub date_scale: Option<crate::axis::DateScale>,
+    /// Data labels in drawing order.
+    pub data_labels: Vec<LabelBox>,
+    /// Texts of the value-axis major tick labels, from the minimum up.
+    pub value_tick_texts: Vec<String>,
+    /// Texts of the X-axis major tick labels of a scatter or bubble chart.
+    pub x_tick_texts: Vec<String>,
+    /// Tick labels of a date axis.
+    pub date_ticks: Vec<DateTick>,
+    /// Centre of every category of the first series along the category axis (columns, lines,
+    /// areas), in chart-area points.
+    pub category_x: Vec<f64>,
 }
 
 /// Measures text. Supply real font metrics for exact layout; [`ApproxMeasure`] needs none.

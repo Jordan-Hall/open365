@@ -6,7 +6,7 @@
 //! `oddfprice`, `oddfyield`, `oddlprice` and `oddlyield`.
 
 use super::finbond::{
-    clamped_date, coupon_date, date_arg, days_between, frequency, num, opt_basis,
+    clamped_date, coupon_date, date_arg, days_between, frequency, num, opt_basis, ymd,
 };
 use super::{Res, arity, number};
 use crate::eval::{Arg, EvalContext};
@@ -59,6 +59,19 @@ fn backwards(first: i64, issue: i64, step: i64, d1904: bool) -> Res<Vec<i64>> {
     Ok(v)
 }
 
+/// Like `backwards`, but every date steps back from the previous one, so a clamped day stays clamped.
+fn backwards_cascade(first: i64, issue: i64, step: i64, d1904: bool) -> Res<Vec<i64>> {
+    let mut v = vec![first];
+    while *v.last().unwrap_or(&first) > issue {
+        let prev = *v.last().unwrap_or(&first);
+        v.push(clamped_date(prev, 1, step, d1904)?);
+        if v.len() > 100_000 {
+            return Err(ErrorKind::Num);
+        }
+    }
+    Ok(v)
+}
+
 /// Dates from the last interest date forwards to the first date on or after `maturity`.
 fn forwards(last: i64, maturity: i64, step: i64, d1904: bool) -> Res<Vec<i64>> {
     // follow the schedule that ends at the last interest date: step forward from it
@@ -72,6 +85,31 @@ fn forwards(last: i64, maturity: i64, step: i64, d1904: bool) -> Res<Vec<i64>> {
         }
     }
     Ok(v)
+}
+
+fn is_month_end(serial: i64, d1904: bool) -> Res<bool> {
+    let (y, m, d) = ymd(serial, d1904)?;
+    let leap = (y % 4 == 0 && y % 100 != 0) || y % 400 == 0;
+    let len = match m {
+        2 if leap => 29,
+        2 => 28,
+        4 | 6 | 9 | 11 => 30,
+        _ => 31,
+    };
+    Ok(d == len)
+}
+
+/// Excel's discount exponent counts one quasi-coupon period too many when the first coupon date is a month end,
+/// the odd period spans two or more quasi periods, and the settlement is not a month end and not in the month of
+/// a quasi-coupon date before the first one (measured on bases 0 to 4, 2,348 exponents per basis).
+fn extra_period(a: &Args, quasi_count: usize, step: i64, d1904: bool) -> Res<bool> {
+    if quasi_count < 3 || !is_month_end(a.first, d1904)? || is_month_end(a.settlement, d1904)? {
+        return Ok(false);
+    }
+    let (fy, fm, _) = ymd(a.first, d1904)?;
+    let (sy, sm, _) = ymd(a.settlement, d1904)?;
+    let months = (fy - sy) * 12 + fm - sm;
+    Ok(!(months > 0 && months % step == 0))
 }
 
 struct First {
@@ -181,18 +219,32 @@ fn first_model(a: &Args, d1904: bool) -> Res<First> {
     let f = a.freq as f64;
     let c = 100.0 * a.rate / f;
     let q = backwards(a.first, a.other, step, d1904)?;
+    // The accrual of the odd period steps back with the day carried from the previous date (a 29th that fell on
+    // 28 February stays the 28th): measured on bases 0 to 4, 4,200 of 4,200 net first coupons; the discount exponent
+    // uses the end-of-month rule instead.
+    let qn = backwards_cascade(a.first, a.other, step, d1904)?;
+    // An odd period of exactly one normal period is `#NUM!` (measured by moving the issue date one day at a time:
+    // `#NUM!` for that single day only, on every basis).
+    if qn.len() > 1 && dc.days(a.other, a.first)? == dc.normal(qn[1], qn[0]) {
+        return Err(ErrorKind::Num);
+    }
     // period i (1-based) is [q[i], q[i-1]]
     let mut c1 = 0.0;
     let mut accrued = 0.0;
     let mut tau = 0.0;
-    let mut found = false;
-    for i in 1..q.len() {
-        let (lo, hi) = (q[i], q[i - 1]);
+    // a single odd period steps back with the end-of-month rule (measured on basis 1, which has the actual length)
+    let net_list = if qn.len() == 2 && q.len() == 2 {
+        &q
+    } else {
+        &qn
+    };
+    for i in 1..net_list.len() {
+        let (lo, hi) = (net_list[i], net_list[i - 1]);
         let nl = dc.normal(lo, hi);
         let start = lo.max(a.other);
         // a quasi-coupon period inside the odd period counts as exactly 1 (measured on bases 2 and 3, where the
         // actual length differs from the nominal one); only the period that contains the issue date is partial
-        c1 += if lo >= a.other {
+        c1 += if lo > a.other {
             1.0
         } else {
             dc.days(start, hi)? / nl
@@ -200,9 +252,20 @@ fn first_model(a: &Args, d1904: bool) -> Res<First> {
         if a.settlement > start {
             accrued += dc.days(start, a.settlement.min(hi))? / nl;
         }
-        if !found && lo <= a.settlement && a.settlement < hi {
-            found = true;
-            tau = (i - 1) as f64 + dc.days(a.settlement, hi)? / nl;
+    }
+    for i in 1..q.len() {
+        let (lo, hi) = (q[i], q[i - 1]);
+        if lo <= a.settlement && a.settlement < hi {
+            let nl = dc.normal(lo, hi);
+            // basis 0 with an odd period of two or more quasi periods: the rest of the period is its length minus the days since the previous quasi-coupon date
+            // (measured: 2,063 of 2,116 exponents; days to the next date differ on Feb and 31st corner cases)
+            tau = (i - 1) as f64
+                + if matches!(a.basis, 0 | 4) && qn.len() > 2 {
+                    (nl - dc.days(lo, a.settlement)?) / nl
+                } else {
+                    dc.days(a.settlement, hi)? / nl
+                };
+            break;
         }
     }
     c1 *= c;
@@ -224,6 +287,13 @@ fn first_model(a: &Args, d1904: bool) -> Res<First> {
         return Err(ErrorKind::Num);
     }
     let n = k as f64;
+    // bases 2 and 3 have a fixed normal period, so an issue date more than that before the first coupon already
+    // counts as two quasi periods even when only one fits between the dates
+    let spans_two = qn.len() > 2
+        || (matches!(a.basis, 2 | 3) && dc.days(a.other, a.first)? > dc.normal(qn[1], qn[0]));
+    if extra_period(a, if spans_two { 3 } else { 2 }, step, d1904)? {
+        tau += 1.0;
+    }
     Ok(First {
         redemption: a.redemption,
         c,
@@ -243,6 +313,10 @@ pub(super) fn oddfprice(ctx: &EvalContext<'_>, args: &[Arg]) -> Res<Value> {
 
 pub(super) fn oddfyield(ctx: &EvalContext<'_>, args: &[Arg]) -> Res<Value> {
     let a = first_args(ctx, args)?;
+    // a price of 0 has no yield (measured: `#NUM!`)
+    if a.x <= 0.0 {
+        return Err(ErrorKind::Num);
+    }
     let m = first_model(&a, ctx.date1904)?;
     // price falls as the yield rises: bracket and bisect, then polish with secant steps
     let f = a.freq as f64;

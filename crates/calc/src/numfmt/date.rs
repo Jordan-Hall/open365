@@ -1,6 +1,7 @@
 //! Date and time sections.
 
 use super::Out;
+use super::calendars;
 use super::hijri;
 use super::parse::{Section, Tok};
 use crate::fmtlocale::FormatLocale;
@@ -22,6 +23,18 @@ pub(super) fn render_date(
     let names_lcid = match (sec.calendar, sec.thai) {
         (7, _) | (_, true) => Some(0x041E),
         (2, _) => Some(0x0409),
+        (9, _) => Some(0x040C),
+        // Japanese and Korean (Tangun) calendars use English names unless the tag is Japanese or Korean
+        (3, _) => Some(if sec.lcid.is_some_and(|l| l & 0xFFFF == 0x411) {
+            0x0411
+        } else {
+            0x0409
+        }),
+        (5, _) => Some(if sec.lcid.is_some_and(|l| l & 0xFFFF == 0x412) {
+            0x0412
+        } else {
+            0x0409
+        }),
         _ => sec.lcid,
     };
     let by_lcid = names_lcid.and_then(FormatLocale::for_lcid);
@@ -80,7 +93,15 @@ pub(super) fn render_date(
         return false;
     }
     let hijri = sec.calendar == 6 || sec.calendar == 23;
-    let ymd = if calendar && hijri {
+    let japanese_tag = sec.lcid.is_some_and(|l| l & 0xFFFF == 0x411);
+    let other_cal = matches!(sec.calendar, 8 | 16 | 22);
+    let named_cal = other_cal || matches!(sec.calendar, 4 | 10 | 20);
+    let ymd = if calendar && other_cal {
+        match calendars::convert(sec.calendar, days as i64, date1904) {
+            Some(x) => x,
+            None => return false,
+        }
+    } else if calendar && hijri {
         match hijri::from_serial(days as i64, date1904, sec.calendar == 23) {
             Some(x) => x,
             None => return false,
@@ -133,8 +154,8 @@ pub(super) fn render_date(
         } else {
             weekday
         };
-        match hijri::weekday(hijri_names, weekday) {
-            Some(n) => n.to_string(),
+        match hijri::weekday(hijri_names, weekday, abbr) {
+            Some(n) => n,
             None if abbr => loc.day_abbr[weekday].clone(),
             None => loc.day_full[weekday].clone(),
         }
@@ -144,11 +165,16 @@ pub(super) fn render_date(
             Tok::Lit(s) => out.push_lit(s),
             Tok::Pad(c) => out.pad(*c),
             Tok::Fill(c) => out.fill(*c),
+            Tok::Year(_) if sec.calendar == 4 => out.push(&format!("{:04}", ymd.0)),
+            Tok::Year(_) if sec.calendar == 3 => {
+                // the Japanese calendar shows the year of the era, two digits at least, for every year token
+                out.push(&format!("{:02}", japanese_era(ymd).2));
+            }
             Tok::Year(n) => {
-                let y = if sec.calendar == 7 {
-                    ymd.0 + 543
-                } else {
-                    ymd.0
+                let y = match sec.calendar {
+                    7 => ymd.0 + 543,
+                    5 => ymd.0 + 2333,
+                    _ => ymd.0,
                 };
                 if *n <= 2 {
                     out.push(&format!("{:02}", y.rem_euclid(100)));
@@ -158,6 +184,17 @@ pub(super) fn render_date(
             }
             Tok::Month(n) => {
                 let m = (ymd.1.clamp(1, 12) - 1) as usize;
+                if named_cal
+                    && *n >= 3
+                    && let Some(name) = calendars::month_name(sec.calendar, sec.lcid, ymd.0, ymd.1)
+                {
+                    if *n == 5 && sec.calendar != 8 {
+                        out.push_lit(&name.chars().take(1).collect::<String>());
+                    } else {
+                        out.push_lit(&name);
+                    }
+                    continue;
+                }
                 if hijri && *n >= 3 {
                     let name = if *n == 3 {
                         Some(hijri::arabic_month(m, false))
@@ -182,6 +219,16 @@ pub(super) fn render_date(
                     3 => out.push_lit(&loc.month_abbr[m]),
                     5 => out.push_lit(&loc.month_full[m].chars().take(1).collect::<String>()),
                     _ => out.push_lit(&loc.month_full[m]),
+                }
+            }
+            Tok::Day(n) if named_cal && *n >= 3 => {
+                match calendars::weekday_name(sec.calendar, sec.lcid, weekday, *n == 3) {
+                    Some(name) => out.push_lit(&name),
+                    None => out.push_lit(if *n == 3 {
+                        &loc.day_abbr[weekday]
+                    } else {
+                        &loc.day_full[weekday]
+                    }),
                 }
             }
             Tok::Day(n) if hijri && *n >= 3 => out.push_lit(&weekday_name(*n == 3)),
@@ -251,7 +298,10 @@ pub(super) fn render_date(
                     out.push(&format!("{y:04}"));
                 }
             }
-            Tok::Era(n) if sec.lcid.is_some_and(|l| l & 0xFFFF == 0x411) => {
+            Tok::Era(n)
+                if sec.calendar == 3
+                    || (japanese_tag && !matches!(sec.calendar, 4 | 5 | 9 | 10 | 20)) =>
+            {
                 let (kanji, initial, _) = japanese_era(ymd);
                 match n {
                     1 => out.push_lit(initial),
@@ -260,7 +310,9 @@ pub(super) fn render_date(
                 }
             }
             Tok::EraYear(n) => {
-                if sec.lcid.is_some_and(|l| l & 0xFFFF == 0x411) {
+                if sec.calendar == 3
+                    || (japanese_tag && !matches!(sec.calendar, 4 | 5 | 9 | 10 | 20))
+                {
                     let (_, _, year) = japanese_era(ymd);
                     if *n >= 2 {
                         out.push(&format!("{year:02}"));

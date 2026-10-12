@@ -19,13 +19,14 @@ fn g_is_mark(line: &Line, g: &open365_layout::PlacedGlyph) -> bool {
 }
 
 fn lines_with_glyphs(page: &open365_layout::Page) -> Vec<&Line> {
+    // Word writes the header and footer artifacts first.
     page.header
         .iter()
+        .chain(&page.footer)
         .chain(&page.lines)
         .chain(page.frames.iter().flat_map(|f| f.lines.iter()))
         .chain(&page.notes)
-        .chain(&page.footer)
-        .filter(|l| l.runs.iter().any(|r| !r.glyphs.is_empty()))
+        .filter(|l| l.runs.iter().any(|r| !r.glyphs.is_empty()) && !common::clipped_away(page, l))
         .collect()
 }
 
@@ -59,18 +60,16 @@ fn glyph_positions_and_text_round_trip() {
             // The page height Word's grid gives (the MediaBox), not the section's.
             let media_h = reader.pages()[pi].1.dict()["MediaBox"].arr()[3].num();
             // A line can be several marked-content sequences (list label, hyperlinks).
-            let mut next = 0;
+            // One marked-content sequence holds the lines of a paragraph: read the glyphs in
+            // order and hand each line its share.
+            let mut rest = got.iter().flat_map(|l| l.glyphs.iter().cloned());
             for line in &want {
                 let mut flat: Vec<_> = line.runs.iter().flat_map(|r| r.glyphs.iter()).collect();
                 // A line with tab leaders is written in x order (as Word's is).
                 if flat.iter().any(|g| line.leader_char(g).is_some()) {
                     flat.sort_by(|a, b| a.x.total_cmp(&b.x));
                 }
-                let mut pdf_glyphs = Vec::new();
-                while pdf_glyphs.len() < flat.len() && next < got.len() {
-                    pdf_glyphs.extend(got[next].glyphs.iter().cloned());
-                    next += 1;
-                }
+                let pdf_glyphs: Vec<_> = rest.by_ref().take(flat.len()).collect();
                 assert_eq!(flat.len(), pdf_glyphs.len(), "{name}: glyph count");
                 let mut text = String::new();
                 for (g, p) in flat.iter().zip(&pdf_glyphs) {

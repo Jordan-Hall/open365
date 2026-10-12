@@ -28,7 +28,7 @@ use open365_layout::{
     Page, ParaRole, PlacedGlyph, StoryKind,
 };
 use open365_opc::{PartName, Relationships, TargetMode, rels_part_name, resolve_target};
-use open365_text::FontLibrary;
+use open365_text::{FontLibrary, FontStyle};
 
 use font::FaceDraw;
 use lang::Languages;
@@ -133,6 +133,16 @@ impl fmt::Display for PdfError {
 
 impl std::error::Error for PdfError {}
 
+/// The `/BBox` of a figure: its rectangle in PDF space.
+fn figure_bbox(img: &ImagePlacement, page_h: f64) -> [f64; 4] {
+    [
+        img.x,
+        page_h - img.y - img.height,
+        img.x + img.width,
+        page_h - img.y,
+    ]
+}
+
 fn pdf_color(c: [u8; 3]) -> String {
     format!(
         "{} {} {}",
@@ -146,7 +156,31 @@ fn pdf_color(c: [u8; 3]) -> String {
 #[derive(Clone)]
 enum Owner {
     Struct(u32, String),
-    Artifact,
+    Artifact(Art),
+}
+
+/// The kind of an artifact: Word marks a header and a footer as pagination artifacts.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+enum Art {
+    Plain,
+    Header,
+    Footer,
+}
+
+/// The marked-content sequence a page is in the middle of.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Open {
+    Struct(u32),
+    Artifact(Art),
+}
+
+impl Owner {
+    fn open_key(&self) -> Open {
+        match self {
+            Owner::Struct(id, _) => Open::Struct(*id),
+            Owner::Artifact(a) => Open::Artifact(*a),
+        }
+    }
 }
 
 /// A child of a structure element, in reading order.
@@ -158,11 +192,26 @@ enum Kid {
     Elem(u32),
 }
 
+/// A `Footnote` or `Endnote` element for the part of a note on a later page.
+struct ContNote {
+    id: u32,
+    page: usize,
+    /// Left edge of the note area it is in, in tenths of a point (a column of the page).
+    left: i64,
+    /// (story code, note number)
+    key: (u8, usize),
+}
+
 struct FigureRec {
     id: u32,
     page: usize,
     mcid: u32,
     alt: Option<String>,
+    /// The figure's box in PDF space (`/A /BBox`), as Word writes it on every figure.
+    bbox: [f64; 4],
+    /// The figure comes before its paragraph in the tree: a picture or shape behind the text
+    /// that the text does not wrap around (`layout-img-none`, `layout-float-wrap-behind-front`).
+    before: bool,
 }
 
 /// A hyperlink's `Link` structure element and the annotations it owns.
@@ -241,6 +290,28 @@ struct Export<'a> {
     note_elems: HashMap<(u8, usize), u32>,
     /// `Note` element -> the `P` elements of its paragraphs, in drawing order.
     note_paras: HashMap<u32, Vec<u32>>,
+    /// The continuation `Footnote` elements of notes that go on over a page (Word writes one more
+    /// element for each page a note continues on, in the reading order of that page).
+    cont_notes: Vec<ContNote>,
+    /// Shapes of each paragraph already handed to a placement (the layout lists a paragraph's
+    /// drawings in order, text boxes included).
+    shape_next: HashMap<usize, usize>,
+    /// The default tab stop interval in points.
+    tab_step: f64,
+    /// Anchored drawings of each paragraph already seen, for their wrapping.
+    anchor_next: HashMap<usize, usize>,
+    /// The wrapping of the drawing being drawn is none and it is behind the text.
+    behind_none: Vec<bool>,
+    /// Index in `Page::images` of the picture being drawn.
+    cur_image: usize,
+    /// (text box, paragraph in the box) -> the paragraph's spacing, for link rectangles.
+    box_meta: HashMap<(usize, usize), structure::ParaMeta>,
+    /// Structure element of a paragraph -> the paragraph's index.
+    para_of_node: HashMap<u32, usize>,
+    /// (story code, note, page, left) -> index in `cont_notes`.
+    cont_keys: HashMap<(u8, usize, usize, i64), usize>,
+    /// (story code, note paragraph, page, left) -> the `P` of the continuation.
+    cont_para: HashMap<(u8, usize, usize, i64), u32>,
     /// (story code, note number) -> the `Link` element around the note's reference mark and the
     /// note's number among all notes.
     note_link: HashMap<(u8, usize), (u32, usize)>,
@@ -290,6 +361,9 @@ struct Export<'a> {
     /// is corrected by the next glyph's position).
     skip_notdef: bool,
     ua: bool,
+    /// Rectangles (`[x0, y0, x1, y1]`) of the cells of the page being drawn whose clip rectangle
+    /// is empty: Word writes nothing of the text in them.
+    dead_cells: Vec<[f64; 4]>,
     warnings: Vec<String>,
     pdf: Pdf,
 }
@@ -299,6 +373,9 @@ struct PageBuf {
     height: f64,
     content: String,
     owners: Vec<u32>,
+    /// The sequence left open: the next line of the same paragraph goes on in it (Word writes
+    /// one marked-content sequence per paragraph, not per line).
+    open: Option<Open>,
 }
 
 impl PageBuf {
@@ -322,6 +399,22 @@ struct Piece {
     run: usize,
     from: usize,
     to: usize,
+}
+
+/// A tab's blank: index in the glyph order it stands before, pen x, run, and the font of the
+/// run the tab is in.
+type TabBlank = (usize, f64, usize, Option<(usize, f64)>);
+
+/// What a segment of a line is drawn from.
+enum Item {
+    Glyphs(Piece),
+    /// The blank Word draws for a tab and where a tab leader ends: its x, the run whose font it
+    /// takes and, for a tab, the font of the run the tab character is in (face and size).
+    Blank {
+        x: f64,
+        run: usize,
+        font: Option<(usize, f64)>,
+    },
 }
 
 /// Word widens a link rectangle by 3 pixels of its 96 dpi device grid on each side.
@@ -528,6 +621,21 @@ pub fn export_pdf_with(
             }
         }
     }
+    let mut box_meta: HashMap<(usize, usize), structure::ParaMeta> = HashMap::new();
+    for (id, (_, tb)) in st.boxes.iter().enumerate() {
+        for (i, m) in structure::story_spacing(doc.styles(), &tb.blocks)
+            .into_iter()
+            .enumerate()
+        {
+            box_meta.insert((id, i), m);
+        }
+    }
+    let para_of_node: HashMap<u32, usize> = st
+        .paras
+        .iter()
+        .enumerate()
+        .map(|(i, p)| (p.node, i))
+        .collect();
     let mut ex = Export {
         fonts,
         simple_used: BTreeMap::new(),
@@ -544,6 +652,16 @@ pub fn export_pdf_with(
         extra_keys: HashMap::new(),
         note_elems: HashMap::new(),
         note_paras: HashMap::new(),
+        cont_notes: Vec::new(),
+        shape_next: HashMap::new(),
+        tab_step: f64::from(doc.settings().default_tab_stop_pt()),
+        anchor_next: HashMap::new(),
+        behind_none: Vec::new(),
+        cur_image: 0,
+        box_meta,
+        para_of_node,
+        cont_keys: HashMap::new(),
+        cont_para: HashMap::new(),
         note_link: HashMap::new(),
         note_first,
         end_base,
@@ -595,6 +713,7 @@ pub fn export_pdf_with(
         flatten: options.conformance == Conformance::PdfA1b,
         skip_notdef: options.conformance != Conformance::None || options.ua,
         ua: options.ua,
+        dead_cells: Vec::new(),
         warnings,
         pdf,
     };
@@ -1128,30 +1247,86 @@ fn cluster_text(
 impl Export<'_> {
     fn render_page(&mut self, index: usize, page: &Page) -> (String, Vec<u32>) {
         self.current_section = page.section_index;
+        // A cell whose content area (the box less its top and bottom margins) is empty clips
+        // everything: Word draws none of its text and tags no paragraph for it
+        // (`layout-trh-small`, `layout-trh-pad`).
+        self.dead_cells = page
+            .cells
+            .iter()
+            .filter(|c| c.height - c.pad_top - c.pad_bottom <= 0.005)
+            .map(|c| [c.x, c.y, c.x + c.width, c.y + c.height])
+            .collect();
         let mut buf = PageBuf {
             index,
             height: self.page_dims[index].1,
             content: String::new(),
             owners: Vec::new(),
+            open: None,
         };
         self.draw_cells(&mut buf, page);
-        for img in page.images.iter().filter(|i| !i.anchored || i.behind_text) {
-            self.draw_image(&mut buf, img, true);
+        let specs: Vec<Option<structure::ShapeSpec>> = page
+            .images
+            .iter()
+            .map(|img| {
+                if img.embed.is_some() || img.source != ImageSource::Main {
+                    return None;
+                }
+                let n = self.shape_next.entry(img.paragraph).or_insert(0);
+                let at = *n;
+                *n += 1;
+                self.st
+                    .shapes
+                    .get(&img.paragraph)
+                    .and_then(|v| v.get(at))
+                    .cloned()
+            })
+            .collect();
+        let flags: Vec<bool> = page
+            .images
+            .iter()
+            .map(|img| {
+                if !img.anchored || img.source != ImageSource::Main {
+                    return false;
+                }
+                let n = self.anchor_next.entry(img.paragraph).or_insert(0);
+                let at = *n;
+                *n += 1;
+                img.behind_text
+                    && self
+                        .st
+                        .wraps
+                        .get(&img.paragraph)
+                        .and_then(|v| v.get(at))
+                        .is_some_and(|w| *w == open365_docx::WrapType::None)
+            })
+            .collect();
+        self.behind_none = flags;
+        for (at, (img, spec)) in page.images.iter().zip(&specs).enumerate() {
+            if !img.anchored || img.behind_text {
+                self.cur_image = at;
+                self.draw_image(&mut buf, img, true, spec.as_ref());
+            }
         }
         self.draw_borders(&mut buf, page);
         self.draw_rules(&mut buf, page);
+        // Word writes the header and the footer first, each as one pagination artifact.
+        for line in page.header.iter().chain(&page.footer) {
+            self.draw_line(&mut buf, line);
+        }
         for line in page
-            .header
+            .lines
             .iter()
-            .chain(&page.lines)
             .chain(page.frames.iter().flat_map(|f| f.lines.iter()))
             .chain(&page.notes)
-            .chain(&page.footer)
         {
             self.draw_line(&mut buf, line);
         }
-        for img in page.images.iter().filter(|i| i.anchored && !i.behind_text) {
-            self.draw_image(&mut buf, img, true);
+        self.end_seq(&mut buf);
+        for (at, (img, spec)) in page.images.iter().zip(&specs).enumerate() {
+            if img.anchored && !img.behind_text {
+                self.cur_image = at;
+                self.draw_image(&mut buf, img, true, spec.as_ref());
+            }
         }
         // Pictures of headers, footers and notes are not part of the reading order.
         for img in page
@@ -1160,15 +1335,35 @@ impl Export<'_> {
             .chain(&page.note_images)
             .chain(&page.footer_images)
         {
-            self.draw_image(&mut buf, img, false);
+            self.draw_image(&mut buf, img, false, None);
         }
+        self.end_seq(&mut buf);
         (buf.content, buf.owners)
     }
 
-    /// Opens a marked-content sequence.
+    /// Closes the open marked-content sequence, if any.
+    fn end_seq(&self, buf: &mut PageBuf) {
+        if buf.open.take().is_some() {
+            buf.content.push_str("EMC\n");
+        }
+    }
+
+    /// Starts a marked-content sequence for `owner`, or goes on in the open one when it has the
+    /// same owner.
     fn begin(&mut self, buf: &mut PageBuf, owner: &Owner) {
+        if buf.open == Some(owner.open_key()) {
+            return;
+        }
+        self.end_seq(buf);
+        buf.open = Some(owner.open_key());
         match owner {
-            Owner::Artifact => buf.content.push_str("/Artifact BMC\n"),
+            Owner::Artifact(Art::Plain) => buf.content.push_str("/Artifact BMC\n"),
+            Owner::Artifact(Art::Header) => buf.content.push_str(
+                "/Artifact << /Attached [/Top] /Type /Pagination /Subtype /Header >> BDC\n",
+            ),
+            Owner::Artifact(Art::Footer) => buf.content.push_str(
+                "/Artifact << /Attached [/Bottom] /Type /Pagination /Subtype /Footer >> BDC\n",
+            ),
             Owner::Struct(id, tag) => {
                 let mcid = buf.owners.len() as u32;
                 buf.owners.push(*id);
@@ -1206,12 +1401,12 @@ impl Export<'_> {
                         Owner::Struct(id, "Span".to_owned())
                     }
                 }
-                None => Owner::Artifact,
+                None => Owner::Artifact(Art::Plain),
             },
             StoryKind::TextBox => {
                 let frame = line.frame.unwrap_or(0);
                 let Some(&tb) = self.st.box_elems.get(frame) else {
-                    return Owner::Artifact;
+                    return Owner::Artifact(Art::Plain);
                 };
                 let id = match self.box_p.get(&(frame, line.paragraph)) {
                     Some(id) => *id,
@@ -1226,6 +1421,44 @@ impl Export<'_> {
             }
             StoryKind::Footnotes | StoryKind::Endnotes => {
                 let key = (line.story.word_code(), note_paragraph(line, self.end_base));
+                let note = self.st.note_of.get(&key).copied().unwrap_or(key.1);
+                // The part of a note in a later column or on a later page than its first lines is a
+                // `Footnote` of its own.
+                let tenths = |x: f64| (x * 10.0).round() as i64;
+                let at = (page, tenths(line.left));
+                if self
+                    .note_first
+                    .get(&(key.0, note))
+                    .is_some_and(|first| at > (first.0, tenths(first.1)))
+                {
+                    let ck = (key.0, note, at.0, at.1);
+                    let ci = match self.cont_keys.get(&ck) {
+                        Some(i) => *i,
+                        None => {
+                            let id = self.pdf.reserve();
+                            self.cont_notes.push(ContNote {
+                                id,
+                                page,
+                                left: at.1,
+                                key: (key.0, note),
+                            });
+                            self.cont_keys.insert(ck, self.cont_notes.len() - 1);
+                            self.cont_notes.len() - 1
+                        }
+                    };
+                    let note_id = self.cont_notes[ci].id;
+                    let pk = (key.0, key.1, at.0, at.1);
+                    let pid = match self.cont_para.get(&pk) {
+                        Some(p) => *p,
+                        None => {
+                            let p = self.pdf.reserve();
+                            self.cont_para.insert(pk, p);
+                            self.note_paras.entry(note_id).or_default().push(p);
+                            p
+                        }
+                    };
+                    return Owner::Struct(pid, "P".to_owned());
+                }
                 let id = match self.extra_keys.get(&key) {
                     Some(id) => *id,
                     None => {
@@ -1249,18 +1482,147 @@ impl Export<'_> {
                 };
                 Owner::Struct(id, "P".to_owned())
             }
-            _ => Owner::Artifact,
+            StoryKind::PrimaryHeader | StoryKind::FirstHeader | StoryKind::EvenHeader => {
+                Owner::Artifact(Art::Header)
+            }
+            // The note separator is part of the footer's pagination artifacts in Word's file.
+            StoryKind::PrimaryFooter
+            | StoryKind::FirstFooter
+            | StoryKind::EvenFooter
+            | StoryKind::FootnoteSeparator
+            | StoryKind::EndnoteSeparator => Owner::Artifact(Art::Footer),
         }
     }
 
-    /// Splits the glyphs of a line into what each belongs to: list label, hyperlink or text.
+    /// The tab characters of a line: for each, the index in `order` of the glyph it stands before,
+    /// the pen position where it starts (the end of the text before it) and the run whose font
+    /// Word draws its blank in (the run of the glyph after it, else the one before).
+    fn line_tabs(&self, line: &Line, order: &[(usize, usize, &PlacedGlyph)]) -> Vec<TabBlank> {
+        let text: &str = &line.text;
+        if order.is_empty() || !text.contains('\t') {
+            return Vec::new();
+        }
+        let is_text = |g: &PlacedGlyph| {
+            g.cluster.kind == ClusterKind::Text && g.cluster.text_end > g.cluster.text_start
+        };
+        let lo_c = order
+            .iter()
+            .filter(|(_, _, g)| is_text(g))
+            .map(|(_, _, g)| g.cluster.text_start as usize)
+            .min();
+        let hi_c = order
+            .iter()
+            .filter(|(_, _, g)| is_text(g))
+            .map(|(_, _, g)| g.cluster.text_end as usize)
+            .max();
+        let key = (
+            line.story.word_code(),
+            line.frame.unwrap_or(0),
+            note_paragraph(line, self.end_base),
+        );
+        let first = self.first_line.get(&key) == Some(&line.start);
+        let last = self.last_line.get(&key) == Some(&line.start);
+        // Tabs that start a wrapped line belong to it (Word draws their blank at the line's left
+        // edge).
+        let lo = if first {
+            0
+        } else {
+            let mut lo = lo_c.unwrap_or(0);
+            while lo > 0 && text.as_bytes()[lo - 1] == b'\t' {
+                lo -= 1;
+            }
+            lo
+        };
+        let hi = if last { text.len() } else { hi_c.unwrap_or(0) };
+        let mut out: Vec<TabBlank> = Vec::new();
+        let mut leader_end: Option<f64> = None;
+        let model = if line.story == StoryKind::Main {
+            self.st.texts.get(&line.paragraph)
+        } else {
+            None
+        };
+        // The first text after the tabs in a row: where the last of them ends.
+        for (t, c) in text.char_indices() {
+            if c != '\t' || t < lo || t >= hi {
+                continue;
+            }
+            let after = t + 1;
+            let run_len = text[after..].chars().take_while(|c| *c == '\t').count();
+            let next_x = order
+                .iter()
+                .filter(|(_, _, g)| is_text(g) && g.cluster.text_start as usize > t + run_len)
+                .map(|(_, _, g)| g.x)
+                .reduce(f64::min);
+            let mut pen = order
+                .iter()
+                .filter(|(_, _, g)| is_text(g) && g.cluster.text_end as usize <= t)
+                .map(|(_, _, g)| g.x + g.advance)
+                .reduce(f64::max)
+                .unwrap_or(line.left);
+            // A tab right after a tab starts where that one ended: at the end of its leader,
+            // else one default stop before the text that follows the tabs.
+            if t > 0 && text.as_bytes()[t - 1] == b'\t' && t > lo {
+                pen = match (leader_end, next_x) {
+                    (Some(e), _) => e,
+                    (None, Some(x)) => x - self.tab_step * (run_len + 1) as f64,
+                    (None, None) => pen,
+                };
+            }
+            leader_end = None;
+            let k = order
+                .iter()
+                .position(|(_, _, g)| match g.cluster.kind {
+                    ClusterKind::Text => is_text(g) && g.cluster.text_start as usize > t,
+                    ClusterKind::Other => line.leader_char(g).is_some() && g.x >= pen - 0.05,
+                    ClusterKind::Label => false,
+                })
+                .unwrap_or(order.len());
+            // A leader that starts at the pen (nothing between the text and the leader) comes
+            // without the blank of the tab (`layout-tabs`: 3 of 4 decimal tabs with a leader).
+            if let Some((_, _, g)) = order.get(k)
+                && line.leader_char(g).is_some()
+                && g.x - pen <= 0.4
+            {
+                continue;
+            }
+            let run = order[k.min(order.len() - 1)].0;
+            // The end of this tab's leader, for a tab that follows.
+            if let Some((_, _, g)) = order.get(k)
+                && line.leader_char(g).is_some()
+            {
+                let mut end = g.x + g.advance;
+                for (_, _, n) in &order[k + 1..] {
+                    if line.leader_char(n).is_some() && n.x - end <= 0.5 {
+                        end = n.x + n.advance;
+                    } else {
+                        break;
+                    }
+                }
+                leader_end = Some(end);
+            }
+            let ordinal = text[..t].matches('\t').count();
+            let font = model.and_then(|m| m.tabs.get(ordinal)).and_then(|m| {
+                let style = FontStyle {
+                    bold: m.bold,
+                    italic: m.italic,
+                };
+                let face = self.fonts.chain(&m.family, style).faces.first()?.index();
+                (m.size > 0.0).then_some((face, m.size))
+            });
+            out.push((k, pen, run, font));
+        }
+        out
+    }
+
+    /// Splits the glyphs of a line into what each belongs to: list label, hyperlink or text, with
+    /// the blanks Word draws for tabs between them.
     fn segments(
         &self,
         line: &Line,
         key: usize,
         links: bool,
         label_apart: bool,
-    ) -> Vec<(Seg, Vec<Piece>)> {
+    ) -> Vec<(Seg, Vec<Item>)> {
         let spans = if links {
             self.link_spans.get(&key)
         } else {
@@ -1271,7 +1633,7 @@ impl Export<'_> {
         } else {
             None
         };
-        let mut out: Vec<(Seg, Vec<Piece>)> = Vec::new();
+        let mut out: Vec<(Seg, Vec<Item>)> = Vec::new();
         let mut prev = Seg::Text;
         // Word writes a tab leader where it lies on the line, so that it copies out between the
         // text on either side; the layout lists the leaders after the text of the line.
@@ -1289,79 +1651,152 @@ impl Export<'_> {
         if order.iter().any(|(_, _, g)| line.leader_char(g).is_some()) {
             order.sort_by(|a, b| a.2.x.total_cmp(&b.2.x));
         }
-        {
-            for (ri, gi, g) in order {
-                let c = g.cluster;
-                let key = match c.kind {
-                    // A heading's number is part of the heading's own marked content.
-                    ClusterKind::Label if label_apart => Seg::Label,
-                    ClusterKind::Label => Seg::Text,
-                    // A tab leader is text of the paragraph, as in Word's PDF (one string of the
-                    // leader character in the paragraph's span, no artifact, no ActualText).
-                    ClusterKind::Other => Seg::Text,
-                    // The later glyphs of a cluster belong with the first.
-                    ClusterKind::Text if c.text_start == c.text_end => match prev {
-                        Seg::Label => Seg::Text,
-                        other => other,
-                    },
-                    ClusterKind::Text => {
-                        let at = c.text_start as usize;
-                        spans
-                            .and_then(|s| s.iter().find(|(a, b, _)| *a <= at && at < *b))
-                            .map(|(_, _, k)| Seg::Link(*k))
-                            .or_else(|| {
-                                langs.and_then(|l| {
-                                    l.iter()
-                                        .position(|(a, b, _)| *a <= at && at < *b)
-                                        .map(Seg::Lang)
-                                })
-                            })
-                            .unwrap_or(Seg::Text)
-                    }
-                };
-                prev = key;
+        let label_blank = line.story == StoryKind::Main
+            && self
+                .st
+                .paras
+                .get(line.paragraph)
+                .is_some_and(|p| p.label_blank);
+        let mut tabs = self.line_tabs(line, &order).into_iter().peekable();
+        let mut pending: Vec<Item> = Vec::new();
+        for (idx, &(ri, gi, g)) in order.iter().enumerate() {
+            while let Some(&(k, x, run, font)) = tabs.peek() {
+                if k > idx {
+                    break;
+                }
+                tabs.next();
+                let blank = Item::Blank { x, run, font };
                 match out.last_mut() {
-                    Some((seg, pieces)) if *seg == key => match pieces.last_mut() {
-                        Some(p) if p.run == ri && p.to == gi => p.to = gi + 1,
-                        _ => pieces.push(Piece {
-                            run: ri,
-                            from: gi,
-                            to: gi + 1,
-                        }),
-                    },
-                    _ => out.push((
-                        key,
-                        vec![Piece {
-                            run: ri,
-                            from: gi,
-                            to: gi + 1,
-                        }],
-                    )),
+                    Some((_, items)) => items.push(blank),
+                    None => pending.push(blank),
                 }
             }
+            let c = g.cluster;
+            let key = match c.kind {
+                // A heading's number is part of the heading's own marked content.
+                ClusterKind::Label if label_apart => Seg::Label,
+                ClusterKind::Label => Seg::Text,
+                // A tab leader is text of the paragraph, as in Word's PDF (one string of the
+                // leader character in the paragraph's span, no artifact, no ActualText).
+                ClusterKind::Other => Seg::Text,
+                // The later glyphs of a cluster belong with the first.
+                ClusterKind::Text if c.text_start == c.text_end => match prev {
+                    Seg::Label => Seg::Text,
+                    other => other,
+                },
+                ClusterKind::Text => {
+                    let at = c.text_start as usize;
+                    spans
+                        .and_then(|s| s.iter().find(|(a, b, _)| *a <= at && at < *b))
+                        .map(|(_, _, k)| Seg::Link(*k))
+                        .or_else(|| {
+                            langs.and_then(|l| {
+                                l.iter()
+                                    .position(|(a, b, _)| *a <= at && at < *b)
+                                    .map(Seg::Lang)
+                            })
+                        })
+                        .unwrap_or(Seg::Text)
+                }
+            };
+            prev = key;
+            let piece = Piece {
+                run: ri,
+                from: gi,
+                to: gi + 1,
+            };
+            match out.last_mut() {
+                Some((seg, items)) if *seg == key => match items.last_mut() {
+                    Some(Item::Glyphs(p)) if p.run == ri && p.to == gi => p.to = gi + 1,
+                    _ => items.push(Item::Glyphs(piece)),
+                },
+                _ => {
+                    let mut items = std::mem::take(&mut pending);
+                    items.push(Item::Glyphs(piece));
+                    out.push((key, items));
+                }
+            }
+            // The tab or space after a list label is a blank at the label's end, drawn with the
+            // text that follows.
+            if c.kind == ClusterKind::Label
+                && label_blank
+                && order
+                    .get(idx + 1)
+                    .is_none_or(|(_, _, n)| n.cluster.kind != ClusterKind::Label)
+            {
+                let blank = Item::Blank {
+                    x: g.x + g.advance,
+                    run: ri,
+                    font: None,
+                };
+                match out.last_mut() {
+                    Some((Seg::Label, _)) | None => pending.push(blank),
+                    Some((_, items)) => items.push(blank),
+                }
+            }
+            // Word draws a blank where a tab leader ends.
+            if line.leader_char(g).is_some()
+                && order.get(idx + 1).is_none_or(|(_, _, n)| {
+                    line.leader_char(n).is_none() || n.x - (g.x + g.advance) > 0.5
+                })
+                && let Some((_, items)) = out.last_mut()
+            {
+                items.push(Item::Blank {
+                    x: g.x + g.advance,
+                    run: ri,
+                    font: None,
+                });
+            }
+        }
+        for (_, x, run, font) in tabs {
+            if let Some((_, items)) = out.last_mut() {
+                items.push(Item::Blank { x, run, font });
+            }
+        }
+        // The blank after the label of an empty item, with the paragraph mark's.
+        if !pending.is_empty() {
+            out.push((Seg::Text, pending));
         }
         out
     }
 
+    /// The line lies in a cell whose clip rectangle is empty.
+    fn clipped_away(&self, line: &Line) -> bool {
+        line.story == StoryKind::Main
+            && self.dead_cells.iter().any(|c| {
+                line.left >= c[0] - 0.01
+                    && line.left < c[2]
+                    && line.top < c[3]
+                    && line.top + line.height > c[1]
+            })
+    }
+
     fn draw_line(&mut self, buf: &mut PageBuf, line: &Line) {
+        if self.clipped_away(line) {
+            return;
+        }
         if line.runs.iter().all(|r| r.glyphs.is_empty()) {
             if line.story == StoryKind::Main {
                 self.para_page.entry(line.paragraph).or_insert(buf.index);
             }
-            // An empty paragraph still has its paragraph mark: Word draws the blank.
+            // An empty paragraph still has its paragraph mark: Word draws the blank, in the
+            // mark's font.
             let last = self.last_line.get(&(
                 line.story.word_code(),
                 line.frame.unwrap_or(0),
                 note_paragraph(line, self.end_base),
             )) == Some(&line.start);
-            if last && line.runs.iter().any(|r| r.size > 0.0) {
+            // A paragraph that ends a section draws nothing and has no element in Word's file.
+            let silent = line.story == StoryKind::Main
+                && self
+                    .st
+                    .paras
+                    .get(line.paragraph)
+                    .is_some_and(|p| self.st.section_breaks.contains(&p.node));
+            if last && !silent {
                 let owner = self.owner_of(line, buf.index);
                 self.begin(buf, &owner);
-                self.draw_blank(buf, line, line.last_x);
-                buf.content.push_str(
-                    "EMC
-",
-                );
+                self.draw_blank(buf, line, line.last_x, true);
             }
             return;
         }
@@ -1381,6 +1816,10 @@ impl Export<'_> {
         // Links and languages are looked for in the main story, the notes and (links only, they
         // are artifacts) the header and footer.
         let tagged = structured || self.link_spans.contains_key(&key);
+        // Each line of a text frame is a marked-content sequence of its own.
+        if main && self.st.paras.get(line.paragraph).is_some_and(|p| p.framed) {
+            self.end_seq(buf);
+        }
         let segs = self.segments(line, key, tagged, label_owner.is_some());
         // Word draws a blank at each paragraph mark and line break.
         let last_of_paragraph = self.last_line.get(&(
@@ -1388,8 +1827,10 @@ impl Export<'_> {
             line.frame.unwrap_or(0),
             note_paragraph(line, self.end_base),
         )) == Some(&line.start);
+        let section_end = line.story == StoryKind::Main
+            && self.st.paras.get(line.paragraph).is_some_and(|p| p.sect);
         let mut blank_at = if last_of_paragraph {
-            Some(line.last_x)
+            (!section_end).then_some(line.last_x)
         } else if ends_with_break(line) {
             line.runs
                 .iter()
@@ -1405,7 +1846,7 @@ impl Export<'_> {
         let mark_lang = self.st.texts.get(&key).and_then(|t| t.mark_lang.clone());
         let comment =
             line.story == StoryKind::Main && self.st.texts.get(&key).is_some_and(|t| t.comment_ref);
-        for (si, (seg, pieces)) in segs.into_iter().enumerate() {
+        for (si, (seg, items)) in segs.into_iter().enumerate() {
             // Links and language runs hang under the paragraph, also on a continuation page.
             let parent_of = |this: &Self, id: u32| -> u32 {
                 if line.story == StoryKind::Main {
@@ -1430,8 +1871,12 @@ impl Export<'_> {
                 _ => owner.clone(),
             };
             self.begin(buf, &seg_owner);
-            let glyphs: Vec<&PlacedGlyph> = pieces
+            let glyphs: Vec<&PlacedGlyph> = items
                 .iter()
+                .filter_map(|it| match it {
+                    Item::Glyphs(p) => Some(p),
+                    Item::Blank { .. } => None,
+                })
                 .flat_map(|p| line.runs[p.run].glyphs[p.from..p.to].iter())
                 .collect();
             let actual = self.actual_text(line, &glyphs);
@@ -1439,8 +1884,18 @@ impl Export<'_> {
                 buf.content
                     .push_str(&format!("/Span << /ActualText {} >> BDC\n", text_string(t)));
             }
-            for p in &pieces {
-                self.draw_run(buf, line, &line.runs[p.run], p.from..p.to);
+            for it in &items {
+                match it {
+                    Item::Glyphs(p) => {
+                        self.draw_run(buf, line, &line.runs[p.run], p.from..p.to);
+                    }
+                    Item::Blank {
+                        font: Some((face, size)),
+                        x,
+                        ..
+                    } => self.put_blank(buf, line, *x, *face, *size),
+                    Item::Blank { x, run, .. } => self.draw_run_blank(buf, line, *x, *run),
+                }
             }
             if actual.is_some() {
                 buf.content.push_str("EMC\n");
@@ -1451,9 +1906,8 @@ impl Export<'_> {
                 && ((matches!(seg, Seg::Text) && mark_lang.is_none() && !comment) || mark_inside)
                 && let Some(x) = blank_at.take()
             {
-                self.draw_blank(buf, line, x);
+                self.draw_blank(buf, line, x, last_of_paragraph);
             }
-            buf.content.push_str("EMC\n");
             if let Seg::Link(k) = seg {
                 let x0 = glyphs.iter().map(|g| g.x).fold(f64::INFINITY, f64::min);
                 let mut x1 = glyphs
@@ -1541,9 +1995,14 @@ impl Export<'_> {
                 }
                 _ => self.owner_of(line, buf.index),
             };
+            // The blank in the `Span` of the last run is a sequence of its own (`probe-lang-fr`).
+            if same_run.is_some() {
+                self.end_seq(buf);
+            }
             self.begin(buf, &owner);
-            self.draw_blank(buf, line, x);
-            buf.content.push_str("EMC\n");
+            self.draw_blank(buf, line, x, last_of_paragraph);
+            // What follows starts a sequence of its own.
+            self.end_seq(buf);
         }
     }
 
@@ -1648,15 +2107,22 @@ impl Export<'_> {
             )
         };
         let (mut above, mut below) = (0.0, 0.0);
-        if line.story == StoryKind::Main
-            && let Some(p) = self.st.paras.get(line.paragraph)
-        {
+        // The paragraphs of the main story and of a text box carry their spacing into the
+        // rectangle (`p-txbx-link`: the box paragraph's space after, 6 pt, is in it).
+        let meta = |i: usize| -> Option<&structure::ParaMeta> {
+            match line.story {
+                StoryKind::Main => self.st.paras.get(i),
+                StoryKind::TextBox => self.box_meta.get(&(line.frame.unwrap_or(0), i)),
+                _ => None,
+            }
+        };
+        if let Some(p) = meta(line.paragraph) {
             let prev = line
                 .paragraph
                 .checked_sub(1)
-                .and_then(|i| self.st.paras.get(i))
+                .and_then(meta)
                 .filter(|_| !p.first);
-            let next = self.st.paras.get(line.paragraph + 1);
+            let next = meta(line.paragraph + 1);
             // Contextual spacing: a paragraph that has it drops its own space towards a
             // neighbour of the same style (`p-rect`: the other paragraph keeps its space).
             let same = |a: &structure::ParaMeta, b: &structure::ParaMeta| {
@@ -1911,27 +2377,72 @@ impl Export<'_> {
         (gid == g.glyph_id).then_some(c)
     }
 
-    /// The blank Word draws for a paragraph mark or a line break, at `x` on the line's baseline.
-    fn draw_blank(&mut self, buf: &mut PageBuf, line: &Line, x: f64) {
+    /// The font and size of the blank at a paragraph mark or a line break: for the mark, the
+    /// paragraph mark's own font (Word's blank is not set in the font of the last run), else the
+    /// font of the last run of the line.
+    fn blank_font(&mut self, line: &Line, mark: bool) -> Option<(usize, f64)> {
+        if mark
+            && line.story == StoryKind::Main
+            && let Some(m) = self
+                .st
+                .paras
+                .get(line.paragraph)
+                .and_then(|p| p.mark.clone())
+            && m.size > 0.0
+        {
+            let style = FontStyle {
+                bold: m.bold,
+                italic: m.italic,
+            };
+            if let Some(face) = self.fonts.chain(&m.family, style).faces.first() {
+                return Some((face.index(), m.size));
+            }
+        }
         let run = line
             .runs
             .iter()
             .rev()
             .find(|r| !r.superscript && !r.glyphs.is_empty())
             .or_else(|| line.runs.iter().rev().find(|r| !r.glyphs.is_empty()))
-            .or_else(|| line.runs.last());
-        let Some(run) = run else { return };
+            .or_else(|| line.runs.last())?;
+        if run.size.is_nan() || run.size <= 0.0 {
+            return None;
+        }
+        Some((
+            run.glyphs.last().map_or(run.face, |g| g.face).index(),
+            run.size,
+        ))
+    }
+
+    /// The blank Word draws for a paragraph mark (`mark`) or a line break, at `x` on the line's
+    /// baseline.
+    fn draw_blank(&mut self, buf: &mut PageBuf, line: &Line, x: f64, mark: bool) {
+        let Some((face, size)) = self.blank_font(line, mark) else {
+            return;
+        };
+        self.put_blank(buf, line, x, face, size);
+    }
+
+    /// A blank in the font of run `run` of the line (the blank of a tab).
+    fn draw_run_blank(&mut self, buf: &mut PageBuf, line: &Line, x: f64, run: usize) {
+        let Some(run) = line.runs.get(run) else {
+            return;
+        };
         if run.size.is_nan() || run.size <= 0.0 {
             return;
         }
         let face = run.glyphs.last().map_or(run.face, |g| g.face).index();
-        if self.simple_glyph(face, ' ').is_none() || !self.faces.contains_key(&face) {
+        self.put_blank(buf, line, x, face, run.size);
+    }
+
+    fn put_blank(&mut self, buf: &mut PageBuf, line: &Line, x: f64, face: usize, size: f64) {
+        if self.simple_glyph(face, ' ').is_none() {
             return;
         }
         self.simple_used.entry(face).or_default().insert(' ');
         buf.content.push_str(&format!(
             "0 0 0 rg\nBT /FS{face} {} Tf 1 0 0 1 {} {} Tm [( )] TJ ET\n",
-            num(run.size, 3),
+            num(size, 3),
             num((x * 1e4).round() / 1e4, 4),
             num(buf.y(line.baseline), 4)
         ));
@@ -2152,8 +2663,17 @@ impl Export<'_> {
     }
 
     /// Draws a picture; `tagged` pictures of the main story become Figure elements.
-    fn draw_image(&mut self, buf: &mut PageBuf, img: &ImagePlacement, tagged: bool) {
+    fn draw_image(
+        &mut self,
+        buf: &mut PageBuf,
+        img: &ImagePlacement,
+        tagged: bool,
+        shape: Option<&structure::ShapeSpec>,
+    ) {
         let Some(embed) = img.embed.as_deref() else {
+            if tagged && let Some(spec) = shape.filter(|s| !s.text_box) {
+                self.draw_shape(buf, img, spec);
+            }
             return;
         };
         let key = format!("{:?}|{embed}", img.source);
@@ -2181,6 +2701,7 @@ impl Export<'_> {
             return;
         };
         let name = name.clone();
+        self.end_seq(buf);
         let parent = if tagged {
             self.st.paras.get(img.paragraph).map(|p| p.node)
         } else {
@@ -2207,6 +2728,12 @@ impl Export<'_> {
                     page: buf.index,
                     mcid,
                     alt,
+                    bbox: figure_bbox(img, buf.height),
+                    before: self
+                        .behind_none
+                        .get(self.cur_image)
+                        .copied()
+                        .unwrap_or(false),
                 });
                 buf.content
                     .push_str(&format!("/Figure << /MCID {mcid} >> BDC\n"));
@@ -2220,6 +2747,114 @@ impl Export<'_> {
             num(img.x, 4),
             num(buf.y(img.y + img.height), 4)
         ));
+    }
+
+    /// Draws a floating DrawingML shape and tags it as a `Figure`, as Word does (evidence:
+    /// `layout-float-wrap-tight`: a fill-only path per shape, a `Figure` with an empty `/Alt`).
+    fn draw_shape(&mut self, buf: &mut PageBuf, img: &ImagePlacement, spec: &structure::ShapeSpec) {
+        let Some(parent) = self.st.paras.get(img.paragraph).map(|p| p.node) else {
+            return;
+        };
+        self.end_seq(buf);
+        let id = self.pdf.reserve();
+        let mcid = buf.owners.len() as u32;
+        buf.owners.push(id);
+        let alt = if self.ua {
+            "Shape without description".to_owned()
+        } else {
+            String::new()
+        };
+        self.figures.entry(parent).or_default().push(FigureRec {
+            id,
+            page: buf.index,
+            mcid,
+            alt: Some(alt),
+            bbox: figure_bbox(img, buf.height),
+            before: self
+                .behind_none
+                .get(self.cur_image)
+                .copied()
+                .unwrap_or(false),
+        });
+        buf.content
+            .push_str(&format!("/Figure << /MCID {mcid} >> BDC\nq\n"));
+        let (x, w, h) = (img.x, img.width, img.height);
+        let (bottom, top) = (buf.height - img.y - h, buf.height - img.y);
+        let (cx, cy) = (x + w / 2.0, (bottom + top) / 2.0);
+        let mut path = String::new();
+        let mv = |p: &mut String, x: f64, y: f64| {
+            p.push_str(&format!("{} {} m\n", num(x, 3), num(y, 3)));
+        };
+        let ln = |p: &mut String, x: f64, y: f64| {
+            p.push_str(&format!("{} {} l\n", num(x, 3), num(y, 3)));
+        };
+        match spec.geometry.as_str() {
+            "ellipse" => {
+                let k = 0.552_284_75;
+                let (rx, ry) = (w / 2.0, h / 2.0);
+                mv(&mut path, x, cy);
+                let mut curve = |a: (f64, f64), b: (f64, f64), c: (f64, f64)| {
+                    path.push_str(&format!(
+                        "{} {} {} {} {} {} c\n",
+                        num(a.0, 3),
+                        num(a.1, 3),
+                        num(b.0, 3),
+                        num(b.1, 3),
+                        num(c.0, 3),
+                        num(c.1, 3)
+                    ));
+                };
+                curve((x, cy + ry * k), (cx - rx * k, top), (cx, top));
+                curve((cx + rx * k, top), (x + w, cy + ry * k), (x + w, cy));
+                curve((x + w, cy - ry * k), (cx + rx * k, bottom), (cx, bottom));
+                curve((cx - rx * k, bottom), (x, cy - ry * k), (x, cy));
+                path.push_str("h\n");
+            }
+            "triangle" => {
+                mv(&mut path, x, bottom);
+                ln(&mut path, cx, top);
+                ln(&mut path, x + w, bottom);
+                path.push_str("h\n");
+            }
+            "diamond" => {
+                mv(&mut path, x, cy);
+                ln(&mut path, cx, top);
+                ln(&mut path, x + w, cy);
+                ln(&mut path, cx, bottom);
+                path.push_str("h\n");
+            }
+            _ => path.push_str(&format!(
+                "{} {} {} {} re\n",
+                num(x, 3),
+                num(bottom, 3),
+                num(w, 3),
+                num(h, 3)
+            )),
+        }
+        let paint = match (spec.fill, spec.line) {
+            (Some(f), Some((l, lw))) => {
+                buf.content.push_str(&format!(
+                    "{} rg {} RG {} w\n",
+                    pdf_color(f),
+                    pdf_color(l),
+                    num(lw, 3)
+                ));
+                "B*"
+            }
+            (Some(f), None) => {
+                buf.content.push_str(&format!("{} rg\n", pdf_color(f)));
+                "f*"
+            }
+            (None, Some((l, lw))) => {
+                buf.content
+                    .push_str(&format!("{} RG {} w\n", pdf_color(l), num(lw, 3)));
+                "S"
+            }
+            (None, None) => "n",
+        };
+        buf.content.push_str(&path);
+        buf.content.push_str(paint);
+        buf.content.push_str("\nQ\nEMC\n");
     }
 
     fn write_structure(&mut self, page_owners: &[Vec<u32>]) -> u32 {
@@ -2241,15 +2876,9 @@ impl Export<'_> {
         let by_elem: HashMap<u32, (u8, usize)> =
             self.note_elems.iter().map(|(k, v)| (*v, *k)).collect();
         let mut loose = self.note_link.values().map(|l| l.1).max().unwrap_or(0);
+        // Where each note body hangs and its number among the notes of the document.
+        let mut placed: Vec<(u32, (u8, usize), u32, usize)> = Vec::new();
         for id in &extras {
-            let paras = self.note_paras.get(id).cloned().unwrap_or_default();
-            for p in &paras {
-                let k = self.kid_list(*p);
-                self.pdf.set(
-                    *p,
-                    format!("<< /Type /StructElem /S /P /P {id} 0 R /K [{k}] >>"),
-                );
-            }
             let key = by_elem.get(id).copied().unwrap_or((2, 0));
             let (parent, seq) = match self.note_link.get(&key) {
                 Some(l) => *l,
@@ -2258,7 +2887,48 @@ impl Export<'_> {
                     (root_id, loose)
                 }
             };
-            let name = format!("Note {seq}");
+            placed.push((*id, key, parent, seq));
+        }
+        // With notes that go on over a page the numbers follow the pages: Word counts the
+        // continuation of a note before the notes that start on its page (`layout-fn-long`:
+        // Note 1, its continuation Note 2, then Note 3 and Note 4).
+        let mut number: HashMap<u32, usize> = placed.iter().map(|p| (p.0, p.3)).collect();
+        if !self.cont_notes.is_empty() {
+            let mut frags: Vec<(usize, i64, u8, usize, u32)> = Vec::new();
+            for (id, key, _, seq) in &placed {
+                let (page, left) = self
+                    .note_first
+                    .get(key)
+                    .map_or((0, 0), |f| (f.0, (f.1 * 10.0).round() as i64));
+                frags.push((page, left, 1, *seq, *id));
+            }
+            for (i, c) in self.cont_notes.iter().enumerate() {
+                frags.push((c.page, c.left, 0, i, c.id));
+            }
+            frags.sort_unstable();
+            number = frags
+                .iter()
+                .enumerate()
+                .map(|(n, f)| (f.4, n + 1))
+                .collect();
+        }
+        let conts: Vec<(u32, (u8, usize))> =
+            self.cont_notes.iter().map(|c| (c.id, c.key)).collect();
+        let wanted: Vec<(u32, (u8, usize), u32)> = placed
+            .iter()
+            .map(|(id, key, parent, _)| (*id, *key, *parent))
+            .chain(conts.iter().map(|(id, key)| (*id, *key, root_id)))
+            .collect();
+        for (id, key, parent) in &wanted {
+            let paras = self.note_paras.get(id).cloned().unwrap_or_default();
+            for p in &paras {
+                let k = self.kid_list(*p);
+                self.pdf.set(
+                    *p,
+                    format!("<< /Type /StructElem /S /P /P {id} 0 R /K [{k}] >>"),
+                );
+            }
+            let name = format!("Note {}", number.get(id).copied().unwrap_or(0));
             let role = if key.0 == 3 { "Endnote" } else { "Footnote" };
             let kids: String = paras.iter().map(|p| format!("{p} 0 R ")).collect();
             self.pdf.set(
@@ -2452,28 +3122,61 @@ impl Export<'_> {
         } else {
             String::new()
         };
+        // The continuations of notes come in front of the first element on their page.
+        let mut conts: Vec<((usize, i64), u32)> = if node.kind == structure::Kind::Document {
+            self.cont_notes
+                .iter()
+                .map(|c| ((c.page, c.left), c.id))
+                .collect()
+        } else {
+            Vec::new()
+        };
+        conts.sort_unstable();
+        let mut conts = conts.into_iter().peekable();
         for kid in &node.kids {
             if self.is_empty_leaf(kid) {
                 continue;
             }
-            k.push_str(&format!("{} 0 R ", kid.id));
-            // Word writes a picture's `Figure` after the paragraph that holds it, not inside it.
-            if let Some(figs) = self.figures.remove(&kid.id) {
-                for f in figs {
-                    k.push_str(&format!("{} 0 R ", f.id));
-                    let alt = f
-                        .alt
-                        .as_deref()
-                        .map_or(String::new(), |a| format!("/Alt {} ", text_string(a)));
-                    self.pdf.set(
-                        f.id,
-                        format!(
-                            "<< /Type /StructElem /S /Figure /P {} 0 R {alt}/K [<< /Type /MCR /Pg {} 0 R /MCID {} >>] >>",
-                            node.id, self.page_ids[f.page], f.mcid
-                        ),
-                    );
+            if conts.peek().is_some()
+                && let Some(at) = self.first_position(kid)
+            {
+                while let Some((_, id)) = conts.next_if(|(p, _)| *p <= at) {
+                    k.push_str(&format!("{id} 0 R "));
                 }
             }
+            let figs = self.figures.remove(&kid.id).unwrap_or_default();
+            // A picture behind the text that it does not wrap comes in front of its paragraph;
+            // Word writes any other `Figure` after the paragraph that holds it, not inside it.
+            let (front, after): (Vec<_>, Vec<_>) = figs.into_iter().partition(|f| f.before);
+            for f in &front {
+                k.push_str(&format!("{} 0 R ", f.id));
+            }
+            k.push_str(&format!("{} 0 R ", kid.id));
+            for f in &after {
+                k.push_str(&format!("{} 0 R ", f.id));
+            }
+            for f in front.iter().chain(&after) {
+                let alt = f
+                    .alt
+                    .as_deref()
+                    .map_or(String::new(), |a| format!("/Alt {} ", text_string(a)));
+                self.pdf.set(
+                    f.id,
+                    format!(
+                        "<< /Type /StructElem /S /Figure /P {} 0 R {alt}/A << /O /Layout /Placement /Block /BBox [{} {} {} {}] >> /K [<< /Type /MCR /Pg {} 0 R /MCID {} >>] >>",
+                        node.id,
+                        num(f.bbox[0], 2),
+                        num(f.bbox[1], 2),
+                        num(f.bbox[2], 2),
+                        num(f.bbox[3], 2),
+                        self.page_ids[f.page],
+                        f.mcid
+                    ),
+                );
+            }
+        }
+        for (_, id) in conts {
+            k.push_str(&format!("{id} 0 R "));
         }
         if node.kind != structure::Kind::LBody {
             k.push_str(&self.kid_list(node.id));
@@ -2517,6 +3220,16 @@ impl Export<'_> {
                 self.emit_node(kid, node.id);
             }
         }
+    }
+
+    /// Where the first line of an element or of what it holds is: page and left edge in tenths
+    /// of a point.
+    fn first_position(&self, node: &Node) -> Option<(usize, i64)> {
+        if let Some(i) = self.para_of_node.get(&node.id).copied() {
+            let &(page, left, _) = self.para_first.get(&i)?;
+            return Some((page, (left * 10.0).round() as i64));
+        }
+        node.kids.iter().find_map(|kid| self.first_position(kid))
     }
 
     /// An element Word leaves out: a text box that drew nothing (not on a page), a paragraph

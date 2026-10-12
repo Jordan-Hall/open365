@@ -338,6 +338,8 @@ pub struct Axis {
     pub crosses_at: Option<f64>,
     /// `between` or `midCat` (value axes).
     pub cross_between: Option<String>,
+    /// `c:baseTimeUnit` of a date axis (`days`, `months` or `years`); `None` is automatic.
+    pub base_time_unit: Option<String>,
     pub font_pt: Option<f64>,
 }
 
@@ -735,7 +737,10 @@ fn parse_data_labels(e: &XmlElement) -> DataLabels {
         show_legend_key: val_bool(e, "showLegendKey").unwrap_or(false),
         deleted: val_bool(e, "delete").unwrap_or(false),
         position: val(e, "dLblPos").map(str::to_owned),
-        num_fmt: child(e, "numFmt").and_then(|n| n.head.attr("formatCode").map(str::to_owned)),
+        // A format linked to the source cells is not a format of its own.
+        num_fmt: child(e, "numFmt")
+            .filter(|n| !matches!(n.head.attr("sourceLinked"), Some("1" | "true")))
+            .and_then(|n| n.head.attr("formatCode").map(str::to_owned)),
         separator: child(e, "separator").map(text_of),
         font_pt: child(e, "txPr").and_then(text_size),
     }
@@ -914,6 +919,7 @@ fn parse_axis(e: &XmlElement, kind: AxisKind) -> Axis {
         crosses: val(e, "crosses").unwrap_or("autoZero").to_owned(),
         crosses_at: val_f64(e, "crossesAt"),
         cross_between: val(e, "crossBetween").map(str::to_owned),
+        base_time_unit: val(e, "baseTimeUnit").map(str::to_owned),
         font_pt: child(e, "txPr").and_then(text_size),
     }
 }

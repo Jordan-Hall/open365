@@ -11,8 +11,8 @@
 use crate::axis::{AxisScale, max_intervals, resolve_scale};
 use crate::data::{CellSource, resolve};
 use crate::display::{
-    ApproxMeasure, DisplayItem, DisplayList, FontSpec, PathCmd, Rect, Rgba, Stroke, TextAnchor,
-    TextMeasure, TextRun,
+    ApproxMeasure, DateTick, DisplayItem, DisplayList, FontSpec, LabelBox, PathCmd, Rect, Rgba,
+    Stroke, TextAnchor, TextMeasure, TextRun,
 };
 use crate::model::{
     AxisKind, BarDirection, Chart, ChartGroup, ChartSpace, DEFAULT_TEXT_PT, DEFAULT_TITLE_PT,
@@ -201,6 +201,14 @@ fn font(opts: &RenderOptions<'_>, size: f64, bold: bool) -> FontSpec {
 struct Canvas<'a> {
     items: Vec<DisplayItem>,
     opts: &'a RenderOptions<'a>,
+    labels: Vec<LabelBox>,
+    value_ticks: Vec<String>,
+    x_ticks: Vec<String>,
+    date_ticks: Vec<DateTick>,
+    category_x: Vec<f64>,
+    /// Where data labels may sit: Excel keeps a label box within the chart area, shifted by
+    /// 4 pt up and left.
+    label_bounds: Rect,
 }
 
 impl Canvas<'_> {
@@ -304,6 +312,12 @@ pub fn render(
     let mut cv = Canvas {
         items: Vec::new(),
         opts,
+        labels: Vec::new(),
+        value_ticks: Vec::new(),
+        x_ticks: Vec::new(),
+        date_ticks: Vec::new(),
+        category_x: Vec::new(),
+        label_bounds: Rect::new(-4.0, -4.0, width_pt, height_pt),
     };
     cv.rect(
         Rect::new(0.0, 0.0, width_pt, height_pt),
@@ -434,8 +448,13 @@ pub fn render(
             _ => lr.x = outer.center_x() - lr.width / 2.0,
         }
     }
+    let mut fixed_inside = None;
     if let Some(lay) = chart.plot_area.layout {
-        outer = manual_rect(lay, area_w, area_h, outer);
+        if lay.inner {
+            fixed_inside = Some(manual_rect(lay, area_w, area_h, outer));
+        } else {
+            outer = manual_rect(lay, area_w, area_h, outer);
+        }
     }
 
     // Plot.
@@ -445,7 +464,15 @@ pub fn render(
     let plot_outer;
     let mut scales = None;
     if cartesian {
-        let layout = cartesian_layout(chart, &groups, outer, base_pt, opts, space.date1904);
+        let layout = cartesian_layout(
+            chart,
+            &groups,
+            outer,
+            fixed_inside,
+            base_pt,
+            opts,
+            space.date1904,
+        );
         inside = layout.inside;
         plot_outer = layout.outer;
         scales = Some(layout);
@@ -466,6 +493,16 @@ pub fn render(
             side,
             side,
         );
+        // A manual inner layout fixes the pie's square (Excel reports it as the plot area).
+        let sq = fixed_inside.map_or(sq, |r| {
+            let side = r.width.min(r.height);
+            Rect::new(
+                r.center_x() - side / 2.0,
+                r.center_y() - side / 2.0,
+                side,
+                side,
+            )
+        });
         inside = sq;
         plot_outer = sq;
     }
@@ -499,6 +536,11 @@ pub fn render(
     }
 
     list.items = cv.items;
+    list.data_labels = cv.labels;
+    list.value_tick_texts = cv.value_ticks;
+    list.x_tick_texts = cv.x_ticks;
+    list.date_ticks = cv.date_ticks;
+    list.category_x = cv.category_x;
     list.value_scale = scales.as_ref().map(|l| l.value);
     list.x_scale = scales.as_ref().and_then(|l| l.x_scale);
     list.date_scale = scales.as_ref().and_then(|l| l.date_scale);
@@ -678,6 +720,14 @@ struct CartLayout {
     /// Category-axis scale for scatter; `None` for category axes.
     x_scale: Option<AxisScale>,
     date_scale: Option<crate::axis::DateScale>,
+    /// Slot of every point along a date axis; `None` for category axes.
+    point_slots: Option<Vec<usize>>,
+    /// Major ticks of a date axis: serial and slot.
+    date_ticks: Vec<(f64, usize)>,
+    date_fmt: String,
+    /// Number of points of the longest series.
+    points: usize,
+    /// Number of category slots: the points, or the base units of a date axis.
     categories: usize,
     cross_between_mid: bool,
     value_fmt: String,
@@ -691,6 +741,24 @@ struct CartLayout {
     show_cat_axis: bool,
     gridlines: bool,
     label_font: FontSpec,
+}
+
+impl CartLayout {
+    /// Slot of point `i` along the category axis (reversed axes count from the end).
+    fn slot(&self, i: usize) -> f64 {
+        match &self.point_slots {
+            Some(p) => p.get(i).copied().unwrap_or(0) as f64,
+            None if self.reversed_cats => (self.categories - 1 - i) as f64,
+            None => i as f64,
+        }
+    }
+
+    /// Like [`Self::slot`], but ignoring a reversed axis.
+    fn slot_forward(&self, i: usize) -> f64 {
+        self.point_slots
+            .as_ref()
+            .map_or(i as f64, |p| p.get(i).copied().unwrap_or(0) as f64)
+    }
 }
 
 type Extent = Option<(f64, f64)>;
@@ -745,6 +813,7 @@ fn cartesian_layout(
     chart: &Chart,
     groups: &[Group<'_>],
     outer: Rect,
+    fixed_inside: Option<Rect>,
     base_pt: f64,
     opts: &RenderOptions<'_>,
     date1904: bool,
@@ -1002,23 +1071,111 @@ fn cartesian_layout(
         }
         inside = Rect::new(o.x + vw, o.y + 0.1, in_w, in_h - 0.1);
     }
+    // A manual inner plot layout fixes the plot rectangle; the scales are then picked for it.
+    let (value, x_scale, inside) = match fixed_inside {
+        Some(r) => {
+            let along = if horizontal_bars { r.width } else { r.height };
+            let pick = |moved: bool| {
+                pick_scale(
+                    val_axis,
+                    yext,
+                    log_lo,
+                    percent,
+                    AxisSpace {
+                        len: along,
+                        labels_in_plot: moved,
+                        horizontal: horizontal_bars,
+                        font_pt: label_pt,
+                        log_narrow,
+                    },
+                )
+            };
+            let mut v = pick(false);
+            if !horizontal_bars && !scatter {
+                let moved = if v.log_base.is_some() {
+                    v.min < 1.0
+                } else {
+                    v.max <= 0.0 && v.min < 0.0
+                };
+                if moved {
+                    v = pick(true);
+                }
+            }
+            let xs = scatter.then(|| {
+                resolve_scale(
+                    cat_axis.and_then(|a| a.min),
+                    cat_axis.and_then(|a| a.max),
+                    cat_axis.and_then(|a| a.major_unit),
+                    cat_axis.and_then(|a| a.minor_unit),
+                    xext,
+                    max_intervals(r.width, true, label_pt),
+                )
+            });
+            (v, xs, r)
+        }
+        None => (value, x_scale, inside),
+    };
     let cross_mid = val_axis
         .and_then(|a| a.cross_between.as_deref())
         .map_or(first.def.kind == GroupKind::Area, |c| c == "midCat");
-    let date_scale = cat_axis
-        .filter(|a| a.kind == AxisKind::Date && !scatter)
-        .and_then(|_| {
-            let xs: Vec<f64> = first
+    let date_xs: Vec<Option<f64>> = first
+        .series
+        .iter()
+        .max_by_key(|s| s.xs.len())
+        .map(|s| s.xs.clone())
+        .unwrap_or_default();
+    let date_fmt = cat_axis
+        .and_then(|a| (!a.num_fmt_linked).then(|| a.num_fmt.clone()).flatten())
+        .or_else(|| {
+            first
                 .series
-                .iter()
-                .max_by_key(|s| s.xs.len())?
-                .xs
-                .iter()
-                .flatten()
-                .copied()
-                .collect();
-            crate::axis::date_scale(&xs, inside.width, inside.height, label_pt)
+                .first()
+                .and_then(|s| s.series.categories.as_ref())
+                .and_then(|d| d.format_code.clone())
+        })
+        .unwrap_or_else(|| "General".to_owned());
+    let date_scale = cat_axis
+        .filter(|a| a.kind == AxisKind::Date && !scatter && !horizontal_bars)
+        .and_then(|_| {
+            let xs: Vec<f64> = date_xs.iter().flatten().copied().collect();
+            let forced = cat_axis
+                .and_then(|a| a.base_time_unit.as_deref())
+                .and_then(crate::axis::DateUnit::from_ooxml);
+            crate::axis::date_scale(
+                &xs,
+                inside.width,
+                inside.height,
+                label_pt,
+                forced,
+                &|serial| {
+                    // A date label wraps at its spaces: the widest word is what must fit.
+                    format_number(serial, &date_fmt, date1904)
+                        .split(' ')
+                        .map(|w| opts.measure.width(w, &cat_font))
+                        .fold(0.0, f64::max)
+                },
+            )
         });
+    let (point_slots, date_ticks, categories) = match &date_scale {
+        Some(ds) => (
+            Some(
+                date_xs
+                    .iter()
+                    .map(|x| x.map_or(0, |x| ds.slot(x)))
+                    .collect(),
+            ),
+            ds.ticks().into_iter().map(|t| (t, ds.slot(t))).collect(),
+            ds.slots(),
+        ),
+        None => (None, Vec::new(), n_cat),
+    };
+    let cat_labels = match &date_scale {
+        Some(_) => date_xs
+            .iter()
+            .map(|x| x.map_or(String::new(), |x| format_number(x, &date_fmt, date1904)))
+            .collect(),
+        None => cat_labels,
+    };
     CartLayout {
         outer: o,
         inside,
@@ -1026,7 +1183,11 @@ fn cartesian_layout(
         value,
         x_scale,
         date_scale,
-        categories: n_cat,
+        point_slots,
+        date_ticks,
+        date_fmt,
+        points: n_cat,
+        categories,
         cross_between_mid: cross_mid,
         value_fmt: vfmt,
         x_fmt: xfmt,
@@ -1129,6 +1290,7 @@ fn draw_axes(cv: &mut Canvas<'_>, l: &CartLayout, chart: &Chart, base_pt: f64, d
     for t in &ticks {
         let p = val_to(l, *t);
         let label = format_number(*t, &l.value_fmt, date1904);
+        cv.value_ticks.push(label.clone());
         if l.horizontal_bars {
             if l.gridlines {
                 cv.line(p, ins.y, p, ins.bottom(), grid.clone());
@@ -1166,6 +1328,37 @@ fn draw_axes(cv: &mut Canvas<'_>, l: &CartLayout, chart: &Chart, base_pt: f64, d
             cv.line(x, ins.bottom(), x, ins.bottom() + 3.0, axis_stroke.clone());
             if l.show_cat_axis {
                 let label = format_number(t, &l.x_fmt, date1904);
+                cv.x_ticks.push(label.clone());
+                cv.text(
+                    &label,
+                    x,
+                    ins.bottom() + 1.76,
+                    TextAnchor::Middle,
+                    &font,
+                    TEXT_COLOR,
+                    0.0,
+                );
+            }
+        }
+    } else if l.date_scale.is_some() {
+        let n = l.categories as f64;
+        for (serial, slot) in &l.date_ticks {
+            let x = cat_x(l, *slot as f64);
+            let edge = ins.x + *slot as f64 * ins.width / n;
+            cv.line(
+                edge,
+                ins.bottom(),
+                edge,
+                ins.bottom() + 3.0,
+                axis_stroke.clone(),
+            );
+            let label = format_number(*serial, &l.date_fmt, date1904);
+            cv.date_ticks.push(DateTick {
+                serial: *serial,
+                text: label.clone(),
+                x,
+            });
+            if l.show_cat_axis {
                 cv.text(
                     &label,
                     x,
@@ -1316,20 +1509,28 @@ fn draw_cartesian(
 ) {
     let ins = l.inside;
     let n = l.categories.max(1) as f64;
-    let label_font = font(cv.opts, base_pt, false);
+    if !l.horizontal_bars {
+        let first_len = groups
+            .first()
+            .and_then(|g| g.series.first())
+            .map_or(0, |s| s.values.len());
+        cv.category_x = (0..first_len).map(|i| cat_x(l, l.slot(i))).collect();
+    }
     cv.items.push(DisplayItem::PushClip(Rect::new(
         ins.x - 1.0,
         ins.y - 1.0,
         ins.width + 2.0,
         ins.height + 2.0,
     )));
+    let mut requests: Vec<LabelRequest> = Vec::new();
+    let mut series_base = 0;
     for g in groups {
         let def = g.def;
         let ns = g.series.len().max(1) as f64;
         let stacked = matches!(def.grouping, Grouping::Stacked | Grouping::PercentStacked);
-        let mut pos_base = vec![0.0f64; l.categories];
-        let mut neg_base = vec![0.0f64; l.categories];
-        let totals: Vec<f64> = (0..l.categories)
+        let mut pos_base = vec![0.0f64; l.points];
+        let mut neg_base = vec![0.0f64; l.points];
+        let totals: Vec<f64> = (0..l.points)
             .map(|i| {
                 g.series
                     .iter()
@@ -1339,6 +1540,7 @@ fn draw_cartesian(
             })
             .collect();
         for (si, s) in g.series.iter().enumerate() {
+            let series_no = series_base + si;
             match def.kind {
                 GroupKind::Bar => {
                     let gap = f64::from(def.gap_width) / 100.0;
@@ -1356,12 +1558,10 @@ fn draw_cartesian(
                     let bar = band / (slots - (slots - 1.0) * overlap + gap);
                     for (i, v) in s.values.iter().enumerate() {
                         let Some(v) = *v else { continue };
-                        let k = if l.reversed_cats {
-                            l.categories - 1 - i
-                        } else {
-                            i
-                        } as f64;
-                        let mut v0 = 0.0;
+                        let k = l.slot(i);
+                        let log = l.value.log_base.is_some();
+                        // Bars hang from zero, or from 1 where a logarithmic axis crosses.
+                        let mut v0 = if log { 1.0 } else { 0.0 };
                         let mut v1 = v;
                         if stacked {
                             let scale = if l.percent && totals[i] > 0.0 {
@@ -1380,7 +1580,15 @@ fn draw_cartesian(
                                 v1 = neg_base[i];
                             }
                         }
-                        let slot = if stacked { 0.0 } else { si as f64 };
+                        // Horizontal bars list the first series at the bottom of a group unless
+                        // the categories run top down.
+                        let slot = if stacked {
+                            0.0
+                        } else if l.horizontal_bars && !l.reversed_cats {
+                            ns - 1.0 - si as f64
+                        } else {
+                            si as f64
+                        };
                         let off = (band - bar * (slots - (slots - 1.0) * overlap)) / 2.0
                             + bar * slot * (1.0 - overlap);
                         let (a, b) = (
@@ -1396,39 +1604,19 @@ fn draw_cartesian(
                         };
                         cv.rect(rect, Some(s.color), None);
                         if let Some(lb) = s.labels.as_ref().filter(|x| x.visible()) {
-                            let text = label_text(lb, s, i, v, l, date1904);
-                            let lh = cv.opts.measure.line_height(&label_font);
-                            if l.horizontal_bars {
-                                cv.text(
-                                    &text,
-                                    rect.right() + 2.0,
-                                    rect.center_y() - lh / 2.0,
-                                    TextAnchor::Start,
-                                    &label_font,
-                                    TEXT_COLOR,
-                                    0.0,
-                                );
-                            } else if stacked {
-                                cv.text(
-                                    &text,
-                                    rect.center_x(),
-                                    rect.center_y() - lh / 2.0,
-                                    TextAnchor::Middle,
-                                    &label_font,
-                                    TEXT_COLOR,
-                                    0.0,
-                                );
-                            } else {
-                                cv.text(
-                                    &text,
-                                    rect.center_x(),
-                                    rect.y - lh - 1.0,
-                                    TextAnchor::Middle,
-                                    &label_font,
-                                    TEXT_COLOR,
-                                    0.0,
-                                );
-                            }
+                            requests.push(LabelRequest {
+                                series: series_no,
+                                point: i,
+                                text: label_text(lb, s, i, v, l, date1904),
+                                font: label_font_of(cv.opts, base_pt, lb),
+                                position: lb.position.clone(),
+                                anchor: LabelAnchor::Bar {
+                                    rect,
+                                    horizontal: l.horizontal_bars,
+                                    negative: v < if log { 1.0 } else { 0.0 },
+                                    stacked,
+                                },
+                            });
                         }
                     }
                 }
@@ -1437,7 +1625,7 @@ fn draw_cartesian(
                     let mut base_pts: Vec<(f64, f64)> = Vec::new();
                     for (i, v) in s.values.iter().enumerate() {
                         let Some(v) = *v else { continue };
-                        let x = cat_x(l, i as f64);
+                        let x = cat_x(l, l.slot_forward(i));
                         let mut y0 = 0.0;
                         let mut yv = v;
                         if stacked {
@@ -1453,17 +1641,17 @@ fn draw_cartesian(
                         pts.push((x, val_to(l, yv)));
                         base_pts.push((x, val_to(l, y0.max(l.value.min))));
                         if let Some(lb) = s.labels.as_ref().filter(|x| x.visible()) {
-                            let text = label_text(lb, s, i, v, l, date1904);
-                            let lh = cv.opts.measure.line_height(&label_font);
-                            cv.text(
-                                &text,
-                                x,
-                                val_to(l, yv) - lh - 2.0,
-                                TextAnchor::Middle,
-                                &label_font,
-                                TEXT_COLOR,
-                                0.0,
-                            );
+                            requests.push(LabelRequest {
+                                series: series_no,
+                                point: i,
+                                text: label_text(lb, s, i, v, l, date1904),
+                                font: label_font_of(cv.opts, base_pt, lb),
+                                position: lb.position.clone(),
+                                anchor: LabelAnchor::Point {
+                                    x,
+                                    y: val_to(l, yv),
+                                },
+                            });
                         }
                     }
                     if pts.is_empty() {
@@ -1494,10 +1682,21 @@ fn draw_cartesian(
                     for (i, v) in s.values.iter().enumerate() {
                         let x = s.xs.get(i).copied().flatten().unwrap_or((i + 1) as f64);
                         let Some(v) = *v else { continue };
-                        pts.push((
+                        let p = (
                             ins.x + xs.position(x).clamp(-0.5, 1.5) * ins.width,
                             val_to(l, v),
-                        ));
+                        );
+                        pts.push(p);
+                        if let Some(lb) = s.labels.as_ref().filter(|x| x.visible()) {
+                            requests.push(LabelRequest {
+                                series: series_no,
+                                point: i,
+                                text: label_text(lb, s, i, v, l, date1904),
+                                font: label_font_of(cv.opts, base_pt, lb),
+                                position: lb.position.clone(),
+                                anchor: LabelAnchor::Point { x: p.0, y: p.1 },
+                            });
+                        }
                     }
                     let lines = !s.series.line_none
                         && matches!(
@@ -1551,8 +1750,231 @@ fn draw_cartesian(
                 _ => {}
             }
         }
+        series_base += g.series.len();
     }
     cv.items.push(DisplayItem::PopClip);
+    for r in &requests {
+        place_label(cv, r, l);
+    }
+}
+
+/// Where a data label hangs.
+enum LabelAnchor {
+    /// On a column or bar.
+    Bar {
+        rect: Rect,
+        horizontal: bool,
+        negative: bool,
+        stacked: bool,
+    },
+    /// On a plotted point (line, area, scatter).
+    Point { x: f64, y: f64 },
+}
+
+struct LabelRequest {
+    series: usize,
+    point: usize,
+    text: String,
+    font: FontSpec,
+    position: Option<String>,
+    anchor: LabelAnchor,
+}
+
+fn label_font_of(opts: &RenderOptions<'_>, base_pt: f64, lb: &DataLabels) -> FontSpec {
+    let mut f = font(opts, base_pt, false);
+    if let Some(pt) = lb.font_pt {
+        f.size_pt = pt;
+    }
+    f
+}
+
+/// Margin Excel keeps around data label text inside the label box.
+const LABEL_PAD_X: f64 = 3.0;
+const LABEL_PAD_Y: f64 = 1.5;
+/// Distance of a label box from the bar edge it hangs on.
+const LABEL_BAR_GAP: f64 = 3.0;
+/// Distance of a label box from the point it labels.
+const LABEL_POINT_GAP: f64 = 7.5;
+
+/// Places one data label and draws its text. `rect` of the stored [`LabelBox`] is the box
+/// Excel reports for the label.
+fn place_label(cv: &mut Canvas<'_>, r: &LabelRequest, l: &CartLayout) {
+    let (lines, w, h) = label_lines(cv, &r.text, &r.font, 1e-9);
+    let pos = r.position.as_deref();
+    let (mut x, mut y) = match &r.anchor {
+        LabelAnchor::Bar {
+            rect,
+            horizontal,
+            negative,
+            stacked,
+        } => {
+            let pos = pos.unwrap_or(if *stacked { "ctr" } else { "outEnd" });
+            if *horizontal {
+                let mut x = match (pos, *negative) {
+                    ("inEnd", false) => rect.right() - LABEL_BAR_GAP - w,
+                    ("inEnd", true) => rect.x + LABEL_BAR_GAP,
+                    ("inBase", false) => rect.x + LABEL_BAR_GAP,
+                    ("inBase", true) if *stacked => rect.x + LABEL_BAR_GAP,
+                    ("inBase", true) => rect.right() - LABEL_BAR_GAP - w,
+                    ("ctr", _) => rect.center_x() - w / 2.0,
+                    (_, false) => rect.right() + LABEL_BAR_GAP,
+                    (_, true) => rect.x - LABEL_BAR_GAP - w,
+                };
+                // A label never crosses the bar's base line.
+                if !*stacked {
+                    x = if *negative {
+                        x.min(rect.right() - LABEL_BAR_GAP - w)
+                    } else {
+                        x.max(rect.x + LABEL_BAR_GAP)
+                    };
+                }
+                (x, rect.center_y() - h / 2.0)
+            } else {
+                let (end, base) = if *negative {
+                    (rect.bottom(), rect.y)
+                } else {
+                    (rect.y, rect.bottom())
+                };
+                let y = match (pos, *negative) {
+                    ("inEnd", false) => end + LABEL_BAR_GAP,
+                    ("inEnd", true) => end - LABEL_BAR_GAP - h,
+                    ("inBase", false) => base - LABEL_BAR_GAP - h,
+                    ("inBase", true) => base + LABEL_BAR_GAP,
+                    ("ctr", _) => rect.center_y() - h / 2.0,
+                    (_, false) => end - LABEL_BAR_GAP - h,
+                    (_, true) => end + LABEL_BAR_GAP,
+                };
+                let y = match (*stacked, *negative) {
+                    (true, _) => y,
+                    (false, true) => y.max(base + LABEL_BAR_GAP),
+                    (false, false) => y.min(base - LABEL_BAR_GAP - h),
+                };
+                (rect.center_x() - w / 2.0, y)
+            }
+        }
+        LabelAnchor::Point { x, y } => match pos.unwrap_or("r") {
+            "t" => (x - w / 2.0, y - LABEL_POINT_GAP - h),
+            "b" => (x - w / 2.0, y + LABEL_POINT_GAP),
+            "l" => (x - LABEL_POINT_GAP - w, y - h / 2.0),
+            "ctr" => (x - w / 2.0, y - h / 2.0),
+            _ => (x + LABEL_POINT_GAP, y - h / 2.0),
+        },
+    };
+    let _ = l;
+    let b = cv.label_bounds;
+    x = x.min(b.right() - w).max(b.x);
+    y = y.min(b.bottom() - h).max(b.y);
+    emit_label(
+        cv,
+        r.series,
+        r.point,
+        &r.text,
+        &lines,
+        Rect::new(x, y, w, h),
+        &r.font,
+    );
+}
+
+/// Splits a label into lines: Excel limits a label box to a fifth of the chart width and
+/// wraps longer text at spaces, or between characters when a word is too long. Returns the
+/// lines and the box size (text plus margins).
+fn label_lines(
+    cv: &Canvas<'_>,
+    text: &str,
+    font: &FontSpec,
+    slack: f64,
+) -> (Vec<String>, f64, f64) {
+    let m = cv.opts.measure;
+    let limit = (0.2 * cv.label_bounds.width - 2.0 * LABEL_PAD_X).max(1.0);
+    let lh = m.line_height(font);
+    let full = m.width(text, font);
+    if full <= limit + slack {
+        return (
+            vec![text.to_owned()],
+            full + 2.0 * LABEL_PAD_X,
+            lh + 2.0 * LABEL_PAD_Y,
+        );
+    }
+    let mut lines: Vec<String> = Vec::new();
+    let mut cur = String::new();
+    for ch in text.chars() {
+        loop {
+            let mut next = cur.clone();
+            next.push(ch);
+            if cur.is_empty() || m.width(next.trim_end(), font) <= limit {
+                cur = next;
+                break;
+            }
+            // Break after the last space, or after a hyphen that is not a minus sign in
+            // front of a digit; with neither the line breaks between characters.
+            if ch != ' '
+                && let Some(at) = last_break(&cur, ch)
+            {
+                let (head, tail) = cur.split_at(at);
+                lines.push(head.trim_end().to_owned());
+                cur = tail.to_owned();
+                continue;
+            }
+            lines.push(cur.trim_end().to_owned());
+            cur = if ch == ' ' {
+                String::new()
+            } else {
+                ch.to_string()
+            };
+            break;
+        }
+    }
+    if !cur.is_empty() {
+        lines.push(cur);
+    }
+    let widest = lines.iter().map(|t| m.width(t, font)).fold(0.0, f64::max);
+    (
+        lines.clone(),
+        widest + 2.0 * LABEL_PAD_X,
+        lh * lines.len() as f64 + 2.0 * LABEL_PAD_Y,
+    )
+}
+
+/// Byte offset after the last place `cur` (followed by `next`) may break: after a space, or after
+/// a hyphen unless a digit follows it.
+fn last_break(cur: &str, next: char) -> Option<usize> {
+    let chars: Vec<(usize, char)> = cur.char_indices().collect();
+    (0..chars.len()).rev().find_map(|i| {
+        let (at, c) = chars[i];
+        let after = chars.get(i + 1).map_or(next, |x| x.1);
+        let end = at + c.len_utf8();
+        (c == ' ' || (c == '-' && !after.is_ascii_digit())).then_some(end)
+    })
+}
+
+/// Draws a data label inside `rect` (lines centred) and records its box.
+fn emit_label(
+    cv: &mut Canvas<'_>,
+    series: usize,
+    point: usize,
+    text: &str,
+    lines: &[String],
+    rect: Rect,
+    font: &FontSpec,
+) {
+    let lh = cv.opts.measure.line_height(font);
+    for (i, line) in lines.iter().enumerate() {
+        cv.text(
+            line,
+            rect.center_x(),
+            rect.y + LABEL_PAD_Y + lh * i as f64,
+            TextAnchor::Middle,
+            font,
+            TEXT_COLOR,
+            0.0,
+        );
+    }
+    cv.labels.push(LabelBox {
+        series,
+        point,
+        text: text.to_owned(),
+        rect,
+    });
 }
 
 /// A radar web: one spoke per category, five rings, one closed polygon per series. Rings use
@@ -1711,6 +2133,71 @@ fn label_text(
     parts.join(&sep)
 }
 
+/// Text of the percentage label of slice `i`. Whole-number and one-decimal percentage formats
+/// are rounded so that the slices add up to exactly 100 % (largest remainder), as Excel does.
+fn pie_percent(shares: &[f64], i: usize, code: &str, date1904: bool) -> String {
+    let decimals = match code {
+        "0%" => Some(0),
+        "0.0%" => Some(1),
+        "0.00%" => Some(2),
+        _ => None,
+    };
+    let Some(dec) = decimals else {
+        return format_number(shares[i], code, date1904);
+    };
+    let scale = 10f64.powi(dec + 2);
+    let exact: Vec<f64> = shares.iter().map(|s| s * scale).collect();
+    let mut floor: Vec<f64> = exact.iter().map(|v| v.floor()).collect();
+    let missing = (scale - floor.iter().sum::<f64>()).round().max(0.0) as usize;
+    let mut order: Vec<usize> = (0..exact.len()).collect();
+    order.sort_by(|a, b| {
+        (exact[*b] - floor[*b])
+            .partial_cmp(&(exact[*a] - floor[*a]))
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
+    for k in order.into_iter().take(missing) {
+        floor[k] += 1.0;
+    }
+    format_number(floor[i] / scale, code, date1904)
+}
+
+/// Centre of a pie data label. Fitted to Excel's answers (`chart-labels/*.json`, 10 pt and other
+/// sizes): `centre` sits at half the radius; an outside label sits on the circle of radius
+/// `1.04 r`, shifted by half its width towards the side it is on (fully once the slice middle is
+/// 0.35 off the vertical, in proportion before) and by half its height along the vertical; an
+/// inside label sits on `0.96 r` pulled back by half its width and height in proportion to the
+/// direction; `best fit` is inside when the slice is wide enough at that radius and outside
+/// otherwise. `mid` is clockwise from twelve o'clock.
+fn pie_label_center(
+    position: Option<&str>,
+    (cx, cy): (f64, f64),
+    r: f64,
+    mid: f64,
+    sweep: f64,
+    (w, h): (f64, f64),
+) -> (f64, f64) {
+    let (sin, cos) = (mid.sin(), mid.cos());
+    let outside = || {
+        let t = (sin / 0.35).clamp(-1.0, 1.0);
+        (
+            cx + 1.04 * r * sin + (w / 2.0 + 1.5) * t,
+            cy - 1.04 * r * cos - (h / 2.0 + 1.0) * cos,
+        )
+    };
+    let inside = || {
+        (
+            cx + 0.96 * r * sin - (w / 2.0 - 1.0) * sin,
+            cy - 0.96 * r * cos + (h / 2.0 + 0.5) * cos,
+        )
+    };
+    match position {
+        Some("ctr") => (cx + 0.5 * r * sin, cy - 0.5 * r * cos),
+        Some("inEnd") => inside(),
+        Some("bestFit") if sweep * 0.82 * r >= w => inside(),
+        _ => outside(),
+    }
+}
+
 fn draw_pie(cv: &mut Canvas<'_>, g: &Group<'_>, area: Rect, base_pt: f64, date1904: bool) {
     let Some(s) = g.series.first() else { return };
     let total: f64 = s.values.iter().flatten().filter(|v| **v > 0.0).sum();
@@ -1725,6 +2212,11 @@ fn draw_pie(cv: &mut Canvas<'_>, g: &Group<'_>, area: Rect, base_pt: f64, date19
         0.0
     };
     let mut angle = f64::from(g.def.first_slice_angle).to_radians();
+    let shares: Vec<f64> = s
+        .values
+        .iter()
+        .map(|v| v.filter(|v| *v > 0.0).map_or(0.0, |v| v / total))
+        .collect();
     let font = font(cv.opts, base_pt, false);
     let white = Stroke::solid(Rgba::WHITE, 0.75);
     for (i, v) in s.values.iter().enumerate() {
@@ -1764,27 +2256,29 @@ fn draw_pie(cv: &mut Canvas<'_>, g: &Group<'_>, area: Rect, base_pt: f64, date19
                 parts.push(c.clone());
             }
             if lb.show_value {
-                parts.push(format_number(
-                    v,
-                    lb.num_fmt.as_deref().unwrap_or("General"),
-                    date1904,
-                ));
+                let code = lb
+                    .num_fmt
+                    .clone()
+                    .or_else(|| s.format_code.clone())
+                    .unwrap_or_else(|| "General".to_owned());
+                parts.push(format_number(v, &code, date1904));
             }
             if lb.show_percent {
-                parts.push(format_number(v / total, "0%", date1904));
+                let code = lb.num_fmt.as_deref().unwrap_or("0%");
+                parts.push(pie_percent(&shares, i, code, date1904));
             }
             let text = parts.join(lb.separator.as_deref().unwrap_or(", "));
-            let lh = cv.opts.measure.line_height(&font);
-            let rr = r + lh * 0.6;
-            let (tx, ty) = (cx + rr * mid.sin(), cy - rr * mid.cos());
-            let anchor = if mid.sin() > 0.3 {
-                TextAnchor::Start
-            } else if mid.sin() < -0.3 {
-                TextAnchor::End
-            } else {
-                TextAnchor::Middle
-            };
-            cv.text(&text, tx, ty - lh / 2.0, anchor, &font, TEXT_COLOR, 0.0);
+            let mut lfont = font.clone();
+            if let Some(pt) = lb.font_pt {
+                lfont.size_pt = pt;
+            }
+            let (lines, w, h) = label_lines(cv, &text, &lfont, 0.5);
+            let (cxl, cyl) =
+                pie_label_center(lb.position.as_deref(), (cx, cy), r, mid, sweep, (w, h));
+            let b = cv.label_bounds;
+            let x = (cxl - w / 2.0).min(b.right() - w).max(b.x);
+            let y = (cyl - h / 2.0).min(b.bottom() - h).max(b.y);
+            emit_label(cv, 0, i, &text, &lines, Rect::new(x, y, w, h), &lfont);
         }
         angle += sweep;
     }

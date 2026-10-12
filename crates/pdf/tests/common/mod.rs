@@ -648,3 +648,20 @@ pub fn resource_names(layout: &Layout) -> BTreeMap<usize, String> {
         .map(|(n, face)| (face, format!("F{n}")))
         .collect()
 }
+
+/// The line lies in a table cell whose clip rectangle (the box less its top and bottom margins)
+/// is empty: Word draws none of its text.
+#[allow(dead_code)]
+pub fn clipped_away(page: &open365_layout::Page, line: &open365_layout::Line) -> bool {
+    line.story == open365_layout::StoryKind::Main
+        && page
+            .cells
+            .iter()
+            .filter(|c| c.height - c.pad_top - c.pad_bottom <= 0.005)
+            .any(|c| {
+                line.left >= c.x - 0.01
+                    && line.left < c.x + c.width
+                    && line.top < c.y + c.height
+                    && line.top + line.height > c.y
+            })
+}
