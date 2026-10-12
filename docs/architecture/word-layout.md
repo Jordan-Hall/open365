@@ -377,4 +377,14 @@ Still open:
 | Block content controls in headers and footers are part of the story (page number galleries); a later section with `titlePg` after a section that has header/footer parts has empty first-page header and footer. | `4e493df5` 104 -> 213 |
 | A table whose top lies exactly between two grid lines (52.2 pt) goes to the lower line and keeps its row distances from it. | `ca4e5536` 483 -> 607 |
 
-Open: `w:beforeAutospacing`/`afterAutospacing` (probe `layout-autospacing`: 14 pt between paragraphs, collapsed with the larger neighbour, 0 at page top and first paragraph of a cell) needs `crates/docx` to expose the flag (`371fe1a1`, 7/127); x-edge ties (178.2, 142.2 go down, 217.8 goes up) are unexplained; implied empty first-page header/footer lines are not emitted; `65cf689e` remaining misses are mostly oracle mispairing of repeated placeholder text.
+Open: x-edge ties (178.2, 142.2 go down, 217.8 goes up) are unexplained; implied empty first-page header/footer lines are not emitted; `65cf689e` remaining misses are mostly oracle mispairing of repeated placeholder text.
+
+## Round 17 (autospacing, paragraph shading, run East Asian font)
+
+| Rule | Evidence |
+|---|---|
+| `w:beforeAutospacing` / `w:afterAutospacing` (direct formatting and style chain, `ParaFmt::from_ppr`; a written `w:before` / `w:after` without the flag clears an inherited flag) make the space 14 pt and set `ParagraphProps::before_auto` / `after_auto`. Spaces still collapse to the larger neighbour. Automatic space before is 0 at the top of a page and for the first paragraph of a cell; automatic space after the last paragraph of a cell is taken as 0 (probable, no probe separates it from the cell tail). | `layout-autospacing` 0 -> 25/25; `371fe1a1` 7 -> 61 of 127; `ad265748` 219 -> 236 of 516 |
+| Paragraph `w:shd` is drawn as a band per line: text area +- 1.44 pt (the side-rule gap), top of the line box to its bottom; in a border box from the inner edge of the top rule to the inner edge of the bottom rule. Between two paragraphs with the same band edges the gap is filled: the upper band down by its space after, the lower one up by the remainder. Next to an unshaded paragraph or one with other edges the space stays unfilled. `shading.rs` (`Line::shading`, set after pagination like `Page::rules`). | `p-pshd` (all 14 plain-band rectangles within 0.2 pt of Word's PDF, which is 1.0004 / 1.0003 times nominal; the marked content is equal) |
+| A side rule stands off the text by `w:space` rounded down to whole 0.24 pt units (4 pt is 3.84 pt). | `rules-floor.toml` 32/46/5 -> 39/48/10 |
+
+Open: the pattern shading is mixed to a solid colour (`pctNN`), Word draws it the same way in `p-pshd` (0.749 grey for `pct25`); other patterns (stripes) are drawn as the fill colour. The hint (`FontHint`) and the East Asian font (`EffectiveRun::east_asia_font`) are exposed by `crates/docx` but the layout does not use them yet (ballot boxes U+2610 to U+2612 with `w:hint="eastAsia"` need the font fallback to pick the East Asian slot).

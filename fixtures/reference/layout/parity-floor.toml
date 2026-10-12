@@ -53,7 +53,7 @@ matched = 10
 total = 10
 
 [fixtures.layout-autospacing]
-matched = 0
+matched = 25
 total = 25
 
 [fixtures.layout-caps]

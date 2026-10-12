@@ -816,6 +816,7 @@ pub(crate) fn build_line(
         label: label_text,
         role: para.role,
         border: None,
+        shading: para.line_shading(lb, left_origin),
     }
 }
 
@@ -930,6 +931,10 @@ fn first_gap(pg: &PageBuild, para: &ParaLayout) -> f64 {
     }
     if !pg.has_content() {
         after = 0.0;
+        // Measured (layout-autospacing): automatic space before is 0 at the top of a page.
+        if para.flow.before_auto {
+            before = 0.0;
+        }
         if !pg.hard_start && pg.number > 1 {
             before = 0.0;
         }

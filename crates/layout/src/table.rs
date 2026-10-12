@@ -61,7 +61,7 @@ fn resolve_border(
 }
 
 /// A shading as a solid colour: `pctNN` patterns mix the foreground into the fill.
-fn shading_fill(s: &Shading) -> Option<[u8; 3]> {
+pub(crate) fn shading_fill(s: &Shading) -> Option<[u8; 3]> {
     let pattern = s.pattern.as_str();
     match pattern {
         "nil" | "none" => None,
@@ -325,6 +325,7 @@ struct Prev {
     after: f64,
     contextual: bool,
     style: Option<String>,
+    after_auto: bool,
 }
 
 /// What a cell holds, relative to its content box.
@@ -378,6 +379,7 @@ pub(crate) fn layout_cell(
             Block::Paragraph(p) => {
                 let idx = b.paragraph(p, content_w, Some(fmt));
                 let pl = &b.arena[idx];
+                let first_block = !seen_block;
                 if !seen_block {
                     head_style = pl.style_id.clone();
                 }
@@ -396,6 +398,11 @@ pub(crate) fn layout_cell(
                     y += std::mem::take(&mut pending_bottom);
                 }
                 let mut before = f64::from(pl.props.space_before_pt);
+                // Measured (layout-autospacing): automatic space before is 0 for the first
+                // paragraph of a cell.
+                if pl.flow.before_auto && first_block {
+                    before = 0.0;
+                }
                 let mut after_prev = prev.as_ref().map_or(0.0, |p| p.after);
                 if let Some(pv) = &prev
                     && pv.style == pl.style_id
@@ -513,6 +520,7 @@ pub(crate) fn layout_cell(
                     after: f64::from(pl.props.space_after_pt),
                     contextual: pl.flow.contextual_spacing,
                     style: pl.style_id.clone(),
+                    after_auto: pl.flow.after_auto,
                 });
             }
             Block::Table(t) => {
@@ -535,10 +543,11 @@ pub(crate) fn layout_cell(
         }
     }
     y += pending_bottom;
+    // Probably (layout-autospacing): automatic space after the last paragraph of a cell is 0.
     let tail = prev.map(|p| Tail {
         style: p.style,
         contextual: p.contextual,
-        after: p.after,
+        after: if p.after_auto { 0.0 } else { p.after },
     });
     y += tail.as_ref().map_or(0.0, |t| t.after);
     CellContent {

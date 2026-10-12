@@ -37,6 +37,7 @@ mod numbering;
 mod para;
 mod props;
 mod rules;
+mod shading;
 mod table;
 mod textbox;
 
@@ -50,6 +51,7 @@ pub use incremental::{IncrementalLayout, UpdateStats};
 pub use metrics::LineMetricModel;
 pub use props::{SectionProps, TabKind, TabLeader, TabStop};
 pub use rules::LineBorder;
+pub use shading::LineShading;
 
 /// Knobs for layout. The defaults are the measured Word behaviour.
 #[derive(Debug, Clone, Copy)]
@@ -206,6 +208,8 @@ pub struct Line {
     pub role: ParaRole,
     /// The paragraph's border box, when it has borders; [`Page::rules`] is derived from it.
     pub border: Option<LineBorder>,
+    /// The paragraph's fill (`w:shd`), when it has one: the band Word draws behind this line.
+    pub shading: Option<LineShading>,
 }
 
 impl Line {

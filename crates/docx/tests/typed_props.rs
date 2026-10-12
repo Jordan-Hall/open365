@@ -5,8 +5,8 @@
 mod common;
 
 use open365_docx::{
-    Columns, DEFAULT_COMPATIBILITY_MODE, DocGridType, Document, Inline, Ligatures, Orientation,
-    Run, SectionType, TabKind, TabLeader,
+    Columns, DEFAULT_COMPATIBILITY_MODE, DocGridType, Document, FontHint, Inline, Ligatures,
+    Orientation, Run, SectionType, TabKind, TabLeader,
 };
 use open365_opc::Limits;
 
@@ -556,4 +556,101 @@ fn paragraph_borders_resolve_through_defaults_style_chain_and_direct() {
         borders(3).top.is_none(),
         "direct none removes the style's side"
     );
+}
+
+#[test]
+fn auto_spacing_replaces_the_written_space_in_direct_formatting_and_the_style_chain() {
+    let styles = styles_xml(
+        r#"<w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/><w:pPr><w:spacing w:before="40" w:after="60"/></w:pPr></w:style>
+<w:style w:type="paragraph" w:styleId="Web"><w:name w:val="Web"/><w:basedOn w:val="Normal"/><w:pPr><w:spacing w:beforeAutospacing="1" w:afterAutospacing="1" w:before="100" w:after="100"/></w:pPr></w:style>
+<w:style w:type="paragraph" w:styleId="WebChild"><w:name w:val="WebChild"/><w:basedOn w:val="Web"/></w:style>"#,
+    );
+    let doc = doc_with(
+        r#"<w:p><w:r><w:t>plain</w:t></w:r></w:p>
+<w:p><w:pPr><w:pStyle w:val="Web"/></w:pPr><w:r><w:t>style</w:t></w:r></w:p>
+<w:p><w:pPr><w:pStyle w:val="WebChild"/></w:pPr><w:r><w:t>inherited</w:t></w:r></w:p>
+<w:p><w:pPr><w:pStyle w:val="Web"/><w:spacing w:before="200" w:after="0"/></w:pPr><w:r><w:t>overridden</w:t></w:r></w:p>
+<w:p><w:pPr><w:spacing w:beforeAutospacing="1" w:afterAutospacing="0" w:after="80"/></w:pPr><w:r><w:t>direct</w:t></w:r></w:p>"#,
+        Some(&styles),
+        None,
+    );
+    let st = doc.styles().unwrap();
+    let at = |i: usize| {
+        let p = doc.paragraph(i).unwrap();
+        (st.effective_para_props(p), st.paragraph_flow_props(p))
+    };
+    let (eff, flow) = at(0);
+    assert_eq!((eff.space_before_pt, eff.space_after_pt), (2.0, 3.0));
+    assert!(!flow.before_auto && !flow.after_auto);
+    for i in [1, 2] {
+        let (eff, flow) = at(i);
+        assert_eq!(
+            (eff.space_before_pt, eff.space_after_pt),
+            (14.0, 14.0),
+            "{i}"
+        );
+        assert!(flow.before_auto && flow.after_auto, "{i}");
+    }
+    // A written value without the flag replaces the style's automatic space.
+    let (eff, flow) = at(3);
+    assert_eq!((eff.space_before_pt, eff.space_after_pt), (10.0, 0.0));
+    assert!(!flow.before_auto && !flow.after_auto);
+    let (eff, flow) = at(4);
+    assert_eq!((eff.space_before_pt, eff.space_after_pt), (14.0, 4.0));
+    assert!(flow.before_auto && !flow.after_auto);
+}
+
+#[test]
+fn paragraph_shading_resolves_through_the_style_chain() {
+    let styles = styles_xml(
+        r#"<w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/></w:style>
+<w:style w:type="paragraph" w:styleId="Shaded"><w:name w:val="Shaded"/><w:basedOn w:val="Normal"/><w:pPr><w:shd w:val="clear" w:color="auto" w:fill="FFFF00"/></w:pPr></w:style>"#,
+    );
+    let doc = doc_with(
+        r#"<w:p><w:r><w:t>none</w:t></w:r></w:p>
+<w:p><w:pPr><w:pStyle w:val="Shaded"/></w:pPr><w:r><w:t>style</w:t></w:r></w:p>
+<w:p><w:pPr><w:pStyle w:val="Shaded"/><w:shd w:val="pct25" w:color="000000" w:fill="FFFFFF"/></w:pPr><w:r><w:t>direct</w:t></w:r></w:p>"#,
+        Some(&styles),
+        None,
+    );
+    let st = doc.styles().unwrap();
+    let shading = |i: usize| st.paragraph_flow_props(doc.paragraph(i).unwrap()).shading;
+    assert_eq!(shading(0), None);
+    let s = shading(1).unwrap();
+    assert_eq!((s.pattern.as_str(), s.fill), ("clear", Some([255, 255, 0])));
+    let d = shading(2).unwrap();
+    assert_eq!(d.pattern, "pct25");
+    assert_eq!(d.color, Some([0, 0, 0]));
+}
+
+#[test]
+fn run_east_asian_font_and_hint_resolve_like_the_latin_font() {
+    let styles = styles_xml(
+        r#"<w:docDefaults><w:rPrDefault><w:rPr><w:rFonts w:ascii="Calibri" w:hAnsi="Calibri" w:eastAsia="MS Mincho"/></w:rPr></w:rPrDefault></w:docDefaults>
+<w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/></w:style>
+<w:style w:type="character" w:styleId="Han"><w:name w:val="Han"/><w:rPr><w:rFonts w:hint="eastAsia"/></w:rPr></w:style>"#,
+    );
+    let doc = doc_with(
+        r#"<w:p><w:r><w:t>a</w:t></w:r><w:r><w:rPr><w:rFonts w:hint="eastAsia" w:eastAsia="Yu Gothic"/></w:rPr><w:t>&#x2610;</w:t></w:r><w:r><w:rPr><w:rFonts w:hint="cs"/></w:rPr><w:t>b</w:t></w:r></w:p>"#,
+        Some(&styles),
+        None,
+    );
+    let st = doc.styles().unwrap();
+    let p = doc.paragraph(0).unwrap();
+    let runs: Vec<&Run> = p
+        .content
+        .iter()
+        .filter_map(|i| match i {
+            Inline::Run(r) => Some(r),
+            _ => None,
+        })
+        .collect();
+    let eff = |i: usize| st.effective_run_props(p, runs[i]);
+    assert_eq!(eff(0).east_asia_font.as_deref(), Some("MS Mincho"));
+    assert_eq!(eff(0).hint, FontHint::Default);
+    assert_eq!(eff(1).east_asia_font.as_deref(), Some("Yu Gothic"));
+    assert_eq!(eff(1).hint, FontHint::EastAsia);
+    // The hint is its own attribute: the run keeps the inherited East Asian font.
+    assert_eq!(eff(2).east_asia_font.as_deref(), Some("MS Mincho"));
+    assert_eq!(eff(2).hint, FontHint::ComplexScript);
 }

@@ -12,14 +12,14 @@ use open365_opc::PartName;
 
 use crate::DocxError;
 use crate::layout_props::{
-    LayoutFmt, ParagraphBorders, ParagraphMark, ParagraphProps, RunLayoutProps, TabOp,
+    FontHint, LayoutFmt, ParagraphBorders, ParagraphMark, ParagraphProps, RunLayoutProps, TabOp,
     resolve_tabs, tab_ops,
 };
 use crate::model::{Paragraph, Run};
 use crate::numbering::{NumPr, StyleNumPr};
 use crate::ppr::Alignment;
 use crate::props::RunProps;
-use crate::table::{CellPosition, CellProps, TableProps, TableStyleCondition};
+use crate::table::{CellPosition, CellProps, Shading, TableProps, TableStyleCondition};
 use crate::xml::{self, ParsedXml, RawXml, XmlElement};
 
 const WORD_NS: &str = crate::xml::W_NS;
@@ -63,6 +63,11 @@ pub enum LineSpacing {
 pub struct EffectiveRun {
     /// Latin font family name (theme fonts resolved).
     pub font: String,
+    /// East Asian font family (`w:rFonts` `eastAsia`, or the theme's East Asian slot); `None`
+    /// when the run names none and the theme has none.
+    pub east_asia_font: Option<String>,
+    /// `w:rFonts/@w:hint`.
+    pub hint: FontHint,
     pub size_half_points: u32,
     pub bold: bool,
     pub italic: bool,
@@ -114,6 +119,8 @@ enum FontSpec {
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 struct RunFmt {
     font: Option<FontSpec>,
+    east_asia: Option<FontSpec>,
+    hint: Option<FontHint>,
     size: Option<u32>,
     bold: Option<bool>,
     italic: Option<bool>,
@@ -136,8 +143,26 @@ impl RunFmt {
                 .or_else(|| theme(f.head.attr_w("hAnsiTheme")))
                 .or_else(|| f.head.attr_w("hAnsi").map(|n| FontSpec::Name(n.to_owned())))
         });
+        let east_asia = props.fonts().and_then(|f| {
+            match f.head.attr_w("eastAsiaTheme") {
+                Some(t) if t.starts_with("major") => Some(FontSpec::Major),
+                Some(t) if t.starts_with("minor") => Some(FontSpec::Minor),
+                _ => None,
+            }
+            .or_else(|| {
+                f.head
+                    .attr_w("eastAsia")
+                    .map(|n| FontSpec::Name(n.to_owned()))
+            })
+        });
+        let hint = props
+            .fonts()
+            .and_then(|f| f.head.attr_w("hint"))
+            .map(FontHint::parse);
         Self {
             font,
+            east_asia,
+            hint,
             size: props.size_half_points(),
             bold: props.bold(),
             italic: props.italic(),
@@ -155,6 +180,8 @@ impl RunFmt {
             }
         }
         put(&mut self.font, &other.font);
+        put(&mut self.east_asia, &other.east_asia);
+        put(&mut self.hint, &other.hint);
         put(&mut self.size, &other.size);
         put(&mut self.bold, &other.bold);
         put(&mut self.italic, &other.italic);
@@ -179,6 +206,9 @@ struct ParaFmt {
     alignment: Option<Alignment>,
     before: Option<f32>,
     after: Option<f32>,
+    /// `w:beforeAutospacing` / `w:afterAutospacing`: Word's automatic space replaces the value.
+    before_auto: Option<bool>,
+    after_auto: Option<bool>,
     line: Option<LineSpacing>,
     left: Option<f32>,
     right: Option<f32>,
@@ -191,6 +221,8 @@ struct ParaFmt {
     suppress_auto_hyphens: Option<bool>,
     tab_ops: Vec<TabOp>,
     borders: ParagraphBorders,
+    /// `w:shd` of `w:pPr`.
+    shading: Option<Shading>,
 }
 
 fn twips(value: Option<&str>) -> Option<f32> {
@@ -198,6 +230,13 @@ fn twips(value: Option<&str>) -> Option<f32> {
         .and_then(|v| v.trim().parse::<f32>().ok())
         .map(|t| t / 20.0)
 }
+
+fn spacing_flag(value: &str) -> bool {
+    !matches!(value.trim(), "0" | "false" | "off")
+}
+
+/// Word's automatic paragraph space (`w:beforeAutospacing`, `w:afterAutospacing`), in points.
+pub const AUTO_SPACING_PT: f32 = 14.0;
 
 fn on_off(element: &XmlElement) -> bool {
     !matches!(element.head.attr_w("val"), Some("0" | "false" | "off"))
@@ -221,9 +260,23 @@ impl ParaFmt {
                 "suppressAutoHyphens" => fmt.suppress_auto_hyphens = Some(on_off(e)),
                 "tabs" => fmt.tab_ops.extend(tab_ops(e)),
                 "pBdr" => fmt.borders = ParagraphBorders::from_element(e),
+                "shd" => fmt.shading = Some(Shading::from_element(e)),
                 "spacing" => {
                     fmt.before = twips(e.head.attr_w("before")).or(fmt.before);
                     fmt.after = twips(e.head.attr_w("after")).or(fmt.after);
+                    // A written space value without the flag replaces inherited automatic space.
+                    if e.head.attr_w("before").is_some() {
+                        fmt.before_auto = Some(false);
+                    }
+                    if e.head.attr_w("after").is_some() {
+                        fmt.after_auto = Some(false);
+                    }
+                    if let Some(v) = e.head.attr_w("beforeAutospacing") {
+                        fmt.before_auto = Some(spacing_flag(v));
+                    }
+                    if let Some(v) = e.head.attr_w("afterAutospacing") {
+                        fmt.after_auto = Some(spacing_flag(v));
+                    }
                     if let Some(line) = e
                         .head
                         .attr_w("line")
@@ -263,6 +316,8 @@ impl ParaFmt {
         put(&mut self.alignment, other.alignment);
         put(&mut self.before, other.before);
         put(&mut self.after, other.after);
+        put(&mut self.before_auto, other.before_auto);
+        put(&mut self.after_auto, other.after_auto);
         put(&mut self.line, other.line);
         put(&mut self.left, other.left);
         put(&mut self.right, other.right);
@@ -275,6 +330,9 @@ impl ParaFmt {
         put(&mut self.suppress_auto_hyphens, other.suppress_auto_hyphens);
         self.tab_ops.extend(other.tab_ops.iter().copied());
         self.borders.overlay(&other.borders);
+        if other.shading.is_some() {
+            self.shading.clone_from(&other.shading);
+        }
     }
 }
 
@@ -343,6 +401,25 @@ fn local_child<'a>(el: &'a XmlElement, local: &str) -> Option<&'a XmlElement> {
 }
 
 impl ThemeFonts {
+    /// The `a:ea` typefaces of the major and minor font slots; an empty typeface is `None`.
+    fn parse_east_asia(bytes: &[u8]) -> (Option<String>, Option<String>) {
+        let Some(parsed) = xml::parse(bytes).ok() else {
+            return (None, None);
+        };
+        let scheme =
+            local_child(&parsed.root, "themeElements").and_then(|e| local_child(e, "fontScheme"));
+        let ea = |slot: &str| -> Option<String> {
+            let ea = local_child(local_child(scheme?, slot)?, "ea")?;
+            ea.head
+                .attrs
+                .iter()
+                .find(|a| a.name == "typeface")
+                .map(|a| a.value.clone())
+                .filter(|t| !t.is_empty())
+        };
+        (ea("majorFont"), ea("minorFont"))
+    }
+
     fn parse(bytes: &[u8]) -> Option<Self> {
         let parsed = xml::parse(bytes).ok()?;
         let elements = local_child(&parsed.root, "themeElements")?;
@@ -376,6 +453,8 @@ pub struct Styles {
     order: Vec<String>,
     default_paragraph: Option<String>,
     theme: ThemeFonts,
+    /// East Asian typeface of the theme's major and minor font slots (empty slots are `None`).
+    theme_ea: (Option<String>, Option<String>),
     dirty: bool,
 }
 
@@ -473,6 +552,7 @@ impl Styles {
             order: Vec::new(),
             default_paragraph: None,
             theme: theme.and_then(ThemeFonts::parse).unwrap_or_default(),
+            theme_ea: theme.map(ThemeFonts::parse_east_asia).unwrap_or_default(),
             dirty: false,
             parsed,
         };
@@ -601,6 +681,13 @@ impl Styles {
     fn effective_from(&self, fmt: &RunFmt) -> EffectiveRun {
         EffectiveRun {
             font: self.resolve_font(fmt.font.as_ref()),
+            east_asia_font: match fmt.east_asia.as_ref() {
+                Some(FontSpec::Name(n)) => Some(n.clone()),
+                Some(FontSpec::Major) => self.theme_ea.0.clone(),
+                Some(FontSpec::Minor) => self.theme_ea.1.clone(),
+                None => None,
+            },
+            hint: fmt.hint.unwrap_or_default(),
             size_half_points: fmt.size.unwrap_or(FALLBACK_SIZE_HALF_POINTS),
             bold: fmt.bold.unwrap_or(false),
             italic: fmt.italic.unwrap_or(false),
@@ -690,6 +777,9 @@ impl Styles {
             page_break_before: fmt.page_break_before.unwrap_or(false),
             contextual_spacing: fmt.contextual_spacing.unwrap_or(false),
             suppress_auto_hyphens: fmt.suppress_auto_hyphens.unwrap_or(false),
+            before_auto: fmt.before_auto.unwrap_or(false),
+            after_auto: fmt.after_auto.unwrap_or(false),
+            shading: fmt.shading.clone(),
             tabs: resolve_tabs(&fmt.tab_ops),
             borders: fmt.borders.visible(),
         }
@@ -725,8 +815,16 @@ impl Styles {
         let fmt = self.resolved_para_fmt(para, table);
         EffectiveParagraph {
             alignment: fmt.alignment.unwrap_or(Alignment::Left),
-            space_before_pt: fmt.before.unwrap_or(0.0),
-            space_after_pt: fmt.after.unwrap_or(0.0),
+            space_before_pt: if fmt.before_auto == Some(true) {
+                AUTO_SPACING_PT
+            } else {
+                fmt.before.unwrap_or(0.0)
+            },
+            space_after_pt: if fmt.after_auto == Some(true) {
+                AUTO_SPACING_PT
+            } else {
+                fmt.after.unwrap_or(0.0)
+            },
             line: fmt.line.unwrap_or(LineSpacing::Multiple(1.0)),
             indent_left_pt: fmt.left.unwrap_or(0.0),
             indent_right_pt: fmt.right.unwrap_or(0.0),

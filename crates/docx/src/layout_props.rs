@@ -132,6 +132,12 @@ pub struct ParagraphProps {
     pub contextual_spacing: bool,
     /// `w:suppressAutoHyphens`, §17.3.1.34. Default false.
     pub suppress_auto_hyphens: bool,
+    /// `w:beforeAutospacing`: the space before is Word's automatic 14 pt (§17.3.1.33).
+    pub before_auto: bool,
+    /// `w:afterAutospacing`: the space after is Word's automatic 14 pt.
+    pub after_auto: bool,
+    /// `w:shd` of the paragraph (§17.3.1.31): the fill behind its lines.
+    pub shading: Option<crate::Shading>,
     /// Effective custom tab stops (§17.3.1.38), sorted by position, `clear` applied.
     pub tabs: Vec<TabStop>,
     /// Effective paragraph borders (`w:pBdr`, §17.3.1.24); a side without a visible border is
@@ -223,6 +229,9 @@ impl Default for ParagraphProps {
             page_break_before: false,
             contextual_spacing: false,
             suppress_auto_hyphens: false,
+            before_auto: false,
+            after_auto: false,
+            shading: None,
             tabs: Vec::new(),
             borders: ParagraphBorders::default(),
         }
@@ -258,6 +267,30 @@ impl Ligatures {
 
     pub fn is_none(&self) -> bool {
         *self == Self::default()
+    }
+}
+
+/// `w:rFonts/@w:hint` (§17.3.2.26): which font slot Word uses for ambiguous characters
+/// (for example U+2610 to U+2612, which have both East Asian and Latin glyphs).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum FontHint {
+    /// No hint, or `default`.
+    #[default]
+    Default,
+    /// `eastAsia`.
+    EastAsia,
+    /// `cs`.
+    ComplexScript,
+}
+
+impl FontHint {
+    /// Parse a `w:hint` value; an unknown value is no hint.
+    pub fn parse(value: &str) -> Self {
+        match value.trim() {
+            "eastAsia" => Self::EastAsia,
+            "cs" => Self::ComplexScript,
+            _ => Self::Default,
+        }
     }
 }
 

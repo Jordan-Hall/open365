@@ -191,7 +191,7 @@ pub struct Shading {
 }
 
 impl Shading {
-    fn from_element(e: &XmlElement) -> Self {
+    pub(crate) fn from_element(e: &XmlElement) -> Self {
         Self {
             pattern: e.head.attr_w("val").unwrap_or("clear").to_owned(),
             fill: e.head.attr_w("fill").and_then(parse_color),

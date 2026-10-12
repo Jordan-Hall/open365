@@ -2,16 +2,16 @@
 # Raise with UPDATE_PARITY_FLOOR=1; never lower.
 
 [layout-pbdr-ctx]
-matched = 32
+matched = 39
 
 [layout-pbdr-edges]
 matched = 44
 
 [layout-pbdr-groups]
-matched = 46
+matched = 48
 
 [layout-pbdr-pages]
-matched = 5
+matched = 10
 
 [layout-pbdr-styles]
 matched = 64

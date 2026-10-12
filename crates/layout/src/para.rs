@@ -177,6 +177,28 @@ impl ParaLayout {
         })
     }
 
+    /// The fill information a line of this paragraph carries (`w:shd`), `None` without a fill.
+    pub(crate) fn line_shading(
+        &self,
+        lb: &LineBox,
+        origin_x: f64,
+    ) -> Option<crate::shading::LineShading> {
+        let fill = self
+            .flow
+            .shading
+            .as_ref()
+            .and_then(crate::table::shading_fill)?;
+        Some(crate::shading::LineShading {
+            fill,
+            rect: [0.0; 4],
+            left: origin_x + f64::from(self.props.indent_left_pt),
+            right: origin_x + self.fill.text_width - f64::from(self.props.indent_right_pt),
+            after: f64::from(self.props.space_after_pt),
+            first: lb.atoms.start == 0,
+            last: lb.atoms.end >= self.atoms.len(),
+        })
+    }
+
     /// Whether `next` continues this paragraph's border group: borders present and identical,
     /// and the same left and right indents (alignment does not matter; layout-pbdr-groups).
     pub(crate) fn joins(&self, next: &Self) -> bool {
@@ -529,6 +551,8 @@ pub(crate) struct Context<'a> {
 fn fallback_run(er: Option<EffectiveRun>) -> EffectiveRun {
     er.unwrap_or(EffectiveRun {
         font: "Calibri".to_owned(),
+        east_asia_font: None,
+        hint: open365_docx::FontHint::Default,
         size_half_points: 22,
         bold: false,
         italic: false,

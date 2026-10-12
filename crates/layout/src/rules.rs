@@ -123,6 +123,12 @@ impl Edge {
         }
     }
 
+    /// `w:space` as a side rule stands off the text: whole grid units, rounded down (a 4 pt
+    /// space is 3.84 pt; `p-pshd`).
+    fn side_space(&self) -> f64 {
+        (self.space / UNIT + 1e-6).floor() * UNIT
+    }
+
     /// Thickness of all bars with their gaps, in points.
     fn thickness(&self) -> f64 {
         self.bars.last().map_or(0.0, |(o, t)| (o + t) * UNIT)
@@ -175,7 +181,7 @@ pub struct LineBorder {
 
 /// Whether the lines `a` then `b` are in one border box (the same paragraph, or consecutive
 /// paragraphs the layout joined).
-fn same_box(a: &Line, b: &Line) -> bool {
+pub(crate) fn same_box(a: &Line, b: &Line) -> bool {
     let (Some(x), Some(y)) = (&a.border, &b.border) else {
         return false;
     };
@@ -230,6 +236,41 @@ pub(crate) fn rules_of(lines: &[Line], rules: &mut Vec<Rule>) {
     }
 }
 
+/// The edges of a border box that a fill inside it stops at (page coordinates, y down).
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct BoxEdges {
+    pub left_inner: f64,
+    pub right_inner: f64,
+    /// Inner edge of the top rule; `None` when the box has no top rule at its top.
+    pub top_inner: Option<f64>,
+    /// Inner edge of the bottom rule; `None` when the box has no bottom rule at its bottom.
+    pub bottom_inner: Option<f64>,
+}
+
+/// The edges of the border box of `lines` (consecutive lines of one border group).
+pub(crate) fn box_edges(lines: &[Line]) -> Option<BoxEdges> {
+    let (first, last) = (lines.first()?, lines.last()?);
+    let (fb, lb) = (first.border.as_ref()?, last.border.as_ref()?);
+    let spec = &fb.spec;
+    let side_in = |e: &Option<Edge>| e.as_ref().map_or(SIDE_GAP, |e| e.side_space() + SIDE_GAP);
+    let top_edge = fb
+        .first
+        .then_some(())
+        .and(spec.top.as_ref())
+        .filter(|_| !fb.join_prev);
+    let bottom_edge = lb
+        .last
+        .then_some(())
+        .and(spec.bottom.as_ref())
+        .filter(|_| !lb.join_next);
+    Some(BoxEdges {
+        left_inner: snap(fb.left - side_in(&spec.left)),
+        right_inner: snap(fb.right + side_in(&spec.right)),
+        top_inner: top_edge.map(|e| snap(first.top - e.space - e.extent) + snap_len(e.thickness())),
+        bottom_inner: bottom_edge.map(|e| snap(last.top + last.height + e.space)),
+    })
+}
+
 /// The rules of one box: consecutive lines of one border group on one page.
 fn box_rules(lines: &[Line], rules: &mut Vec<Rule>) {
     let (first, last) = (&lines[0], &lines[lines.len() - 1]);
@@ -243,7 +284,7 @@ fn box_rules(lines: &[Line], rules: &mut Vec<Rule>) {
         paragraph: first.paragraph,
     };
     // Horizontal extent: the side rules' outer edges, or the bare gap when a side has no rule.
-    let side_in = |e: &Option<Edge>| e.as_ref().map_or(SIDE_GAP, |e| e.space + SIDE_GAP);
+    let side_in = |e: &Option<Edge>| e.as_ref().map_or(SIDE_GAP, |e| e.side_space() + SIDE_GAP);
     let left_inner = snap(fb.left - side_in(&spec.left));
     let right_inner = snap(fb.right + side_in(&spec.right));
     let left_outer = left_inner - spec.left.as_ref().map_or(0.0, |e| snap_len(e.thickness()));

@@ -30,6 +30,7 @@ use crate::numbering::ListLabel;
 use crate::para::{Context, FieldEnv, LineBox, NoteOrder, ParaLayout};
 use crate::props::{SectionCols, SectionProps};
 use crate::rules::rules_of;
+use crate::shading::shades_of;
 use crate::{ImagePlacement, ImageSource, Line, NoteSlot, Page, StoryKind};
 
 /// Where the body goes on a page.
@@ -382,6 +383,14 @@ impl Furniture {
             rules_of(&page.notes, &mut rules);
             rules_of(&page.footer, &mut rules);
             page.rules = rules;
+            for lines in [
+                &mut page.header,
+                &mut page.lines,
+                &mut page.notes,
+                &mut page.footer,
+            ] {
+                shades_of(lines);
+            }
         }
     }
 }

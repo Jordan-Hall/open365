@@ -562,11 +562,13 @@ fn blanks_of_consecutive_tabs_with_custom_stops_equal_words() {
 fn marked_content_of_tables_and_bordered_paragraphs_equals_words() {
     let fonts = FontLibrary::bundled();
     for name in [
+        "layout-pbdr-ctx",
         "layout-pbdr-edges",
         "layout-pbdr-groups",
         "layout-pbdr-pages",
         "layout-table-flow",
         "layout-table-rows",
+        "probes/p-pshd",
         "probes/p-thead-nest",
         "probes/p-thead-nest2",
         "probes/p-tnest",

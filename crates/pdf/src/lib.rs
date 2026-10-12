@@ -1341,8 +1341,26 @@ impl Export<'_> {
             self.draw_line(&mut buf, line);
         }
         let trailing = self.nested_trailing(page, &cell_of);
-        for at in order {
+        // The line of the shaded paragraph being drawn: (paragraph, lines drawn so far).
+        let mut shade_run: Option<(usize, usize)> = None;
+        for (pos, &at) in order.iter().enumerate() {
             let line = &page.lines[at];
+            let mut shade_seq = None;
+            if let Some(shade) = &line.shading {
+                let m = match shade_run {
+                    Some((p, m)) if p == line.paragraph => m,
+                    _ => 0,
+                };
+                shade_run = Some((line.paragraph, m + 1));
+                // Word's marked content (`p-pshd`, `layout-pbdr-ctx`): the band of a paragraph's
+                // first two lines (and of every bordered line) is a `P` sequence of its own
+                // before the text; later lines draw it inside the text's sequence.
+                let inline = m >= 2 && line.border.is_none() && buf.open.is_some();
+                self.draw_shade(&mut buf, line, shade, inline);
+                shade_seq = Some(m);
+            } else {
+                shade_run = None;
+            }
             if let Some(c) = cell_of[at]
                 && pending[c]
                 && !self.clipped_away(line)
@@ -1361,6 +1379,28 @@ impl Export<'_> {
                 {
                     self.begin(&mut buf, &owner);
                     self.put_blank(&mut buf, &fake, x, face, 0.48);
+                }
+            }
+            // A shaded paragraph without a border: Word closes the text's sequence with an empty
+            // artifact after its first line and after its last (not before a band that reaches up
+            // into the gap, measured once in `p-pshd`).
+            if let (Some(m), Some(shade)) = (shade_seq, &line.shading)
+                && !plan.contains_key(&at)
+                && line.border.is_none()
+            {
+                let next_reaches_up = order
+                    .get(pos + 1)
+                    .and_then(|&n| page.lines[n].shading.as_ref())
+                    .is_some_and(|n| {
+                        let next = &page.lines[order[pos + 1]];
+                        n.first
+                            && next.border.is_none()
+                            && next.paragraph != line.paragraph
+                            && next.top - n.rect[1] > 1e-6
+                    });
+                if m == 0 || (shade.last && !next_reaches_up) {
+                    self.end_seq(&mut buf);
+                    buf.content.push_str("/Artifact BMC\nEMC\n");
                 }
             }
             // Word writes the border of a bordered paragraph after each of its lines, as an
@@ -2823,6 +2863,44 @@ EMC
             }
         }
         if open {
+            buf.content.push_str("EMC\n");
+        }
+    }
+
+    /// The band behind a shaded line: a filled rectangle, in a `P` sequence of the paragraph
+    /// (or inside the open sequence when `inline`).
+    fn draw_shade(
+        &mut self,
+        buf: &mut PageBuf,
+        line: &Line,
+        shade: &open365_layout::LineShading,
+        inline: bool,
+    ) {
+        if self.clipped_away(line) {
+            return;
+        }
+        let [x0, y0, x1, y1] = shade.rect;
+        let rect = format!(
+            "{} rg {} {} {} {} re\nf*\n",
+            pdf_color(shade.fill),
+            num(x0, 4),
+            num(buf.y(y1), 4),
+            num(x1 - x0, 4),
+            num(y1 - y0, 4)
+        );
+        if inline {
+            buf.content.push_str(&rect);
+            return;
+        }
+        let owner = self.owner_of(line, buf.index);
+        self.end_seq(buf);
+        if matches!(owner, Owner::Struct(..)) {
+            self.begin(buf, &owner);
+            buf.content.push_str(&rect);
+            self.end_seq(buf);
+        } else {
+            buf.content.push_str("/Artifact BMC\n");
+            buf.content.push_str(&rect);
             buf.content.push_str("EMC\n");
         }
     }

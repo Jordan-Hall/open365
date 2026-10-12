@@ -76,8 +76,8 @@ pub use fields_locale::LocaleNames;
 pub use fields_number::{NumberSymbols, format_picture as format_number_picture};
 pub use flatten::{FlatBlocks, SDT_END, SDT_START, flatten_content_controls, is_sdt_marker};
 pub use layout_props::{
-    Ligatures, ParagraphBorders, ParagraphMark, ParagraphProps, RunLayoutProps, TabKind, TabLeader,
-    TabStop, VertAlign,
+    FontHint, Ligatures, ParagraphBorders, ParagraphMark, ParagraphProps, RunLayoutProps, TabKind,
+    TabLeader, TabStop, VertAlign,
 };
 pub use model::{
     Block, Body, Break, BreakKind, Cell, DocChild, DocumentRoot, Group, Inline, Paragraph, Row,
