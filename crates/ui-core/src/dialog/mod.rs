@@ -20,6 +20,6 @@ mod tests;
 
 pub use runtime::{Dialog, Icons, Outcome, Response, format_number, scrim_serial};
 pub use spec::{
-    BUTTON_H, BUTTON_W, ButtonRole, Control, FIELD_H, FOOTER_H, FooterButton, Kind, LIST_ROW_H,
-    MARGIN, ROW_H, Spec, TAB_H, TITLE_H, Value, Values, split_access,
+    BORDER_EDGES, BUTTON_H, BUTTON_W, ButtonRole, Control, FIELD_H, FOOTER_H, FooterButton, Kind,
+    LIST_ROW_H, LineLook, MARGIN, ROW_H, Secret, Spec, TAB_H, TITLE_H, Value, Values, split_access,
 };

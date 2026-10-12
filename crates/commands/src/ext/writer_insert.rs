@@ -44,6 +44,10 @@ pub enum HfAlign {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "op", rename_all = "snake_case")]
 pub enum WriterInsertOp {
+    /// Cover pages, fields, cross-references, text boxes and quick tables.
+    More {
+        more: crate::ext::insert_more::InsertMoreOp,
+    },
     /// Page Break (Ctrl+Enter): the paragraph splits at `pos` and the break ends the first part.
     PageBreak { pos: DocPos },
     /// Blank Page: a page break, an empty page, a page break.
@@ -156,6 +160,7 @@ pub(crate) fn run(doc: &mut Document, op: &WriterInsertOp) -> Result<(), Command
             doc.add_comment(*start, *end, &NewComment::new(author, text))?;
             Ok(())
         }
+        WriterInsertOp::More { more } => crate::ext::insert_more::run(doc, more),
         other => rewrite(doc, |m| apply(m, other)),
     }
 }

@@ -97,6 +97,12 @@ pub enum WriterHomeOp {
         before: Option<f64>,
         after: Option<f64>,
     },
+    /// Paragraph dialog > Outline level: 1 to 9, or `None` for Body Text.
+    OutlineLevel {
+        first: usize,
+        last: usize,
+        level: Option<u8>,
+    },
     /// Shading: a fill colour (`RRGGBB`) for the paragraphs, or `None` for No Color.
     Shading {
         first: usize,
@@ -277,6 +283,36 @@ fn apply(m: &mut Main, op: &WriterHomeOp) -> Result<(), CommandError> {
                     sp.head.remove_attr_w("afterAutospacing");
                 }
                 set_ordered(props, PPR_ORDER, sp);
+            }
+            Ok(())
+        }
+        WriterHomeOp::OutlineLevel { first, last, level } => {
+            if level.is_some_and(|l| !(1..=9).contains(&l)) {
+                return Err(fail("The outline level is Body Text or 1 to 9".to_owned()));
+            }
+            for para in *first..=*last {
+                let p = para_mut(m.root(), para)?;
+                let like = p.head.clone();
+                let props = ppr_mut(p);
+                match level {
+                    Some(l) => set_ordered(
+                        props,
+                        PPR_ORDER,
+                        w_val(&like, "outlineLvl", &(l - 1).to_string()),
+                    ),
+                    None => {
+                        // Body Text on a heading style has to say so (level 9); elsewhere the
+                        // paragraph simply has no level of its own.
+                        x::remove_child(props, "outlineLvl");
+                        let heading = child(props, "pStyle")
+                            .and_then(|s| s.head.attr_w("val"))
+                            .is_some_and(|id| id.to_ascii_lowercase().starts_with("heading"));
+                        if heading {
+                            set_ordered(props, PPR_ORDER, w_val(&like, "outlineLvl", "9"));
+                        }
+                    }
+                }
+                drop_empty_props(p);
             }
             Ok(())
         }

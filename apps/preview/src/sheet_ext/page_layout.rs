@@ -10,6 +10,7 @@ use std::collections::BTreeSet;
 use std::path::PathBuf;
 
 use super::super::{MAX_COL, MAX_ROW, Rect4, SheetModel};
+use crate::dialogs::header_footer::HeaderFooter;
 
 /// Page margins in inches.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -127,6 +128,8 @@ pub struct SheetPage {
     pub scale: u32,
     pub print_gridlines: bool,
     pub print_headings: bool,
+    /// The header and footer, read from the worksheet's `<headerFooter>`.
+    pub header_footer: HeaderFooter,
 }
 
 impl Default for SheetPage {
@@ -146,6 +149,7 @@ impl Default for SheetPage {
             scale: 100,
             print_gridlines: false,
             print_headings: false,
+            header_footer: HeaderFooter::default(),
         }
     }
 }
@@ -231,7 +235,32 @@ impl SheetModel {
     /// The page setup of the active sheet.
     #[must_use]
     pub fn page(&self) -> SheetPage {
-        self.ext_page.of(self.sheet)
+        let mut page = self.ext_page.of(self.sheet);
+        page.header_footer = self.header_footer_of(self.sheet);
+        page
+    }
+
+    /// The header and footer `sheet` holds in the file.
+    #[must_use]
+    pub fn header_footer_of(&self, sheet: usize) -> HeaderFooter {
+        self.target.xlsx().map_or_else(HeaderFooter::default, |wb| {
+            HeaderFooter::from_request(&open365_commands::header_footer(wb, sheet))
+        })
+    }
+
+    /// Page Setup > Header/Footer > OK: writes the header and footer of `sheet` to the file as
+    /// one undo step.
+    ///
+    /// # Errors
+    /// The command layer's message.
+    pub fn set_header_footer(&mut self, sheet: usize, hf: &HeaderFooter) -> Result<(), String> {
+        if self.header_footer_of(sheet) == *hf {
+            return Ok(());
+        }
+        self.apply(open365_commands::Command::SheetObjects {
+            sheet,
+            op: open365_commands::ObjectsOp::SetHeaderFooter(hf.to_request()),
+        })
     }
 
     fn page_mut(&mut self) -> &mut SheetPage {

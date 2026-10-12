@@ -11,6 +11,8 @@ use std::path::{Path, PathBuf};
 use open365_commands::Command;
 
 use super::super::{MAX_COL, SheetModel};
+use super::page_layout::SheetPage;
+use crate::dialogs::header_footer::{self as hf, Context};
 
 /// Picks the workbook to open; `None` when cancelled.
 pub type OpenChooser = fn() -> Option<PathBuf>;
@@ -259,6 +261,97 @@ impl SheetModel {
         Ok(Some((path, pages.len())))
     }
 
+    /// What the header and footer field codes print for the active sheet.
+    #[must_use]
+    pub fn header_context(&self) -> Context {
+        let names = self.sheet_names();
+        let path = self.path();
+        let file = path
+            .as_ref()
+            .and_then(|p| p.file_name())
+            .map_or_else(|| "Book1".to_owned(), |n| n.to_string_lossy().into_owned());
+        let unix = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map_or(0, |d| d.as_secs() as i64);
+        Context {
+            sheet: names.get(self.sheet).cloned().unwrap_or_default(),
+            path: path.map_or_else(|| file.clone(), |p| p.to_string_lossy().into_owned()),
+            file,
+            user: std::env::var("USERNAME")
+                .or_else(|_| std::env::var("USER"))
+                .ok()
+                .filter(|n| !n.trim().is_empty())
+                .unwrap_or_else(|| "Author".to_owned()),
+            date: hf::date_text(unix),
+            time: hf::time_text(unix),
+        }
+    }
+
+    /// The header and footer of page `index` (0-based) of `count`, as page content in points
+    /// with the origin at the page's bottom-left corner. The first page uses the first-page
+    /// header when "Different first page" is on, even pages the even header when "Different odd
+    /// & even pages" is on.
+    fn header_footer_stream(
+        &self,
+        page: &SheetPage,
+        index: usize,
+        count: usize,
+        (pw, ph): (f64, f64),
+    ) -> String {
+        let h = &page.header_footer;
+        let number = index + 1;
+        let (header, footer) = if h.different_first && index == 0 {
+            (&h.first_header, &h.first_footer)
+        } else if h.different_odd_even && number.is_multiple_of(2) {
+            (&h.even_header, &h.even_footer)
+        } else {
+            (&h.header, &h.footer)
+        };
+        let ctx = self.header_context();
+        let (page_no, pages_no) = (number.to_string(), count.to_string());
+        let m = page.margins;
+        let (x0, x1) = if h.align_with_margins {
+            (m.left * 72.0, pw - m.right * 72.0)
+        } else {
+            (0.0, pw)
+        };
+        let line_h = FONT_PT + 4.0;
+        let mut s = format!(
+            "q 1 0 0 1 0 {ph:.2} cm
+"
+        );
+        for (sections, y) in [
+            (header, m.header * 72.0),
+            (footer, ph - m.footer * 72.0 - line_h),
+        ] {
+            for (i, code) in sections.iter().enumerate() {
+                let text = hf::render(code, &ctx, &page_no, &pages_no);
+                if text.is_empty() {
+                    continue;
+                }
+                let width: f64 = text.chars().map(char_em).sum::<f64>() * FONT_PT + 4.0;
+                match i {
+                    0 => cell_text(&mut s, &text, x0, y, x1 - x0, line_h, false),
+                    1 => cell_text(
+                        &mut s,
+                        &text,
+                        x0 + ((x1 - x0 - width) / 2.0).max(0.0),
+                        y,
+                        width,
+                        line_h,
+                        false,
+                    ),
+                    _ => cell_text(&mut s, &text, x0, y, x1 - x0, line_h, true),
+                }
+            }
+        }
+        s.push_str(
+            "Q
+",
+        );
+        s
+    }
+
     /// The PDF of the printed pages.
     pub fn pdf_bytes(&self) -> Vec<u8> {
         let (pages, scale) = self.print_layout();
@@ -272,8 +365,8 @@ impl SheetModel {
             (0.0, 0.0)
         };
         let mut streams = Vec::new();
-        for p in &pages {
-            let mut s = String::new();
+        for (index, p) in pages.iter().enumerate() {
+            let mut s = self.header_footer_stream(&page, index, pages.len(), (pw, ph));
             // Origin: the top-left of the printable area, scaled.
             let _ = writeln!(
                 s,

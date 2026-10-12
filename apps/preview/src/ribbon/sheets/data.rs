@@ -34,6 +34,15 @@ use crate::sheet::{SheetModel, parse_a1};
 
 /// The control ids this module handles (ids as in the spec, without `=` or `#` suffixes).
 pub const IDS: &[&str] = &[
+    "data.get-transform-data.from-text-csv",
+    "data.get-transform-data.recent-sources",
+    "data.get-transform-data.existing-connections",
+    "data.queries-connections.refresh-all",
+    "data.queries-connections.queries-connections",
+    "data.queries-connections.properties",
+    "data.queries-connections.workbook-links",
+    "data.data-tools.quick-fill",
+    "data.forecast.forecast-sheet",
     "data.sort-filter.sort-a-to-z",
     "data.sort-filter.sort-z-to-a",
     "data.sort-filter.sort",
@@ -109,6 +118,14 @@ fn run(m: &mut SheetModel, ctrl: &str, sub: &str, arg: Option<&str>) -> Result<(
             Some(a) => remove_duplicates_from(m, a),
             None => ask(m, Request::RemoveDuplicates),
         },
+        "data-validation" if sub == "circle-invalid-data" => {
+            m.data_circle_invalid();
+            Ok(())
+        }
+        "data-validation" if sub == "clear-validation-circles" => {
+            m.data_clear_circles();
+            Ok(())
+        }
         "data-validation" => match arg {
             Some(a) => validation_from(m, a),
             None => ask(m, Request::DataValidation),
@@ -117,13 +134,41 @@ fn run(m: &mut SheetModel, ctrl: &str, sub: &str, arg: Option<&str>) -> Result<(
             Some(a) => consolidate_from(m, a),
             None => ask(m, Request::Consolidate),
         },
+        "quick-fill" => m.data_quick_fill(),
+        "from-text-csv" => match arg {
+            Some(a) => import_from(m, a),
+            None => {
+                m.status = "Choose a text or CSV file to import.".to_owned();
+                Ok(())
+            }
+        },
+        "forecast-sheet" => forecast_from(m, arg.unwrap_or("")),
+        "refresh-all" => {
+            m.data_refresh_all();
+            Ok(())
+        }
+        "queries-connections"
+        | "existing-connections"
+        | "recent-sources"
+        | "properties"
+        | "workbook-links" => {
+            m.data_connections();
+            Ok(())
+        }
         "what-if-analysis" => match (sub, arg) {
+            (_, Some(a)) if a.starts_with("scenario=") => scenario_from(m, a),
+            (_, Some(a)) if a.starts_with("datatable") => data_table_from(m, a),
+            ("scenario-manager", None) => {
+                m.status = "Scenario Manager needs its dialog.".to_owned();
+                Ok(())
+            }
+            ("data-table", None) => data_table_from(m, "datatable"),
             (_, Some(a)) if a.starts_with("goalseek=") => {
                 goal_seek_from(m, &a["goalseek=".len()..])
             }
             ("goal-seek", None) => ask(m, Request::GoalSeek),
             (_, None) if sub.is_empty() || sub == "run" => ask(m, Request::GoalSeek),
-            _ => Err("Scenario Manager and Data Table are not available yet.".to_owned()),
+            _ => Err("Unknown What-If Analysis command.".to_owned()),
         },
         "group" => match arg {
             Some("columns") => m.data_group_cols(),
@@ -483,4 +528,130 @@ fn subtotal_from(m: &mut SheetModel, arg: &str) -> Result<(), String> {
         replace_current: !keep,
         summary_below: below,
     })
+}
+
+// ---- Quick Fill, text import, scenarios, data table, forecast -----------------------------
+
+fn import_from(m: &mut SheetModel, arg: &str) -> Result<(), String> {
+    use crate::sheet_ext::data_more::TextImport;
+    // `text=` carries the payload and so is the last option (it may contain `;`).
+    let (opts, inline) = match arg.find("text=") {
+        Some(i) if i == 0 || arg[..i].ends_with(';') => (&arg[..i], Some(&arg[i + 5..])),
+        _ => (arg, None),
+    };
+    let (mut file, mut delim, mut dest) = (None, None, None);
+    let (mut consecutive, mut start, mut qualifier) = (false, 1usize, Some('"'));
+    let mut fixed = None;
+    for (k, v) in parts(opts) {
+        match (k, v) {
+            ("file", Some(v)) => file = Some(v.to_owned()),
+            ("delim", Some(v)) => delim = Some(v.to_owned()),
+            ("consecutive", _) => consecutive = true,
+            ("start", Some(v)) => start = v.trim().parse().map_err(|_| "Bad start row.")?,
+            ("qualifier", Some("none")) => qualifier = None,
+            ("qualifier", Some(q)) => qualifier = q.chars().next(),
+            ("fixed", Some(v)) => {
+                fixed = Some(
+                    v.split(',')
+                        .map(|n| n.trim().parse::<usize>().map_err(|_| "Bad break position."))
+                        .collect::<Result<Vec<_>, _>>()?,
+                );
+            }
+            ("dest", Some(v)) => dest = Some(cell(v)?),
+            _ => return Err(format!("Unknown option '{k}'.")),
+        }
+    }
+    let text = match (inline, file) {
+        (Some(t), _) => t.replace("\\n", "\n").replace("\\t", "\t"),
+        (None, Some(path)) => {
+            let bytes = std::fs::read(&path).map_err(|e| format!("Cannot read the file: {e}"))?;
+            if bytes.len() > 256 * 1024 * 1024 {
+                return Err("The file is too large to import.".to_owned());
+            }
+            String::from_utf8_lossy(&bytes).into_owned()
+        }
+        (None, None) => return Err("Choose a text or CSV file to import.".to_owned()),
+    };
+    let sample = text
+        .lines()
+        .skip(start.saturating_sub(1))
+        .collect::<Vec<_>>()
+        .join("\n");
+    let mut opts = TextImport::detect(&sample);
+    if let Some(d) = delim.as_deref() {
+        opts.delimiters = d
+            .split(',')
+            .filter_map(|n| match n.trim() {
+                "tab" => Some('\t'),
+                "semicolon" => Some(';'),
+                "comma" => Some(','),
+                "space" => Some(' '),
+                "pipe" => Some('|'),
+                other => other.chars().next().filter(|_| other.chars().count() == 1),
+            })
+            .collect();
+    }
+    opts.fixed = fixed;
+    opts.consecutive = consecutive;
+    opts.qualifier = qualifier;
+    opts.start_row = start;
+    m.data_import_text(&text, &opts, dest).map(|_| ())
+}
+
+fn cells_list(v: &str) -> Result<Vec<(u32, u32)>, String> {
+    v.split(',').map(|c| cell(c.trim())).collect()
+}
+
+fn scenario_from(m: &mut SheetModel, arg: &str) -> Result<(), String> {
+    let (mut action, mut name, mut cells, mut values) = ("", "", Vec::new(), None);
+    let (mut comment, mut results) = ("", Vec::new());
+    for (k, v) in parts(arg) {
+        match (k, v) {
+            ("scenario", Some(v)) => action = v,
+            ("name", Some(v)) => name = v,
+            ("cells", Some(v)) => cells = cells_list(v)?,
+            ("values", Some(v)) => values = Some(v.split('|').map(str::to_owned).collect()),
+            ("comment", Some(v)) => comment = v,
+            ("results", Some(v)) => results = cells_list(v)?,
+            _ => return Err(format!("Unknown option '{k}'.")),
+        }
+    }
+    match action {
+        "add" => m.data_scenario_add(name, cells, values, comment),
+        "show" => m.data_scenario_show(name),
+        "delete" => m.data_scenario_delete(name),
+        "summary" => m.data_scenario_summary(&results),
+        other => Err(format!("Unknown scenario action '{other}'.")),
+    }
+}
+
+fn data_table_from(m: &mut SheetModel, arg: &str) -> Result<(), String> {
+    let (mut row_in, mut col_in) = (None, None);
+    for (k, v) in parts(arg) {
+        match (k, v) {
+            ("datatable", _) => {}
+            ("row", Some(v)) => row_in = Some(cell(v)?),
+            ("col", Some(v)) => col_in = Some(cell(v)?),
+            _ => return Err(format!("Unknown option '{k}'.")),
+        }
+    }
+    if row_in.is_none() && col_in.is_none() {
+        m.status = "Data Table needs a row input cell or a column input cell.".to_owned();
+        return Ok(());
+    }
+    m.data_table(row_in, col_in)
+}
+
+fn forecast_from(m: &mut SheetModel, arg: &str) -> Result<(), String> {
+    let (mut periods, mut confidence) = (10usize, 0.95);
+    for (k, v) in parts(arg) {
+        match (k, v) {
+            ("periods", Some(v)) => periods = v.trim().parse().map_err(|_| "Bad period count.")?,
+            ("confidence", Some(v)) => {
+                confidence = v.trim().parse::<f64>().map_err(|_| "Bad confidence.")? / 100.0;
+            }
+            _ => return Err(format!("Unknown option '{k}'.")),
+        }
+    }
+    m.data_forecast_sheet(periods, confidence)
 }

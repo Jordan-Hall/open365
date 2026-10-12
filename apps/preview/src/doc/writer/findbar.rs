@@ -206,6 +206,7 @@ impl WriterPane {
 
     /// Keys while the find box is open. Returns true when the key was taken.
     pub(super) fn find_key(&mut self, key: Key, m: Modifiers) -> bool {
+        self.touch();
         if self.replace.open {
             return self.replace_key(key, m);
         }
@@ -224,6 +225,7 @@ impl WriterPane {
     }
 
     pub(super) fn find_text(&mut self, text: &str) {
+        self.touch();
         let clean: String = text.chars().filter(|c| !c.is_control()).collect();
         if self.replace.open && self.replace_text(&clean) {
             return;
@@ -292,7 +294,13 @@ impl WriterPane {
     }
 
     /// The find box in the top right corner of the pane.
-    pub(super) fn paint_find_box(&mut self, ui: &mut Ui, list: &mut DrawList, pal: &Palette) {
+    pub(super) fn paint_find_box(
+        &mut self,
+        ui: &mut Ui,
+        list: &mut DrawList,
+        pal: &Palette,
+        caret_on: bool,
+    ) {
         if !self.find.open || self.replace.open {
             return;
         }
@@ -321,6 +329,29 @@ impl WriterPane {
             (self.find.query.clone(), pal.page_text)
         };
         crate::doc::text(ui, list, &shown, (r.x0 + 10.0 * u).floor(), base, px, color);
+        if caret_on {
+            let typed = ui
+                .assets
+                .layout_text(
+                    ui.font,
+                    &self.find.query,
+                    px,
+                    0.0,
+                    0.0,
+                    TextLayoutOptions::default(),
+                )
+                .width;
+            let x = (r.x0 + 10.0 * u + typed).floor();
+            list.fill_rect(
+                GRect::from_edges(
+                    x,
+                    base - px * 0.85,
+                    x + u.max(1.0).round(),
+                    base + px * 0.25,
+                ),
+                pal.page_text,
+            );
+        }
         let status = self.find_status();
         if !status.is_empty() {
             let wd = ui

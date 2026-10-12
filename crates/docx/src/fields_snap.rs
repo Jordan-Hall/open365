@@ -614,3 +614,13 @@ fn letters(value: i64, lower: bool) -> String {
 fn paragraph_count(body: &Body) -> usize {
     body.paragraphs().len()
 }
+
+impl Document {
+    /// The outline level of paragraph `para`, 0-based (0 is Level 1): its own `w:outlineLvl`, else
+    /// the one its style gives. `None` is Body Text, or a paragraph that does not exist.
+    #[must_use]
+    pub fn paragraph_outline_level(&self, para: usize) -> Option<u8> {
+        let styles = StyleTable::load(self);
+        Snapshot::build(self, &styles).outline_level(&styles, para)
+    }
+}

@@ -1,0 +1,234 @@
+{
+  "batch": "b03",
+  "note": "Shape.Adjustments from Word with default adjusts: count and values in Word units (fractions of 100000, angles in degrees)",
+  "presets": {
+    "notchedRightArrow": {
+      "count": 2,
+      "values": [
+        0.5,
+        0.5
+      ],
+      "auto_shape_type": 50
+    },
+    "bentUpArrow": {
+      "count": 3,
+      "values": [
+        0.25,
+        0.25,
+        0.25
+      ],
+      "auto_shape_type": 44
+    },
+    "leftRightArrow": {
+      "count": 2,
+      "values": [
+        0.5,
+        0.5
+      ],
+      "auto_shape_type": 37
+    },
+    "upDownArrow": {
+      "count": 2,
+      "values": [
+        0.5,
+        0.5
+      ],
+      "auto_shape_type": 38
+    },
+    "leftUpArrow": {
+      "count": 3,
+      "values": [
+        0.25,
+        0.25,
+        0.25
+      ],
+      "auto_shape_type": 43
+    },
+    "leftRightUpArrow": {
+      "count": 3,
+      "values": [
+        0.25,
+        0.25,
+        0.25
+      ],
+      "auto_shape_type": 40
+    },
+    "quadArrow": {
+      "count": 3,
+      "values": [
+        0.225,
+        0.225,
+        0.225
+      ],
+      "auto_shape_type": 39
+    },
+    "leftArrowCallout": {
+      "count": 4,
+      "values": [
+        0.25,
+        0.25,
+        0.25,
+        0.64977
+      ],
+      "auto_shape_type": 54
+    },
+    "rightArrowCallout": {
+      "count": 4,
+      "values": [
+        0.25,
+        0.25,
+        0.25,
+        0.64977
+      ],
+      "auto_shape_type": 53
+    },
+    "upArrowCallout": {
+      "count": 4,
+      "values": [
+        0.25,
+        0.25,
+        0.25,
+        0.64977
+      ],
+      "auto_shape_type": 55
+    },
+    "downArrowCallout": {
+      "count": 4,
+      "values": [
+        0.25,
+        0.25,
+        0.25,
+        0.64977
+      ],
+      "auto_shape_type": 56
+    },
+    "leftRightArrowCallout": {
+      "count": 4,
+      "values": [
+        0.25,
+        0.25,
+        0.25,
+        0.48123
+      ],
+      "auto_shape_type": 57
+    },
+    "upDownArrowCallout": {
+      "count": 4,
+      "values": [
+        0.25,
+        0.25,
+        0.25,
+        0.48123
+      ],
+      "auto_shape_type": 58
+    },
+    "quadArrowCallout": {
+      "count": 4,
+      "values": [
+        0.18515,
+        0.18515,
+        0.18515,
+        0.48123
+      ],
+      "auto_shape_type": 59
+    },
+    "bentArrow": {
+      "count": 4,
+      "values": [
+        0.25,
+        0.25,
+        0.25,
+        0.4375
+      ],
+      "auto_shape_type": 41
+    },
+    "uturnArrow": {
+      "count": 5,
+      "values": [
+        0.25,
+        0.25,
+        0.25,
+        0.4375,
+        0.75
+      ],
+      "auto_shape_type": 42
+    },
+    "circularArrow": {
+      "count": 5,
+      "values": [
+        0.125,
+        19.038651,
+        -19.038651,
+        180.0,
+        0.125
+      ],
+      "auto_shape_type": 60
+    },
+    "leftCircularArrow": {
+      "count": 5,
+      "values": [
+        0.125,
+        -19.038651,
+        19.038651,
+        180.0,
+        0.125
+      ],
+      "auto_shape_type": 176
+    },
+    "leftRightCircularArrow": {
+      "count": 5,
+      "values": [
+        0.125,
+        19.038651,
+        -19.038651,
+        -160.961349,
+        0.125
+      ],
+      "auto_shape_type": 177
+    },
+    "curvedRightArrow": {
+      "count": 3,
+      "values": [
+        0.25,
+        0.5,
+        0.25
+      ],
+      "auto_shape_type": 45
+    },
+    "curvedLeftArrow": {
+      "count": 3,
+      "values": [
+        0.25,
+        0.5,
+        0.25
+      ],
+      "auto_shape_type": 46
+    },
+    "curvedUpArrow": {
+      "count": 3,
+      "values": [
+        0.25,
+        0.5,
+        0.25
+      ],
+      "auto_shape_type": 47
+    },
+    "curvedDownArrow": {
+      "count": 3,
+      "values": [
+        0.25,
+        0.5,
+        0.25
+      ],
+      "auto_shape_type": 48
+    },
+    "swooshArrow": {
+      "count": 2,
+      "values": [
+        0.25,
+        0.16667
+      ],
+      "auto_shape_type": 178
+    }
+  }
+}

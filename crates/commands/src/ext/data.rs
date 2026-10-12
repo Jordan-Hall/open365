@@ -413,6 +413,15 @@ pub enum DataOp {
     RemoveSubtotals {
         range: RangeRef,
     },
+    /// What-If > Data Table: fills the interior of `range` (inputs in its top row and left
+    /// column) with the formula's result for each input; see `data_table`.
+    DataTable {
+        range: RangeRef,
+        #[serde(default)]
+        row_input: Option<(u32, u32)>,
+        #[serde(default)]
+        col_input: Option<(u32, u32)>,
+    },
 }
 
 fn today_serial() -> f64 {
@@ -459,6 +468,7 @@ impl DataOp {
                 | Self::RemoveSubtotals { .. }
                 | Self::TextToColumns { .. }
                 | Self::Consolidate { .. }
+                | Self::DataTable { .. }
         )
     }
 }
@@ -552,6 +562,11 @@ pub(crate) fn run(
             summary_right,
         } => show_detail_cols(x, sheet, *first, *last, *show, *summary_right),
         DataOp::Subtotal(req) => subtotal(x, sheet, req, notes),
+        DataOp::DataTable {
+            range,
+            row_input,
+            col_input,
+        } => super::data_table::run(x, sheet, *range, *row_input, *col_input),
         DataOp::RemoveSubtotals { range } => remove_subtotals(x, sheet, *range),
     }
 }

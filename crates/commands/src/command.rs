@@ -173,6 +173,10 @@ pub enum Command {
     DocxReferences {
         op: crate::ext::writer_references::RefOp,
     },
+    /// Writer Mailings tab (merge fields, envelopes, labels).
+    DocxMailings {
+        op: crate::ext::mailings::MailingsOp,
+    },
     /// Writer Home tab operations the text model has no call for (highlight, case, lists...).
     DocxHome {
         op: crate::ext::writer_home::WriterHomeOp,
@@ -464,6 +468,7 @@ impl Command {
             Self::DocxReview { .. } => "docx_review",
             Self::DocxLayout { .. } => "docx_layout",
             Self::DocxDesign { .. } => "docx_design",
+            Self::DocxMailings { .. } => "docx_mailings",
             Self::DocxHome { .. } => "docx_home",
             Self::DocxInsert { .. } => "docx_insert",
             Self::XlsxReplaceAll { .. } => "xlsx_replace_all",
@@ -568,6 +573,7 @@ impl Command {
             Self::DocxReview { op } => op.effect(),
             Self::DocxLayout { op } => op.effect(),
             Self::DocxDesign { op } => op.effect(),
+            Self::DocxMailings { op } => op.effect(),
             Self::DocxHome { op } if op.destroys() => EffectClass::Destructive,
             Self::DocxHome { .. } | Self::DocxInsert { .. } => EffectClass::Edit,
             Self::DocxDeleteRange { start, end } | Self::DocxReplaceRange { start, end, .. } => {
@@ -710,6 +716,7 @@ impl Command {
             | Self::DocxReview { .. }
             | Self::DocxLayout { .. }
             | Self::DocxDesign { .. }
+            | Self::DocxMailings { .. }
             | Self::DocxHome { .. }
             | Self::DocxInsert { .. }
             | Self::XlsxReplaceAll { .. }

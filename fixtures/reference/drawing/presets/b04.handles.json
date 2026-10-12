@@ -1,0 +1,170 @@
+{
+  "batch": "b04",
+  "note": "Shape.Adjustments from Word with default adjusts: count and values in Word units (fractions of 100000, angles in degrees)",
+  "presets": {
+    "cube": {
+      "count": 1,
+      "values": [
+        0.25
+      ],
+      "auto_shape_type": 14
+    },
+    "can": {
+      "count": 1,
+      "values": [
+        0.25
+      ],
+      "auto_shape_type": 13
+    },
+    "lightningBolt": {
+      "count": 0,
+      "values": [],
+      "auto_shape_type": 22
+    },
+    "heart": {
+      "count": 0,
+      "values": [],
+      "auto_shape_type": 21
+    },
+    "sun": {
+      "count": 1,
+      "values": [
+        0.25
+      ],
+      "auto_shape_type": 23
+    },
+    "moon": {
+      "count": 1,
+      "values": [
+        0.5
+      ],
+      "auto_shape_type": 24
+    },
+    "smileyFace": {
+      "count": 1,
+      "values": [
+        0.04653
+      ],
+      "auto_shape_type": 17
+    },
+    "irregularSeal1": {
+      "count": 0,
+      "values": [],
+      "auto_shape_type": 89
+    },
+    "irregularSeal2": {
+      "count": 0,
+      "values": [],
+      "auto_shape_type": 90
+    },
+    "foldedCorner": {
+      "count": 1,
+      "values": [
+        0.16667
+      ],
+      "auto_shape_type": 16
+    },
+    "bevel": {
+      "count": 1,
+      "values": [
+        0.125
+      ],
+      "auto_shape_type": 15
+    },
+    "frame": {
+      "count": 1,
+      "values": [
+        0.125
+      ],
+      "auto_shape_type": 158
+    },
+    "halfFrame": {
+      "count": 2,
+      "values": [
+        0.33333,
+        0.33333
+      ],
+      "auto_shape_type": 159
+    },
+    "corner": {
+      "count": 2,
+      "values": [
+        0.5,
+        0.5
+      ],
+      "auto_shape_type": 162
+    },
+    "diagStripe": {
+      "count": 1,
+      "values": [
+        0.5
+      ],
+      "auto_shape_type": 141
+    },
+    "chord": {
+      "count": 2,
+      "values": [
+        45.0,
+        -90.0
+      ],
+      "auto_shape_type": 161
+    },
+    "arc": {
+      "count": 2,
+      "values": [
+        -90.0,
+        0.0
+      ],
+      "auto_shape_type": 25
+    },
+    "leftBracket": {
+      "count": 1,
+      "values": [
+        0.08333
+      ],
+      "auto_shape_type": 29
+    },
+    "rightBracket": {
+      "count": 1,
+      "values": [
+        0.08333
+      ],
+      "auto_shape_type": 30
+    },
+    "leftBrace": {
+      "count": 2,
+      "values": [
+        0.08333,
+        0.5
+      ],
+      "auto_shape_type": 31
+    },
+    "rightBrace": {
+      "count": 2,
+      "values": [
+        0.08333,
+        0.5
+      ],
+      "auto_shape_type": 32
+    },
+    "bracketPair": {
+      "count": 1,
+      "values": [
+        0.16667
+      ],
+      "auto_shape_type": 26
+    },
+    "bracePair": {
+      "count": 1,
+      "values": [
+        0.08333
+      ],
+      "auto_shape_type": 27
+    },
+    "straightConnector1": {
+      "count": 0,
+      "values": [],
+      "auto_shape_type": -2
+    }
+  }
+}

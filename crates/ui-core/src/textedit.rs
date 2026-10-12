@@ -23,9 +23,56 @@ pub struct TextEdit {
     pub composition: Option<Composition>,
     /// When the caret last moved or text changed; blinking restarts from "on".
     pub last_activity: Option<Instant>,
+    /// A password field: it paints a bullet per character; its text is never given to
+    /// accessibility, the clipboard or the `TextChanged` and `TextCommitted` events.
+    pub masked: bool,
 }
 
+/// What a masked field paints for each character.
+pub const MASK_CHAR: char = '\u{2022}';
+
 impl TextEdit {
+    /// A masked (password) field holding `text`.
+    pub fn masked(text: &str) -> Self {
+        Self {
+            masked: true,
+            ..Self::new(text)
+        }
+    }
+
+    /// What the field shows: itself, or for a masked field a copy holding a bullet for each
+    /// character, with the caret and selection moved to match.
+    pub fn display(&self) -> std::borrow::Cow<'_, Self> {
+        if !self.masked {
+            return std::borrow::Cow::Borrowed(self);
+        }
+        let to_shown =
+            |i: usize| self.text[..i.min(self.text.len())].chars().count() * MASK_CHAR.len_utf8();
+        let shown: String = self.text.chars().map(|_| MASK_CHAR).collect();
+        std::borrow::Cow::Owned(Self {
+            caret: to_shown(self.caret),
+            anchor: to_shown(self.anchor),
+            text: shown,
+            composition: self.composition.as_ref().map(|c| Composition {
+                text: c.text.chars().map(|_| MASK_CHAR).collect(),
+                cursor: None,
+            }),
+            ..self.clone()
+        })
+    }
+
+    /// The byte offset in the text of a masked field that corresponds to byte `shown` of its
+    /// bullets; `shown` itself for a plain field.
+    pub fn real_byte(&self, shown: usize) -> usize {
+        if !self.masked {
+            return shown;
+        }
+        self.text
+            .char_indices()
+            .nth(shown / MASK_CHAR.len_utf8())
+            .map_or(self.text.len(), |(i, _)| i)
+    }
+
     pub fn new(text: &str) -> Self {
         Self {
             text: text.to_owned(),
@@ -173,15 +220,31 @@ impl TextEdit {
     /// Whether the caret is drawn at `now`: solid for one blink interval after activity, then
     /// alternating; always on when the OS asks for a steady caret.
     pub fn caret_visible(&self, now: Instant, blink: Option<Duration>) -> bool {
-        let (Some(b), Some(t0)) = (blink, self.last_activity) else {
-            return true;
-        };
-        if b.is_zero() {
-            return true;
+        match self.last_activity {
+            Some(t0) => blink_on(t0, now, blink),
+            None => true,
         }
-        let phase = now.saturating_duration_since(t0).as_millis() / b.as_millis();
-        phase.is_multiple_of(2)
     }
+}
+
+/// Whether a caret whose blink cycle restarted at `epoch` is shown at `now`: on for one `blink`
+/// interval, then off for one. A steady caret (`None` or zero) is always shown.
+#[must_use]
+pub fn blink_on(epoch: Instant, now: Instant, blink: Option<Duration>) -> bool {
+    match blink.filter(|b| !b.is_zero()) {
+        Some(b) => {
+            (now.saturating_duration_since(epoch).as_nanos() / b.as_nanos()).is_multiple_of(2)
+        }
+        None => true,
+    }
+}
+
+/// The first blink edge (the caret turns on or off) after `now`, for a cycle restarted at `epoch`.
+#[must_use]
+pub fn next_blink_edge(epoch: Instant, now: Instant, blink: Duration) -> Instant {
+    let b = blink.as_nanos().max(1);
+    let n = now.saturating_duration_since(epoch).as_nanos() / b + 1;
+    epoch + Duration::from_nanos(u64::try_from(n * b).unwrap_or(u64::MAX))
 }
 
 #[cfg(test)]

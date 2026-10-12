@@ -239,6 +239,25 @@ impl WriterPane {
         }
     }
 
+    /// The outline level of the caret's paragraph: 0 is Body Text, 1 to 9 are Levels 1 to 9.
+    #[must_use]
+    pub fn outline_level(&self) -> usize {
+        self.target
+            .docx()
+            .and_then(|d| d.paragraph_outline_level(self.caret.para))
+            .map_or(0, |l| usize::from(l) + 1)
+    }
+
+    /// Paragraph > Outline level on the selected paragraphs (0 is Body Text).
+    pub fn set_outline_level(&mut self, level: usize) -> bool {
+        let (first, last) = self.selected_paragraphs();
+        self.home_op(WriterHomeOp::OutlineLevel {
+            first,
+            last,
+            level: u8::try_from(level).ok().filter(|l| *l > 0),
+        })
+    }
+
     /// Line spacing as a multiple (1.0, 1.15, 1.5, 2.0...).
     pub fn set_line_spacing(&mut self, multiple: f64) {
         let (first, last) = self.selected_paragraphs();

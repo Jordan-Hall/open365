@@ -1,0 +1,121 @@
+{
+  "batch": "b07",
+  "note": "Shape.Adjustments from Word with default adjusts: count and values in Word units (fractions of 100000, angles in degrees)",
+  "presets": {
+    "flowChartManualOperation": {
+      "count": 0,
+      "values": [],
+      "auto_shape_type": 72
+    },
+    "flowChartConnector": {
+      "count": 0,
+      "values": [],
+      "auto_shape_type": 73
+    },
+    "flowChartOffpageConnector": {
+      "count": 0,
+      "values": [],
+      "auto_shape_type": 74
+    },
+    "flowChartPunchedCard": {
+      "count": 0,
+      "values": [],
+      "auto_shape_type": 75
+    },
+    "flowChartPunchedTape": {
+      "count": 0,
+      "values": [],
+      "auto_shape_type": 76
+    },
+    "flowChartSummingJunction": {
+      "count": 0,
+      "values": [],
+      "auto_shape_type": 77
+    },
+    "flowChartOr": {
+      "count": 0,
+      "values": [],
+      "auto_shape_type": 78
+    },
+    "flowChartCollate": {
+      "count": 0,
+      "values": [],
+      "auto_shape_type": 79
+    },
+    "flowChartSort": {
+      "count": 0,
+      "values": [],
+      "auto_shape_type": 80
+    },
+    "flowChartExtract": {
+      "count": 0,
+      "values": [],
+      "auto_shape_type": 81
+    },
+    "flowChartMerge": {
+      "count": 0,
+      "values": [],
+      "auto_shape_type": 82
+    },
+    "flowChartOfflineStorage": {
+      "count": 0,
+      "values": [],
+      "auto_shape_type": 139
+    },
+    "flowChartOnlineStorage": {
+      "count": 0,
+      "values": [],
+      "auto_shape_type": 83
+    },
+    "flowChartMagneticTape": {
+      "count": 0,
+      "values": [],
+      "auto_shape_type": 85
+    },
+    "flowChartMagneticDisk": {
+      "count": 0,
+      "values": [],
+      "auto_shape_type": 86
+    },
+    "flowChartMagneticDrum": {
+      "count": 0,
+      "values": [],
+      "auto_shape_type": 87
+    },
+    "flowChartDisplay": {
+      "count": 0,
+      "values": [],
+      "auto_shape_type": 88
+    },
+    "flowChartDelay": {
+      "count": 0,
+      "values": [],
+      "auto_shape_type": 84
+    },
+    "actionButtonBlank": {
+      "count": 0,
+      "values": [],
+      "auto_shape_type": 125
+    },
+    "actionButtonHome": {
+      "count": 0,
+      "values": [],
+      "auto_shape_type": 126
+    },
+    "actionButtonHelp": {
+      "count": 0,
+      "values": [],
+      "auto_shape_type": 127
+    },
+    "actionButtonInformation": {
+      "count": 0,
+      "values": [],
+      "auto_shape_type": 128
+    },
+    "actionButtonForwardNext": {
+      "count": 0,
+      "values": [],
+      "auto_shape_type": 130
+    }
+  }
+}

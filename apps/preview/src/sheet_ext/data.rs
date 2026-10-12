@@ -34,6 +34,8 @@ pub enum Request {
 #[derive(Debug, Default)]
 pub struct DataState {
     request: Option<Request>,
+    /// Quick Fill, scenarios, circles (see `data_more`).
+    pub more: super::data_more::MoreState,
 }
 
 impl DataState {

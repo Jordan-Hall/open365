@@ -7,8 +7,8 @@ use std::collections::HashMap;
 use open365_gfx::{Color, IconId};
 
 use super::spec::{
-    BUTTON_H, BUTTON_W, ButtonRole, FIELD_H, FOOTER_H, Kind, LIST_ROW_H, MARGIN, Spec, TAB_H,
-    TITLE_H, Value, Values, split_access,
+    BORDER_EDGES, BUTTON_H, BUTTON_W, ButtonRole, FIELD_H, FOOTER_H, Kind, LIST_ROW_H, LineLook,
+    MARGIN, RAW_SUFFIX, Secret, Spec, TAB_H, TITLE_H, Value, Values, split_access,
 };
 use crate::access::ak_id;
 use crate::geom::{Point, Rect};
@@ -25,6 +25,8 @@ const GROUP_BASE: u32 = 0x7000_0000;
 /// Width of a list box's scroll bar and of the reference button.
 const BAR_W: f32 = 16.0;
 const REF_BTN_W: f32 = 26.0;
+/// What a password field shows for each character.
+const BULLET: char = '\u{2022}';
 /// Colour of the error line.
 const ERROR_INK: Color = Color::rgba(196, 43, 28, 255);
 
@@ -67,6 +69,17 @@ struct Slot {
     extra: Vec<NodeId>,
 }
 
+/// The nodes of a border diagram.
+#[derive(Debug, Default)]
+struct BorderState {
+    /// The eight labelled buttons, in [`BORDER_EDGES`] order.
+    buttons: Vec<NodeId>,
+    /// The clickable zones of the preview: (edge, node).
+    hits: Vec<(usize, NodeId)>,
+    /// The drawn line pieces.
+    lines: Vec<NodeId>,
+}
+
 #[derive(Debug)]
 struct ListState {
     items: Vec<String>,
@@ -84,6 +97,8 @@ enum Owner {
     /// The invisible button behind a label's access key; focuses control `.0`.
     Proxy(usize),
     RefButton(usize),
+    /// An edge button or edge hit zone of border diagram `.0`; `.1` indexes [`BORDER_EDGES`].
+    Edge(usize, usize),
     Footer(usize),
     Close,
     Strip,
@@ -109,6 +124,11 @@ pub struct Dialog {
     footer: Vec<NodeId>,
     owners: HashMap<NodeId, Owner>,
     lists: HashMap<usize, ListState>,
+    /// The text of every password field, by control index. Never shown, logged or labelled.
+    secrets: HashMap<usize, Secret>,
+    borders: HashMap<usize, BorderState>,
+    /// The access keys taken off while another dialog is open over this one.
+    suspended: Vec<(NodeId, char)>,
     groups: HashMap<String, u32>,
     page: usize,
     /// Panel origin when the user dragged the dialog (or collapsed it from a dragged place).
@@ -137,6 +157,9 @@ impl Dialog {
             footer: Vec::new(),
             owners: HashMap::new(),
             lists: HashMap::new(),
+            secrets: HashMap::new(),
+            borders: HashMap::new(),
+            suspended: Vec::new(),
             groups: HashMap::new(),
             page: 0,
             moved: None,
@@ -363,6 +386,26 @@ impl Dialog {
         }
     }
 
+    /// Takes the access keys off this dialog's controls while a dialog opened over it is up, so
+    /// Alt+key reaches only the top one. [`Dialog::resume`] gives them back.
+    pub fn suspend(&mut self, ui: &mut Ui) {
+        let ids: Vec<NodeId> = self.owners.keys().copied().collect();
+        for id in ids {
+            if let Some(key) = ui.tree.get_mut(id).and_then(|n| n.access_key.take()) {
+                self.suspended.push((id, key));
+            }
+        }
+    }
+
+    /// Gives the access keys back after the dialog over this one closed.
+    pub fn resume(&mut self, ui: &mut Ui) {
+        for (id, key) in self.suspended.drain(..) {
+            if let Some(n) = ui.tree.get_mut(id) {
+                n.access_key = Some(key);
+            }
+        }
+    }
+
     /// Removes the dialog from the tree and leaves the focus to the caller.
     pub fn close(&mut self, ui: &mut Ui) {
         if let Some(s) = self.scrim.take() {
@@ -373,6 +416,8 @@ impl Dialog {
         self.footer.clear();
         self.owners.clear();
         self.lists.clear();
+        self.secrets.clear();
+        self.borders.clear();
         ui.set_focus(None);
     }
 
@@ -600,6 +645,10 @@ impl Dialog {
                         bar,
                     },
                 );
+                // The selected row is in view when the dialog opens.
+                if let Some(sel) = selected.filter(|s| *s < items.len()) {
+                    self.ensure_visible(i, sel);
+                }
                 frame
             }
             Kind::Ref(v) => {
@@ -645,12 +694,76 @@ impl Dialog {
                     ..Look::default()
                 },
             ),
+            Kind::Password(v) => {
+                let secret = Secret::new(v);
+                let shown = mask(secret.len_chars());
+                self.secrets.insert(i, secret);
+                mk(
+                    ui,
+                    Widget::TextField(TextEdit::masked(&shown)),
+                    r,
+                    &text,
+                    Look::default(),
+                )
+            }
+            Kind::BorderBox => {
+                let geo = border_geo(r);
+                let preview = mk(
+                    ui,
+                    Widget::Panel,
+                    geo.preview,
+                    "",
+                    Look {
+                        fill: Some(Token::Field),
+                        border: Some(Token::FieldBorder),
+                        still: true,
+                        ..Look::default()
+                    },
+                );
+                let mut state = BorderState::default();
+                for (k, label) in BORDER_LABELS.iter().enumerate() {
+                    let rect = if k < 3 {
+                        geo.side[k]
+                    } else {
+                        geo.bottom[k - 3]
+                    };
+                    let mut b = Node::new(Widget::Button { toggled: None }, rect)
+                        .with_label(label)
+                        .with_look(Look {
+                            content: Content::TextOnly,
+                            fill: Some(Token::Field),
+                            border: Some(Token::FieldBorder),
+                            radius: 2.0,
+                            ..Look::default()
+                        });
+                    b.intercept = vec![Key::Tab, Key::Escape];
+                    let id = ui.add(panel, b);
+                    self.owners.insert(id, Owner::Edge(i, k));
+                    extra.push(id);
+                    state.buttons.push(id);
+                }
+                for (k, zone) in geo.hits() {
+                    let mut h = Node::new(Widget::Button { toggled: None }, zone)
+                        .with_label(BORDER_NAMES[k])
+                        .with_look(Look {
+                            content: Content::TextOnly,
+                            still: true,
+                            ..Look::default()
+                        });
+                    h.intercept = vec![Key::Tab, Key::Escape];
+                    let id = ui.add(preview, h);
+                    self.owners.insert(id, Owner::Edge(i, k));
+                    state.hits.push((k, id));
+                }
+                self.borders.insert(i, state);
+                preview
+            }
         };
         self.owners.insert(main, Owner::Control(i));
         if let Some(n) = ui.tree.get_mut(main) {
             n.enabled = c.enabled;
             match c.kind {
-                Kind::Label | Kind::Group | Kind::List { .. } => {}
+                Kind::Label | Kind::Group | Kind::List { .. } | Kind::BorderBox => {}
                 Kind::Button => {
                     n.access_key = key;
                     n.intercept = vec![Key::Tab, Key::Escape];
@@ -839,6 +952,11 @@ impl Dialog {
                         }
                     }
                     Kind::Label | Kind::Group => {}
+                    Kind::BorderBox => {
+                        if let Some(n) = ui.tree.get_mut(slot.main) {
+                            n.bounds = border_geo(r).preview;
+                        }
+                    }
                     _ => {
                         if let Some(n) = ui.tree.get_mut(slot.main) {
                             n.bounds = r;
@@ -944,6 +1062,10 @@ impl Dialog {
             if c.id.is_empty() {
                 continue;
             }
+            if let Some(secret) = self.secrets.get(&i) {
+                v.insert(&c.id, Value::Secret(secret.clone()));
+                continue;
+            }
             let Some(n) = ui.tree.get(self.slots[i].main) else {
                 continue;
             };
@@ -959,6 +1081,10 @@ impl Dialog {
                 } => {
                     let parsed = edit.text.trim().parse::<f64>().unwrap_or(*value);
                     v.insert(&c.id, Value::Number(parsed.clamp(*min, *max)));
+                    v.insert(
+                        &format!("{}{RAW_SUFFIX}", c.id),
+                        Value::Text(edit.text.clone()),
+                    );
                 }
                 Widget::Checkbox { checked } => v.insert(&c.id, Value::Bool(*checked)),
                 Widget::Radio { checked, .. } => {
@@ -1000,6 +1126,20 @@ impl Dialog {
     pub fn set_text(&mut self, ui: &mut Ui, id: &str, text: &str) {
         let Some(i) = self.index_of(id) else { return };
         let main = self.slots[i].main;
+        if let Some(secret) = self.secrets.get_mut(&i) {
+            *secret = Secret::new(text);
+            let shown = mask(secret.len_chars());
+            if let Some(Node {
+                widget: Widget::TextField(e),
+                ..
+            }) = ui.tree.get_mut(main)
+            {
+                e.caret = shown.len();
+                e.anchor = shown.len();
+                e.text = shown;
+            }
+            return;
+        }
         if let Some(n) = ui.tree.get_mut(main) {
             match &mut n.widget {
                 Widget::TextField(e) | Widget::Combo { edit: e, .. } => {
@@ -1085,6 +1225,141 @@ impl Dialog {
             self.spec.footer[j].enabled = on;
             if let Some(n) = ui.tree.get_mut(self.footer[j]) {
                 n.enabled = on;
+            }
+        }
+    }
+
+    /// True unless edge `k` of border diagram `i` is one the host disabled.
+    fn edge_enabled(&self, ui: &Ui, i: usize, k: usize) -> bool {
+        self.borders
+            .get(&i)
+            .and_then(|b| b.buttons.get(k))
+            .and_then(|n| ui.tree.get(*n))
+            .is_none_or(|n| n.enabled)
+    }
+
+    /// Keeps `secrets[i]` in step with the bullets the field shows: the characters typed since
+    /// the last event are the ones that are not bullets, they end at the caret; whatever the
+    /// edit removed is the difference in length. The field is then masked again.
+    fn sync_secret(&mut self, ui: &mut Ui, i: usize) {
+        let Some(secret) = self.secrets.get_mut(&i) else {
+            return;
+        };
+        let Some(Node {
+            widget: Widget::TextField(e),
+            ..
+        }) = ui.tree.get_mut(self.slots[i].main)
+        else {
+            return;
+        };
+        let chars: Vec<char> = e.text.chars().collect();
+        let caret = e
+            .text
+            .get(..e.caret)
+            .map_or(chars.len(), |t| t.chars().count());
+        let typed: String = chars.iter().filter(|c| **c != BULLET).collect();
+        let ins = typed.chars().count();
+        let old = secret.len_chars();
+        if ins == 0 && chars.len() >= old {
+            return;
+        }
+        let start = caret.saturating_sub(ins);
+        let removed = (old + ins).saturating_sub(chars.len());
+        secret.splice(start, removed, &typed);
+        let shown = mask(secret.len_chars());
+        let at = (start + ins).min(secret.len_chars()) * BULLET.len_utf8();
+        e.text = shown;
+        e.caret = at;
+        e.anchor = at;
+    }
+
+    /// Draws the lines of border diagram `id` and enables or disables the two inside edges
+    /// (`inner` is horizontal, vertical). `lines` follows [`BORDER_EDGES`]; `None` is no line.
+    pub fn set_border_box(
+        &mut self,
+        ui: &mut Ui,
+        id: &str,
+        lines: &[Option<LineLook>; 8],
+        inner: (bool, bool),
+    ) {
+        let Some(i) = self.index_of(id) else { return };
+        let main = self.slots[i].main;
+        let geo = border_geo(self.spec.controls[i].rect.translate(0.0, TITLE_H));
+        let b = geo.lines();
+        let Some(state) = self.borders.get_mut(&i) else {
+            return;
+        };
+        for old in state.lines.drain(..) {
+            ui.tree.remove(old);
+        }
+        for (k, btn) in state.buttons.iter().enumerate() {
+            if let Some(n) = ui.tree.get_mut(*btn) {
+                n.enabled = inner_on(inner, k);
+            }
+        }
+        for (k, hit) in &state.hits {
+            if let Some(n) = ui.tree.get_mut(*hit) {
+                n.enabled = inner_on(inner, *k);
+            }
+        }
+        let mut made: Vec<NodeId> = Vec::new();
+        let mut piece = |ui: &mut Ui, r: Rect, rgb: (u8, u8, u8)| {
+            let n = Node::new(Widget::Panel, r).with_look(Look {
+                fill_rgb: Some(Color::rgba(rgb.0, rgb.1, rgb.2, 255)),
+                still: true,
+                ..Look::default()
+            });
+            made.push(ui.add(main, n));
+        };
+        for (k, line) in lines.iter().enumerate() {
+            let Some(line) = line else { continue };
+            if k >= 6 {
+                diagonal(ui, &mut piece, b, k == 6, line);
+                continue;
+            }
+            let horizontal = k < 3;
+            let (along, at) = match k {
+                0 => (b.w, b.y),
+                1 => (b.w, b.y + b.h / 2.0),
+                2 => (b.w, b.y + b.h),
+                3 => (b.h, b.x),
+                4 => (b.h, b.x + b.w / 2.0),
+                _ => (b.h, b.x + b.w),
+            };
+            let offsets: &[f32] = if line.double { &[-1.5, 1.5] } else { &[0.0] };
+            let weight = if line.double { 1.0 } else { line.weight };
+            for off in offsets {
+                let mut pos = 0.0_f32;
+                while pos < along {
+                    let len = if line.dash.0 > 0.0 {
+                        line.dash.0.min(along - pos)
+                    } else {
+                        along
+                    };
+                    let thick_at = at + off - weight / 2.0;
+                    let r = if horizontal {
+                        Rect::new(b.x + pos, thick_at, len, weight)
+                    } else {
+                        Rect::new(thick_at, b.y + pos, weight, len)
+                    };
+                    piece(ui, r, line.rgb);
+                    pos += len + line.dash.1;
+                    if line.dash.0 <= 0.0 {
+                        break;
+                    }
+                }
+            }
+        }
+        // The hit zones stay on top of the lines.
+        if let Some(state) = self.borders.get_mut(&i) {
+            state.lines = made;
+            for (_, hit) in &state.hits {
+                if let Some(parent) = ui.tree.get_mut(main)
+                    && let Some(pos) = parent.children.iter().position(|c| c == hit)
+                {
+                    let c = parent.children.remove(pos);
+                    parent.children.push(c);
+                }
             }
         }
     }
@@ -1205,6 +1480,9 @@ impl Dialog {
     fn focus_target_index(&self, i: usize) -> Option<NodeId> {
         if let Some(ls) = self.lists.get(&i) {
             return self.row_stop(ls);
+        }
+        if let Some(b) = self.borders.get(&i) {
+            return b.buttons.first().copied();
         }
         Some(self.slots[i].main)
     }
@@ -1345,6 +1623,17 @@ impl Dialog {
                     out.push(slot.main);
                     out.extend(slot.extra.first().copied());
                 }
+                Kind::BorderBox => {
+                    if let Some(b) = self.borders.get(&i) {
+                        out.extend(
+                            b.buttons
+                                .iter()
+                                .zip(0..)
+                                .filter(|(_, k)| c.enabled && self.edge_enabled(ui, i, *k))
+                                .map(|(n, _)| *n),
+                        );
+                    }
+                }
                 _ => out.push(slot.main),
             }
         }
@@ -1389,7 +1678,12 @@ impl Dialog {
             },
             Emit::Selected(n, _) | Emit::TextChanged(n, _) | Emit::ValueChanged(n, _) => {
                 match self.owners.get(n).copied() {
-                    Some(Owner::Control(i)) => self.changed(i),
+                    Some(Owner::Control(i)) => {
+                        if matches!(ev, Emit::TextChanged(..)) {
+                            self.sync_secret(ui, i);
+                        }
+                        self.changed(i)
+                    }
                     Some(_) => Response::Consumed,
                     None => Response::Ignored,
                 }
@@ -1448,6 +1742,13 @@ impl Dialog {
             .footer
             .iter()
             .find(|b| b.role == ButtonRole::Cancel)
+            // A message box with only OK is closed by Esc and the close button as well.
+            .or_else(|| {
+                self.spec
+                    .footer
+                    .iter()
+                    .find(|b| b.role == ButtonRole::Default)
+            })
             .map(|b| b.id.clone())
     }
 
@@ -1478,6 +1779,10 @@ impl Dialog {
                 Response::Outcome(Outcome::Pressed(self.spec.controls[i].id.clone()))
             }
             Owner::RefButton(i) => self.toggle_ref(ui, i),
+            Owner::Edge(i, k) => Response::Outcome(Outcome::Pressed(format!(
+                "{}:{}",
+                self.spec.controls[i].id, BORDER_EDGES[k]
+            ))),
             Owner::Proxy(t) => {
                 // Alt+key on a label: focus its field unless that is disabled or hidden.
                 let id = self.spec.controls[t].id.clone();
@@ -1654,6 +1959,35 @@ fn clamp_origin(p: Point, w: f32, win: Rect) -> Point {
     Point::new(p.x.clamp(min_x, max_x), p.y.clamp(0.0, max_y))
 }
 
+/// A diagonal as steps of small squares from corner to corner.
+fn diagonal(
+    ui: &mut Ui,
+    piece: &mut impl FnMut(&mut Ui, Rect, (u8, u8, u8)),
+    b: Rect,
+    down: bool,
+    line: &LineLook,
+) {
+    let steps = 32;
+    let size = line.weight.max(1.0);
+    for s in 0..=steps {
+        if line.dash.0 > 0.0 && (s / 2) % 2 == 1 {
+            continue;
+        }
+        let t = s as f32 / steps as f32;
+        let x = b.x + b.w * t;
+        let y = if down {
+            b.y + b.h * t
+        } else {
+            b.y + b.h * (1.0 - t)
+        };
+        piece(
+            ui,
+            Rect::new(x - size / 2.0, y - size / 2.0, size, size),
+            line.rgb,
+        );
+    }
+}
+
 fn label_look(ink: Token, pad: f32) -> Look {
     Look {
         content: Content::TextOnly,
@@ -1670,6 +2004,99 @@ fn hidden_node() -> accesskit::Node {
     let mut n = accesskit::Node::new(accesskit::Role::GenericContainer);
     n.set_hidden();
     n
+}
+
+/// False for an inside edge the diagram has no room for (`inner` is horizontal, vertical).
+fn inner_on(inner: (bool, bool), k: usize) -> bool {
+    match k {
+        1 => inner.0,
+        4 => inner.1,
+        _ => true,
+    }
+}
+
+/// The bullets a password field shows for `n` characters.
+fn mask(n: usize) -> String {
+    std::iter::repeat_n(BULLET, n).collect()
+}
+
+/// Visible captions of the eight edge buttons (the diagonals are drawn as themselves).
+const BORDER_LABELS: [&str; 8] = [
+    "Top", "Inside", "Bottom", "Left", "Inside", "Right", "\\", "/",
+];
+/// Accessible names of the edges.
+const BORDER_NAMES: [&str; 8] = [
+    "Top Border",
+    "Inside Horizontal Border",
+    "Bottom Border",
+    "Left Border",
+    "Inside Vertical Border",
+    "Right Border",
+    "Diagonal Down Border",
+    "Diagonal Up Border",
+];
+/// Gap between the preview and the edge before a line is drawn.
+const BORDER_PAD: f32 = 14.0;
+const SIDE_W: f32 = 52.0;
+
+/// Where the parts of a border diagram sit, in dialog panel coordinates.
+struct BorderGeo {
+    preview: Rect,
+    side: [Rect; 3],
+    bottom: [Rect; 5],
+}
+
+fn border_geo(r: Rect) -> BorderGeo {
+    let ph = (r.h - BUTTON_H - 6.0).max(40.0);
+    let pw = (r.w - SIDE_W - 6.0).max(40.0);
+    let preview = Rect::new(r.x + SIDE_W + 6.0, r.y, pw, ph);
+    let side = [
+        Rect::new(r.x, r.y, SIDE_W, BUTTON_H),
+        Rect::new(r.x, r.y + (ph - BUTTON_H) / 2.0, SIDE_W, BUTTON_H),
+        Rect::new(r.x, r.y + ph - BUTTON_H, SIDE_W, BUTTON_H),
+    ];
+    let bw = (r.w - 4.0 * 3.0) / 5.0;
+    let mut bottom = [Rect::default(); 5];
+    for (k, b) in bottom.iter_mut().enumerate() {
+        *b = Rect::new(r.x + k as f32 * (bw + 3.0), r.y + ph + 6.0, bw, BUTTON_H);
+    }
+    BorderGeo {
+        preview,
+        side,
+        bottom,
+    }
+}
+
+impl BorderGeo {
+    /// The box the lines are drawn in, relative to the preview.
+    fn lines(&self) -> Rect {
+        Rect::new(
+            BORDER_PAD,
+            BORDER_PAD,
+            self.preview.w - 2.0 * BORDER_PAD,
+            self.preview.h - 2.0 * BORDER_PAD,
+        )
+    }
+
+    /// Clickable zones of the preview, relative to it: (edge, rect).
+    fn hits(&self) -> Vec<(usize, Rect)> {
+        let b = self.lines();
+        let z = 12.0;
+        let sq =
+            |fx: f32, fy: f32| Rect::new(b.x + b.w * fx - 7.0, b.y + b.h * fy - 7.0, 14.0, 14.0);
+        vec![
+            (0, Rect::new(b.x, b.y - z / 2.0, b.w, z)),
+            (1, Rect::new(b.x, b.y + b.h / 2.0 - z / 2.0, b.w, z)),
+            (2, Rect::new(b.x, b.y + b.h - z / 2.0, b.w, z)),
+            (3, Rect::new(b.x - z / 2.0, b.y, z, b.h)),
+            (4, Rect::new(b.x + b.w / 2.0 - z / 2.0, b.y, z, b.h)),
+            (5, Rect::new(b.x + b.w - z / 2.0, b.y, z, b.h)),
+            (6, sq(0.25, 0.25)),
+            (6, sq(0.75, 0.75)),
+            (7, sq(0.25, 0.75)),
+            (7, sq(0.75, 0.25)),
+        ]
+    }
 }
 
 /// A number as a spin box shows it: no decimals for whole numbers.

@@ -1,0 +1,233 @@
+{
+  "batch": "b05.fill",
+  "note": "Shape.Adjustments from Word with default adjusts: count and values in Word units (fractions of 100000, angles in degrees)",
+  "presets": {
+    "bentConnector2": {
+      "count": 0,
+      "values": [],
+      "auto_shape_type": -2
+    },
+    "bentConnector3": {
+      "count": 1,
+      "values": [
+        0.5
+      ],
+      "auto_shape_type": -2
+    },
+    "bentConnector4": {
+      "count": 2,
+      "values": [
+        0.5,
+        0.5
+      ],
+      "auto_shape_type": -2
+    },
+    "bentConnector5": {
+      "count": 3,
+      "values": [
+        0.5,
+        0.5,
+        0.5
+      ],
+      "auto_shape_type": -2
+    },
+    "curvedConnector2": {
+      "count": 0,
+      "values": [],
+      "auto_shape_type": -2
+    },
+    "curvedConnector3": {
+      "count": 1,
+      "values": [
+        0.5
+      ],
+      "auto_shape_type": -2
+    },
+    "curvedConnector4": {
+      "count": 2,
+      "values": [
+        0.5,
+        0.5
+      ],
+      "auto_shape_type": -2
+    },
+    "curvedConnector5": {
+      "count": 3,
+      "values": [
+        0.5,
+        0.5,
+        0.5
+      ],
+      "auto_shape_type": -2
+    },
+    "callout1": {
+      "count": 4,
+      "values": [
+        0.1875,
+        -0.08333,
+        1.125,
+        -0.38333
+      ],
+      "auto_shape_type": 113
+    },
+    "callout2": {
+      "count": 6,
+      "values": [
+        0.1875,
+        -0.08333,
+        0.1875,
+        -0.16667,
+        1.125,
+        -0.46667
+      ],
+      "auto_shape_type": 119
+    },
+    "callout3": {
+      "count": 8,
+      "values": [
+        0.1875,
+        -0.08333,
+        0.1875,
+        -0.16667,
+        1.0,
+        -0.16667,
+        1.12963,
+        -0.08333
+      ],
+      "auto_shape_type": 120
+    },
+    "accentCallout1": {
+      "count": 4,
+      "values": [
+        0.1875,
+        -0.08333,
+        1.125,
+        -0.38333
+      ],
+      "auto_shape_type": 114
+    },
+    "accentCallout2": {
+      "count": 6,
+      "values": [
+        0.1875,
+        -0.08333,
+        0.1875,
+        -0.16667,
+        1.125,
+        -0.46667
+      ],
+      "auto_shape_type": 115
+    },
+    "accentCallout3": {
+      "count": 8,
+      "values": [
+        0.1875,
+        -0.08333,
+        0.1875,
+        -0.16667,
+        1.0,
+        -0.16667,
+        1.12963,
+        -0.08333
+      ],
+      "auto_shape_type": 116
+    },
+    "borderCallout1": {
+      "count": 4,
+      "values": [
+        0.1875,
+        -0.08333,
+        1.125,
+        -0.38333
+      ],
+      "auto_shape_type": 109
+    },
+    "borderCallout2": {
+      "count": 6,
+      "values": [
+        0.1875,
+        -0.08333,
+        0.1875,
+        -0.16667,
+        1.125,
+        -0.46667
+      ],
+      "auto_shape_type": 111
+    },
+    "borderCallout3": {
+      "count": 8,
+      "values": [
+        0.1875,
+        -0.08333,
+        0.1875,
+        -0.16667,
+        1.0,
+        -0.16667,
+        1.12963,
+        -0.08333
+      ],
+      "auto_shape_type": 112
+    },
+    "accentBorderCallout1": {
+      "count": 4,
+      "values": [
+        0.1875,
+        -0.08333,
+        1.125,
+        -0.38333
+      ],
+      "auto_shape_type": 122
+    },
+    "accentBorderCallout2": {
+      "count": 6,
+      "values": [
+        0.1875,
+        -0.08333,
+        0.1875,
+        -0.16667,
+        1.125,
+        -0.46667
+      ],
+      "auto_shape_type": 123
+    },
+    "accentBorderCallout3": {
+      "count": 8,
+      "values": [
+        0.1875,
+        -0.08333,
+        0.1875,
+        -0.16667,
+        1.0,
+        -0.16667,
+        1.12963,
+        -0.08333
+      ],
+      "auto_shape_type": 124
+    },
+    "wedgeRectCallout": {
+      "count": 2,
+      "values": [
+        -0.20833,
+        0.625
+      ],
+      "auto_shape_type": 105
+    },
+    "wedgeRoundRectCallout": {
+      "count": 3,
+      "values": [
+        -0.20833,
+        0.625,
+        0.16667
+      ],
+      "auto_shape_type": 106
+    },
+    "wedgeEllipseCallout": {
+      "count": 2,
+      "values": [
+        -0.20833,
+        0.625
+      ],
+      "auto_shape_type": 107
+    }
+  }
+}

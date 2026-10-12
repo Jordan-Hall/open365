@@ -1,0 +1,38 @@
+{
+  "batch": "pilot",
+  "note": "Shape.Adjustments from Word with default adjusts: count and values in Word units (fractions of 100000, angles in degrees)",
+  "presets": {
+    "rect": {
+      "count": 0,
+      "values": [],
+      "auto_shape_type": 1
+    },
+    "roundRect": {
+      "count": 1,
+      "values": [
+        0.16667
+      ],
+      "auto_shape_type": 5
+    },
+    "ellipse": {
+      "count": 0,
+      "values": [],
+      "auto_shape_type": 9
+    },
+    "triangle": {
+      "count": 1,
+      "values": [
+        0.5
+      ],
+      "auto_shape_type": 7
+    },
+    "rightArrow": {
+      "count": 2,
+      "values": [
+        0.5,
+        0.5
+      ],
+      "auto_shape_type": 33
+    }
+  }
+}

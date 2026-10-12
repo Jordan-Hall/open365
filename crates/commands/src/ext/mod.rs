@@ -2,6 +2,10 @@
 //! Add one `mod` line per file; other agents append theirs.
 
 pub mod data;
+pub(crate) mod data_table;
+pub mod header_footer;
+pub mod insert_more;
+pub mod mailings;
 pub mod review;
 pub mod sheet_objects;
 pub mod sheets_home;

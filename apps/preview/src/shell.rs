@@ -38,6 +38,8 @@ pub enum WinAct {
     ToggleMaximize,
     Close,
     Title(String),
+    /// Open this document in a new window (the host starts another instance on the file).
+    OpenDocument(std::path::PathBuf),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -108,6 +110,8 @@ pub struct Shell {
     /// The Writer document (Writer only); `None` shows the placeholder page.
     writer: Option<doc::WriterPane>,
     refocus_doc: bool,
+    /// Documents opened in new windows so far (names their temporary files).
+    new_documents: u32,
     /// The operator the next Custom AutoFilter dialog preselects (index into its list).
     filter_op: usize,
     /// The open dialogs by scrim serial (see `shell::dialogs`).
@@ -193,6 +197,7 @@ impl Shell {
             grid_ids: Vec::new(),
             writer: None,
             refocus_doc: false,
+            new_documents: 0,
             filter_op: 0,
             dialogs: HashMap::new(),
             share: None,
@@ -2160,9 +2165,55 @@ impl Shell {
         }
     }
 
+    /// Opens the documents a command produced (Finish & Merge, Labels) in a window of their own,
+    /// as Word does: each is written to a temporary `.docx` and the host is asked to open it.
+    fn open_new_documents(&mut self, out: &mut Vec<WinAct>) {
+        let Some(p) = self.writer.as_mut() else {
+            return;
+        };
+        for (n, bytes) in p.take_new_documents().into_iter().enumerate() {
+            let path = std::env::temp_dir().join(format!(
+                "open365-merge-{}-{}-{n}.docx",
+                std::process::id(),
+                self.new_documents
+            ));
+            self.new_documents += 1;
+            match std::fs::write(&path, bytes) {
+                Ok(()) => out.push(WinAct::OpenDocument(path)),
+                Err(e) => p.status = Some(format!("Cannot create the new document: {e}")),
+            }
+        }
+    }
+
+    /// Enables the Mailings controls the way Word does: Envelopes, Labels and Start Mail Merge
+    /// always; Select Recipients once a merge started; the rest once it has recipients.
+    fn sync_mailings(&mut self, ui: &mut Ui) {
+        let Some(p) = self.writer.as_ref() else {
+            return;
+        };
+        let (started, recipients) = (p.mail_started(), p.mail_has_recipients());
+        for (node, act) in &self.acts {
+            let Act::Cmd(id) = act else { continue };
+            if !id.starts_with("mailings.") {
+                continue;
+            }
+            let on = match id.as_str() {
+                "mailings.create.envelopes"
+                | "mailings.create.labels"
+                | "mailings.start-mail-merge.start-mail-merge" => true,
+                "mailings.start-mail-merge.select-recipients" => started,
+                _ => recipients,
+            };
+            if let Some(n) = ui.tree.get_mut(*node) {
+                n.enabled = on;
+            }
+        }
+    }
+
     /// Reflects the caret's formatting in the ribbon (toggle buttons, font and size boxes) and
     /// returns the keyboard focus to the document after a ribbon command.
     pub fn sync_writer_state(&mut self, ui: &mut Ui) {
+        self.sync_mailings(ui);
         let Some(p) = self.writer.as_ref() else {
             return;
         };
@@ -2250,6 +2301,7 @@ impl Shell {
         }
         self.dispatch_command(ui, id, out);
         self.poll_dialog_requests(ui);
+        self.open_new_documents(out);
         self.apply_writer_zoom(ui);
         self.note = id.to_owned();
         out.push(WinAct::Title(self.title()));

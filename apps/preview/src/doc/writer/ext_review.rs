@@ -1,13 +1,16 @@
 //! Writer pane: the Review tab. Spelling, word count, comments and tracked changes. Every edit is
 //! a `Command::DocxReview` of the command layer, so it is logged and undoable.
 
+use std::cell::RefCell;
+use std::path::Path;
 use std::sync::OnceLock;
 
 use open365_commands::{Command, WriterReviewOp};
-use open365_docx::{DocPos, Revision, TextView};
+use open365_docx::{DocPos, Revision, TextView, align_paragraphs, diff_text};
 use open365_spell::Proofing;
 
 use super::WriterPane;
+use crate::ribbon::writer::review::{EditRestriction, ReviewDisplay, ReviewState};
 
 /// What Word's Word Count dialog shows.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -394,5 +397,131 @@ impl WriterPane {
         self.target
             .docx()?
             .paragraph_text_view(para, TextView::Markup)
+    }
+}
+
+thread_local! {
+    static REVIEW: RefCell<ReviewState> = RefCell::new(ReviewState::default());
+}
+
+impl WriterPane {
+    /// The Review tab view state.
+    #[must_use]
+    pub fn review_state(&self) -> ReviewState {
+        REVIEW.with(|s| s.borrow().clone())
+    }
+
+    /// Changes the Review tab view state.
+    pub fn edit_review_state(&mut self, f: impl FnOnce(&mut ReviewState)) {
+        REVIEW.with(|s| f(&mut s.borrow_mut()));
+    }
+
+    /// Display for Review.
+    pub fn set_review_display(&mut self, d: ReviewDisplay) {
+        self.edit_review_state(|s| s.display = d);
+        self.status = Some(d.label().to_owned());
+    }
+
+    /// Restrict Editing: `None` stops protection. Tracked-changes protection also turns
+    /// tracking on, as Word does.
+    pub fn set_edit_restriction(&mut self, r: Option<EditRestriction>) {
+        self.edit_review_state(|s| s.restriction = r);
+        if r == Some(EditRestriction::TrackedChanges) {
+            self.set_track_changes(true);
+        }
+        self.status = Some(match r {
+            Some(_) => "Document protection is on.".to_owned(),
+            None => "Document protection is off.".to_owned(),
+        });
+    }
+
+    /// Whether Restrict Editing blocks typing and deleting.
+    #[must_use]
+    pub fn editing_blocked(&self) -> bool {
+        matches!(
+            self.review_state().restriction,
+            Some(EditRestriction::ReadOnly | EditRestriction::FormFilling)
+        )
+    }
+
+    /// Compare / Combine: the differences of the document at `path` (the revised copy) against
+    /// this one (the original) become tracked changes in this document.
+    ///
+    /// # Errors
+    /// The revised document cannot be opened.
+    pub fn compare_with_file(&mut self, path: &Path) -> Result<usize, String> {
+        let revised = Self::open(path)?.text();
+        Ok(self.compare_with_text(&revised))
+    }
+
+    /// Applies the differences to `revised` (paragraphs separated by line feeds) as tracked
+    /// changes; the number of changed paragraphs.
+    pub fn compare_with_text(&mut self, revised: &str) -> usize {
+        let was_tracking = self.track_changes_on();
+        let orig: Vec<String> = self.text().split('\n').map(str::to_owned).collect();
+        let rev: Vec<String> = revised.split('\n').map(str::to_owned).collect();
+        self.set_track_changes(true);
+        let mut changed = 0;
+        for (a, b) in align_paragraphs(&orig, &rev).into_iter().rev() {
+            match (a, b) {
+                (Some(i), Some(j)) if orig[i] != rev[j] => {
+                    changed += 1;
+                    for e in diff_text(&orig[i], &rev[j]).into_iter().rev() {
+                        if e.delete > 0 {
+                            self.select(DocPos::new(i, e.at), DocPos::new(i, e.at + e.delete));
+                            self.delete_selection();
+                        }
+                        if !e.insert.is_empty() {
+                            self.set_caret(DocPos::new(i, e.at));
+                            self.insert_text(&e.insert);
+                        }
+                    }
+                }
+                (Some(i), None) => {
+                    changed += 1;
+                    let len = orig[i].chars().count();
+                    if i + 1 < orig.len() {
+                        self.select(DocPos::new(i, 0), DocPos::new(i + 1, 0));
+                    } else if i > 0 {
+                        let prev = orig[i - 1].chars().count();
+                        self.select(DocPos::new(i - 1, prev), DocPos::new(i, len));
+                    } else {
+                        self.select(DocPos::new(0, 0), DocPos::new(0, len));
+                    }
+                    self.delete_selection();
+                }
+                (None, Some(j)) => {
+                    changed += 1;
+                    // Original paragraphs that precede this one in the alignment.
+                    let before = align_paragraphs(&orig, &rev)
+                        .iter()
+                        .take_while(|(_, y)| *y != Some(j))
+                        .filter(|(x, _)| x.is_some())
+                        .count();
+                    if before < orig.len() {
+                        self.set_caret(DocPos::new(before, 0));
+                        self.paste_text(&format!(
+                            "{}
+",
+                            rev[j]
+                        ));
+                    } else {
+                        let last = orig.len() - 1;
+                        self.set_caret(DocPos::new(last, orig[last].chars().count()));
+                        self.paste_text(&format!(
+                            "
+{}",
+                            rev[j]
+                        ));
+                    }
+                }
+                _ => {}
+            }
+        }
+        if !was_tracking {
+            self.set_track_changes(false);
+        }
+        self.status = Some(format!("{changed} paragraphs differ."));
+        changed
     }
 }

@@ -67,6 +67,31 @@ pub struct Note {
     pub text: String,
 }
 
+/// A sheet or workbook password. Its `Debug` output is redacted, so a logged or audited command
+/// never carries it.
+#[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct Password(String);
+
+impl Password {
+    #[must_use]
+    pub fn new(text: &str) -> Self {
+        Self(text.to_owned())
+    }
+
+    /// The text; keep it out of logs and messages.
+    #[must_use]
+    pub fn expose(&self) -> &str {
+        &self.0
+    }
+}
+
+impl std::fmt::Debug for Password {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("Password(<redacted>)")
+    }
+}
+
 /// Every Review tab edit.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "op", rename_all = "snake_case")]
@@ -74,20 +99,20 @@ pub enum ReviewOp {
     ProtectSheet {
         options: SheetProtection,
         #[serde(default)]
-        password: Option<String>,
+        password: Option<Password>,
     },
     UnprotectSheet {
         #[serde(default)]
-        password: Option<String>,
+        password: Option<Password>,
     },
     /// Protect Workbook: Structure (sheets cannot be added, moved, renamed or deleted).
     ProtectWorkbook {
         #[serde(default)]
-        password: Option<String>,
+        password: Option<Password>,
     },
     UnprotectWorkbook {
         #[serde(default)]
-        password: Option<String>,
+        password: Option<Password>,
     },
     /// New Note / Edit Note: sets the note of a cell.
     SetNote(Note),
@@ -966,7 +991,7 @@ pub(crate) fn run(
                 return Err(bad("The sheet is already protected."));
             }
             let part = xmlpatch::sheet_part_name(&x.workbook, sheet)?;
-            let element = protection_element(options, password.as_deref());
+            let element = protection_element(options, password.as_ref().map(Password::expose));
             let wb = xmlpatch::rewrite(&x.workbook, |pkg| {
                 let mut xml = xmlpatch::part_text(pkg, &part)?;
                 xmlpatch::remove_element(&mut xml, "sheetProtection");
@@ -982,7 +1007,7 @@ pub(crate) fn run(
             }
             check_password(
                 stored_sheet_hash(&x.workbook, sheet).as_deref(),
-                password.as_deref(),
+                password.as_ref().map(Password::expose),
             )?;
             let part = xmlpatch::sheet_part_name(&x.workbook, sheet)?;
             let wb = xmlpatch::rewrite(&x.workbook, |pkg| {
@@ -999,7 +1024,11 @@ pub(crate) fn run(
             }
             let part = x.workbook.workbook_part().as_str().to_owned();
             let mut el = String::from("<workbookProtection");
-            if let Some(p) = password.as_deref().filter(|p| !p.is_empty()) {
+            if let Some(p) = password
+                .as_ref()
+                .map(Password::expose)
+                .filter(|p| !p.is_empty())
+            {
                 el.push_str(&format!(
                     " workbookPassword=\"{}\"",
                     legacy_password_hash(p)
@@ -1034,7 +1063,7 @@ pub(crate) fn run(
                     xmlpatch::element_text(&t, "workbookProtection")
                 })
                 .and_then(|e| xmlpatch::attr(&e, "workbookPassword"));
-            check_password(stored.as_deref(), password.as_deref())?;
+            check_password(stored.as_deref(), password.as_ref().map(Password::expose))?;
             let wb = xmlpatch::rewrite(&x.workbook, |pkg| {
                 let mut xml = xmlpatch::part_text(pkg, &part)?;
                 xmlpatch::remove_element(&mut xml, "workbookProtection");

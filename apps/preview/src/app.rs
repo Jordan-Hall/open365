@@ -65,6 +65,7 @@ impl Handler {
                 }
                 WinAct::Close => cx.request_exit(),
                 WinAct::Title(t) => cx.set_title(&t),
+                WinAct::OpenDocument(path) => open_in_new_window(&path),
             }
         }
     }
@@ -241,4 +242,14 @@ pub fn run(kind: AppKind) -> Result<(), HostError> {
         },
         UiAdapter::new(handler, cfg),
     )
+}
+
+/// Starts another instance of this program on `path`, as Word opens a merge result in its own
+/// window. A failure is reported on stderr; the current document is untouched.
+fn open_in_new_window(path: &std::path::Path) {
+    let spawned =
+        std::env::current_exe().and_then(|exe| std::process::Command::new(exe).arg(path).spawn());
+    if let Err(e) = spawned {
+        eprintln!("cannot open {} in a new window: {e}", path.display());
+    }
 }

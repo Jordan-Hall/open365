@@ -3,6 +3,13 @@
 //! form the Home tab already handles, so each is one undo step and nothing here touches the
 //! model. Two things have no command yet and are emitted under the id the Home tab should
 //! accept: `home.number.format-code=<code>` and `home.cells.format.protection=...`.
+//!
+//! What the Home tab has no button for (strikethrough, shrink to fit, any text angle, the
+//! style and colour of each border edge) is not a command id: [`format_change`] and
+//! [`border_change`] build the model's own change records for `SheetModel::format_selection`.
+
+use open365_commands::{AlignmentChange, BorderChange, CellFormatChange, ColorSpec, FontChange};
+use open365_commands::{LineSpec, RotationSpec};
 
 /// Horizontal alignment as the dialog offers it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -100,12 +107,14 @@ pub struct Current {
     pub indent: u32,
     /// Degrees counter-clockwise (-90 to 90), `None` for stacked text.
     pub rotation: Option<i32>,
+    pub shrink: bool,
     pub merged: bool,
     pub font_name: String,
     pub font_size: f64,
     pub bold: bool,
     pub italic: bool,
     pub underline: Under,
+    pub strike: bool,
     /// `RRGGBB`, `None` for Automatic.
     pub font_rgb: Option<String>,
     pub fill_rgb: Option<String>,
@@ -113,17 +122,110 @@ pub struct Current {
     pub hidden: bool,
 }
 
-/// How the Border tab asks to change the borders.
+/// The line styles of the Border tab's list, in Excel's order: `(caption, OOXML name)`. The
+/// first, None, removes a line.
+pub const LINE_STYLES: [(&str, &str); 14] = [
+    ("None", "none"),
+    ("Hair", "hair"),
+    ("Dotted", "dotted"),
+    ("Dash-dot-dot", "dashDotDot"),
+    ("Dash-dot", "dashDot"),
+    ("Dashed", "dashed"),
+    ("Thin", "thin"),
+    ("Medium dash-dot-dot", "mediumDashDotDot"),
+    ("Slanted dash-dot", "slantDashDot"),
+    ("Medium dash-dot", "mediumDashDot"),
+    ("Medium dashed", "mediumDashed"),
+    ("Medium", "medium"),
+    ("Thick", "thick"),
+    ("Double", "double"),
+];
+
+/// The index in [`LINE_STYLES`] of an OOXML style name (0, None, for an unknown one).
+#[must_use]
+pub fn line_style_index(ooxml: &str) -> usize {
+    LINE_STYLES
+        .iter()
+        .position(|(_, n)| *n == ooxml)
+        .unwrap_or(0)
+}
+
+/// One line of the border diagram: a style (an index into [`LINE_STYLES`], never 0) and a
+/// colour (`RRGGBB`, `None` for Automatic).
+pub type EdgeLine = (usize, Option<String>);
+
+/// The eight edges of the diagram, in the order of `ui_core::dialog::BORDER_EDGES`: top, inside
+/// horizontal, bottom, left, inside vertical, right, diagonal down, diagonal up. `None` is no
+/// line.
+pub type Edges = [Option<EdgeLine>; 8];
+
+/// What the Border tab asks for: the edges as they were and as they are now. Only the edges
+/// that differ are written.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct BorderWish {
-    /// `none`, `outline` or `all` from the presets; `None` leaves the preset alone.
-    pub preset: Option<String>,
-    pub top: bool,
-    pub bottom: bool,
-    pub left: bool,
-    pub right: bool,
-    /// `thin`, `thick` or `double`.
-    pub style: String,
+    pub before: Edges,
+    pub after: Edges,
+}
+
+/// The border change for the edges the user changed; `None` when none changed.
+#[must_use]
+pub fn border_change(w: &BorderWish) -> Option<BorderChange> {
+    let mut change = BorderChange::default();
+    let mut any = false;
+    for k in 0..8 {
+        if w.before[k] == w.after[k] {
+            continue;
+        }
+        any = true;
+        let line = Some(match &w.after[k] {
+            Some((style, rgb)) => LineSpec {
+                style: LINE_STYLES[(*style).min(LINE_STYLES.len() - 1)]
+                    .1
+                    .to_owned(),
+                color: rgb.as_deref().map(ColorSpec::rgb),
+            },
+            None => LineSpec {
+                style: "none".to_owned(),
+                color: None,
+            },
+        });
+        match k {
+            0 => change.top = line,
+            1 => change.inside_horizontal = line,
+            2 => change.bottom = line,
+            3 => change.left = line,
+            4 => change.inside_vertical = line,
+            5 => change.right = line,
+            6 => change.diagonal_down = line,
+            _ => change.diagonal_up = line,
+        }
+    }
+    any.then_some(change)
+}
+
+/// The change for strikethrough, shrink to fit and the text angle when they differ from what
+/// the cell has; `None` when none does.
+#[must_use]
+pub fn format_change(cur: &Current, want: &Wanted) -> Option<CellFormatChange> {
+    let mut change = CellFormatChange::default();
+    if want.strike != cur.strike {
+        change.font = FontChange {
+            strike: Some(want.strike),
+            ..FontChange::default()
+        };
+    }
+    let mut alignment = AlignmentChange::default();
+    if want.shrink != cur.shrink {
+        alignment.shrink_to_fit = Some(want.shrink);
+    }
+    if want.rotation != cur.rotation {
+        alignment.rotation = Some(match want.rotation {
+            None => RotationSpec::Stacked,
+            Some(d) => RotationSpec::Degrees(d.clamp(-90, 90)),
+        });
+    }
+    change.alignment = alignment;
+    (change != CellFormatChange::default()).then_some(change)
 }
 
 /// What the dialog asks for.
@@ -142,12 +244,14 @@ pub struct Wanted {
     pub wrap: bool,
     pub indent: u32,
     pub rotation: Option<i32>,
+    pub shrink: bool,
     pub merged: bool,
     pub font_name: String,
     pub font_size: f64,
     pub bold: bool,
     pub italic: bool,
     pub underline: Under,
+    pub strike: bool,
     pub font_rgb: Option<String>,
     pub fill_rgb: Option<String>,
     pub locked: bool,
@@ -169,20 +273,6 @@ fn valign_cmd(a: VAlign) -> Option<&'static str> {
         VAlign::Top => Some("home.alignment.top-align"),
         VAlign::Center => Some("home.alignment.middle-align"),
         VAlign::Bottom => None,
-    }
-}
-
-/// The orientation command nearest to `degrees`.
-fn rotation_cmd(degrees: Option<i32>) -> &'static str {
-    match degrees {
-        None => "home.alignment.orientation.vertical-text",
-        Some(d) => match d {
-            i32::MIN..=-68 => "home.alignment.orientation.rotate-down",
-            -67..=-23 => "home.alignment.orientation.angle-clockwise",
-            -22..=22 => "home.alignment.orientation.horizontal",
-            23..=67 => "home.alignment.orientation.angle-counterclockwise",
-            _ => "home.alignment.orientation.rotate-up",
-        },
     }
 }
 
@@ -329,35 +419,6 @@ pub fn plan(cur: &Current, want: &Wanted) -> Vec<String> {
             out.push(c.to_owned());
         }
     }
-    if want.rotation != cur.rotation {
-        out.push(rotation_cmd(want.rotation).to_owned());
-    }
-
-    // Border.
-    let b = &want.border;
-    if let Some(p) = &b.preset {
-        out.push(match p.as_str() {
-            "none" => "home.font.borders.none".to_owned(),
-            "all" => "home.font.borders.all".to_owned(),
-            _ if b.style == "thick" => "home.font.borders.thick-outside".to_owned(),
-            _ => "home.font.borders.outside".to_owned(),
-        });
-    }
-    for (on, edge) in [
-        (b.top, "top"),
-        (b.bottom, "bottom"),
-        (b.left, "left"),
-        (b.right, "right"),
-    ] {
-        if !on {
-            continue;
-        }
-        out.push(match (edge, b.style.as_str()) {
-            ("bottom", "double") => "home.font.borders.bottom-double".to_owned(),
-            ("bottom", "thick") => "home.font.borders.bottom-thick".to_owned(),
-            _ => format!("home.font.borders.{edge}"),
-        });
-    }
 
     // Fill.
     if want.fill_rgb != cur.fill_rgb {
@@ -431,12 +492,14 @@ mod tests {
             wrap: false,
             indent: 0,
             rotation: Some(0),
+            shrink: false,
             merged: false,
             font_name: "Calibri".into(),
             font_size: 11.0,
             bold: false,
             italic: false,
             underline: Under::None,
+            strike: false,
             font_rgb: None,
             fill_rgb: None,
             locked: true,
@@ -457,12 +520,14 @@ mod tests {
             wrap: c.wrap,
             indent: c.indent,
             rotation: c.rotation,
+            shrink: c.shrink,
             merged: c.merged,
             font_name: c.font_name.clone(),
             font_size: c.font_size,
             bold: c.bold,
             italic: c.italic,
             underline: c.underline,
+            strike: c.strike,
             font_rgb: c.font_rgb.clone(),
             fill_rgb: c.fill_rgb.clone(),
             locked: c.locked,
@@ -543,24 +608,60 @@ mod tests {
     }
 
     #[test]
-    fn border_fill_protection_and_merge() {
+    fn fill_protection_and_merge() {
         let c = cur();
         let mut w = same(&c);
-        w.border.preset = Some("outline".into());
-        w.border.style = "thick".into();
-        w.border.bottom = true;
         w.fill_rgb = Some("FFFF00".into());
         w.locked = false;
         w.merged = true;
         assert_eq!(
             plan(&c, &w),
             vec![
-                "home.font.borders.thick-outside",
-                "home.font.borders.bottom-thick",
                 "home.font.fill-colour.rgb-FFFF00",
                 "home.cells.format.protection=locked=0;hidden=0",
                 "home.alignment.merge-centre.cells",
             ]
         );
+    }
+
+    #[test]
+    fn strikethrough_shrink_and_any_angle_become_one_change() {
+        let c = cur();
+        assert_eq!(format_change(&c, &same(&c)), None);
+        let mut w = same(&c);
+        w.strike = true;
+        w.shrink = true;
+        w.rotation = Some(-37);
+        let change = format_change(&c, &w).expect("a change");
+        assert_eq!(change.font.strike, Some(true));
+        assert_eq!(change.alignment.shrink_to_fit, Some(true));
+        assert_eq!(change.alignment.rotation, Some(RotationSpec::Degrees(-37)));
+        w.rotation = None;
+        assert_eq!(
+            format_change(&c, &w).and_then(|c| c.alignment.rotation),
+            Some(RotationSpec::Stacked)
+        );
+        // The plan itself leaves all three alone.
+        assert!(plan(&c, &w).is_empty());
+    }
+
+    #[test]
+    fn only_the_edges_that_changed_are_written_with_their_style_and_colour() {
+        let mut w = BorderWish::default();
+        assert_eq!(border_change(&w), None);
+        w.after[0] = Some((line_style_index("thick"), Some("FF0000".into())));
+        w.after[7] = Some((line_style_index("dashed"), None));
+        w.before[2] = Some((line_style_index("thin"), None));
+        w.after[2] = Some((line_style_index("thin"), None));
+        w.before[3] = Some((line_style_index("double"), None));
+        let b = border_change(&w).expect("changes");
+        assert_eq!(b.top.as_ref().map(|l| l.style.as_str()), Some("thick"));
+        assert_eq!(
+            b.top.and_then(|l| l.color).and_then(|c| c.rgb),
+            Some("FF0000".to_owned())
+        );
+        assert_eq!(b.diagonal_up.map(|l| l.style), Some("dashed".to_owned()));
+        assert_eq!(b.bottom, None, "unchanged");
+        assert_eq!(b.left.map(|l| l.style), Some("none".to_owned()), "removed");
     }
 }

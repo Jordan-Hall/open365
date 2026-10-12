@@ -511,7 +511,10 @@ impl WriterPane {
             return false;
         }
         match self.replace_part_at(x + ox, y + oy) {
-            Some(Part::Field(f)) => self.replace.focus = f,
+            Some(Part::Field(f)) => {
+                self.replace.focus = f;
+                self.touch();
+            }
             Some(Part::Yes) => {
                 self.replace_wrap_answer(true);
             }
@@ -550,7 +553,13 @@ impl WriterPane {
 
     // ---- painting ----------------------------------------------------------------------------
 
-    pub(super) fn paint_replace_box(&mut self, ui: &mut Ui, list: &mut DrawList, pal: &Palette) {
+    pub(super) fn paint_replace_box(
+        &mut self,
+        ui: &mut Ui,
+        list: &mut DrawList,
+        pal: &Palette,
+        caret_on: bool,
+    ) {
         if !self.replace.open {
             return;
         }
@@ -613,6 +622,22 @@ impl WriterPane {
                 },
             );
             crate::doc::text(ui, list, value, (r.x0 + 6.0 * u).floor(), base(r), px, ink);
+            if focused && caret_on && self.replace.prompt.is_none() {
+                let typed = ui
+                    .assets
+                    .layout_text(ui.font, value, px, 0.0, 0.0, TextLayoutOptions::default())
+                    .width;
+                let x = (r.x0 + 6.0 * u + typed).floor();
+                list.fill_rect(
+                    GRect::from_edges(
+                        x,
+                        base(r) - px * 0.85,
+                        x + u.max(1.0).round(),
+                        base(r) + px * 0.25,
+                    ),
+                    ink,
+                );
+            }
         }
         if self.replace.prompt.is_some() {
             // Word's question box: the message over Yes and No; the rest of the dialog waits.

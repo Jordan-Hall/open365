@@ -27,8 +27,10 @@ use crate::shell::Shell;
 mod data;
 mod format;
 mod formulas;
+mod header_footer;
 mod insert;
 mod insert_delete;
+mod names;
 mod page;
 mod paste_special;
 mod review;
@@ -53,6 +55,18 @@ pub(super) trait View: std::fmt::Debug {
 
     /// Cancel, Esc or the close button.
     fn cancel(&mut self, _s: &mut Shell, _ui: &mut Ui) {}
+
+    /// A dialog this one opened with [`request_child`] closed (`applied`: with OK). `Err` is
+    /// shown in this dialog; [`request_close`] finishes it as well.
+    fn child_done(
+        &mut self,
+        _s: &mut Shell,
+        _ui: &mut Ui,
+        _d: &mut Dialog,
+        _applied: bool,
+    ) -> Result<(), String> {
+        Ok(())
+    }
 }
 
 #[derive(Debug)]
@@ -61,9 +75,12 @@ pub(in crate::shell) struct Entry {
     view: Box<dyn View>,
     /// The control that had the focus when the grid last rebuilt, restored afterwards.
     focus: Option<NodeId>,
+    /// Opened over another dialog, which waits underneath.
+    child: bool,
 }
 
 thread_local! {
+    static CHILD: std::cell::RefCell<Option<DialogRequest>> = const { std::cell::RefCell::new(None) };
     static CLOSE: Cell<bool> = const { Cell::new(false) };
     static SERIAL: Cell<u64> = const { Cell::new(0) };
 }
@@ -72,6 +89,62 @@ thread_local! {
 /// the dialog without OK, such as Remove All Subtotals).
 pub(super) fn request_close() {
     CLOSE.with(|c| c.set(true));
+}
+
+/// Asks the host to open `req` over the dialog whose view is handling an event, which stays
+/// open underneath (Name Manager's New..., Protect Sheet's password confirmation).
+pub(super) fn request_child(req: DialogRequest) {
+    CHILD.with(|c| *c.borrow_mut() = Some(req));
+}
+
+fn take_child() -> Option<DialogRequest> {
+    CHILD.with(|c| c.borrow_mut().take())
+}
+
+/// Opens a message box with an OK button over the open dialog.
+pub(super) fn notice(title: &str, text: &str) {
+    request_child(DialogRequest::Notice {
+        title: title.to_owned(),
+        text: text.to_owned(),
+    });
+}
+
+/// The message box: `text` is wrapped, its own line breaks kept.
+fn notice_dialog(title: &str, text: &str) -> (Spec, Box<dyn View>) {
+    let mut lines: Vec<String> = Vec::new();
+    for para in text.split('\n') {
+        if para.trim().is_empty() {
+            lines.push(String::new());
+        } else {
+            lines.extend(wrap(para, 56, 6));
+        }
+    }
+    let mut spec = Spec::new(title, 390.0, 24.0 + 17.0 * lines.len() as f32).footer(vec![
+        open365_ui_core::dialog::FooterButton::new(
+            "ok",
+            "OK",
+            open365_ui_core::dialog::ButtonRole::Default,
+        ),
+    ]);
+    for (i, l) in lines.iter().enumerate() {
+        spec.label(14.0, 12.0 + 17.0 * i as f32, 362.0, l);
+    }
+    (spec, Box::new(Notice))
+}
+
+#[derive(Debug)]
+struct Notice;
+
+impl View for Notice {
+    fn commit(
+        &mut self,
+        _s: &mut Shell,
+        _ui: &mut Ui,
+        _d: &mut Dialog,
+        _v: &Values,
+    ) -> Result<(), String> {
+        Ok(())
+    }
 }
 
 fn next_serial() -> u64 {
@@ -102,7 +175,14 @@ fn make(s: &mut Shell, req: &DialogRequest) -> Option<(Spec, Box<dyn View>)> {
         | R::Group
         | R::Subtotal
         | R::CustomFilter { .. } => data::make(s, req),
-        R::ProtectSheet | R::ProtectWorkbook => review::make(s, req),
+        R::ProtectSheet
+        | R::ProtectWorkbook
+        | R::UnprotectSheet
+        | R::UnprotectWorkbook
+        | R::ConfirmPassword { .. } => review::make(s, req),
+        R::NameEdit { .. } | R::DeleteName { .. } => names::make(s, req),
+        R::Notice { title, text } => Some(notice_dialog(title, text)),
+        R::HeaderFooterCustom { .. } => header_footer::make(s, req),
         R::FormatCells { .. }
         | R::RowHeight
         | R::ColumnWidth
@@ -132,6 +212,11 @@ impl Shell {
     /// cancelled first.
     pub fn open_dialog(&mut self, ui: &mut Ui, req: DialogRequest) -> bool {
         self.close_dialog(ui);
+        self.open_over(ui, req, false)
+    }
+
+    /// Opens `req`; a `child` goes over the open dialog instead of replacing it.
+    fn open_over(&mut self, ui: &mut Ui, req: DialogRequest, child: bool) -> bool {
         let Some((spec, mut view)) = make(self, &req) else {
             return false;
         };
@@ -152,6 +237,7 @@ impl Shell {
                 focus: ui.focus(),
                 dialog,
                 view,
+                child,
             },
         );
         true
@@ -274,6 +360,10 @@ impl Shell {
             close = self.dialog_outcome(ui, &mut e, &o);
         }
         match close {
+            Some(applied) if e.child => {
+                e.dialog.close(ui);
+                self.child_closed(ui, applied);
+            }
             Some(applied) => {
                 e.dialog.close(ui);
                 self.dialog_closed(ui, applied);
@@ -283,9 +373,58 @@ impl Shell {
             }
             None => {
                 self.dialogs.insert(serial, e);
+                if let Some(req) = take_child() {
+                    // Alt+key must reach the new dialog, not the one under it.
+                    if let Some(parent) = self.dialogs.get_mut(&serial) {
+                        parent.dialog.suspend(ui);
+                    }
+                    if !self.open_over(ui, req, true)
+                        && let Some(parent) = self.dialogs.get_mut(&serial)
+                    {
+                        parent.dialog.resume(ui);
+                    }
+                }
             }
         }
         consumed
+    }
+
+    /// A child dialog closed: tell the dialog underneath and give it the focus back.
+    fn child_closed(&mut self, ui: &mut Ui, applied: bool) {
+        let Some(serial) = scrim_serial(ui) else {
+            self.dialog_closed(ui, false);
+            return;
+        };
+        let Some(mut e) = self.dialogs.remove(&serial) else {
+            return;
+        };
+        e.dialog.resume(ui);
+        let result = e.view.child_done(self, ui, &mut e.dialog, applied);
+        let finish = CLOSE.with(Cell::take);
+        match result {
+            Ok(()) => e.dialog.set_error(ui, ""),
+            Err(msg) => e.dialog.set_error(ui, &msg),
+        }
+        if finish {
+            e.dialog.close(ui);
+            self.dialog_closed(ui, true);
+            return;
+        }
+        e.dialog.raise(ui);
+        // The control that had the focus, unless the child's work switched it off; then the
+        // first control.
+        let usable = e
+            .focus
+            .filter(|f| ui.tree.shown(*f) && ui.tree.get(*f).is_some_and(|n| n.enabled));
+        match usable {
+            Some(f) => ui.set_focus(Some(f)),
+            None => {
+                if let Some(first) = e.dialog.tab_stops(ui).first() {
+                    ui.set_focus(Some(*first));
+                }
+            }
+        }
+        self.dialogs.insert(serial, e);
     }
 
     /// `Some(applied)` when the dialog is finished.

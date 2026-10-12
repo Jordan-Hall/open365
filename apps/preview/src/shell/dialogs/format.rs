@@ -3,13 +3,18 @@
 
 use open365_ui_core::Rect;
 use open365_ui_core::Ui;
-use open365_ui_core::dialog::{ButtonRole, Dialog, FooterButton, Outcome, Spec, Values};
-use open365_xlsx::{ColorSource, FillPattern, HorizontalAlignment, Underline, VerticalAlignment};
+use open365_ui_core::dialog::{
+    BORDER_EDGES, ButtonRole, Dialog, FooterButton, LineLook, Outcome, Spec, Values,
+};
+use open365_xlsx::{
+    BorderEdge, BorderStyle, ColorSource, FillPattern, HorizontalAlignment, Underline,
+    VerticalAlignment,
+};
 
 use super::{View, request_close, wrap};
 use crate::dialogs::format_cells::{
-    BorderWish, CATEGORIES, COLOURS, Current, HAlign, Under, VAlign, Wanted, category_of,
-    default_decimals, plan,
+    BorderWish, CATEGORIES, COLOURS, Current, Edges, HAlign, LINE_STYLES, Under, VAlign, Wanted,
+    border_change, category_of, default_decimals, format_change, line_style_index, plan,
 };
 use crate::dialogs::request::{DialogRequest, FormatTab};
 use crate::shell::Shell;
@@ -132,6 +137,86 @@ const SYMBOLS: [(&str, &str); 5] = [
 #[derive(Debug)]
 struct FormatCells {
     cur: Current,
+    /// The diagram's lines when the dialog opened and now.
+    edges_before: Edges,
+    edges: Edges,
+    /// Whether the selection has room for inside horizontal and vertical lines.
+    inner: (bool, bool),
+}
+
+/// The OOXML name of a border style.
+fn style_name(s: BorderStyle) -> &'static str {
+    match s {
+        BorderStyle::None => "none",
+        BorderStyle::Thin => "thin",
+        BorderStyle::Medium => "medium",
+        BorderStyle::Dashed => "dashed",
+        BorderStyle::Dotted => "dotted",
+        BorderStyle::Thick => "thick",
+        BorderStyle::Double => "double",
+        BorderStyle::Hair => "hair",
+        BorderStyle::MediumDashed => "mediumDashed",
+        BorderStyle::DashDot => "dashDot",
+        BorderStyle::MediumDashDot => "mediumDashDot",
+        BorderStyle::DashDotDot => "dashDotDot",
+        BorderStyle::MediumDashDotDot => "mediumDashDotDot",
+        BorderStyle::SlantDashDot => "slantDashDot",
+    }
+}
+
+fn edge_line(e: &BorderEdge) -> Option<(usize, Option<String>)> {
+    if e.style == BorderStyle::None {
+        return None;
+    }
+    let rgb = match e.color.source {
+        ColorSource::Rgb(c) => Some(format!("{:02X}{:02X}{:02X}", c.r, c.g, c.b)),
+        _ => None,
+    };
+    Some((line_style_index(style_name(e.style)), rgb))
+}
+
+/// The lines the Border tab starts with: the outline of the selection, read from its corner
+/// cells, and the diagonals of the first cell.
+fn current_edges(s: &Shell) -> Edges {
+    let (r1, c1, r2, c2) = s.sheet.range();
+    let mut edges: Edges = Default::default();
+    if let Some(tl) = s.sheet.home_cell_format(r1, c1) {
+        edges[0] = edge_line(&tl.border.top);
+        edges[3] = edge_line(&tl.border.left);
+        edges[6] = edge_line(&tl.border.diagonal_down_edge());
+        edges[7] = edge_line(&tl.border.diagonal_up_edge());
+    }
+    if let Some(br) = s.sheet.home_cell_format(r2, c2) {
+        edges[2] = edge_line(&br.border.bottom);
+        edges[5] = edge_line(&br.border.right);
+    }
+    edges
+}
+
+/// How a line of the diagram is drawn.
+fn look_of(line: &(usize, Option<String>)) -> LineLook {
+    let (weight, dash, double): (f32, (f32, f32), bool) = match LINE_STYLES[line.0].1 {
+        "hair" => (1.0, (1.0, 1.0), false),
+        "dotted" => (1.0, (1.0, 2.0), false),
+        "dashDotDot" | "dashDot" => (1.0, (4.0, 2.0), false),
+        "dashed" => (1.0, (3.0, 2.0), false),
+        "mediumDashDotDot" | "slantDashDot" | "mediumDashDot" => (2.0, (4.0, 2.0), false),
+        "mediumDashed" => (2.0, (3.0, 2.0), false),
+        "medium" => (2.0, (0.0, 0.0), false),
+        "thick" => (3.0, (0.0, 0.0), false),
+        "double" => (1.0, (0.0, 0.0), true),
+        _ => (1.0, (0.0, 0.0), false),
+    };
+    let rgb = line.1.as_deref().map_or((0, 0, 0), |h| {
+        let n = |i: usize| u8::from_str_radix(h.get(i..i + 2).unwrap_or("00"), 16).unwrap_or(0);
+        (n(0), n(2), n(4))
+    });
+    LineLook {
+        weight,
+        dash,
+        double,
+        rgb,
+    }
 }
 
 fn current_state(s: &Shell) -> Current {
@@ -146,12 +231,14 @@ fn current_state(s: &Shell) -> Current {
         wrap: false,
         indent: 0,
         rotation: Some(0),
+        shrink: false,
         merged: false,
         font_name: "Calibri".to_owned(),
         font_size: 11.0,
         bold: false,
         italic: false,
         underline: Under::None,
+        strike: false,
         font_rgb: None,
         fill_rgb: None,
         locked: true,
@@ -177,10 +264,12 @@ fn current_state(s: &Shell) -> Current {
             r @ 91..=180 => Some(-(r as i32 - 90)),
             _ => Some(0),
         };
+        cur.shrink = f.alignment.shrink_to_fit;
         cur.font_name = f.font.name.clone();
         cur.font_size = f.font.size;
         cur.bold = f.font.bold;
         cur.italic = f.font.italic;
+        cur.strike = f.font.strike;
         cur.underline = match f.font.underline {
             Underline::None => Under::None,
             Underline::Single | Underline::SingleAccounting => Under::Single,
@@ -238,7 +327,10 @@ fn items_ref(v: &[String]) -> Vec<&str> {
 
 fn format_cells(s: &mut Shell, tab: FormatTab) -> (Spec, Box<dyn View>) {
     let cur = current_state(s);
-    let mut spec = Spec::new("Format Cells", 440.0, 300.0);
+    let edges = current_edges(s);
+    let (r1, c1, r2, c2) = s.sheet.range();
+    let inner = (r2 > r1, c2 > c1);
+    let mut spec = Spec::new("Format Cells", 440.0, 330.0);
     spec.tabs = vec![
         "&Number".into(),
         "&Alignment".into(),
@@ -320,8 +412,7 @@ fn format_cells(s: &mut Shell, tab: FormatTab) -> (Spec, Box<dyn View>) {
     );
     spec.group(12.0, 108.0, 416.0, 100.0, "Text control");
     spec.check("wrap", 24.0, 130.0, 300.0, "&Wrap text", cur.wrap);
-    spec.check("shrink", 24.0, 152.0, 300.0, "Shrin&k to fit", false)
-        .disabled();
+    spec.check("shrink", 24.0, 152.0, 300.0, "Shrin&k to fit", cur.shrink);
     spec.check("merge", 24.0, 174.0, 300.0, "&Merge cells", cur.merged);
     spec.group(12.0, 216.0, 416.0, 66.0, "Orientation");
     spec.label(24.0, 242.0, 70.0, "Degr&ees:");
@@ -340,6 +431,13 @@ fn format_cells(s: &mut Shell, tab: FormatTab) -> (Spec, Box<dyn View>) {
         "Vertical te&xt",
         cur.rotation.is_none(),
     );
+    if cur.rotation.is_none() {
+        for c in &mut spec.controls {
+            if c.id == "deg" {
+                c.enabled = false;
+            }
+        }
+    }
     spec.on_page(Some(2));
     spec.label(12.0, 44.0, 200.0, "&Font:");
     let mut fonts: Vec<&str> = FONTS.to_vec();
@@ -382,42 +480,32 @@ fn format_cells(s: &mut Shell, tab: FormatTab) -> (Spec, Box<dyn View>) {
     let (fc, fsel) = colour_items(cur.font_rgb.as_deref(), "Automatic");
     spec.dropdown("fcolour", 224.0, 124.0, 200.0, &items_ref(&fc), fsel);
     spec.label(12.0, 164.0, 100.0, "Effects");
-    spec.check("strike", 24.0, 186.0, 200.0, "Stri&kethrough", false)
-        .disabled();
+    spec.check("strike", 24.0, 186.0, 200.0, "Stri&kethrough", cur.strike);
     spec.on_page(Some(3));
-    spec.group(12.0, 40.0, 416.0, 66.0, "Presets");
-    spec.radio("pre_none", "preset", 24.0, 64.0, 100.0, "&None", false);
-    spec.radio(
-        "pre_outline",
-        "preset",
-        130.0,
-        64.0,
-        100.0,
-        "&Outline",
-        false,
-    );
-    spec.radio(
-        "pre_all",
-        "preset",
-        236.0,
-        64.0,
-        180.0,
-        "&All borders",
-        false,
-    );
-    spec.group(12.0, 114.0, 416.0, 66.0, "Border");
-    spec.check("b_top", 24.0, 138.0, 90.0, "&Top", false);
-    spec.check("b_bottom", 130.0, 138.0, 90.0, "&Bottom", false);
-    spec.check("b_left", 236.0, 138.0, 90.0, "&Left", false);
-    spec.check("b_right", 330.0, 138.0, 90.0, "&Right", false);
-    spec.label(12.0, 198.0, 50.0, "St&yle:");
-    spec.dropdown(
+    spec.group(12.0, 40.0, 160.0, 226.0, "Line");
+    spec.label(24.0, 60.0, 130.0, "St&yle:");
+    let styles: Vec<String> = LINE_STYLES.iter().map(|(n, _)| (*n).to_owned()).collect();
+    spec.list(
         "bstyle",
-        66.0,
-        194.0,
-        150.0,
-        &["Thin", "Thick", "Double"],
-        0,
+        Rect::new(24.0, 80.0, 136.0, 134.0),
+        styles,
+        Some(line_style_index("thin")),
+    );
+    spec.label(24.0, 220.0, 130.0, "&Color:");
+    let (bcolours, _) = colour_items(None, "Automatic");
+    spec.dropdown("bcolour", 24.0, 238.0, 136.0, &items_ref(&bcolours), 0);
+    spec.group(184.0, 40.0, 244.0, 56.0, "Presets");
+    spec.button("pre_none", 196.0, 62.0, 72.0, "&None");
+    spec.button("pre_outline", 274.0, 62.0, 72.0, "&Outline");
+    spec.button("pre_inside", 352.0, 62.0, 64.0, "&Inside");
+    spec.group(184.0, 102.0, 244.0, 164.0, "Border");
+    spec.border_box("bx", Rect::new(196.0, 124.0, 220.0, 134.0));
+    spec.note(
+        12.0,
+        272.0,
+        416.0,
+        32.0,
+        "The selected line style can be applied by clicking the presets, the diagram or the buttons around it.",
     );
     spec.on_page(Some(4));
     spec.label(12.0, 44.0, 200.0, "Background &Color:");
@@ -449,7 +537,15 @@ fn format_cells(s: &mut Shell, tab: FormatTab) -> (Spec, Box<dyn View>) {
             _ => {}
         }
     }
-    (spec, Box::new(FormatCells { cur }))
+    (
+        spec,
+        Box::new(FormatCells {
+            cur,
+            edges_before: edges.clone(),
+            edges,
+            inner,
+        }),
+    )
 }
 
 impl FormatCells {
@@ -488,12 +584,16 @@ impl FormatCells {
         };
         let font_rgb = picked(v.index("fcolour").unwrap_or(0), &self.cur.font_rgb);
         let fill_pick = picked(v.index("fill").unwrap_or(0), &self.cur.fill_rgb);
-        let preset = match v.radio("preset") {
-            "pre_none" => Some("none".to_owned()),
-            "pre_outline" => Some("outline".to_owned()),
-            "pre_all" => Some("all".to_owned()),
-            _ => None,
-        };
+        if !v.flag("stacked") {
+            let ok = v
+                .raw("deg")
+                .trim()
+                .parse::<i32>()
+                .is_ok_and(|d| (-90..=90).contains(&d));
+            if !ok {
+                return Err("The number must be between -90 and 90.".to_owned());
+            }
+        }
         Ok(Wanted {
             number_category: cat,
             decimals: v.num("dec") as i32,
@@ -519,6 +619,7 @@ impl FormatCells {
             } else {
                 Some(v.num("deg") as i32)
             },
+            shrink: v.flag("shrink"),
             merged: v.flag("merge"),
             font_name: v.text("fname").trim().to_owned(),
             font_size: size,
@@ -526,31 +627,97 @@ impl FormatCells {
             italic: style % 2 == 1,
             underline: [Under::None, Under::Single, Under::Double]
                 [v.index("under").unwrap_or(0).min(2)],
+            strike: v.flag("strike"),
             font_rgb,
             fill_rgb: fill_rgb.or(fill_pick),
             locked: v.flag("locked"),
             hidden: v.flag("hidden"),
             border: BorderWish {
-                preset,
-                top: v.flag("b_top"),
-                bottom: v.flag("b_bottom"),
-                left: v.flag("b_left"),
-                right: v.flag("b_right"),
-                style: ["thin", "thick", "double"][v.index("bstyle").unwrap_or(0).min(2)]
-                    .to_owned(),
+                before: self.edges_before.clone(),
+                after: self.edges.clone(),
             },
         })
     }
 }
 
+impl FormatCells {
+    /// The line the style list and the colour box describe now; `None` for the style None.
+    fn chosen_line(v: &Values) -> Option<(usize, Option<String>)> {
+        let style = v.index("bstyle").unwrap_or(0);
+        if style == 0 {
+            return None;
+        }
+        let rgb = COLOURS
+            .get(v.index("bcolour").unwrap_or(0))
+            .and_then(|(_, c)| c.map(str::to_owned));
+        Some((style, rgb))
+    }
+
+    fn redraw(&self, ui: &mut Ui, d: &mut Dialog) {
+        let mut lines: [Option<LineLook>; 8] = [None; 8];
+        for (slot, edge) in lines.iter_mut().zip(&self.edges) {
+            *slot = edge.as_ref().map(look_of);
+        }
+        d.set_border_box(ui, "bx", &lines, self.inner);
+    }
+
+    /// A press on an edge of the diagram or on a preset.
+    fn press(&mut self, ui: &mut Ui, d: &mut Dialog, id: &str) {
+        let line = Self::chosen_line(&d.values(ui));
+        if let Some(edge) = id.strip_prefix("bx:") {
+            let Some(k) = BORDER_EDGES.iter().position(|e| *e == edge) else {
+                return;
+            };
+            // Pressing a line that is already there takes it away.
+            self.edges[k] = if self.edges[k] == line { None } else { line };
+        } else {
+            match id {
+                "pre_none" => self.edges = Edges::default(),
+                "pre_outline" => {
+                    for k in [0, 2, 3, 5] {
+                        self.edges[k].clone_from(&line);
+                    }
+                }
+                "pre_inside" => {
+                    if self.inner.0 {
+                        self.edges[1].clone_from(&line);
+                    }
+                    if self.inner.1 {
+                        self.edges[4].clone_from(&line);
+                    }
+                }
+                _ => return,
+            }
+        }
+        self.redraw(ui, d);
+    }
+}
+
 impl View for FormatCells {
+    fn opened(&mut self, _s: &mut Shell, ui: &mut Ui, d: &mut Dialog) {
+        self.redraw(ui, d);
+    }
+
     fn event(&mut self, _s: &mut Shell, ui: &mut Ui, d: &mut Dialog, o: &Outcome) {
-        if let Outcome::Changed(id) = o
-            && id == "cat"
-        {
-            let cat = d.values(ui).index("cat").unwrap_or(0);
-            d.set_number(ui, "dec", f64::from(default_decimals(cat)));
-            Self::sync_number(ui, d);
+        match o {
+            Outcome::Changed(id) if id == "cat" => {
+                let cat = d.values(ui).index("cat").unwrap_or(0);
+                d.set_number(ui, "dec", f64::from(default_decimals(cat)));
+                Self::sync_number(ui, d);
+            }
+            // Wrapped text and shrink to fit exclude each other.
+            Outcome::Changed(id) if id == "wrap" && d.values(ui).flag("wrap") => {
+                d.set_checked(ui, "shrink", false);
+            }
+            Outcome::Changed(id) if id == "shrink" && d.values(ui).flag("shrink") => {
+                d.set_checked(ui, "wrap", false);
+            }
+            Outcome::Changed(id) if id == "stacked" => {
+                let stacked = d.values(ui).flag("stacked");
+                d.set_enabled(ui, "deg", !stacked);
+            }
+            Outcome::Pressed(id) => self.press(ui, d, id),
+            _ => {}
         }
     }
 
@@ -563,9 +730,22 @@ impl View for FormatCells {
     ) -> Result<(), String> {
         let want = self.wanted(v)?;
         let commands = plan(&self.cur, &want);
+        // Excel's OK is one undo step however many things the dialog changed.
+        let group = s.sheet.begin_undo_group();
         s.run_ids(ui, &commands);
+        let change = format_change(&self.cur, &want);
+        let borders = border_change(&want.border);
+        let done = if change.is_some() || borders.is_some() {
+            s.sheet
+                .format_selection(change.unwrap_or_default(), borders)
+        } else {
+            Ok(())
+        };
+        s.sheet.end_undo_group(group);
+        done?;
         // Apply keeps the dialog open: what it did is the new starting point.
         self.cur = current_state(s);
+        self.edges_before.clone_from(&self.edges);
         Ok(())
     }
 }

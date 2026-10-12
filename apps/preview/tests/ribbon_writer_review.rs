@@ -153,3 +153,47 @@ fn every_control_runs_on_a_document() {
         }
     }
 }
+
+#[test]
+fn markup_display_and_filters_keep_state() {
+    let mut p = rig("Hello");
+    run(&mut p, "review.markup.display-for-review=No Markup");
+    assert_eq!(pane(&mut p).review_state().display.label(), "No Markup");
+    run(&mut p, "review.markup.display-for-review.original");
+    assert_eq!(pane(&mut p).review_state().display.label(), "Original");
+    run(&mut p, "review.comments.show-comments");
+    assert!(!pane(&mut p).review_state().show_comments);
+    run(&mut p, "review.markup.show-markup.formatting");
+    assert!(!pane(&mut p).review_state().show_formatting);
+    run(&mut p, "review.markup.filter-all-markup.Ann");
+    assert_eq!(
+        pane(&mut p).review_state().reviewers,
+        vec!["Ann".to_owned()]
+    );
+    run(&mut p, "review.markup.filter-all-markup.all-reviewers");
+    assert!(pane(&mut p).review_state().reviewers.is_empty());
+    run(&mut p, "review.markup.reviewing-pane");
+    assert!(pane(&mut p).review_state().reviewing_pane);
+}
+
+#[test]
+fn restrict_editing_tracked_changes_turns_tracking_on() {
+    let mut p = rig("Hello");
+    run(&mut p, "review.protect.protect.tracked-changes");
+    assert!(pane(&mut p).track_changes_on());
+    run(&mut p, "review.protect.protect.no-changes");
+    assert!(pane(&mut p).editing_blocked());
+    run(&mut p, "review.protect.protect.stop-protection");
+    assert!(!pane(&mut p).editing_blocked());
+}
+
+#[test]
+fn compare_records_differences_as_tracked_changes() {
+    let mut p = rig("The quick fox");
+    let n = pane(&mut p).compare_with_text("The slow fox");
+    assert_eq!(n, 1);
+    assert!(!pane(&mut p).revisions().is_empty());
+    assert_eq!(pane(&mut p).text(), "The slow fox");
+    run(&mut p, "review.tracking.reject.reject-all");
+    assert_eq!(pane(&mut p).text(), "The quick fox");
+}

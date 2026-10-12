@@ -52,7 +52,9 @@ impl Ui {
         self.theme.color(t)
     }
 
-    fn text_px(&self) -> f32 {
+    /// The pixel size the UI text is drawn, measured and hit-tested at: the logical size scaled
+    /// once and rounded the way GDI rounds a font height.
+    pub(crate) fn text_px(&self) -> f32 {
         gdi_ppem(self.text_size * self.scale.0)
     }
 
@@ -903,6 +905,7 @@ impl Ui {
         ink: Color,
         layers: PaintLayers,
     ) {
+        let e = &*e.display();
         let px = self.text_px();
         let Some(m) = self.assets.font_metrics(self.font, px) else {
             return;
@@ -964,8 +967,9 @@ impl Ui {
                 + e.composition
                     .as_ref()
                     .map_or(0, |c| c.cursor.map_or(c.text.len(), |cu| cu.1));
-            let visible =
-                self.focus == Some(id) && e.caret_visible(self.now, self.settings.caret_blink);
+            let visible = self.focus == Some(id)
+                && self.window_focused
+                && e.caret_visible(self.now, self.settings.caret_blink);
             if visible {
                 let x = (area.x0 as f32 + lay.x_at(caret_at)).round();
                 let w = (self.settings.caret_width as f32 * self.scale.0)

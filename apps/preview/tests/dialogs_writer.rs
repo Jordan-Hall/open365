@@ -193,3 +193,67 @@ fn escape_cancels_every_writer_dialog_without_changes() {
     }
     assert!(p.shell.writer().unwrap().watermark_text().is_none());
 }
+
+#[test]
+fn paragraph_dialog_sets_first_line_and_hanging_indents() {
+    let mut p = writer("hello");
+    assert!(bare(&mut p, "home.paragraph.launcher"));
+    // Special: First line fills By with half an inch, as Word does.
+    alt(&mut p, 's');
+    key(&mut p, Key::Down);
+    assert_eq!(focus_label(&p), "Special");
+    key(&mut p, Key::Enter);
+    assert!(!is_open(&p), "{:?}", p.shell.writer().unwrap().status);
+    let xml = saved_xml(&mut p, "firstline");
+    assert!(xml.contains("w:firstLine=\"720\""), "{xml}");
+
+    // Hanging with a 1" left indent: the first line starts half an inch to the left of it.
+    assert!(bare(&mut p, "home.paragraph.launcher"));
+    alt(&mut p, 'l');
+    type_text(&mut p, "1\"");
+    alt(&mut p, 's');
+    key(&mut p, Key::Down);
+    key(&mut p, Key::Enter);
+    assert!(!is_open(&p), "{:?}", p.shell.writer().unwrap().status);
+    let xml = saved_xml(&mut p, "hanging");
+    assert!(xml.contains("w:left=\"1440\""), "{xml}");
+    assert!(xml.contains("w:hanging=\"720\""), "{xml}");
+
+    // The box shows what the paragraph has, and none empties By.
+    assert!(bare(&mut p, "home.paragraph.launcher"));
+    alt(&mut p, 's');
+    key(&mut p, Key::Up);
+    key(&mut p, Key::Up);
+    key(&mut p, Key::Enter);
+    assert!(!is_open(&p));
+    let xml = saved_xml(&mut p, "none");
+    assert!(!xml.contains("w:hanging"), "{xml}");
+}
+
+#[test]
+fn paragraph_dialog_refuses_a_bad_indent_and_keeps_the_outline_level() {
+    let mut p = writer("hello");
+    assert!(bare(&mut p, "home.paragraph.launcher"));
+    alt(&mut p, 'l');
+    type_text(&mut p, "wide");
+    key(&mut p, Key::Enter);
+    assert!(is_open(&p));
+    assert!(dump(&p).contains(&"Enter an indent such as 0.5\" or 1.27 cm.".to_owned()));
+    alt(&mut p, 'l');
+    type_text(&mut p, "0\"");
+    // Outline level is part of the dialog.
+    alt(&mut p, 'o');
+    key(&mut p, Key::Down);
+    key(&mut p, Key::Enter);
+    assert!(!is_open(&p), "{:?}", dump(&p));
+    let xml = saved_xml(&mut p, "none");
+    assert!(xml.contains(r#"<w:outlineLvl w:val="0"/>"#), "{xml}");
+    // The dialog opens on the level and Body Text takes it off again; one undo step each.
+    assert!(bare(&mut p, "home.paragraph.launcher"));
+    alt(&mut p, 'o');
+    key(&mut p, Key::Up);
+    key(&mut p, Key::Enter);
+    assert!(!is_open(&p));
+    let xml = saved_xml(&mut p, "none");
+    assert!(!xml.contains("outlineLvl"), "{xml}");
+}

@@ -651,6 +651,17 @@ impl SheetModel {
         self.target.redo().is_ok()
     }
 
+    /// Starts a group of edits that undo and redo as one step (see [`Self::end_undo_group`]).
+    #[must_use]
+    pub fn begin_undo_group(&self) -> open365_commands::Group {
+        self.target.begin_group()
+    }
+
+    /// Merges the edits made since [`Self::begin_undo_group`] into one undo step.
+    pub fn end_undo_group(&mut self, group: open365_commands::Group) {
+        self.target.end_group(group);
+    }
+
     /// Moves the active cell by `(d_row, d_col)`, clamped to the sheet; the selection collapses.
     pub fn move_by(&mut self, d_row: i64, d_col: i64) {
         let r = (i64::from(self.active.0) + d_row).clamp(1, i64::from(MAX_ROW)) as u32;

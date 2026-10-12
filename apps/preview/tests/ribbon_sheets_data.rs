@@ -534,9 +534,10 @@ fn get_data_and_automate_controls_are_left_unhandled() {
     let mut p = rig();
     for id in [
         "data.get-transform-data.get-data",
-        "data.queries-connections.refresh-all",
-        "data.forecast.forecast-sheet",
-        "data.data-tools.quick-fill",
+        "data.get-transform-data.from-web",
+        "data.get-transform-data.from-table-range",
+        "data.data-tools.clean-data",
+        "data.data-tools.data-model",
         "automate.scripts.new-script",
     ] {
         assert_eq!(p.shell.run_command(&mut p.ui, id), Handled::No, "{id}");
@@ -657,4 +658,234 @@ fn subtotal_with_the_summary_above_and_validation_and_filter_survive_a_save() {
     assert!(again.home_row_state(3).1);
     assert!(again.data_check_entry(2, 2, "-1").is_err());
     assert!(again.data_check_entry(2, 2, "1.5").is_ok());
+}
+
+// ---- Quick Fill, From Text/CSV, Data Table, Scenario Manager, Forecast Sheet, circles --------
+
+fn select(p: &mut Preview, a: (u32, u32), b: (u32, u32)) {
+    sheet(p).select_cell(a);
+    sheet(p).extend_to(b);
+}
+
+#[test]
+fn quick_fill_infers_the_pattern_from_one_example() {
+    let mut p = rig();
+    fill(
+        &mut p,
+        &[&["John Smith", "J. Smith"], &["Mary Jones"], &["Ann Lee"]],
+    );
+    sheet(&mut p).select_cell((2, 2));
+    run(&mut p, "data.data-tools.quick-fill");
+    assert_eq!(col(&mut p, 2, 3), ["J. Smith", "M. Jones", "A. Lee"]);
+    assert!(sheet(&mut p).undo());
+    assert_eq!(col(&mut p, 2, 3), ["J. Smith", "", ""], "one undo step");
+}
+
+#[test]
+fn quick_fill_changes_case_and_uses_two_columns() {
+    let mut p = rig();
+    fill(
+        &mut p,
+        &[&["john", "smith", "SMITH, John"], &["mary", "jones"]],
+    );
+    sheet(&mut p).select_cell((2, 3));
+    run(&mut p, "data.data-tools.quick-fill");
+    assert_eq!(sheet(&mut p).source(2, 3), "JONES, Mary");
+}
+
+#[test]
+fn quick_fill_without_a_pattern_leaves_the_column_alone() {
+    let mut p = rig();
+    fill(&mut p, &[&["abc", "zzz"], &["def"]]);
+    sheet(&mut p).select_cell((2, 2));
+    run(&mut p, "data.data-tools.quick-fill");
+    assert_eq!(sheet(&mut p).source(2, 2), "");
+}
+
+#[test]
+fn from_text_csv_imports_quoted_fields_in_one_undo_step() {
+    let mut p = rig();
+    sheet(&mut p).select_cell((2, 2));
+    run(
+        &mut p,
+        "data.get-transform-data.from-text-csv=delim=comma;text=Name,Qty\n\"Smith, J\",3\n\"say \"\"hi\"\"\",4",
+    );
+    assert_eq!(sheet(&mut p).source(2, 2), "Name");
+    assert_eq!(sheet(&mut p).source(3, 2), "Smith, J");
+    assert_eq!(sheet(&mut p).source(3, 3), "3");
+    assert_eq!(sheet(&mut p).source(4, 2), "say \"hi\"");
+    assert!(sheet(&mut p).undo());
+    assert_eq!(sheet(&mut p).source(3, 2), "");
+}
+
+#[test]
+fn from_text_csv_detects_semicolons_and_skips_start_rows() {
+    let mut p = rig();
+    run(
+        &mut p,
+        "data.get-transform-data.from-text-csv=start=2;text=junk\nA;B\n1;2",
+    );
+    assert_eq!(sheet(&mut p).source(1, 1), "A");
+    assert_eq!(sheet(&mut p).source(2, 2), "2");
+}
+
+#[test]
+fn data_table_fills_one_variable_results_and_restores_the_input() {
+    let mut p = rig();
+    fill(&mut p, &[&["", "5", "", "", "=B1*2"]]);
+    for (i, v) in ["1", "2", "3"].iter().enumerate() {
+        sheet(&mut p).enter(i as u32 + 2, 4, v).unwrap();
+    }
+    select(&mut p, (1, 4), (4, 5));
+    run(
+        &mut p,
+        "data.forecast.what-if-analysis.data-table=datatable;col=B1",
+    );
+    assert_eq!(
+        (2..=4)
+            .map(|r| sheet(&mut p).source(r, 5))
+            .collect::<Vec<_>>(),
+        ["2", "4", "6"]
+    );
+    assert_eq!(
+        sheet(&mut p).source(1, 2),
+        "5",
+        "the input cell is put back"
+    );
+    assert_eq!(sheet(&mut p).source(1, 5), "=B1*2");
+}
+
+#[test]
+fn data_table_two_variables() {
+    let mut p = rig();
+    fill(&mut p, &[&["2", "3", "", "=A1*B1", "10", "20"]]);
+    sheet(&mut p).enter(2, 4, "1").unwrap();
+    sheet(&mut p).enter(3, 4, "2").unwrap();
+    select(&mut p, (1, 4), (3, 6));
+    run(
+        &mut p,
+        "data.forecast.what-if-analysis.data-table=datatable;row=A1;col=B1",
+    );
+    assert_eq!(sheet(&mut p).source(2, 5), "10");
+    assert_eq!(sheet(&mut p).source(3, 6), "40");
+    assert_eq!(sheet(&mut p).source(1, 1), "2");
+}
+
+#[test]
+fn scenario_manager_adds_shows_summarises_and_deletes() {
+    let mut p = rig();
+    fill(&mut p, &[&["10", "20", "=A1+B1"]]);
+    select(&mut p, (1, 1), (1, 2));
+    let w = "data.forecast.what-if-analysis";
+    run(
+        &mut p,
+        &format!("{w}=scenario=add;name=Best;cells=A1,B1;values=100|200"),
+    );
+    run(&mut p, &format!("{w}=scenario=add;name=Base;cells=A1,B1"));
+    assert_eq!(sheet(&mut p).data_scenarios().len(), 2);
+    run(&mut p, &format!("{w}=scenario=show;name=Best"));
+    assert_eq!(sheet(&mut p).source(1, 3), "=A1+B1");
+    assert_eq!(sheet(&mut p).source(1, 1), "100");
+    assert_eq!(sheet(&mut p).source(1, 2), "200");
+    assert!(sheet(&mut p).undo());
+    assert_eq!(sheet(&mut p).source(1, 1), "10", "Show is one undo step");
+    run(&mut p, &format!("{w}=scenario=show;name=Base"));
+    assert_eq!(sheet(&mut p).source(1, 1), "10");
+    run(&mut p, &format!("{w}=scenario=summary;results=C1"));
+    assert_eq!(sheet(&mut p).sheet_names().len(), 2);
+    assert_eq!(sheet(&mut p).active_sheet_index(), 1);
+    assert_eq!(sheet(&mut p).source(1, 2), "Scenario Summary");
+    assert_eq!(sheet(&mut p).source(4, 2), "$A$1");
+    assert_eq!(sheet(&mut p).source(4, 4), "100");
+}
+
+#[test]
+fn scenario_show_of_an_unknown_name_reports_it() {
+    let mut p = rig();
+    run(
+        &mut p,
+        "data.forecast.what-if-analysis=scenario=show;name=Nope",
+    );
+    assert!(sheet(&mut p).status.contains("no scenario"));
+}
+
+#[test]
+fn forecast_sheet_extends_a_linear_series_on_a_new_sheet() {
+    let mut p = rig();
+    fill(
+        &mut p,
+        &[
+            &["Time", "Value"],
+            &["1", "2"],
+            &["2", "4"],
+            &["3", "6"],
+            &["4", "8"],
+            &["5", "10"],
+        ],
+    );
+    select(&mut p, (1, 1), (6, 2));
+    run(
+        &mut p,
+        "data.forecast.forecast-sheet=periods=2;confidence=95",
+    );
+    assert_eq!(sheet(&mut p).sheet_names().len(), 2);
+    assert_eq!(sheet(&mut p).active_sheet_index(), 1);
+    assert_eq!(sheet(&mut p).source(1, 3), "Forecast");
+    let num = |p: &mut Preview, r, c| sheet(p).source(r, c).parse::<f64>().unwrap();
+    assert!((num(&mut p, 7, 1) - 6.0).abs() < 1e-9);
+    assert!((num(&mut p, 7, 3) - 12.0).abs() < 1e-9);
+    assert!((num(&mut p, 8, 3) - 14.0).abs() < 1e-9);
+    assert!(num(&mut p, 7, 4) <= num(&mut p, 7, 3));
+    assert!(num(&mut p, 7, 5) >= num(&mut p, 7, 3));
+}
+
+#[test]
+fn forecast_sheet_refuses_too_little_data() {
+    let mut p = rig();
+    fill(&mut p, &[&["1", "2"], &["2", "4"]]);
+    select(&mut p, (1, 1), (2, 2));
+    run(&mut p, "data.forecast.forecast-sheet");
+    assert_eq!(sheet(&mut p).sheet_names().len(), 1);
+    assert!(sheet(&mut p).status.contains("three"));
+}
+
+#[test]
+fn t_critical_matches_the_tables() {
+    use open365_preview::sheet::sheet_ext::data_more::t_critical;
+    assert!((t_critical(0.95, 10.0) - 2.228).abs() < 1e-3);
+    assert!((t_critical(0.95, 3.0) - 3.182).abs() < 1e-3);
+}
+
+#[test]
+fn circle_invalid_data_marks_cells_that_break_the_rule() {
+    let mut p = rig();
+    fill(&mut p, &[&["5"], &["50"], &["7"]]);
+    select(&mut p, (1, 1), (3, 1));
+    run(&mut p, "data.data-tools.data-validation=whole=between,1,10");
+    run(
+        &mut p,
+        "data.data-tools.data-validation.circle-invalid-data",
+    );
+    assert_eq!(sheet(&mut p).data_circles(), [(2, 1)]);
+    run(
+        &mut p,
+        "data.data-tools.data-validation.clear-validation-circles",
+    );
+    assert!(sheet(&mut p).data_circles().is_empty());
+}
+
+#[test]
+fn connection_controls_are_list_only() {
+    let mut p = rig();
+    for id in [
+        "data.queries-connections.refresh-all",
+        "data.queries-connections.queries-connections",
+        "data.queries-connections.properties",
+        "data.queries-connections.workbook-links",
+        "data.get-transform-data.existing-connections",
+        "data.get-transform-data.recent-sources",
+    ] {
+        run(&mut p, id);
+        assert!(sheet(&mut p).status.starts_with("There are no"), "{id}");
+    }
 }

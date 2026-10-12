@@ -11,7 +11,7 @@ use crate::geom::{Point, Rect, Scale};
 use crate::input::{Emit, ImeInput, InputEvent, Key, Modifiers, PointerButton};
 use crate::keytips::{KeyTips, Tip, TipOutcome};
 use crate::settings::PlatformSettings;
-use crate::textedit::{Composition, TextEdit};
+use crate::textedit::{Composition, TextEdit, next_blink_edge};
 use crate::theme::Theme;
 use crate::tree::{
     DROPDOWN_ARROW_W, MENU_PAD, MenuItem, MenuState, Node, NodeId, SPINNER_BUTTON_W, Tree, Widget,
@@ -84,7 +84,10 @@ pub struct Ui {
     pub(crate) now: Instant,
     pub(crate) tooltip: Option<TooltipState>,
     pub(crate) ime_enabled: bool,
-    window_focused: bool,
+    pub(crate) window_focused: bool,
+    /// When the focused node got focus (a blink cycle restarts there), and the cycle start of a focused canvas caret.
+    focus_since: Instant,
+    canvas_blink: Option<Instant>,
     tip_children: HashMap<String, Vec<Tip>>,
     tip_targets: HashMap<String, TipTarget>,
     tip_nodes: HashMap<String, NodeId>,
@@ -156,6 +159,8 @@ impl Ui {
             tooltip: None,
             ime_enabled: false,
             window_focused: true,
+            focus_since: now,
+            canvas_blink: None,
             tip_children: HashMap::new(),
             tip_targets: HashMap::new(),
             tip_nodes: HashMap::new(),
@@ -176,6 +181,7 @@ impl Ui {
         self.theme = Theme::for_settings(&s);
         self.settings = s;
         self.redraw = true;
+        self.sync_blink();
     }
 
     pub fn set_clipboard(&mut self, c: Box<dyn Clipboard>) {
@@ -270,16 +276,18 @@ impl Ui {
 
     fn touch_focus(&mut self) {
         let now = self.now;
+        self.focus_since = now;
+        self.canvas_blink = None;
         let Some(f) = self.focus else {
             self.ime_enabled = false;
+            self.sync_blink();
             return;
         };
-        let blink = self.settings.caret_blink;
-        let mut text = false;
         let canvas = self
             .tree
             .get(f)
             .is_some_and(|n| matches!(n.widget, Widget::Canvas { .. }));
+        let mut text = false;
         if let Some(e) = self
             .tree
             .get_mut(f)
@@ -288,16 +296,67 @@ impl Ui {
             e.last_activity = Some(now);
             text = true;
         }
-        self.ime_enabled = text
-            || self
-                .tree
-                .get(f)
-                .is_some_and(|n| matches!(n.widget, Widget::Canvas { .. }));
-        if (text || canvas)
-            && let Some(b) = blink
-        {
-            self.schedule(now + b, TimerKind::Blink);
+        self.ime_enabled = text || canvas;
+        self.sync_blink();
+    }
+
+    /// Where the focused caret's blink cycle started, `None` when nothing blinks: no focus, the
+    /// window is inactive, or the focused node is a canvas that has not drawn a caret.
+    fn blink_epoch(&self) -> Option<Instant> {
+        if !self.window_focused {
+            return None;
         }
+        let n = self.tree.get(self.focus?)?;
+        if let Some(e) = editable(&n.widget) {
+            return Some(
+                e.last_activity
+                    .unwrap_or(self.focus_since)
+                    .max(self.focus_since),
+            );
+        }
+        if matches!(n.widget, Widget::Canvas { .. }) {
+            return self.canvas_blink.map(|c| c.max(self.focus_since));
+        }
+        None
+    }
+
+    /// Keeps exactly one blink timer, at the next edge of the focused caret's cycle (none when the
+    /// caret is steady, unfocused or the window is inactive). Called after every input, so a
+    /// keystroke or caret move that restarts the cycle also moves the wake-up.
+    fn sync_blink(&mut self) {
+        let edge = self
+            .settings
+            .caret_blink
+            .filter(|b| !b.is_zero())
+            .zip(self.blink_epoch())
+            .map(|(b, e)| next_blink_edge(e, self.now, b));
+        match edge {
+            Some(at) => self.schedule(at, TimerKind::Blink),
+            None => self.timers.retain(|t| t.kind != TimerKind::Blink),
+        }
+    }
+
+    /// Whether a canvas that draws its own caret (the Writer page) shows it at `now`. `epoch` is
+    /// when the caret last moved or text changed. The caret is hidden while the window is
+    /// inactive, restarts when the canvas gains focus, and a wake-up is scheduled for the next
+    /// edge only (a steady caret schedules nothing).
+    pub fn canvas_caret_visible(&mut self, epoch: Instant, now: Instant) -> bool {
+        if self.canvas_blink != Some(epoch) {
+            self.canvas_blink = Some(epoch);
+        }
+        self.sync_blink();
+        self.window_focused
+            && crate::textedit::blink_on(
+                epoch.max(self.focus_since),
+                now,
+                self.settings.caret_blink,
+            )
+    }
+
+    /// Whether the window has the OS focus (carets are hidden without it).
+    #[must_use]
+    pub fn window_focused(&self) -> bool {
+        self.window_focused
     }
 
     /// The modifier keys held now (tracked from the key events).
@@ -411,7 +470,10 @@ impl Ui {
             InputEvent::Ime(i) => self.ime(i),
             InputEvent::FocusChanged(f) => {
                 self.window_focused = f;
-                if !f {
+                if f {
+                    // A caret comes back solid, as in Office.
+                    self.touch_focus();
+                } else {
                     self.keytips.cancel();
                     self.capture = None;
                     self.pressed = None;
@@ -420,6 +482,7 @@ impl Ui {
                 self.redraw = true;
             }
         }
+        self.sync_blink();
         self.redraw
     }
 
@@ -455,18 +518,7 @@ impl Ui {
                         self.schedule(now + FRAME_INTERVAL, TimerKind::Frame);
                     }
                 }
-                TimerKind::Blink => {
-                    if self.window_focused
-                        && let (Some(f), Some(b)) = (self.focus, self.settings.caret_blink)
-                        && self.tree.get(f).is_some_and(|n| {
-                            editable(&n.widget).is_some()
-                                || matches!(n.widget, Widget::Canvas { .. })
-                        })
-                    {
-                        self.redraw = true;
-                        self.schedule(now + b, TimerKind::Blink);
-                    }
-                }
+                TimerKind::Blink => self.redraw = true,
             }
         }
     }
@@ -1046,15 +1098,16 @@ impl Ui {
         let Some(e) = self.tree.get(id).and_then(|n| editable(&n.widget)) else {
             return 0;
         };
+        let shown = e.display();
         let lay = self.assets.layout_text(
             self.font,
-            &e.text,
-            self.text_size * self.scale.0,
+            &shown.text,
+            self.text_px(),
             0.0,
             0.0,
             crate::paint::UI_TEXT,
         );
-        lay.byte_at(x * self.scale.0)
+        e.real_byte(lay.byte_at(x * self.scale.0))
     }
 
     fn drag_text(&mut self, id: NodeId, p: Point) {
@@ -1306,11 +1359,13 @@ impl Ui {
             },
             Some(Widget::TextField(_)) => {
                 if key == Key::Enter {
-                    let t = self
-                        .tree
-                        .get(f)
-                        .and_then(|n| editable(&n.widget))
-                        .map(|e| e.text.clone());
+                    let t = self.tree.get(f).and_then(|n| editable(&n.widget)).map(|e| {
+                        if e.masked {
+                            String::new()
+                        } else {
+                            e.text.clone()
+                        }
+                    });
                     if let Some(t) = t {
                         self.emit(Emit::TextCommitted(f, t));
                     }
@@ -1596,6 +1651,7 @@ impl Ui {
                         .tree
                         .get(id)
                         .and_then(|n| editable(&n.widget))
+                        .filter(|e| !e.masked)
                         .map(|e| e.selected_text().to_owned());
                     if let Some(s) = sel.filter(|s| !s.is_empty()) {
                         self.clipboard.set_text(&s);
@@ -1640,7 +1696,12 @@ impl Ui {
             f(e);
             e.last_activity = Some(now);
             if e.text != was {
-                changed = Some(e.text.clone());
+                // A password's text stays in the field.
+                changed = Some(if e.masked {
+                    String::new()
+                } else {
+                    e.text.clone()
+                });
             }
         }
         self.redraw = true;

@@ -9,6 +9,7 @@ use open365_ui_core::dialog::{ButtonRole, Dialog, FooterButton, Outcome, Spec, V
 use super::{View, pick_selection, wrap};
 use crate::dialogs::formulas_evaluate::EvalSession;
 use crate::dialogs::formulas_function::{Category, formula_for, functions_in, search};
+use crate::dialogs::formulas_names::NameRow;
 use crate::dialogs::function_args::{Signature, signature};
 use crate::dialogs::request::DialogRequest;
 use crate::shell::Shell;
@@ -201,23 +202,29 @@ struct FunctionArguments {
     sig: Signature,
 }
 
+const FA_W: f32 = 520.0;
+
 fn function_arguments(name: &str) -> (Spec, Box<dyn View>) {
     let sig = signature(name);
     let n = sig.boxes();
-    let h = 34.0 + 30.0 * n as f32 + 92.0;
-    let mut spec = Spec::new("Function Arguments", 440.0, h);
-    spec.label(12.0, 8.0, 416.0, &sig.name).id = "fname".to_owned();
-    for i in 0..n {
-        let y = 32.0 + 30.0 * i as f32;
-        spec.label(12.0, y + 3.0, 120.0, &sig.box_name(i));
-        spec.reference(&format!("a{i}"), 134.0, y, 294.0, "");
-    }
     let y = 32.0 + 30.0 * n as f32 + 4.0;
-    spec.label(12.0, y, 416.0, &format!("Formula: ={}()", sig.name))
-        .id = "preview".to_owned();
-    for (i, line) in wrap(&sig.help, 66, 3).iter().enumerate() {
-        spec.label(12.0, y + 24.0 + 15.0 * i as f32, 416.0, line);
+    let mut spec = Spec::new("Function Arguments", FA_W, y + 104.0);
+    spec.label(12.0, 8.0, FA_W - 24.0, &sig.name).id = "fname".to_owned();
+    for i in 0..n {
+        let row = 32.0 + 30.0 * i as f32;
+        spec.label(12.0, row + 3.0, 104.0, &sig.box_name(i));
+        spec.reference(&format!("a{i}"), 120.0, row, 236.0, "");
+        spec.label(364.0, row + 3.0, FA_W - 376.0, "").id = format!("p{i}");
     }
+    for (i, line) in wrap(&sig.help, 82, 2).iter().enumerate() {
+        spec.label(12.0, y + 15.0 * i as f32, FA_W - 24.0, line);
+    }
+    for i in 0..2 {
+        spec.label(12.0, y + 36.0 + 15.0 * i as f32, FA_W - 24.0, "")
+            .id = format!("adesc{i}");
+    }
+    spec.label(12.0, y + 78.0, FA_W - 24.0, "Formula result =")
+        .id = "result".to_owned();
     spec.focus = Some("a0".to_owned());
     (spec, Box::new(FunctionArguments { sig }))
 }
@@ -228,17 +235,58 @@ impl FunctionArguments {
             .map(|i| v.text(&format!("a{i}")))
             .collect()
     }
+
+    /// Argument `i`'s description under the boxes.
+    fn describe(&self, ui: &mut Ui, d: &mut Dialog, i: usize) {
+        let lines = wrap(&self.sig.arg_help(i), 82, 2);
+        for k in 0..2 {
+            d.set_text(
+                ui,
+                &format!("adesc{k}"),
+                lines.get(k).map_or("", String::as_str),
+            );
+        }
+    }
+
+    /// The value of every argument and of the whole call, beside the boxes and under them.
+    fn preview(&self, s: &Shell, ui: &mut Ui, d: &mut Dialog) {
+        let v = d.values(ui);
+        let args = self.args(&v);
+        let texts: Vec<String> = args.iter().map(|a| (*a).to_owned()).collect();
+        for (i, shown) in s.sheet.evaluate_previews(&texts, true).iter().enumerate() {
+            let text = shown
+                .as_ref()
+                .map_or_else(String::new, |t| format!("= {t}"));
+            d.set_text(ui, &format!("p{i}"), &text);
+        }
+        let whole = vec![formula_for(&self.sig.name, &args)];
+        let result = match s.sheet.evaluate_previews(&whole, false).pop().flatten() {
+            Some(t) if args.iter().any(|a| !a.trim().is_empty()) || self.sig.args.is_empty() => {
+                format!("Formula result = {t}")
+            }
+            _ => "Formula result =".to_owned(),
+        };
+        d.set_text(ui, "result", &result);
+    }
 }
 
 impl View for FunctionArguments {
+    fn opened(&mut self, s: &mut Shell, ui: &mut Ui, d: &mut Dialog) {
+        self.describe(ui, d, 0);
+        self.preview(s, ui, d);
+    }
+
     fn event(&mut self, s: &mut Shell, ui: &mut Ui, d: &mut Dialog, o: &Outcome) {
         pick_selection(s, ui, d, o);
-        let v = d.values(ui);
-        d.set_text(
-            ui,
-            "preview",
-            &format!("Formula: {}", formula_for(&self.sig.name, &self.args(&v))),
-        );
+        let touched = match o {
+            Outcome::Changed(id) => id.strip_prefix('a').and_then(|n| n.parse::<usize>().ok()),
+            Outcome::Ref { id, .. } => id.strip_prefix('a').and_then(|n| n.parse::<usize>().ok()),
+            _ => None,
+        };
+        if let Some(i) = touched {
+            self.describe(ui, d, i);
+        }
+        self.preview(s, ui, d);
     }
 
     fn commit(
@@ -257,52 +305,117 @@ impl View for FunctionArguments {
 
 #[derive(Debug)]
 struct NameManager {
-    refers: Vec<String>,
+    rows: Vec<NameRow>,
+}
+
+fn row_text(r: &NameRow) -> String {
+    format!("{}    {}    ({})", r.name, r.refers_to, r.scope)
 }
 
 fn name_manager(s: &mut Shell) -> (Spec, Box<dyn View>) {
     let rows = s.sheet.name_rows();
-    let items: Vec<String> = rows
-        .iter()
-        .map(|r| format!("{}    {}    ({})", r.name, r.refers_to, r.scope))
-        .collect();
+    let items: Vec<String> = rows.iter().map(row_text).collect();
+    let any = !rows.is_empty();
     let mut spec = Spec::new("Name Manager", 520.0, 270.0).close_only();
-    spec.button("new", 12.0, 8.0, 80.0, "&New...").disabled();
-    spec.button("edit", 98.0, 8.0, 80.0, "&Edit...").disabled();
-    spec.button("delete", 184.0, 8.0, 80.0, "&Delete")
-        .disabled();
+    spec.button("new", 12.0, 8.0, 80.0, "&New...");
+    spec.button("edit", 98.0, 8.0, 80.0, "&Edit...");
+    if !any && let Some(c) = spec.controls.last_mut() {
+        c.enabled = false;
+    }
+    spec.button("delete", 184.0, 8.0, 80.0, "&Delete");
+    if !any && let Some(c) = spec.controls.last_mut() {
+        c.enabled = false;
+    }
     spec.list(
         "names",
         open365_ui_core::Rect::new(12.0, 40.0, 496.0, 160.0),
         items,
-        (!rows.is_empty()).then_some(0),
+        any.then_some(0),
     );
-    spec.label(12.0, 208.0, 200.0, "&Refers to:");
+    spec.label(12.0, 208.0, 200.0, "Refers to:");
     spec.text(
         "refers",
         12.0,
         228.0,
         496.0,
         rows.first().map_or("", |r| r.refers_to.as_str()),
-    );
-    spec.focus = Some("names".to_owned());
-    (
-        spec,
-        Box::new(NameManager {
-            refers: rows.into_iter().map(|r| r.refers_to).collect(),
-        }),
     )
+    .enabled = false;
+    spec.focus = Some("names".to_owned());
+    (spec, Box::new(NameManager { rows }))
+}
+
+impl NameManager {
+    fn selected(&self, ui: &Ui, d: &Dialog) -> Option<&NameRow> {
+        d.values(ui).index("names").and_then(|i| self.rows.get(i))
+    }
+
+    /// Shows the refers-to text of the selected name and enables Edit and Delete for it.
+    fn sync(&self, ui: &mut Ui, d: &mut Dialog) {
+        let text = self
+            .selected(ui, d)
+            .map(|r| r.refers_to.clone())
+            .unwrap_or_default();
+        let has = self.selected(ui, d).is_some();
+        d.set_text(ui, "refers", &text);
+        d.set_enabled(ui, "edit", has);
+        d.set_enabled(ui, "delete", has);
+    }
 }
 
 impl View for NameManager {
-    fn event(&mut self, _s: &mut Shell, ui: &mut Ui, d: &mut Dialog, o: &Outcome) {
-        if let Outcome::Changed(id) = o
-            && id == "names"
-            && let Some(i) = d.values(ui).index("names")
-        {
-            let text = self.refers.get(i).cloned().unwrap_or_default();
-            d.set_text(ui, "refers", &text);
+    fn event(&mut self, s: &mut Shell, ui: &mut Ui, d: &mut Dialog, o: &Outcome) {
+        match o {
+            Outcome::Changed(id) if id == "names" => self.sync(ui, d),
+            Outcome::Pressed(id) if id == "new" => {
+                super::request_child(DialogRequest::NameEdit {
+                    name: String::new(),
+                    scope: None,
+                    refers_to: super::names::selection_ref(s),
+                    comment: String::new(),
+                    editing: false,
+                });
+            }
+            Outcome::Pressed(id) if id == "edit" => {
+                if let Some(r) = self.selected(ui, d) {
+                    super::request_child(DialogRequest::NameEdit {
+                        name: r.name.clone(),
+                        scope: r.scope_index,
+                        refers_to: r.refers_to.clone(),
+                        comment: r.comment.clone(),
+                        editing: true,
+                    });
+                }
+            }
+            Outcome::Pressed(id) if id == "delete" => {
+                if let Some(r) = self.selected(ui, d) {
+                    super::request_child(DialogRequest::DeleteName {
+                        name: r.name.clone(),
+                        scope: r.scope_index,
+                    });
+                }
+            }
+            _ => {}
         }
+    }
+
+    fn child_done(
+        &mut self,
+        s: &mut Shell,
+        ui: &mut Ui,
+        d: &mut Dialog,
+        applied: bool,
+    ) -> Result<(), String> {
+        if !applied {
+            return Ok(());
+        }
+        let was = d.values(ui).index("names").unwrap_or(0);
+        self.rows = s.sheet.name_rows();
+        let items: Vec<String> = self.rows.iter().map(row_text).collect();
+        let sel = (!items.is_empty()).then(|| was.min(items.len() - 1));
+        d.set_items(ui, "names", items, sel);
+        self.sync(ui, d);
+        Ok(())
     }
 
     fn commit(
@@ -326,23 +439,19 @@ struct Evaluate {
 
 fn evaluate(s: &mut Shell) -> Option<(Spec, Box<dyn View>)> {
     let session = s.sheet.evaluate_session()?;
-    let (r, c) = s.sheet.active;
-    let mut spec = Spec::new("Evaluate Formula", 460.0, 110.0).footer(vec![
+    let mut spec = Spec::new("Evaluate Formula", 480.0, 110.0).footer(vec![
         FooterButton::new("step", "&Evaluate", ButtonRole::Default),
+        FooterButton::new("stepin", "Step &In", ButtonRole::Normal),
+        FooterButton::new("stepout", "Step &Out", ButtonRole::Normal),
         FooterButton::new("restart", "&Restart", ButtonRole::Normal),
         FooterButton::new("cancel", "&Close", ButtonRole::Cancel),
     ]);
     spec.label(12.0, 8.0, 150.0, "Reference:");
-    spec.label(12.0, 30.0, 150.0, &crate::sheet::a1(r, c)).id = "ref".to_owned();
-    spec.label(180.0, 8.0, 270.0, "E&valuation:");
-    spec.label(180.0, 30.0, 270.0, &session.text()).id = "formula".to_owned();
-    spec.label(
-        12.0,
-        70.0,
-        436.0,
-        "To show the result of the underlined expression, click Evaluate.",
-    )
-    .id = "hint".to_owned();
+    spec.label(12.0, 30.0, 150.0, &s.sheet.evaluate_reference(&session))
+        .id = "ref".to_owned();
+    spec.label(180.0, 8.0, 290.0, "E&valuation:");
+    spec.label(180.0, 30.0, 290.0, &session.text()).id = "formula".to_owned();
+    spec.label(12.0, 70.0, 456.0, HINT).id = "hint".to_owned();
     spec.focus = Some("step".to_owned());
     // Evaluate is the footer's first control, so the label buttons are not tab stops.
     Some((
@@ -354,7 +463,23 @@ fn evaluate(s: &mut Shell) -> Option<(Spec, Box<dyn View>)> {
     ))
 }
 
+const HINT: &str = "To show the result of the underlined expression, click Evaluate.";
+
+impl Evaluate {
+    /// Shows the formula and the cell it is in, and enables Step In and Step Out as they apply.
+    fn show(&self, s: &Shell, ui: &mut Ui, d: &mut Dialog) {
+        d.set_text(ui, "formula", &self.session.text());
+        d.set_text(ui, "ref", &s.sheet.evaluate_reference(&self.session));
+        d.set_enabled(ui, "stepin", s.sheet.evaluate_can_step_in(&self.session));
+        d.set_enabled(ui, "stepout", self.session.can_step_out());
+    }
+}
+
 impl View for Evaluate {
+    fn opened(&mut self, s: &mut Shell, ui: &mut Ui, d: &mut Dialog) {
+        self.show(s, ui, d);
+    }
+
     fn event(&mut self, s: &mut Shell, ui: &mut Ui, d: &mut Dialog, o: &Outcome) {
         let Outcome::Pressed(id) = o else { return };
         match id.as_str() {
@@ -366,17 +491,19 @@ impl View for Evaluate {
                     "The evaluation is complete. Click Restart to evaluate again.",
                 );
             }
+            "stepin" => {
+                s.sheet.evaluate_step_in(&mut self.session);
+            }
+            "stepout" => {
+                s.sheet.evaluate_step_out(&mut self.session);
+            }
             "restart" => {
                 self.session = self.start.clone();
-                d.set_text(
-                    ui,
-                    "hint",
-                    "To show the result of the underlined expression, click Evaluate.",
-                );
+                d.set_text(ui, "hint", HINT);
             }
             _ => {}
         }
-        d.set_text(ui, "formula", &self.session.text());
+        self.show(s, ui, d);
     }
 
     fn commit(

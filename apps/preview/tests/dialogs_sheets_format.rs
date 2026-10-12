@@ -69,10 +69,12 @@ fn format_cells_font_fill_and_border_tabs() {
     key(&mut p, Key::Tab); // Font name
     key(&mut p, Key::Tab); // Font style
     keys(&mut p, &[Key::Down, Key::Down]); // Regular, Italic, Bold
-    // Border page: Tab goes to the presets (none checked yet), Down checks Outline.
+    // Border page: Tab visits the style list, the colour, then the presets; Outline draws the
+    // selected (thin) line around the cell.
     ctrl(&mut p, Key::Tab);
-    key(&mut p, Key::Tab);
-    key(&mut p, Key::Down);
+    keys(&mut p, &[Key::Tab, Key::Tab, Key::Tab, Key::Tab]);
+    assert_eq!(focus_label(&p), "Outline");
+    key(&mut p, Key::Enter);
     // Fill page.
     ctrl(&mut p, Key::Tab);
     key(&mut p, Key::Tab);
@@ -90,6 +92,15 @@ fn format_cells_font_fill_and_border_tabs() {
         "{:?}",
         f.border.left
     );
+    // One OK, one undo step: font, fill and border go together, and come back together.
+    assert!(p.shell.sheet_mut().undo());
+    let f = p.shell.sheet().home_cell_format(2, 2).unwrap();
+    assert!(!f.font.bold);
+    assert_eq!(f.fill.pattern, FillPattern::None);
+    assert!(!format!("{:?}", f.border.left).contains("Thin"));
+    assert!(p.shell.sheet_mut().redo());
+    let f = p.shell.sheet().home_cell_format(2, 2).unwrap();
+    assert!(f.font.bold && f.fill.pattern == FillPattern::Solid);
 }
 
 #[test]
@@ -244,4 +255,379 @@ fn protect_workbook_dialog_protects_the_structure() {
     key(&mut p, Key::Enter);
     assert!(!is_open(&p));
     assert!(p.shell.sheet().review_workbook_protected());
+}
+
+// ---- Protect, Unprotect and Confirm Password -----------------------------------------------------
+
+/// Presses the OK button (Enter would press the focused push button instead).
+fn press_ok(p: &mut open365_preview::Preview) {
+    let ok = find(p, "OK").expect("OK button");
+    click(p, ok);
+}
+
+/// The text a focused field shows (a password field shows bullets only).
+fn focused_text(p: &open365_preview::Preview) -> String {
+    match p
+        .ui
+        .focus()
+        .and_then(|f| p.ui.tree.get(f))
+        .map(|n| &n.widget)
+    {
+        Some(open365_ui_core::Widget::TextField(e)) => e.text.clone(),
+        other => panic!("not a text field: {other:?}"),
+    }
+}
+
+#[test]
+fn protect_sheet_opens_before_it_protects_and_asks_for_the_password_twice() {
+    let mut p = sheets();
+    assert!(bare(&mut p, "review.protect.protect-sheet"));
+    assert_eq!(title(&p).as_deref(), Some("Protect Sheet"));
+    assert!(
+        p.shell.sheet().review_sheet_protection().is_none(),
+        "the dialog comes first"
+    );
+    type_text(&mut p, "secret");
+    assert_eq!(
+        focused_text(&p),
+        "\u{2022}".repeat(6),
+        "the field is masked"
+    );
+    assert!(!dump(&p).iter().any(|l| l.contains("secret")));
+    key(&mut p, Key::Enter);
+    assert_eq!(title(&p).as_deref(), Some("Confirm Password"));
+    assert!(p.shell.sheet().review_sheet_protection().is_none());
+
+    // A different second entry returns to Protect Sheet with Excel's complaint.
+    type_text(&mut p, "other");
+    key(&mut p, Key::Enter);
+    assert_eq!(title(&p).as_deref(), Some("Protect Sheet"));
+    assert!(dump(&p).contains(&"Confirmation password is not identical.".to_owned()));
+    assert!(p.shell.sheet().review_sheet_protection().is_none());
+    assert_eq!(focused_text(&p), "", "the password was cleared");
+
+    // The same twice protects.
+    type_text(&mut p, "secret");
+    key(&mut p, Key::Enter);
+    type_text(&mut p, "secret");
+    key(&mut p, Key::Enter);
+    assert!(!is_open(&p), "{:?}", dump(&p));
+    assert!(p.shell.sheet().review_sheet_protection().is_some());
+    assert!(
+        p.shell
+            .sheet_mut()
+            .review_unprotect_sheet(Some("nope"))
+            .is_err()
+    );
+    assert!(p.shell.sheet().review_sheet_protection().is_some());
+
+    // Escape on Confirm Password leaves Protect Sheet open and nothing changed.
+    assert!(
+        p.shell
+            .sheet_mut()
+            .review_unprotect_sheet(Some("secret"))
+            .is_ok()
+    );
+    assert!(bare(&mut p, "review.protect.protect-sheet"));
+    type_text(&mut p, "abc");
+    key(&mut p, Key::Enter);
+    key(&mut p, Key::Escape);
+    assert_eq!(title(&p).as_deref(), Some("Protect Sheet"));
+    key(&mut p, Key::Escape);
+    assert!(!is_open(&p));
+    assert!(p.shell.sheet().review_sheet_protection().is_none());
+}
+
+#[test]
+fn unprotect_sheet_prompts_for_the_password_and_answers_a_wrong_one_with_a_message() {
+    let mut p = sheets();
+    p.shell
+        .sheet_mut()
+        .review_protect_sheet(Default::default(), Some("secret"))
+        .unwrap();
+    assert!(bare(&mut p, "review.protect.protect-sheet"));
+    assert_eq!(title(&p).as_deref(), Some("Unprotect Sheet"));
+    type_text(&mut p, "nope");
+    key(&mut p, Key::Enter);
+    // Excel's message box over the prompt, which stays.
+    assert_eq!(title(&p).as_deref(), Some("Open365"));
+    assert!(
+        dump(&p)
+            .iter()
+            .any(|l| l.starts_with("The password you supplied is not correct."))
+    );
+    key(&mut p, Key::Enter);
+    assert_eq!(title(&p).as_deref(), Some("Unprotect Sheet"));
+    assert!(p.shell.sheet().review_sheet_protection().is_some());
+    for _ in 0..4 {
+        key(&mut p, Key::Backspace);
+    }
+    type_text(&mut p, "secret");
+    key(&mut p, Key::Enter);
+    assert!(!is_open(&p));
+    assert!(p.shell.sheet().review_sheet_protection().is_none());
+
+    // No password: the button unprotects at once.
+    p.shell
+        .sheet_mut()
+        .review_protect_sheet(Default::default(), None)
+        .unwrap();
+    assert!(!bare(&mut p, "review.protect.protect-sheet"));
+    assert!(p.shell.sheet().review_sheet_protection().is_none());
+}
+
+#[test]
+fn protect_workbook_with_a_password_confirms_it_and_unprotect_asks_for_it() {
+    let mut p = sheets();
+    assert!(bare(&mut p, "review.protect.protect-workbook"));
+    assert!(!p.shell.sheet().review_workbook_protected());
+    type_text(&mut p, "pw");
+    key(&mut p, Key::Enter);
+    assert_eq!(title(&p).as_deref(), Some("Confirm Password"));
+    type_text(&mut p, "pw");
+    key(&mut p, Key::Enter);
+    assert!(!is_open(&p));
+    assert!(p.shell.sheet().review_workbook_protected());
+    assert!(bare(&mut p, "review.protect.protect-workbook"));
+    assert_eq!(title(&p).as_deref(), Some("Unprotect Workbook"));
+    type_text(&mut p, "pw");
+    key(&mut p, Key::Enter);
+    assert!(!is_open(&p));
+    assert!(!p.shell.sheet().review_workbook_protected());
+}
+
+// ---- Format Cells: angle, strikethrough, shrink to fit and borders ---------------------------------
+
+#[test]
+fn format_cells_takes_any_text_angle_and_shrink_to_fit() {
+    let mut p = sheets();
+    p.shell.sheet_mut().select_cell((2, 2));
+    assert!(p.shell.open_dialog(
+        &mut p.ui,
+        DialogRequest::FormatCells {
+            tab: FormatTab::Alignment
+        }
+    ));
+    alt(&mut p, 'k'); // Shrink to fit
+    alt(&mut p, 'e'); // Degrees
+    type_text(&mut p, "-37");
+    key(&mut p, Key::Enter);
+    assert!(!is_open(&p), "{:?}", dump(&p));
+    let f = p.shell.sheet().home_cell_format(2, 2).unwrap();
+    assert!(f.alignment.shrink_to_fit);
+    assert_eq!(f.alignment.text_rotation, 127, "37 degrees clockwise");
+
+    // Wrap text and shrink to fit exclude each other.
+    assert!(p.shell.open_dialog(
+        &mut p.ui,
+        DialogRequest::FormatCells {
+            tab: FormatTab::Alignment
+        }
+    ));
+    alt(&mut p, 'w');
+    alt(&mut p, 'e');
+    type_text(&mut p, "95");
+    key(&mut p, Key::Enter);
+    assert!(
+        is_open(&p),
+        "an angle outside -90..90 keeps the dialog open"
+    );
+    assert!(dump(&p).contains(&"The number must be between -90 and 90.".to_owned()));
+    alt(&mut p, 'e');
+    type_text(&mut p, "90");
+    key(&mut p, Key::Enter);
+    assert!(!is_open(&p));
+    let f = p.shell.sheet().home_cell_format(2, 2).unwrap();
+    assert!(f.alignment.wrap_text && !f.alignment.shrink_to_fit);
+    assert_eq!(f.alignment.text_rotation, 90);
+}
+
+#[test]
+fn format_cells_font_tab_sets_strikethrough() {
+    let mut p = sheets();
+    p.shell.sheet_mut().select_cell((2, 2));
+    assert!(p.shell.open_dialog(
+        &mut p.ui,
+        DialogRequest::FormatCells {
+            tab: FormatTab::Font
+        }
+    ));
+    alt(&mut p, 'k');
+    key(&mut p, Key::Enter);
+    assert!(!is_open(&p));
+    assert!(p.shell.sheet().home_cell_format(2, 2).unwrap().font.strike);
+}
+
+#[test]
+fn format_cells_border_tab_draws_chosen_styles_and_colours_on_the_clicked_edges() {
+    use open365_xlsx::BorderStyle;
+    let mut p = sheets();
+    p.shell.sheet_mut().select_cell((2, 2));
+    assert!(p.shell.open_dialog(
+        &mut p.ui,
+        DialogRequest::FormatCells {
+            tab: FormatTab::Border
+        }
+    ));
+    key(&mut p, Key::Tab); // the style list, on Thin
+    assert_eq!(focus_label(&p), "Thin");
+    for _ in 0..6 {
+        key(&mut p, Key::Down); // Thin -> Thick
+    }
+    assert_eq!(focus_label(&p), "Thick");
+    key(&mut p, Key::Tab); // colour
+    keys(&mut p, &[Key::Down, Key::Down, Key::Down]); // Automatic, Black, White, Red
+    alt(&mut p, 'o'); // Outline
+    let diag = find(&p, "\\").expect("diagonal button");
+    click(&mut p, diag);
+    // Pressing the top edge again removes the line the outline drew.
+    let top = find(&p, "Top").expect("top button");
+    click(&mut p, top);
+    press_ok(&mut p);
+    assert!(!is_open(&p), "{:?}", dump(&p));
+    let b = p.shell.sheet().home_cell_format(2, 2).unwrap().border;
+    assert_eq!(b.left.style, BorderStyle::Thick);
+    assert_eq!(b.right.style, BorderStyle::Thick);
+    assert_eq!(b.bottom.style, BorderStyle::Thick);
+    assert_eq!(
+        b.top.style,
+        BorderStyle::None,
+        "the second press removed it"
+    );
+    assert!(matches!(
+        b.left.color.source,
+        ColorSource::Rgb(c) if (c.r, c.g, c.b) == (255, 0, 0)
+    ));
+    assert!(b.diagonal_down && b.diagonal_down_edge().style == BorderStyle::Thick);
+}
+
+#[test]
+fn format_cells_border_tab_none_preset_clears_and_inside_needs_a_range() {
+    use open365_xlsx::BorderStyle;
+    let mut p = sheets();
+    p.shell.sheet_mut().select_cell((2, 2));
+    p.shell.run_command(&mut p.ui, "home.font.borders.all");
+    assert!(p.shell.open_dialog(
+        &mut p.ui,
+        DialogRequest::FormatCells {
+            tab: FormatTab::Border
+        }
+    ));
+    let enabled = |p: &open365_preview::Preview, label: &str| -> bool {
+        let id = find(p, label).expect(label);
+        p.ui.tree.get(id).unwrap().enabled
+    };
+    assert!(
+        !enabled(&p, "Inside Horizontal Border"),
+        "one cell has no inside lines"
+    );
+    alt(&mut p, 'n');
+    press_ok(&mut p);
+    assert!(!is_open(&p));
+    let b = p.shell.sheet().home_cell_format(2, 2).unwrap().border;
+    assert_eq!(b.left.style, BorderStyle::None);
+    assert_eq!(b.top.style, BorderStyle::None);
+
+    // Over a range the inside lines can be drawn.
+    p.shell.sheet_mut().select_cell((2, 2));
+    p.shell.sheet_mut().extend_to((3, 3));
+    assert!(p.shell.open_dialog(
+        &mut p.ui,
+        DialogRequest::FormatCells {
+            tab: FormatTab::Border
+        }
+    ));
+    assert!(enabled(&p, "Inside Horizontal Border"));
+    alt(&mut p, 'i');
+    press_ok(&mut p);
+    assert!(!is_open(&p));
+    let inner = p.shell.sheet().home_cell_format(2, 2).unwrap().border;
+    assert_eq!(inner.bottom.style, BorderStyle::Thin);
+    assert_eq!(inner.right.style, BorderStyle::Thin);
+}
+
+// ---- Page Setup: Header/Footer --------------------------------------------------------------------
+
+#[test]
+fn page_setup_header_footer_tab_picks_presets_and_edits_custom_sections() {
+    use open365_preview::dialogs::request::PageTab;
+    let mut p = sheets();
+    assert!(p.shell.open_dialog(
+        &mut p.ui,
+        DialogRequest::PageSetup {
+            tab: PageTab::HeaderFooter
+        }
+    ));
+    key(&mut p, Key::Tab); // Header list
+    keys(&mut p, &[Key::Down, Key::Down]); // (none), Page 1, Page 1 of ?
+    assert!(
+        dump(&p).contains(&"Page 1 of 1".to_owned()),
+        "{:?}",
+        dump(&p)
+    );
+    // Custom Header opens over Page Setup, on the centre section.
+    alt(&mut p, 'u');
+    assert_eq!(title(&p).as_deref(), Some("Header"));
+    key(&mut p, Key::End);
+    type_text(&mut p, " draft ");
+    let button = find(&p, "Sheet Name").expect("insert button");
+    click(&mut p, button);
+    key(&mut p, Key::Enter);
+    assert_eq!(title(&p).as_deref(), Some("Page Setup"));
+    // The edited text is a custom entry now, shown in the preview.
+    assert!(
+        dump(&p).iter().any(|l| l.contains("draft Sheet1")),
+        "{:?}",
+        dump(&p)
+    );
+    // The footer takes a preset too.
+    alt(&mut p, 'f');
+    key(&mut p, Key::Down);
+    key(&mut p, Key::Enter);
+    assert!(!is_open(&p));
+    let saved = p.shell.sheet().page().header_footer;
+    assert_eq!(saved.header[1], "Page &P of &N draft &A");
+    assert_eq!(saved.footer[1], "&P");
+    assert!(saved.scale_with_document && saved.align_with_margins);
+}
+
+#[test]
+fn header_footer_is_written_to_the_file_printed_and_undone() {
+    use open365_preview::dialogs::header_footer::HeaderFooter;
+    use open365_preview::sheet::SheetModel;
+    let mut p = sheets();
+    p.shell.sheet_mut().enter(1, 1, "x").unwrap();
+    let mut hf = HeaderFooter {
+        header: ["Left".into(), String::new(), "Right && co".into()],
+        ..HeaderFooter::default()
+    };
+    hf.footer[1] = "Page &P of &N".into();
+    hf.first_footer[1] = "Cover".into();
+    hf.align_with_margins = false;
+    p.shell.sheet_mut().set_header_footer(0, &hf).unwrap();
+    assert_eq!(p.shell.sheet().page().header_footer, hf);
+    // The PDF prints the footer with the page numbers filled in, and the header.
+    let pdf = String::from_utf8_lossy(&p.shell.sheet().pdf_bytes()).into_owned();
+    assert!(pdf.contains("(Page 1 of 1)"), "{pdf}");
+    assert!(pdf.contains("(Right & co)"));
+    assert!(!pdf.contains("(Cover)"));
+    // "Different first page" prints the first-page footer on page 1 instead.
+    hf.different_first = true;
+    p.shell.sheet_mut().set_header_footer(0, &hf).unwrap();
+    let pdf = String::from_utf8_lossy(&p.shell.sheet().pdf_bytes()).into_owned();
+    assert!(pdf.contains("(Cover)") && !pdf.contains("(Page 1 of 1)"));
+    // It survives save and reopen.
+    let path = std::env::temp_dir().join(format!("o365-hf-{}.xlsx", std::process::id()));
+    p.shell.sheet_mut().save(&path).unwrap();
+    let back = SheetModel::open(&path).unwrap();
+    std::fs::remove_file(&path).ok();
+    assert_eq!(back.page().header_footer, hf);
+    // One undo step each.
+    assert!(p.shell.sheet_mut().undo());
+    assert!(!p.shell.sheet().page().header_footer.different_first);
+    assert!(p.shell.sheet_mut().undo());
+    assert_eq!(
+        p.shell.sheet().page().header_footer,
+        HeaderFooter::default()
+    );
 }

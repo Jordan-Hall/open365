@@ -1,0 +1,154 @@
+{
+  "batch": "b06",
+  "note": "Shape.Adjustments from Word with default adjusts: count and values in Word units (fractions of 100000, angles in degrees)",
+  "presets": {
+    "cloudCallout": {
+      "count": 2,
+      "values": [
+        -0.20833,
+        0.625
+      ],
+      "auto_shape_type": 108
+    },
+    "cloud": {
+      "count": 0,
+      "values": [],
+      "auto_shape_type": 179
+    },
+    "ribbon": {
+      "count": 2,
+      "values": [
+        0.16667,
+        0.5
+      ],
+      "auto_shape_type": 98
+    },
+    "ribbon2": {
+      "count": 2,
+      "values": [
+        0.16667,
+        0.5
+      ],
+      "auto_shape_type": 97
+    },
+    "ellipseRibbon": {
+      "count": 3,
+      "values": [
+        0.25,
+        0.5,
+        0.125
+      ],
+      "auto_shape_type": 100
+    },
+    "ellipseRibbon2": {
+      "count": 3,
+      "values": [
+        0.25,
+        0.5,
+        0.125
+      ],
+      "auto_shape_type": 99
+    },
+    "leftRightRibbon": {
+      "count": 3,
+      "values": [
+        0.5,
+        0.5,
+        0.16667
+      ],
+      "auto_shape_type": 140
+    },
+    "verticalScroll": {
+      "count": 1,
+      "values": [
+        0.125
+      ],
+      "auto_shape_type": 101
+    },
+    "horizontalScroll": {
+      "count": 1,
+      "values": [
+        0.125
+      ],
+      "auto_shape_type": 102
+    },
+    "wave": {
+      "count": 2,
+      "values": [
+        0.125,
+        0.0
+      ],
+      "auto_shape_type": 103
+    },
+    "doubleWave": {
+      "count": 2,
+      "values": [
+        0.0625,
+        0.0
+      ],
+      "auto_shape_type": 104
+    },
+    "plus": {
+      "count": 1,
+      "values": [
+        0.25
+      ],
+      "auto_shape_type": 11
+    },
+    "flowChartProcess": {
+      "count": 0,
+      "values": [],
+      "auto_shape_type": 61
+    },
+    "flowChartAlternateProcess": {
+      "count": 0,
+      "values": [],
+      "auto_shape_type": 62
+    },
+    "flowChartDecision": {
+      "count": 0,
+      "values": [],
+      "auto_shape_type": 63
+    },
+    "flowChartInputOutput": {
+      "count": 0,
+      "values": [],
+      "auto_shape_type": 64
+    },
+    "flowChartPredefinedProcess": {
+      "count": 0,
+      "values": [],
+      "auto_shape_type": 65
+    },
+    "flowChartInternalStorage": {
+      "count": 0,
+      "values": [],
+      "auto_shape_type": 66
+    },
+    "flowChartDocument": {
+      "count": 0,
+      "values": [],
+      "auto_shape_type": 67
+    },
+    "flowChartMultidocument": {
+      "count": 0,
+      "values": [],
+      "auto_shape_type": 68
+    },
+    "flowChartTerminator": {
+      "count": 0,
+      "values": [],
+      "auto_shape_type": 69
+    },
+    "flowChartPreparation": {
+      "count": 0,
+      "values": [],
+      "auto_shape_type": 70
+    },
+    "flowChartManualInput": {
+      "count": 0,
+      "values": [],
+      "auto_shape_type": 71
+    }
+  }
+}

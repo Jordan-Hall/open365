@@ -32,6 +32,7 @@ mod ext_file;
 mod ext_home;
 mod ext_insert;
 mod ext_layout;
+mod ext_mailings;
 mod ext_references;
 mod ext_review;
 mod ext_view;
@@ -56,8 +57,6 @@ const POINT_SCALE: f32 = 96.0 / 72.0;
 const MARK_WIDTH_PT: f64 = 4.0;
 /// Opacity of header and footer text while the body is edited.
 const FURNITURE_DIM: f32 = 0.45;
-/// Half period of the caret blink.
-const BLINK: Duration = Duration::from_millis(530);
 /// AccessKit stores word starts as `u8`, so one text run holds at most this many characters.
 const MAX_CHARS_PER_RUN: usize = 255;
 
@@ -2092,10 +2091,10 @@ impl WriterPane {
         self.stats = PaintStats::default();
     }
 
-    /// The caret is in the shown half of its blink cycle at `now`.
-    pub fn caret_on(&self, now: Instant) -> bool {
-        let t = now.saturating_duration_since(self.blink_epoch);
-        (t.as_millis() / BLINK.as_millis()).is_multiple_of(2)
+    /// The caret is in the shown half of its blink cycle at `now`; `blink` is the OS caret blink
+    /// time (`None`: steady).
+    pub fn caret_on(&self, now: Instant, blink: Option<Duration>) -> bool {
+        open365_ui_core::blink_on(self.blink_epoch, now, blink)
     }
 
     fn gfx_font(&mut self, ui: &mut Ui, face: FaceId) -> Option<FontId> {
@@ -2116,6 +2115,12 @@ impl WriterPane {
         self.drag(ui);
         self.sync();
         let focused = self.canvas.is_some() && ui.focus() == self.canvas;
+        // The caret of the page, or of the find box while it takes the typing. The `Ui` hides it in
+        // an inactive window, restarts it on focus and wakes the loop at the next blink edge only.
+        let boxed = self.find.open || self.replace.open;
+        let caret_on = focused
+            && (boxed || !self.has_selection())
+            && ui.canvas_caret_visible(self.blink_epoch, now);
         let (ox, oy) = (self.area.x as f32, self.area.y as f32);
         let (w, h) = (self.area.w as f32, self.area.h as f32);
         let s = self.s();
@@ -2244,9 +2249,9 @@ impl WriterPane {
             self.paint_pictures(ui, list, page, (px, py), view, pictures::Layer::Front);
         }
         list.pop_clip();
-        if focused
+        if caret_on
+            && !boxed
             && !self.has_selection()
-            && self.caret_on(now)
             && let Some((page, x, top, height)) = self.caret_geom(self.caret)
         {
             let cx = ox + self.page_x(page) + x as f32 * s;
@@ -2264,8 +2269,8 @@ impl WriterPane {
         }
         self.paint_ruler(ui, list, pal);
         self.paint_vruler(ui, list, pal);
-        self.paint_replace_box(ui, list, pal);
-        self.paint_find_box(ui, list, pal);
+        self.paint_replace_box(ui, list, pal, caret_on);
+        self.paint_find_box(ui, list, pal, caret_on);
         if let Some((top, th)) = self.thumb() {
             let bw = self.bar_w();
             let x1 = ox + w;

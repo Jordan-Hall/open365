@@ -33,7 +33,7 @@ pub use input::{Emit, ImeInput, InputEvent, Key, Modifiers, PointerButton};
 pub use keytips::{KeyTips, Tip, TipOutcome};
 pub use paint::PaintLayers;
 pub use settings::{OsLocale, PlatformSettings, os_locale, utc_offset_minutes};
-pub use textedit::{Composition, TextEdit};
+pub use textedit::{Composition, TextEdit, blink_on, next_blink_edge};
 pub use theme::{Theme, ThemeKind, Token};
 pub use tree::{
     Content, Extent, LIST_ROW_FONT_H, LIST_ROW_SIZE_H, Layout, Look, MENU_DETAIL_H, MENU_HEADING_H,

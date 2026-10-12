@@ -9,7 +9,8 @@ use std::collections::BTreeSet;
 
 use open365_calc::ast::Ast;
 use open365_calc::parse_formula;
-use open365_commands::Command;
+use open365_commands::objects_ops::NameRequest;
+use open365_commands::{Command, EvalValue, FormulaEngine, ObjectsOp};
 use open365_xlsx::CellValue;
 
 use crate::dialogs::formulas_function::{Category, formula_for, is_function};
@@ -428,6 +429,43 @@ impl SheetModel {
         self.target.xlsx().is_some_and(|wb| session.step(wb))
     }
 
+    /// Evaluate: Step In on the next cell with a formula; false when there is none.
+    pub fn evaluate_step_in(
+        &self,
+        session: &mut crate::dialogs::formulas_evaluate::EvalSession,
+    ) -> bool {
+        self.target.xlsx().is_some_and(|wb| session.step_in(wb))
+    }
+
+    /// Evaluate: Step Out of a formula Step In opened.
+    pub fn evaluate_step_out(
+        &self,
+        session: &mut crate::dialogs::formulas_evaluate::EvalSession,
+    ) -> bool {
+        self.target.xlsx().is_some_and(|wb| session.step_out(wb))
+    }
+
+    /// Evaluate: whether Step In has a formula to open.
+    #[must_use]
+    pub fn evaluate_can_step_in(
+        &self,
+        session: &crate::dialogs::formulas_evaluate::EvalSession,
+    ) -> bool {
+        self.target.xlsx().is_some_and(|wb| session.can_step_in(wb))
+    }
+
+    /// Evaluate: the cell the session is in, as `Sheet1!$C$3`.
+    #[must_use]
+    pub fn evaluate_reference(
+        &self,
+        session: &crate::dialogs::formulas_evaluate::EvalSession,
+    ) -> String {
+        self.target
+            .xlsx()
+            .map(|wb| session.reference(wb))
+            .unwrap_or_default()
+    }
+
     /// The Name Manager rows.
     #[must_use]
     pub fn name_rows(&self) -> Vec<crate::dialogs::formulas_names::NameRow> {
@@ -435,5 +473,140 @@ impl SheetModel {
             .xlsx()
             .map(crate::dialogs::formulas_names::rows)
             .unwrap_or_default()
+    }
+
+    // ---- Name Manager --------------------------------------------------------------------
+
+    /// The names of the sheets, in tab order (the Scope list of New Name).
+    #[must_use]
+    pub fn sheet_names(&self) -> Vec<String> {
+        self.target
+            .xlsx()
+            .map(|wb| wb.sheets().iter().map(|i| i.name.clone()).collect())
+            .unwrap_or_default()
+    }
+
+    /// The index of the active sheet.
+    #[must_use]
+    pub fn active_sheet_index(&self) -> usize {
+        self.sheet
+    }
+
+    fn name_op(&mut self, op: ObjectsOp) -> Result<(), String> {
+        self.apply(Command::SheetObjects {
+            sheet: self.sheet,
+            op,
+        })
+    }
+
+    /// Name Manager > New: one undo step.
+    ///
+    /// # Errors
+    /// The command layer's message (illegal name, name taken).
+    pub fn name_define(&mut self, name: NameRequest) -> Result<(), String> {
+        self.name_op(ObjectsOp::DefineName(name))
+    }
+
+    /// Name Manager > Edit: renames or retargets `name` (scope `scope`).
+    ///
+    /// # Errors
+    /// The command layer's message.
+    pub fn name_edit(
+        &mut self,
+        name: &str,
+        scope: Option<usize>,
+        to: NameRequest,
+    ) -> Result<(), String> {
+        self.name_op(ObjectsOp::EditName {
+            name: name.to_owned(),
+            scope,
+            to,
+        })
+    }
+
+    /// Name Manager > Delete.
+    ///
+    /// # Errors
+    /// The command layer's message.
+    pub fn name_delete(&mut self, name: &str, scope: Option<usize>) -> Result<(), String> {
+        self.name_op(ObjectsOp::DeleteName {
+            name: name.to_owned(),
+            scope,
+        })
+    }
+
+    // ---- Function Arguments -------------------------------------------------------------
+
+    /// What each formula in `formulas` (with or without a leading `=`) would give in the active
+    /// cell, as Excel's Function Arguments dialog shows it: text in quotes when `quote`, arrays
+    /// as `{1,2;3,4}`. `None` for an empty text or one that does not evaluate. Nothing is
+    /// written to the workbook.
+    #[must_use]
+    pub fn evaluate_previews(&self, formulas: &[String], quote: bool) -> Vec<Option<String>> {
+        let Some(wb) = self.target.xlsx() else {
+            return vec![None; formulas.len()];
+        };
+        let keep = |_: usize, _: u32, _: u32| true;
+        let mut engine = FormulaEngine::build(wb, &keep);
+        formulas
+            .iter()
+            .map(|f| {
+                let t = f.trim();
+                if t.is_empty() {
+                    return None;
+                }
+                // Stacked on its own so a range gives its whole array, as the dialog shows,
+                // and not the single value implicit intersection would pick.
+                let text = format!("=VSTACK({})", t.trim_start_matches('='));
+                engine
+                    .evaluate(
+                        wb,
+                        self.sheet,
+                        self.active.0,
+                        self.active.1,
+                        Some(&text),
+                        &keep,
+                    )
+                    .ok()
+                    .map(|e| show_value(&e.result, quote))
+            })
+            .collect()
+    }
+}
+
+/// A number the way Excel shows it in a dialog: up to 15 significant digits.
+fn show_number(n: f64) -> String {
+    if (n - n.round()).abs() < 1e-9 && n.abs() < 1e15 {
+        return format!("{}", n.round() as i64);
+    }
+    let s = format!("{n:.14e}");
+    let value: f64 = s.parse().unwrap_or(n);
+    let text = format!("{value}");
+    if text.len() > 20 { s } else { text }
+}
+
+fn show_value(v: &EvalValue, quote: bool) -> String {
+    match v {
+        EvalValue::Empty => String::new(),
+        EvalValue::Number(n) => show_number(*n),
+        EvalValue::Text(t) if quote => format!("\"{t}\""),
+        EvalValue::Text(t) => t.clone(),
+        EvalValue::Bool(b) => if *b { "TRUE" } else { "FALSE" }.to_owned(),
+        EvalValue::Error(e) => e.clone(),
+        EvalValue::Array(rows) if rows.len() == 1 && rows[0].len() == 1 => {
+            show_value(&rows[0][0], quote)
+        }
+        EvalValue::Array(rows) => {
+            let body: Vec<String> = rows
+                .iter()
+                .map(|r| {
+                    r.iter()
+                        .map(|c| show_value(c, true))
+                        .collect::<Vec<_>>()
+                        .join(",")
+                })
+                .collect();
+            format!("{{{}}}", body.join(";"))
+        }
     }
 }

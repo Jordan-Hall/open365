@@ -792,24 +792,56 @@ impl View for WriterZoom {
 #[derive(Debug)]
 struct Paragraph {
     align: usize,
+    /// Left, right and first-line (negative: hanging) indent when the dialog opened, in points.
+    indents: (f64, f64, f64),
+    /// The outline level when the dialog opened (0 is Body Text).
+    outline: usize,
+}
+
+const OUTLINE_LEVELS: [&str; 10] = [
+    "Body Text",
+    "Level 1",
+    "Level 2",
+    "Level 3",
+    "Level 4",
+    "Level 5",
+    "Level 6",
+    "Level 7",
+    "Level 8",
+    "Level 9",
+];
+
+/// Points as a box shows them: inches with a `"`.
+fn pt_inches(pt: f64) -> String {
+    inches((pt * 20.0).round() as i64)
 }
 
 fn paragraph(s: &mut Shell) -> (Spec, Box<dyn View>) {
     use open365_docx::Alignment as A;
-    let align = match s
-        .writer
-        .as_ref()
-        .and_then(crate::doc::WriterPane::alignment_state)
-    {
+    let pane = s.writer.as_ref();
+    let align = match pane.and_then(crate::doc::WriterPane::alignment_state) {
         Some(A::Center) => 1,
         Some(A::Right) => 2,
         Some(A::Justify) => 3,
         _ => 0,
     };
-    let mut spec = Spec::new("Paragraph", 400.0, 300.0);
+    let (left, right, first) = pane
+        .and_then(crate::doc::WriterPane::ruler_info)
+        .map_or((0.0, 0.0, 0.0), |r| {
+            (r.indent_left_pt, r.indent_right_pt, r.first_line_pt)
+        });
+    let special = if first > 0.01 {
+        1
+    } else if first < -0.01 {
+        2
+    } else {
+        0
+    };
+    let outline = pane.map_or(0, crate::doc::WriterPane::outline_level);
+    let mut spec = Spec::new("Paragraph", 400.0, 346.0);
     spec.tabs = vec!["Indents and &Spacing".into()];
     spec.on_page(Some(0));
-    spec.group(12.0, 40.0, 376.0, 62.0, "General");
+    spec.group(12.0, 40.0, 376.0, 88.0, "General");
     spec.label(24.0, 66.0, 90.0, "Align&ment:");
     spec.dropdown(
         "align",
@@ -819,30 +851,78 @@ fn paragraph(s: &mut Shell) -> (Spec, Box<dyn View>) {
         &["Left", "Centered", "Right", "Justified"],
         align,
     );
-    spec.group(12.0, 108.0, 376.0, 66.0, "Indentation");
-    spec.label(24.0, 132.0, 50.0, "&Left:");
-    spec.text("left", 70.0, 128.0, 90.0, "0\"");
-    spec.label(210.0, 132.0, 50.0, "&Right:");
-    spec.text("right", 262.0, 128.0, 90.0, "0\"");
-    spec.group(12.0, 180.0, 376.0, 104.0, "Spacing");
-    spec.label(24.0, 204.0, 60.0, "&Before:");
-    spec.text("before", 90.0, 200.0, 90.0, "0 pt");
-    spec.label(210.0, 204.0, 60.0, "A&fter:");
-    spec.text("after", 262.0, 200.0, 90.0, "8 pt");
-    spec.label(24.0, 236.0, 90.0, "Li&ne spacing:");
+    spec.label(24.0, 96.0, 90.0, "&Outline level:");
+    spec.dropdown("outline", 120.0, 92.0, 130.0, &OUTLINE_LEVELS, outline);
+    spec.group(12.0, 134.0, 376.0, 94.0, "Indentation");
+    spec.label(24.0, 158.0, 50.0, "&Left:");
+    spec.text("left", 70.0, 154.0, 90.0, &pt_inches(left));
+    spec.label(210.0, 158.0, 50.0, "&Right:");
+    spec.text("right", 262.0, 154.0, 90.0, &pt_inches(right));
+    spec.label(24.0, 190.0, 50.0, "&Special:");
+    spec.dropdown(
+        "special",
+        70.0,
+        186.0,
+        110.0,
+        &["(none)", "First line", "Hanging"],
+        special,
+    );
+    spec.label(210.0, 190.0, 50.0, "B&y:");
+    spec.text(
+        "by",
+        262.0,
+        186.0,
+        90.0,
+        &if special == 0 {
+            String::new()
+        } else {
+            pt_inches(first.abs())
+        },
+    )
+    .enabled = special != 0;
+    spec.group(12.0, 234.0, 376.0, 104.0, "Spacing");
+    spec.label(24.0, 258.0, 60.0, "&Before:");
+    spec.text("before", 90.0, 254.0, 90.0, "0 pt");
+    spec.label(210.0, 258.0, 60.0, "A&fter:");
+    spec.text("after", 262.0, 254.0, 90.0, "8 pt");
+    spec.label(24.0, 290.0, 90.0, "Li&ne spacing:");
     spec.dropdown(
         "spacing",
         110.0,
-        232.0,
+        286.0,
         140.0,
         &["Keep as is", "Single", "1.5 lines", "Double"],
         0,
     );
     spec.on_page(None);
-    (spec, Box::new(Paragraph { align }))
+    (
+        spec,
+        Box::new(Paragraph {
+            align,
+            indents: (left, right, first),
+            outline,
+        }),
+    )
 }
 
 impl View for Paragraph {
+    fn event(&mut self, _s: &mut Shell, ui: &mut Ui, d: &mut Dialog, o: &Outcome) {
+        // Word fills By with half an inch when a special indent is chosen, and empties it for
+        // none.
+        if let Outcome::Changed(id) = o
+            && id == "special"
+        {
+            let special = d.values(ui).index("special").unwrap_or(0);
+            d.set_enabled(ui, "by", special != 0);
+            let by = d.values(ui).text("by").trim().to_owned();
+            if special == 0 {
+                d.set_text(ui, "by", "");
+            } else if by.is_empty() || by.starts_with("0\"") || by == "0" {
+                d.set_text(ui, "by", "0.5\"");
+            }
+        }
+    }
+
     fn commit(
         &mut self,
         s: &mut Shell,
@@ -850,15 +930,31 @@ impl View for Paragraph {
         _d: &mut Dialog,
         v: &Values,
     ) -> Result<(), String> {
+        use crate::doc::ruler::RulerEdit;
         use crate::ribbon::writer::layout::parse_len;
-        let check = |id: &str, unit: f64, msg: &str| -> Result<String, String> {
-            let t = v.text(id).trim().to_owned();
-            parse_len(&t, unit).map(|_| t).ok_or_else(|| msg.to_owned())
+        const INDENT_MSG: &str = "Enter an indent such as 0.5\" or 1.27 cm.";
+        let len = |id: &str, unit: f64, msg: &str| -> Result<f64, String> {
+            parse_len(v.text(id).trim(), unit).ok_or_else(|| msg.to_owned())
         };
-        let left = check("left", 72.0, "Enter an indent such as 0.5\" or 1.27 cm.")?;
-        let right = check("right", 72.0, "Enter an indent such as 0.5\" or 1.27 cm.")?;
-        let before = check("before", 1.0, "Enter spacing from 0 pt to 1584 pt.")?;
-        let after = check("after", 1.0, "Enter spacing from 0 pt to 1584 pt.")?;
+        let left = len("left", 72.0, INDENT_MSG)?;
+        let right = len("right", 72.0, INDENT_MSG)?;
+        let special = v.index("special").unwrap_or(0);
+        let by = if special == 0 {
+            0.0
+        } else {
+            let by = len("by", 72.0, INDENT_MSG)?;
+            if by < 0.0 {
+                return Err(INDENT_MSG.to_owned());
+            }
+            by
+        };
+        let first = match special {
+            1 => by,
+            2 => -by,
+            _ => 0.0,
+        };
+        let before = len("before", 1.0, "Enter spacing from 0 pt to 1584 pt.")?;
+        let after = len("after", 1.0, "Enter spacing from 0 pt to 1584 pt.")?;
         let mut cmds = Vec::new();
         let align = v.index("align").unwrap_or(self.align);
         if align != self.align {
@@ -873,23 +969,47 @@ impl View for Paragraph {
             );
         }
         // Indents and spacing are written only when they differ from what the dialog opened with.
-        if left != "0\"" {
-            cmds.push(format!("layout.paragraph.indent-left={left}"));
+        let moved = |a: f64, b: f64| (a - b).abs() > 0.01;
+        if moved(left, self.indents.0)
+            || moved(right, self.indents.1)
+            || moved(first, self.indents.2)
+        {
+            if let Some(w) = s.writer.as_mut() {
+                let para = w.ruler_info().map_or(0, |r| r.para);
+                w.apply_ruler_edit(&RulerEdit::SetIndents {
+                    para,
+                    left_pt: left,
+                    first_line_pt: first,
+                    right_pt: right,
+                });
+            }
+            self.indents = (left, right, first);
         }
-        if right != "0\"" {
-            cmds.push(format!("layout.paragraph.indent-right={right}"));
+        if moved(before, 0.0) {
+            cmds.push(format!(
+                "layout.paragraph.spacing-before={}",
+                v.text("before").trim()
+            ));
         }
-        if before != "0 pt" {
-            cmds.push(format!("layout.paragraph.spacing-before={before}"));
-        }
-        if after != "8 pt" {
-            cmds.push(format!("layout.paragraph.spacing-after={after}"));
+        if moved(after, 8.0) {
+            cmds.push(format!(
+                "layout.paragraph.spacing-after={}",
+                v.text("after").trim()
+            ));
         }
         match v.index("spacing") {
             Some(1) => cmds.push("home.paragraph.line-and-paragraph-spacing=1.0".to_owned()),
             Some(2) => cmds.push("home.paragraph.line-and-paragraph-spacing=1.5".to_owned()),
             Some(3) => cmds.push("home.paragraph.line-and-paragraph-spacing=2.0".to_owned()),
             _ => {}
+        }
+        // Only a changed level is written, so a heading style's own level stays as it is.
+        let outline = v.index("outline").unwrap_or(self.outline);
+        if outline != self.outline {
+            if let Some(w) = s.writer.as_mut() {
+                w.set_outline_level(outline);
+            }
+            self.outline = outline;
         }
         s.run_ids(ui, &cmds);
         self.align = align;

@@ -303,3 +303,137 @@ fn every_wired_insert_control_answers() {
         assert_eq!(p.shell.run_command(&mut p.ui, id), Handled::Yes, "{id}");
     }
 }
+
+#[test]
+fn cover_page_goes_first_and_undoes() {
+    let mut p = rig("body text");
+    pane(&mut p).set_caret(DocPos::new(0, 4));
+    run(&mut p, "insert.pages.cover-page.banner");
+    let x = xml(&mut p);
+    assert!(x.contains("[Document title]"));
+    assert!(x.contains("w:type=\"page\""));
+    assert_eq!(pane(&mut p).paragraph_text(0), Some(""));
+    let last = pane(&mut p).paragraph_count() - 1;
+    assert_eq!(pane(&mut p).paragraph_text(last), Some("body text"));
+    assert_eq!(
+        pane(&mut p).caret(),
+        DocPos::new(last, 4),
+        "the caret keeps its text"
+    );
+    undo(&mut p);
+    assert_eq!(pane(&mut p).paragraph_count(), 1);
+    assert!(!xml(&mut p).contains("[Document title]"));
+    run(&mut p, "insert.pages.cover-page");
+    assert!(xml(&mut p).contains("[Document subtitle]"));
+}
+
+#[test]
+fn quick_table_has_sample_cells() {
+    let mut p = rig("text");
+    pane(&mut p).set_caret(DocPos::new(0, 0));
+    run(&mut p, "insert.tables.table.quick-list");
+    let doc = saved(&mut p);
+    let t = doc.table(0).unwrap();
+    assert_eq!(t.rows().count(), 4);
+    let x = xml(&mut p);
+    assert!(x.contains(">Description<") && x.contains(">Item 3<"));
+    undo(&mut p);
+    assert_eq!(saved(&mut p).table_count(), 0);
+}
+
+#[test]
+fn cross_reference_to_a_bookmark_shows_its_text() {
+    let mut p = rig("Intro text");
+    pane(&mut p).select(DocPos::new(0, 0), DocPos::new(0, 5));
+    run(&mut p, "insert.links.bookmark=Intro");
+    pane(&mut p).set_caret(DocPos::new(0, 10));
+    run(&mut p, "insert.links.cross-reference=Intro");
+    let x = xml(&mut p);
+    assert!(x.contains("REF Intro \\h"), "{x}");
+    assert_eq!(pane(&mut p).paragraph_text(0), Some("Intro textIntro"));
+    run(&mut p, "insert.links.cross-reference=page:Intro");
+    assert!(xml(&mut p).contains("PAGEREF Intro"));
+    undo(&mut p);
+    assert!(!xml(&mut p).contains("PAGEREF"));
+    run(&mut p, "insert.links.cross-reference=Nowhere");
+    assert!(!xml(&mut p).contains("Nowhere"));
+}
+
+#[test]
+fn cross_reference_to_a_heading_adds_a_hidden_bookmark() {
+    let mut p = rig("Chapter one\nbody");
+    pane(&mut p).set_caret(DocPos::new(0, 0));
+    run(&mut p, "home.styles.heading-1");
+    pane(&mut p).set_caret(DocPos::new(1, 4));
+    run(&mut p, "insert.links.cross-reference=number:Chapter one");
+    let x = xml(&mut p);
+    assert!(x.contains("w:name=\"_Ref"), "{x}");
+    assert!(x.contains("\\r \\h"), "{x}");
+}
+
+#[test]
+fn field_dialog_inserts_an_evaluated_field() {
+    let mut p = rig("a b");
+    pane(&mut p).set_caret(DocPos::new(0, 2));
+    run(&mut p, "insert.text.quick-parts=field:PAGE");
+    assert!(xml(&mut p).contains("PAGE"));
+    assert_eq!(pane(&mut p).paragraph_text(0), Some("a 1b"));
+    assert_eq!(pane(&mut p).caret(), DocPos::new(0, 3));
+    undo(&mut p);
+    assert_eq!(pane(&mut p).paragraph_text(0), Some("a b"));
+    run(&mut p, "insert.header-footer.page-number.current");
+    assert!(xml(&mut p).contains("PAGE"));
+}
+
+#[test]
+fn auto_date_is_a_date_field() {
+    let mut p = rig("x");
+    pane(&mut p).set_caret(DocPos::new(0, 1));
+    run(&mut p, "insert.text.date-time=auto:yyyy");
+    assert!(xml(&mut p).contains("DATE"));
+    let text = pane(&mut p).paragraph_text(0).unwrap().to_owned();
+    assert!(text.starts_with('x') && text.len() == 5, "{text}");
+}
+
+#[test]
+fn text_box_is_a_wps_shape() {
+    let mut p = rig("before");
+    pane(&mut p).set_caret(DocPos::new(0, 6));
+    run(&mut p, "insert.text.text-box=draw");
+    let x = xml(&mut p);
+    assert!(
+        x.contains("wps:wsp") && x.contains("txBox=\"1\"") && x.contains("<wp:anchor"),
+        "{x}"
+    );
+    undo(&mut p);
+    assert!(!xml(&mut p).contains("wps:wsp"));
+    pane(&mut p).select(DocPos::new(0, 0), DocPos::new(0, 3));
+    run(&mut p, "insert.text.text-box");
+    let x = xml(&mut p);
+    assert!(x.contains(">bef<"), "the selection moves into the box: {x}");
+    assert_eq!(pane(&mut p).paragraph_text(0), Some("ore"));
+}
+
+#[test]
+fn text_from_file_inserts_the_text() {
+    let mut p = rig("ab");
+    let path = std::env::temp_dir().join(format!("open365-textfile-{}.txt", std::process::id()));
+    std::fs::write(&path, "one\ntwo").unwrap();
+    pane(&mut p).set_caret(DocPos::new(0, 1));
+    run(
+        &mut p,
+        &format!("insert.text.object=text-from-file:{}", path.display()),
+    );
+    let _ = std::fs::remove_file(&path);
+    assert_eq!(pane(&mut p).paragraph_count(), 2);
+    assert_eq!(pane(&mut p).paragraph_text(0), Some("aone"));
+    assert_eq!(pane(&mut p).paragraph_text(1), Some("twob"));
+}
+
+#[test]
+fn special_characters_by_name() {
+    let mut p = rig("");
+    run(&mut p, "insert.symbols.symbol=em-dash");
+    run(&mut p, "insert.symbols.symbol=nbsp");
+    assert_eq!(pane(&mut p).paragraph_text(0), Some("\u{2014}\u{a0}"));
+}

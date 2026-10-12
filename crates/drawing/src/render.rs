@@ -367,13 +367,13 @@ mod tests {
         o.hidden = false;
         if let Kind::Shape(s) = &mut o.kind {
             s.geometry = Geometry::Preset {
-                name: "star5".into(),
+                name: "notAPreset".into(),
                 adjust: vec![],
             };
         }
         let d = display_list(&o, &Builtin, Affine::IDENTITY);
         assert_eq!(d.prims.len(), 1);
         assert_eq!(d.diagnostics.len(), 1);
-        assert!(d.diagnostics[0].contains("star5"));
+        assert!(d.diagnostics[0].contains("notAPreset"));
     }
 }

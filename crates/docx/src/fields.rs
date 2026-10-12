@@ -42,6 +42,13 @@ pub enum FieldKind {
     If,
     Formula,
     MergeField,
+    AddressBlock,
+    GreetingLine,
+    MergeRec,
+    MergeSeq,
+    SkipIf,
+    NextIf,
+    Next,
     Hyperlink,
     Toc,
     Tc,
@@ -79,6 +86,13 @@ impl FieldKind {
             "IF" => Self::If,
             "=" => Self::Formula,
             "MERGEFIELD" => Self::MergeField,
+            "ADDRESSBLOCK" => Self::AddressBlock,
+            "GREETINGLINE" => Self::GreetingLine,
+            "MERGEREC" => Self::MergeRec,
+            "MERGESEQ" => Self::MergeSeq,
+            "SKIPIF" => Self::SkipIf,
+            "NEXTIF" => Self::NextIf,
+            "NEXT" => Self::Next,
             "HYPERLINK" => Self::Hyperlink,
             "TOC" => Self::Toc,
             "TC" => Self::Tc,
@@ -484,6 +498,10 @@ impl PageProvider for NoPages {
 /// Mail-merge data for `MERGEFIELD`; without it the field shows its placeholder.
 pub trait MergeData {
     fn value(&self, field: &str) -> Option<String>;
+
+    /// A record control field fired while updating: `SKIPIF`, `NEXTIF` or `NEXT`. The merge
+    /// driver reads it after the update; the field's own result stays empty.
+    fn signal(&self, _control: &str) {}
 }
 
 /// Month, day and AM/PM names for a language, to override the built-in table.

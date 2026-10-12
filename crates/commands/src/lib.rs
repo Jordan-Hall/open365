@@ -35,6 +35,9 @@ pub use eval::{
     evaluate_formula,
 };
 pub use ext::data::{self as data_ops, DataOp};
+pub use ext::header_footer::{HeaderFooterRequest, header_footer};
+pub use ext::insert_more::{CoverDesign, InsertMoreOp, XRefKind};
+pub use ext::mailings::{self as mailings_ops, MailingsOp};
 pub use ext::review::{self as review_ops, ReviewOp};
 pub use ext::sheet_objects::{self as objects_ops, ObjectsOp};
 pub use ext::sheets_home::{HomeOp, SortLevel};
@@ -62,5 +65,5 @@ pub use share::{
     HiddenItem, HiddenKind, HiddenReport, SHARE_TEMP_PREFIX, Sanitized, inspect_bytes,
     remove_share_temp, sanitize_bytes, sweep_share_temp,
 };
-pub use target::{Target, apply};
+pub use target::{Group, Target, apply};
 pub use template::template_output_extension;

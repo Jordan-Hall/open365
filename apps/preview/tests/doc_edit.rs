@@ -560,7 +560,7 @@ fn caret_blinks_and_hides_while_a_range_is_selected() {
         on > off,
         "the caret quad is missing in the hidden half ({on} vs {off})"
     );
-    assert!(r.pane.caret_on(t0));
+    assert!(r.pane.caret_on(t0, r.ui.settings.caret_blink));
 }
 
 #[test]
@@ -582,4 +582,38 @@ fn a_real_docx_opens_lays_out_and_paints() {
     // Clicking in the first line places the caret in paragraph 0 or the first text paragraph.
     r.click_pos(DocPos::new(0, 0));
     assert_eq!(r.pane.caret().offset, 0);
+}
+
+#[test]
+fn find_box_shows_a_blinking_caret_that_restarts_on_typing() {
+    let mut r = rig();
+    r.typed("abc");
+    let click = r.pane.canvas();
+    r.ui.set_focus(click);
+    r.pane.find_open();
+    let pal = Palette::new(AppKind::Writer, false);
+    let blink = r.ui.settings.caret_blink.expect("default blink");
+    let count = |r: &mut Rig, now: Instant| {
+        let mut list = DrawList::new(AREA.w as u32, AREA.h as u32);
+        r.ui.assets.begin_frame();
+        r.pane.paint(&mut r.ui, &mut list, &pal, now);
+        list.vertices().len()
+    };
+    let t0 = Instant::now();
+    r.input(InputEvent::Tick(t0));
+    r.input(InputEvent::Text("b".to_owned()));
+    let typed_at = Instant::now();
+    let on = count(&mut r, typed_at);
+    let off = count(
+        &mut r,
+        typed_at + blink + std::time::Duration::from_millis(5),
+    );
+    assert!(
+        on > off,
+        "the find box caret is missing in the hidden half ({on} vs {off})"
+    );
+    assert!(
+        r.ui.next_wake().is_some(),
+        "a wake-up is scheduled for the next blink edge"
+    );
 }

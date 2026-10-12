@@ -15,6 +15,7 @@ pub fn items_for(id: &str, label: &str) -> Vec<MenuItem> {
     if let Some(items) = crate::ribbon::writer::layout::menu_items(id)
         .or_else(|| crate::ribbon::writer::design::menu_items(id))
         .or_else(|| crate::ribbon::sheets::insert::menu_items(id))
+        .or_else(|| crate::ribbon::writer::mailings::menu_items(id))
     {
         return items;
     }

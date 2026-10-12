@@ -7,8 +7,8 @@ use accesskit::{Role, Toggled};
 use open365_ui_core::harness::{Harness, find_access};
 use open365_ui_core::tree::{MenuState, SPINNER_BUTTON_W};
 use open365_ui_core::{
-    Emit, ImeInput, Key, MenuItem, Modifiers, Node, NodeId, Rect, ScrollState, TabItem, TextEdit,
-    Tip, Widget,
+    Emit, ImeInput, InputEvent, Key, MenuItem, Modifiers, Node, NodeId, Rect, ScrollState, TabItem,
+    TextEdit, Tip, Widget,
 };
 
 fn node(h: &mut Harness, w: Widget, r: Rect, label: &str) -> NodeId {
@@ -789,4 +789,182 @@ fn a_focused_canvas_gets_alt_chords() {
             .iter()
             .any(|e| matches!(e, Emit::KeyPressed(_, Key::Char('a'), _)))
     );
+}
+
+fn blink_field() -> (Harness, NodeId, Duration) {
+    let mut h = harness();
+    let t = node(
+        &mut h,
+        Widget::TextField(TextEdit::new("")),
+        Rect::new(10.0, 10.0, 200.0, 24.0),
+        "Name",
+    );
+    h.click_node(t);
+    let blink = h.ui.settings.caret_blink.expect("default blink");
+    (h, t, blink)
+}
+
+fn field_visible(h: &Harness, t: NodeId) -> bool {
+    match h.ui.tree.get(t).map(|n| &n.widget) {
+        Some(Widget::TextField(e)) => e.caret_visible(h.now(), h.ui.settings.caret_blink),
+        _ => false,
+    }
+}
+
+#[test]
+fn blink_wakes_only_at_the_next_edge_and_a_keystroke_moves_it() {
+    let (mut h, t, blink) = blink_field();
+    let t0 = h.now();
+    assert!(field_visible(&h, t));
+    assert_eq!(
+        h.ui.next_wake(),
+        Some(t0 + blink),
+        "first edge: caret hides"
+    );
+    h.advance(blink);
+    assert!(!field_visible(&h, t));
+    assert!(h.ui.take_redraw() || h.ui.next_wake().is_some());
+    assert_eq!(h.ui.next_wake(), Some(t0 + blink * 2), "next edge only");
+    h.advance(blink / 2);
+    h.type_text("a");
+    assert!(field_visible(&h, t), "visible right after a keystroke");
+    assert_eq!(
+        h.ui.next_wake(),
+        Some(h.now() + blink),
+        "the keystroke restarted the cycle"
+    );
+}
+
+#[test]
+fn no_blink_timer_without_window_focus_and_caret_returns_solid() {
+    let (mut h, t, blink) = blink_field();
+    h.advance(blink);
+    h.ui.handle(InputEvent::FocusChanged(false));
+    assert_eq!(h.ui.next_wake(), None, "an inactive window does not wake");
+    h.advance(blink * 5);
+    h.ui.handle(InputEvent::FocusChanged(true));
+    assert!(field_visible(&h, t), "solid when focus returns");
+    assert_eq!(h.ui.next_wake(), Some(h.now() + blink));
+}
+
+#[test]
+fn a_steady_os_caret_never_wakes_the_loop() {
+    let mut h = harness();
+    let mut s = h.ui.settings.clone();
+    s.caret_blink = None;
+    h.ui.set_settings(s);
+    let t = node(
+        &mut h,
+        Widget::TextField(TextEdit::new("")),
+        Rect::new(10.0, 10.0, 200.0, 24.0),
+        "Name",
+    );
+    h.click_node(t);
+    h.type_text("a");
+    assert_eq!(h.ui.next_wake(), None);
+    h.advance(Duration::from_secs(3));
+    assert!(field_visible(&h, t));
+}
+
+#[test]
+fn a_canvas_caret_follows_the_blink_clock_and_its_epoch() {
+    let mut h = harness();
+    let c = node(
+        &mut h,
+        Widget::Canvas {
+            caret: Rect::new(0.0, 0.0, 1.0, 16.0),
+        },
+        Rect::new(0.0, 50.0, 300.0, 200.0),
+        "Page",
+    );
+    h.click_node(c);
+    let blink = h.ui.settings.caret_blink.expect("default blink");
+    let t0 = h.now();
+    assert!(h.ui.canvas_caret_visible(t0, t0), "visible at t=0");
+    assert_eq!(h.ui.next_wake(), Some(t0 + blink));
+    h.advance(blink);
+    assert!(
+        !h.ui.canvas_caret_visible(t0, h.now()),
+        "hidden after one interval"
+    );
+    h.advance(blink / 2);
+    let epoch = h.now();
+    assert!(
+        h.ui.canvas_caret_visible(epoch, h.now()),
+        "visible after a move"
+    );
+    assert_eq!(h.ui.next_wake(), Some(epoch + blink));
+    h.ui.handle(InputEvent::FocusChanged(false));
+    assert!(
+        !h.ui.canvas_caret_visible(epoch, h.now()),
+        "no caret without focus"
+    );
+    assert_eq!(h.ui.next_wake(), None);
+}
+
+#[test]
+fn a_canvas_that_draws_no_caret_never_blinks() {
+    let mut h = harness();
+    let c = node(
+        &mut h,
+        Widget::Canvas {
+            caret: Rect::new(0.0, 0.0, 1.0, 16.0),
+        },
+        Rect::new(0.0, 50.0, 300.0, 200.0),
+        "Grid",
+    );
+    h.click_node(c);
+    assert_eq!(
+        h.ui.next_wake(),
+        None,
+        "Sheets outside edit mode has no caret"
+    );
+}
+
+#[test]
+fn a_masked_field_keeps_its_text_from_events_access_and_the_clipboard() {
+    let mut h = harness();
+    let f = node(
+        &mut h,
+        Widget::TextField(TextEdit::masked("")),
+        Rect::new(10.0, 10.0, 200.0, 24.0),
+        "Password",
+    );
+    h.ui.set_focus(Some(f));
+    h.type_text("secret");
+    let events = h.ui.take_events();
+    assert!(
+        events
+            .iter()
+            .any(|e| matches!(e, Emit::TextChanged(n, t) if *n == f && t.is_empty())),
+        "{events:?}"
+    );
+    assert!(
+        !events.iter().any(|e| format!("{e:?}").contains("secret")),
+        "{events:?}"
+    );
+    let u = h.access();
+    let (_, node) = find_access(&u, Role::PasswordInput, "Password").expect("password input");
+    assert_eq!(node.value(), None);
+    // Select all and cut: a password is neither copied nor cut.
+    h.key_with(
+        Key::Char('A'),
+        Modifiers {
+            ctrl: true,
+            ..Modifiers::default()
+        },
+    );
+    h.key_with(
+        Key::Char('X'),
+        Modifiers {
+            ctrl: true,
+            ..Modifiers::default()
+        },
+    );
+    let Widget::TextField(e) = &h.ui.tree.get(f).expect("field").widget else {
+        unreachable!()
+    };
+    assert_eq!(e.text, "secret");
+    // It paints a bullet per character.
+    assert_eq!(e.display().text, "\u{2022}".repeat(6));
 }

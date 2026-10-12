@@ -4,6 +4,8 @@
 //! [`review::Request`](crate::sheet_ext::review::Request)); the rest comes from ribbon commands
 //! sent without a value (`home.cells.format.row-height`) or from keyboard shortcuts.
 
+use open365_ui_core::dialog::Secret;
+
 use crate::dialogs::formulas_function::Category;
 use crate::sheet_ext::{data, formulas, review};
 
@@ -105,6 +107,38 @@ pub enum DialogRequest {
     // Sheets: Review
     ProtectSheet,
     ProtectWorkbook,
+    /// The password prompt of Unprotect Sheet and Unprotect Workbook.
+    UnprotectSheet,
+    UnprotectWorkbook,
+    /// Confirm Password, opened over Protect Sheet or Protect Workbook; `expected` is what was
+    /// typed there.
+    ConfirmPassword {
+        expected: Secret,
+    },
+    /// New Name (`editing` false) and Edit Name, opened over Name Manager. `scope` is a sheet
+    /// index, the workbook when absent.
+    NameEdit {
+        name: String,
+        scope: Option<usize>,
+        refers_to: String,
+        comment: String,
+        editing: bool,
+    },
+    /// The question Name Manager asks before it deletes a name.
+    DeleteName {
+        name: String,
+        scope: Option<usize>,
+    },
+    /// A message box with an OK button.
+    Notice {
+        title: String,
+        text: String,
+    },
+    /// Custom Header and Custom Footer of Page Setup, over it.
+    HeaderFooterCustom {
+        footer: bool,
+        sections: [String; 3],
+    },
     // Sheets: Home and the grid
     FormatCells {
         tab: FormatTab,
@@ -182,6 +216,8 @@ impl DialogRequest {
         match r {
             review::Request::ProtectSheet => Some(Self::ProtectSheet),
             review::Request::ProtectWorkbook => Some(Self::ProtectWorkbook),
+            review::Request::UnprotectSheet => Some(Self::UnprotectSheet),
+            review::Request::UnprotectWorkbook => Some(Self::UnprotectWorkbook),
             review::Request::Spelling
             | review::Request::Accessibility
             | review::Request::Statistics => None,

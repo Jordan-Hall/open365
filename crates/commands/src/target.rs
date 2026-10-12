@@ -63,6 +63,16 @@ struct Entry {
     inverse: Inverse,
     state_before: u64,
     state_after: u64,
+    /// For a merged step ([`Target::end_group`]): every command it holds, in order. Redo runs them
+    /// all; `command` is the first.
+    group: Vec<Command>,
+}
+
+/// The start of a group of edits that undo as one step ([`Target::begin_group`]).
+#[derive(Debug)]
+pub struct Group {
+    since: usize,
+    before: Option<Box<Workbook>>,
 }
 
 /// An open document plus its command log and undo/redo history. All mutation goes
@@ -245,6 +255,7 @@ impl Target {
                 inverse,
                 state_before,
                 state_after: self.state,
+                group: Vec::new(),
             });
             self.redo.clear();
             Outcome {
@@ -260,6 +271,52 @@ impl Target {
         };
         self.audit.0.push(command);
         Ok(outcome)
+    }
+
+    /// Starts a group: the edits applied until [`Target::end_group`] become one undo step. Only
+    /// a workbook can be grouped; a document's edits stay separate steps.
+    pub fn begin_group(&self) -> Group {
+        Group {
+            since: self.undo.len(),
+            before: match &self.content {
+                Content::Xlsx(x) => Some(Box::new(x.workbook.clone())),
+                Content::Docx(_) => None,
+            },
+        }
+    }
+
+    /// Ends a group: the edits since [`Target::begin_group`] are merged into one undo step (and
+    /// one redo step). Does nothing for fewer than two edits, or when the group cannot be
+    /// merged.
+    pub fn end_group(&mut self, group: Group) {
+        let Group { since, before } = group;
+        let Some(before) = before else { return };
+        if self.undo.len() < since + 2 {
+            return;
+        }
+        let steps: Vec<Entry> = self.undo.drain(since..).collect();
+        let (Some(first), Some(last)) = (steps.first(), steps.last()) else {
+            return;
+        };
+        let (state_before, state_after) = (first.state_before, last.state_after);
+        let command = first.command.clone();
+        let group: Vec<Command> = steps
+            .iter()
+            .flat_map(|e| {
+                if e.group.is_empty() {
+                    vec![e.command.clone()]
+                } else {
+                    e.group.clone()
+                }
+            })
+            .collect();
+        self.undo.push(Entry {
+            command,
+            inverse: Inverse::Workbook(before),
+            state_before,
+            state_after,
+            group,
+        });
     }
 
     pub fn undo(&mut self) -> Result<Outcome, CommandError> {
@@ -354,7 +411,28 @@ impl Target {
             return Err(CommandError::NothingToRedo);
         };
         let command = entry.command.clone();
-        let (inverse, changed_cells) = self.run_edit(&command)?;
+        let group = entry.group.clone();
+        let (inverse, changed_cells) = if group.is_empty() {
+            self.run_edit(&command)?
+        } else {
+            let Content::Xlsx(x) = &self.content else {
+                return Err(CommandError::NotUndoable);
+            };
+            let before = Box::new(x.workbook.clone());
+            let mut changed = Vec::new();
+            for c in &group {
+                match self.run_edit(c) {
+                    Ok((_, cells)) => changed.extend(cells),
+                    Err(e) => {
+                        if let Content::Xlsx(x) = &mut self.content {
+                            x.restore_workbook(*before);
+                        }
+                        return Err(e);
+                    }
+                }
+            }
+            (Inverse::Workbook(before), changed)
+        };
         if let Some(mut entry) = self.redo.pop() {
             entry.inverse = inverse;
             self.state = entry.state_after;
@@ -827,6 +905,7 @@ fn is_docx_edit(command: &Command) -> bool {
             | Command::DocxReview { .. }
             | Command::DocxLayout { .. }
             | Command::DocxDesign { .. }
+            | Command::DocxMailings { .. }
             | Command::DocxHome { .. }
             | Command::DocxInsert { .. }
     )
@@ -990,6 +1069,7 @@ fn replay_docx(doc: &mut Document, command: &Command) -> Result<usize, CommandEr
         Command::DocxReview { op } => crate::ext::writer_review::apply(doc, op)?,
         Command::DocxLayout { op } => crate::ext::writer_layout::apply(doc, op)?,
         Command::DocxDesign { op } => crate::ext::writer_design::apply(doc, op)?,
+        Command::DocxMailings { op } => crate::ext::mailings::apply(doc, op)?,
         Command::DocxHome { op } => crate::ext::writer_home::run(doc, op)?,
         Command::DocxInsert { op } => crate::ext::writer_insert::run(doc, op)?,
         _ => {}

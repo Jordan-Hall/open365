@@ -3,7 +3,8 @@
 use open365_ui_core::Ui;
 use open365_ui_core::dialog::{Dialog, Outcome, Spec, Values};
 
-use super::{View, parse_ref, pick_selection};
+use super::{View, header_footer as custom, parse_ref, pick_selection, request_child};
+use crate::dialogs::header_footer::{self as hf, Context, HeaderFooter, Sections};
 use crate::dialogs::request::DialogRequest;
 use crate::sheet_ext::page_layout::Paper;
 use crate::shell::Shell;
@@ -47,7 +48,20 @@ fn paper_index(p: Paper) -> usize {
 #[derive(Debug)]
 struct PageSetup {
     had_titles: bool,
+    /// The header and footer being edited.
+    hf: HeaderFooter,
+    ctx: Context,
+    sheet: usize,
+    /// The sections behind the entries of the Header and Footer drop-downs.
+    sets: [Vec<Sections>; 2],
+    /// The custom dialog open over this one: true for the footer.
+    custom_footer: bool,
 }
+
+const HF_IDS: [(&str, [&str; 3]); 2] = [
+    ("hf_header", ["hf_hl", "hf_hc", "hf_hr"]),
+    ("hf_footer", ["hf_fl", "hf_fc", "hf_fr"]),
+];
 
 fn page_setup(s: &mut Shell, tab: usize) -> (Spec, Box<dyn View>) {
     let page = s.sheet.page();
@@ -139,13 +153,59 @@ fn page_setup(s: &mut Shell, tab: usize) -> (Spec, Box<dyn View>) {
     spec.check("vertically", 220.0, 236.0, 180.0, "&Vertically", false)
         .disabled();
 
+    let ctx = custom::context(s);
+    let sheet = s.sheet.active_sheet_index();
+    let hfs = s.sheet.header_footer_of(sheet);
+    let (hsets, hlabels, hsel) = hf::choices(&hfs.header, &ctx);
+    let (fsets, flabels, fsel) = hf::choices(&hfs.footer, &ctx);
+    let hl: Vec<&str> = hlabels.iter().map(String::as_str).collect();
+    let fl: Vec<&str> = flabels.iter().map(String::as_str).collect();
     spec.on_page(Some(2));
-    spec.note(
+    spec.label(12.0, 44.0, 200.0, "Hea&der:");
+    spec.dropdown("hf_header", 12.0, 62.0, 416.0, &hl, hsel);
+    spec.button("hf_custom_header", 12.0, 90.0, 140.0, "C&ustom Header...");
+    spec.button("hf_custom_footer", 160.0, 90.0, 140.0, "Custom Foo&ter...");
+    spec.group(12.0, 120.0, 416.0, 40.0, "Header preview");
+    spec.label(24.0, 138.0, 125.0, "").id = "hf_hl".to_owned();
+    spec.label(160.0, 138.0, 125.0, "").id = "hf_hc".to_owned();
+    spec.label(296.0, 138.0, 125.0, "").id = "hf_hr".to_owned();
+    spec.label(12.0, 168.0, 200.0, "&Footer:");
+    spec.dropdown("hf_footer", 12.0, 186.0, 416.0, &fl, fsel);
+    spec.group(12.0, 214.0, 416.0, 40.0, "Footer preview");
+    spec.label(24.0, 232.0, 125.0, "").id = "hf_fl".to_owned();
+    spec.label(160.0, 232.0, 125.0, "").id = "hf_fc".to_owned();
+    spec.label(296.0, 232.0, 125.0, "").id = "hf_fr".to_owned();
+    spec.check(
+        "hf_oddeven",
         12.0,
-        44.0,
-        400.0,
-        20.0,
-        "Headers and footers are not supported yet.",
+        262.0,
+        200.0,
+        "Different &odd and even pages",
+        hfs.different_odd_even,
+    );
+    spec.check(
+        "hf_first",
+        220.0,
+        262.0,
+        200.0,
+        "Different first pa&ge",
+        hfs.different_first,
+    );
+    spec.check(
+        "hf_scale",
+        12.0,
+        284.0,
+        200.0,
+        "&Scale with document",
+        hfs.scale_with_document,
+    );
+    spec.check(
+        "hf_align",
+        220.0,
+        284.0,
+        200.0,
+        "&Align with page margins",
+        hfs.align_with_margins,
     );
 
     spec.on_page(Some(3));
@@ -185,6 +245,11 @@ fn page_setup(s: &mut Shell, tab: usize) -> (Spec, Box<dyn View>) {
         spec,
         Box::new(PageSetup {
             had_titles: page.title_rows.is_some() || page.title_cols.is_some(),
+            hf: hfs,
+            ctx,
+            sheet,
+            sets: [hsets, fsets],
+            custom_footer: false,
         }),
     )
 }
@@ -206,8 +271,84 @@ fn titles_text(text: &str, rows: bool) -> Result<Option<String>, String> {
     Ok(Some(t.to_owned()))
 }
 
+impl PageSetup {
+    fn sections(&self, footer: bool) -> &Sections {
+        if footer {
+            &self.hf.footer
+        } else {
+            &self.hf.header
+        }
+    }
+
+    /// Shows the three sections of the header or footer in its preview box.
+    fn preview(&self, ui: &mut Ui, d: &mut Dialog, footer: bool) {
+        let ids = HF_IDS[usize::from(footer)].1;
+        for (i, id) in ids.iter().enumerate() {
+            let text = hf::render(&self.sections(footer)[i], &self.ctx, "1", "1");
+            d.set_text(ui, id, &text);
+        }
+    }
+
+    /// Rebuilds a drop-down after its sections changed (a custom text is listed first).
+    fn refresh(&mut self, ui: &mut Ui, d: &mut Dialog, footer: bool) {
+        let (sets, labels, sel) = hf::choices(self.sections(footer), &self.ctx);
+        self.sets[usize::from(footer)] = sets;
+        d.set_items(ui, HF_IDS[usize::from(footer)].0, labels, Some(sel));
+        self.preview(ui, d, footer);
+    }
+}
+
 impl View for PageSetup {
+    fn opened(&mut self, _s: &mut Shell, ui: &mut Ui, d: &mut Dialog) {
+        self.preview(ui, d, false);
+        self.preview(ui, d, true);
+    }
+
+    fn child_done(
+        &mut self,
+        _s: &mut Shell,
+        ui: &mut Ui,
+        d: &mut Dialog,
+        applied: bool,
+    ) -> Result<(), String> {
+        if applied && let Some(sections) = custom::take_result() {
+            if self.custom_footer {
+                self.hf.footer = sections;
+            } else {
+                self.hf.header = sections;
+            }
+            self.refresh(ui, d, self.custom_footer);
+        }
+        Ok(())
+    }
+
     fn event(&mut self, s: &mut Shell, ui: &mut Ui, d: &mut Dialog, o: &Outcome) {
+        match o {
+            Outcome::Changed(id) if id == "hf_header" || id == "hf_footer" => {
+                let footer = id == "hf_footer";
+                if let Some(set) = d
+                    .values(ui)
+                    .index(id)
+                    .and_then(|i| self.sets[usize::from(footer)].get(i).cloned())
+                {
+                    if footer {
+                        self.hf.footer = set;
+                    } else {
+                        self.hf.header = set;
+                    }
+                    self.preview(ui, d, footer);
+                }
+            }
+            Outcome::Pressed(id) if id == "hf_custom_header" || id == "hf_custom_footer" => {
+                let footer = id == "hf_custom_footer";
+                self.custom_footer = footer;
+                request_child(DialogRequest::HeaderFooterCustom {
+                    footer,
+                    sections: self.sections(footer).clone(),
+                });
+            }
+            _ => {}
+        }
         pick_selection(s, ui, d, o);
         // A reference box shows entire rows or columns: `$1:$3`.
         if let Outcome::Ref {
@@ -294,6 +435,11 @@ impl View for PageSetup {
         }
         s.run_ids(ui, &cmds);
         self.had_titles = rows.is_some() || cols.is_some();
+        self.hf.different_odd_even = v.flag("hf_oddeven");
+        self.hf.different_first = v.flag("hf_first");
+        self.hf.scale_with_document = v.flag("hf_scale");
+        self.hf.align_with_margins = v.flag("hf_align");
+        s.sheet.set_header_footer(self.sheet, &self.hf)?;
         Ok(())
     }
 }

@@ -65,6 +65,72 @@ pub enum Kind {
     Ref(String),
     /// A push button that is not part of the footer.
     Button,
+    /// A one-line field that shows a bullet for every character. The text it holds is a
+    /// [`Secret`]: it is read with [`Values::secret`], never shows in `Debug` output and is not
+    /// part of the accessibility tree.
+    Password(String),
+    /// Excel's border diagram: a preview box with eight clickable edges (see [`BORDER_EDGES`]).
+    /// Pressing an edge answers `Outcome::Pressed("<id>:<edge>")`; the host draws the lines with
+    /// [`super::Dialog::set_border_box`].
+    BorderBox,
+}
+
+/// The edges of a [`Kind::BorderBox`], in the order its lines are given.
+pub const BORDER_EDGES: [&str; 8] = [
+    "top",
+    "inner_h",
+    "bottom",
+    "left",
+    "inner_v",
+    "right",
+    "diag_down",
+    "diag_up",
+];
+
+/// How one line of the border diagram is drawn.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct LineLook {
+    /// Thickness in logical units.
+    pub weight: f32,
+    /// Dash and gap lengths; `(0, 0)` is a solid line.
+    pub dash: (f32, f32),
+    /// Two thin lines side by side.
+    pub double: bool,
+    pub rgb: (u8, u8, u8),
+}
+
+/// Text a user typed into a [`Kind::Password`] field. Its `Debug` output is redacted.
+#[derive(Clone, Default, PartialEq, Eq)]
+pub struct Secret(String);
+
+impl Secret {
+    pub fn new(text: &str) -> Self {
+        Self(text.to_owned())
+    }
+
+    /// The text; keep it out of logs, labels and messages.
+    pub fn expose(&self) -> &str {
+        &self.0
+    }
+
+    pub fn len_chars(&self) -> usize {
+        self.0.chars().count()
+    }
+
+    /// Replaces `removed` characters starting at character `at` by `insert`.
+    pub(crate) fn splice(&mut self, at: usize, removed: usize, insert: &str) {
+        let mut chars: Vec<char> = self.0.chars().collect();
+        let at = at.min(chars.len());
+        let end = (at + removed).min(chars.len());
+        chars.splice(at..end, insert.chars());
+        self.0 = chars.into_iter().collect();
+    }
+}
+
+impl std::fmt::Debug for Secret {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("Secret(<redacted>)")
+    }
 }
 
 /// One control. `label` may carry an access key as `&N` (the letter after `&`).
@@ -362,6 +428,21 @@ impl Spec {
     pub fn button(&mut self, id: &str, x: f32, y: f32, w: f32, label: &str) -> &mut Control {
         self.push(id, Kind::Button, Rect::new(x, y, w, BUTTON_H), label)
     }
+
+    /// A masked field (bullets); read it with [`Values::secret`].
+    pub fn password(&mut self, id: &str, x: f32, y: f32, w: f32) -> &mut Control {
+        self.push(
+            id,
+            Kind::Password(String::new()),
+            Rect::new(x, y, w, FIELD_H),
+            "",
+        )
+    }
+
+    /// The border diagram of Format Cells.
+    pub fn border_box(&mut self, id: &str, rect: Rect) -> &mut Control {
+        self.push(id, Kind::BorderBox, rect, "")
+    }
 }
 
 impl Control {
@@ -409,7 +490,12 @@ pub enum Value {
     Bool(bool),
     /// The chosen item of a drop-down or list (`None` when a list has no selection).
     Index(Option<usize>),
+    /// The text of a password field.
+    Secret(Secret),
 }
+
+/// Key suffix under which a spin box's unclamped text is kept.
+pub(crate) const RAW_SUFFIX: &str = "#raw";
 
 /// Every control's value at the moment of the call, by control id, plus the checked radio of each
 /// group.
@@ -458,6 +544,23 @@ impl Values {
         match self.map.get(id) {
             Some(Value::Index(i)) => *i,
             _ => None,
+        }
+    }
+
+    /// The text of a password field (empty for any other control).
+    pub fn secret(&self, id: &str) -> &str {
+        match self.map.get(id) {
+            Some(Value::Secret(s)) => s.expose(),
+            _ => "",
+        }
+    }
+
+    /// What a spin box shows, before it is clamped to its range: lets a dialog refuse a number
+    /// outside the range the way Excel does instead of silently using the nearest one.
+    pub fn raw(&self, id: &str) -> &str {
+        match self.map.get(&format!("{id}{RAW_SUFFIX}")) {
+            Some(Value::Text(s)) => s,
+            _ => "",
         }
     }
 

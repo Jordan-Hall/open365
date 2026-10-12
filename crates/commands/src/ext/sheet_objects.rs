@@ -403,6 +403,8 @@ pub enum ObjectsOp {
         cache_records: Option<Vec<u8>>,
         table_definition: Vec<u8>,
     },
+    /// Page Setup > Header/Footer.
+    SetHeaderFooter(super::header_footer::HeaderFooterRequest),
     SetCalculation {
         #[serde(default)]
         mode: Option<CalcModeChoice>,
@@ -968,6 +970,10 @@ pub(crate) fn run(
                 },
             )?;
             notes.push(format!("pivot cache {}", made.cache_id));
+            Ok(Vec::new())
+        }
+        ObjectsOp::SetHeaderFooter(h) => {
+            super::header_footer::set(x, sheet, h)?;
             Ok(Vec::new())
         }
         ObjectsOp::SetCalculation {

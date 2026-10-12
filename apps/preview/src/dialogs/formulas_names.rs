@@ -10,6 +10,8 @@ pub struct NameRow {
     pub refers_to: String,
     /// `Workbook` or the sheet name.
     pub scope: String,
+    /// The sheet the name is scoped to; `None` for the workbook.
+    pub scope_index: Option<usize>,
     pub comment: String,
 }
 
@@ -24,6 +26,7 @@ pub fn rows(wb: &Workbook) -> Vec<NameRow> {
         .map(|n| NameRow {
             name: n.name.clone(),
             refers_to: format!("={}", n.formula),
+            scope_index: n.local_sheet_id.map(|i| i as usize),
             scope: n
                 .local_sheet_id
                 .and_then(|i| wb.sheets().get(i as usize))

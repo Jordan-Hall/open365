@@ -3346,7 +3346,9 @@ dependencies = [
 name = "open365-drawing"
 version = "0.1.0"
 dependencies = [
+ "flate2",
  "quick-xml 0.42.0",
+ "serde_json",
 ]
 
 [[package]]

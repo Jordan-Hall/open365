@@ -1,0 +1,172 @@
+{
+  "batch": "b01",
+  "note": "Shape.Adjustments from Word with default adjusts: count and values in Word units (fractions of 100000, angles in degrees)",
+  "presets": {
+    "line": {
+      "count": 0,
+      "values": [],
+      "auto_shape_type": -2
+    },
+    "lineInv": {
+      "count": 0,
+      "values": [],
+      "auto_shape_type": 183
+    },
+    "triangle": {
+      "count": 1,
+      "values": [
+        0.5
+      ],
+      "auto_shape_type": 7
+    },
+    "rtTriangle": {
+      "count": 0,
+      "values": [],
+      "auto_shape_type": 8
+    },
+    "rect": {
+      "count": 0,
+      "values": [],
+      "auto_shape_type": 1
+    },
+    "diamond": {
+      "count": 0,
+      "values": [],
+      "auto_shape_type": 4
+    },
+    "parallelogram": {
+      "count": 1,
+      "values": [
+        0.25
+      ],
+      "auto_shape_type": 2
+    },
+    "trapezoid": {
+      "count": 1,
+      "values": [
+        0.25
+      ],
+      "auto_shape_type": 3
+    },
+    "nonIsoscelesTrapezoid": {
+      "count": 2,
+      "values": [
+        0.25,
+        0.25
+      ],
+      "auto_shape_type": 143
+    },
+    "pentagon": {
+      "count": 2,
+      "values": [
+        1.05146,
+        1.10557
+      ],
+      "auto_shape_type": 12
+    },
+    "hexagon": {
+      "count": 2,
+      "values": [
+        0.25,
+        1.1547
+      ],
+      "auto_shape_type": 10
+    },
+    "heptagon": {
+      "count": 2,
+      "values": [
+        1.02572,
+        1.0521
+      ],
+      "auto_shape_type": 145
+    },
+    "octagon": {
+      "count": 1,
+      "values": [
+        0.29289
+      ],
+      "auto_shape_type": 6
+    },
+    "decagon": {
+      "count": 1,
+      "values": [
+        1.05146
+      ],
+      "auto_shape_type": 144
+    },
+    "dodecagon": {
+      "count": 0,
+      "values": [],
+      "auto_shape_type": 146
+    },
+    "star4": {
+      "count": 1,
+      "values": [
+        0.125
+      ],
+      "auto_shape_type": 91
+    },
+    "star5": {
+      "count": 3,
+      "values": [
+        0.19098,
+        1.05146,
+        1.10557
+      ],
+      "auto_shape_type": 92
+    },
+    "star6": {
+      "count": 2,
+      "values": [
+        0.28868,
+        1.1547
+      ],
+      "auto_shape_type": 147
+    },
+    "star7": {
+      "count": 3,
+      "values": [
+        0.34601,
+        1.02572,
+        1.0521
+      ],
+      "auto_shape_type": 148
+    },
+    "star8": {
+      "count": 1,
+      "values": [
+        0.375
+      ],
+      "auto_shape_type": 93
+    },
+    "star10": {
+      "count": 2,
+      "values": [
+        0.42533,
+        1.05146
+      ],
+      "auto_shape_type": 149
+    },
+    "star12": {
+      "count": 1,
+      "values": [
+        0.375
+      ],
+      "auto_shape_type": 150
+    },
+    "star16": {
+      "count": 1,
+      "values": [
+        0.375
+      ],
+      "auto_shape_type": 94
+    },
+    "star24": {
+      "count": 1,
+      "values": [
+        0.375
+      ],
+      "auto_shape_type": 95
+    }
+  }
+}

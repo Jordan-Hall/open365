@@ -1,0 +1,139 @@
+{
+  "batch": "b08",
+  "note": "Shape.Adjustments from Word with default adjusts: count and values in Word units (fractions of 100000, angles in degrees)",
+  "presets": {
+    "actionButtonBackPrevious": {
+      "count": 0,
+      "values": [],
+      "auto_shape_type": 129
+    },
+    "actionButtonEnd": {
+      "count": 0,
+      "values": [],
+      "auto_shape_type": 132
+    },
+    "actionButtonBeginning": {
+      "count": 0,
+      "values": [],
+      "auto_shape_type": 131
+    },
+    "actionButtonReturn": {
+      "count": 0,
+      "values": [],
+      "auto_shape_type": 133
+    },
+    "actionButtonDocument": {
+      "count": 0,
+      "values": [],
+      "auto_shape_type": 134
+    },
+    "actionButtonSound": {
+      "count": 0,
+      "values": [],
+      "auto_shape_type": 135
+    },
+    "actionButtonMovie": {
+      "count": 0,
+      "values": [],
+      "auto_shape_type": 136
+    },
+    "gear6": {
+      "count": 2,
+      "values": [
+        0.15,
+        0.03526
+      ],
+      "auto_shape_type": 172
+    },
+    "gear9": {
+      "count": 2,
+      "values": [
+        0.1,
+        0.01763
+      ],
+      "auto_shape_type": 173
+    },
+    "funnel": {
+      "count": 0,
+      "values": [],
+      "auto_shape_type": 174
+    },
+    "mathPlus": {
+      "count": 1,
+      "values": [
+        0.2352
+      ],
+      "auto_shape_type": 163
+    },
+    "mathMinus": {
+      "count": 1,
+      "values": [
+        0.2352
+      ],
+      "auto_shape_type": 164
+    },
+    "mathMultiply": {
+      "count": 1,
+      "values": [
+        0.2352
+      ],
+      "auto_shape_type": 165
+    },
+    "mathDivide": {
+      "count": 3,
+      "values": [
+        0.2352,
+        0.0588,
+        0.1176
+      ],
+      "auto_shape_type": 166
+    },
+    "mathEqual": {
+      "count": 2,
+      "values": [
+        0.2352,
+        0.1176
+      ],
+      "auto_shape_type": 167
+    },
+    "mathNotEqual": {
+      "count": 3,
+      "values": [
+        0.2352,
+        110.0,
+        0.1176
+      ],
+      "auto_shape_type": 168
+    },
+    "cornerTabs": {
+      "count": 0,
+      "values": [],
+      "auto_shape_type": 169
+    },
+    "squareTabs": {
+      "count": 0,
+      "values": [],
+      "auto_shape_type": 170
+    },
+    "plaqueTabs": {
+      "count": 0,
+      "values": [],
+      "auto_shape_type": 171
+    },
+    "chartX": {
+      "count": 0,
+      "values": [],
+      "auto_shape_type": 180
+    },
+    "chartStar": {
+      "count": 0,
+      "values": [],
+      "auto_shape_type": 181
+    },
+    "chartPlus": {
+      "count": 0,
+      "values": [],
+      "auto_shape_type": 182
+    }
+  }
+}

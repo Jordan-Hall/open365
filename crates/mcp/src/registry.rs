@@ -443,6 +443,16 @@ pub const COMMANDS: &[CommandSpec] = &[
         },
     },
     CommandSpec {
+        name: "docx_mailings",
+        domain: Domain::Docx,
+        summary: "Writer Mailings tab: merge fields and rules as fields, envelopes, label sheets, Update Labels.",
+        example: || {
+            json!({"command": "docx_mailings",
+                "op": {"insert_field": {"at": {"para": 0, "offset": 0},
+                    "instruction": "MERGEFIELD Name", "placeholder": "Name"}}})
+        },
+    },
+    CommandSpec {
         name: "docx_design",
         domain: Domain::Docx,
         summary: "Writer Design tab: themes, colours, fonts, effects, style sets, page colour and borders, watermark.",

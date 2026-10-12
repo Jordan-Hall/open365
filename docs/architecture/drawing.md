@@ -1,6 +1,6 @@
 # Shared drawing layer (`open365-drawing`)
 
-Status: M0 done except the preset table (blocked on a licence decision, below). Plan decided by the lead on
+Status: M0 done except the preset table (being rebuilt clean-room from Word measurements, below; 187 of 187 authored; 184 match Word on every probe page, 3 have known unmatched pages). Plan decided by the lead on
 2026-10-12.
 
 One crate, pure data, no I/O, used by Writer and Sheets for pictures, shapes, text boxes and groups.
@@ -11,7 +11,7 @@ One crate, pure data, no I/O, used by Writer and Sheets for pictures, shapes, te
 |---|---|
 | `model` | `DrawingObject { id, name, descr, hidden, xfrm, kind, raw }`; `Kind` = `Shape`, `Picture`, `Group`, `Chart`, `Unknown`. `Xfrm` in EMU (off, ext, rot in 60000ths of a degree, flips). `RawXml` = verbatim source. |
 | `geom` | `ShapeDef` (adjust values, guides, paths, text rect); guide-formula evaluator (`*/ +- +/ ?: abs at2 cat2 cos max min mod pin sat2 sin sqrt tan val`, built-in guides `w h l t r b hc vc wd2..wd32 hd2..hd8 ss ls ssd2..ssd32 cd2 cd4 cd8 3cd4 3cd8 5cd8 7cd8`); path commands `moveTo lnTo arcTo quadBezTo cubicBezTo close` (arcs become cubics), fill modes, stroke flag. `PresetSource` trait, `Builtin`, `MapPresets`. |
-| `geom::presets` | Slot for the generated preset table. Empty today. |
+| `geom::presets` | The preset table, authored from Word measurements (clean-room method below). 187 of 187 entries (`presets_b01` .. `b08`, one file per batch, plus the pilot five). |
 | `paint` | `Color` with modifiers (resolved against a `Theme` trait only when drawn), `Fill`, `Line`, `Effect`, `StyleRef`. |
 | `text` | `TextBody<S>`: `BodyProps` (insets, wrap, anchor, vert, autofit) plus a host-generic story (`RawXml` by default). |
 | `render` | `display_list(obj, presets, parent: Affine)` gives `Prim::{Path, Image, TextFrame}` in points with group transforms, rotation and flips applied. Unknown presets draw as `rect` and add a diagnostic. |
@@ -30,17 +30,75 @@ Elements are matched by local name; the host validates namespaces. DOCTYPE is re
 - Insert > Icons uses the bundled Tabler set as SVG with a PNG fallback.
 - The chart crate moves onto `paint`/`Prim` after M3. WordArt warp renders flat in v1. SVG pictures render through resvg and get a PNG fallback as Office does. A drawing object is one CRDT register in v1. SmartArt and ink are preserve-only. Word's Draw Text Box default wrap is measured in the oracle.
 
-## Open: preset geometry data
+## Preset geometry: clean-room method (owner decision, 2026-10-12)
 
-The 187 preset shapes were to be generated from ECMA-376 Part 1 `presetShapeDefinitions.xml`. Checked on
-2026-10-12: neither the 4th (2012) nor the 5th (2016) edition, nor the annex zip, carries a copyright notice that
-grants rights to reuse the file (the 4th edition PDF says only "(c) Ecma International 2012"; the 5th has none).
-Ecma's policy says a copyright notice permits copying a standard but not extracting portions of it. The v3 text
-policy (December 2025) allows implementing by copy and paste, but that notice is not on these files. The owner
-decides; until then nothing is embedded or generated from that file, and `geom::presets::table()` is empty.
-Everything else works with hand-written or custom geometry (`a:custGeom`), and tests use geometry written from the
-operator descriptions. When the table lands, the parity tests against `crates/pdf/src/shape.rs` (and finiteness,
-closure and bounds checks over all presets) are added with it.
+The 187 preset shapes are not generated from Ecma's `presetShapeDefinitions.xml`: the licence on that file is
+unclear (see the 2026-10-12 check in the decision log), so the owner chose to rebuild them from the ECMA-376 prose
+plus measurement of Word's own output. `geom::presets::table()` fills up one measured preset at a time.
+
+**Exclusion list. These must never be opened, read, searched, diffed against or used as a source** (by people or
+agents, for presets or for checking them):
+
+- Ecma's `presetShapeDefinitions.xml`, and anything under `D:\dev\open365\dl-ecma`;
+- `crates/pdf/src/shape.rs`;
+- any other project's preset tables (LibreOffice, Apache POI, OnlyOffice, docx4j and so on) and web copies of them.
+
+Allowed: the ECMA-376 prose (the shape names in `ST_ShapeType`, the guide-language operators and built-in names),
+Word itself, and our own measurements. If an excluded file is seen by accident, stop and report it. Guide names in our
+entries are our own; only the adjust names a document may carry (`adj`, `adj1` .. `adjN`, `hf`, `vf`) are fixed by the
+file format.
+
+**Method, per batch of about 25 presets** (`fixtures/reference/drawing/presets/manifest.json` lists the 187 names in
+batches `b01` .. `b08`, plus a five-preset `pilot`):
+
+1. `pwsh -NoProfile -File tools/office/make-preset-probes.ps1 -Batch b03` (local only; needs Word). Stage 1 opens a
+   one-shape-per-page document and reads `Shape.Adjustments` (count and default values) into `b03.handles.json`. Stage 2
+   writes `b03.docx` with one preset per page, no fill, a 0.75 pt line, no text, anchored at (72 pt, 72 pt): four sizes
+   at default adjusts (144x144, 288x96, 96x288 and 216x144 pt), then on 216x144 all adjusts set to 0, 30000, 100000,
+   -50000 and 400000 (out of range), then one page per adjust set to 0 with the rest at Word's default. The script
+   exports `b03.pdf` through `make-pdf-refs.ps1`, records every Word PID it starts in `b03.run.json`, and never touches
+   another WINWORD process. Word refuses a whole file for one invalid page (an adjust name the preset lacks, a partial
+   `avLst`); the script then opens each page alone, finds the adjust names (`adj`, `hf`, `vf` presets are remembered in
+   `adjnames.json`), drops what Word still refuses (listed in `probes.json` and `run.json`) and exports again.
+   Measured run times: pilot (5 presets, 39 pages) 20 s; `b01` (24 presets, 214 pages) 21 s, or 124 s when the
+   adjust names have to be found.
+2. `cargo test -p open365-drawing --test preset_probes -- --ignored write_word_paths` writes `b03.paths.json`: Word's
+   stroked paths (moveto, lineto, curveto from the PDF content stream; `re` is expanded), in EMU relative to the shape
+   box with y down. Author from those numbers, not from the PDF.
+3. Write the entry in `geom/presets.rs`, as a function with a header comment recording what was measured (adjusts,
+   defaults, clamp limits seen with out-of-range values, how the outline changes with size). Add it to `table()`.
+4. `cargo test -p open365-drawing --test preset_probes -- --nocapture` renders our path at each probe's size and
+   adjusts and compares it with Word's. The deviation is the symmetric Hausdorff distance between the flattened
+   outlines (independent of start point, curve splitting and subpath order); a page passes at 0.25 pt or less. The report
+   gives, per preset, `pass`, `FAIL` (with the worst page kind and the failing pages) or `missing` (not in the table,
+   never a failure), then the coverage of the probed presets and of all 187. A preset also fails when its adjust count
+   or defaults differ from Word's object model.
+5. A preset that cannot reach 0.25 pt is a finding: record it in the header comment and raise it, do not loosen the
+   tolerance. Page kinds that show no change (`scan-adj3` equal to the defaults) tell which adjust a clamp belongs to.
+
+What the probes cannot see: text rectangles (no text), connection sites, handle positions (`Shape.Adjustments` gives
+counts and defaults only), and paths that are not stroked (`stroke="0"` paths such as the shading parts of `cube`; use
+`-Fill` and extend the comparison when a batch needs them). The tests also check that the harness can fail.
+
+Pilot result (2026-10-12), all within 0.25 pt on every page: `rect`, `roundRect` (radius `ss * adj / 100000`, adj
+clamped 0..50000), `ellipse`, `triangle` (apex `w * adj / 100000`, clamped 0..100000) and `rightArrow` (shaft
+`h * adj1 / 100000` clamped 0..100000; head `ss * adj2 / 100000` clamped 0..`100000 * w / ss`).
+
+Batch result (2026-10-12), all 187 presets authored and compared at 0.25 pt: 184 match Word on every probe page; 3 match
+all but the known pages below. The comparison ignores dots (subpaths under 0.05 pt, or only zero-length segments) and
+subpaths wholly off the page on both sides, because Word's PDF drops those inconsistently; angle adjust defaults are
+compared modulo 360 degrees (Word reports 16200000 as -90). The arc converter draws a flat ellipse (one radius zero)
+as Word does, using the visual angle as the parameter (measured on `blockArc` and `donut`), and sweeps a full 360
+degrees.
+
+Known unmatched pages (allow-list `KNOWN_UNMATCHED` in `tests/preset_probes.rs`; the test fails if one starts to pass).
+Word's outline there comes from degenerate arithmetic (collapsed inner ellipses, zero-size heads) that the guides do not
+reproduce:
+
+- `circularArrow`: `adj-all-400000` (1 of 14 pages).
+- `leftCircularArrow`: `adj-all-0`, `adj-all-30000`, `adj-all-100000`, `adj-all--50000`, `adj-all-400000`, `scan-adj5`
+  (6 of 14).
+- `leftRightCircularArrow`: `adj-all-0`, `adj-all-100000`, `adj-all--50000`, `adj-all-400000`, `scan-adj5` (5 of 14).
 
 Formula choices the prose leaves open, to confirm in the oracle: division by zero gives 0, `at2` is normalised to
 `0..21 600 000`, tint and shade mix in sRGB.

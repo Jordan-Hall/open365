@@ -33,6 +33,7 @@ fn role_of(w: &Widget) -> Role {
         Widget::ScrollBar(_) => Role::ScrollBar,
         Widget::TabStrip { .. } => Role::TabList,
         Widget::Tooltip => Role::Tooltip,
+        Widget::TextField(e) if e.masked => Role::PasswordInput,
         Widget::TextField(_) => Role::TextInput,
         Widget::Checkbox { .. } => Role::CheckBox,
         Widget::Radio { .. } => Role::RadioButton,
@@ -121,7 +122,10 @@ impl Ui {
                     node.add_action(Action::Click);
                 }
                 Widget::TextField(e) => {
-                    node.set_value(e.text.clone());
+                    // A password is not told to screen readers.
+                    if !e.masked {
+                        node.set_value(e.text.clone());
+                    }
                     node.add_action(Action::SetValue);
                 }
                 Widget::Spinner {
@@ -292,11 +296,12 @@ impl Ui {
             | Widget::Spinner { edit: e, .. } => e,
             _ => return None,
         };
+        let e = e.display();
         let ar = self.tree.abs_rect(f);
         let lay = self.assets.layout_text(
             self.font,
             &e.text,
-            self.text_size * self.scale.0,
+            self.text_px(),
             0.0,
             0.0,
             Default::default(),

@@ -1,0 +1,183 @@
+{
+  "batch": "b02",
+  "note": "Shape.Adjustments from Word with default adjusts: count and values in Word units (fractions of 100000, angles in degrees)",
+  "presets": {
+    "star32": {
+      "count": 1,
+      "values": [
+        0.375
+      ],
+      "auto_shape_type": 96
+    },
+    "roundRect": {
+      "count": 1,
+      "values": [
+        0.16667
+      ],
+      "auto_shape_type": 5
+    },
+    "round1Rect": {
+      "count": 1,
+      "values": [
+        0.16667
+      ],
+      "auto_shape_type": 151
+    },
+    "round2SameRect": {
+      "count": 2,
+      "values": [
+        0.16667,
+        0.0
+      ],
+      "auto_shape_type": 152
+    },
+    "round2DiagRect": {
+      "count": 2,
+      "values": [
+        0.16667,
+        0.0
+      ],
+      "auto_shape_type": 153
+    },
+    "snipRoundRect": {
+      "count": 2,
+      "values": [
+        0.16667,
+        0.16667
+      ],
+      "auto_shape_type": 154
+    },
+    "snip1Rect": {
+      "count": 1,
+      "values": [
+        0.16667
+      ],
+      "auto_shape_type": 155
+    },
+    "snip2SameRect": {
+      "count": 2,
+      "values": [
+        0.16667,
+        0.0
+      ],
+      "auto_shape_type": 156
+    },
+    "snip2DiagRect": {
+      "count": 2,
+      "values": [
+        0.0,
+        0.16667
+      ],
+      "auto_shape_type": 157
+    },
+    "plaque": {
+      "count": 1,
+      "values": [
+        0.16667
+      ],
+      "auto_shape_type": 28
+    },
+    "ellipse": {
+      "count": 0,
+      "values": [],
+      "auto_shape_type": 9
+    },
+    "teardrop": {
+      "count": 1,
+      "values": [
+        1.0
+      ],
+      "auto_shape_type": 160
+    },
+    "homePlate": {
+      "count": 1,
+      "values": [
+        0.5
+      ],
+      "auto_shape_type": 51
+    },
+    "chevron": {
+      "count": 1,
+      "values": [
+        0.5
+      ],
+      "auto_shape_type": 52
+    },
+    "pieWedge": {
+      "count": 0,
+      "values": [],
+      "auto_shape_type": 175
+    },
+    "pie": {
+      "count": 2,
+      "values": [
+        0.0,
+        -90.0
+      ],
+      "auto_shape_type": 142
+    },
+    "blockArc": {
+      "count": 3,
+      "values": [
+        180.0,
+        0.0,
+        0.25
+      ],
+      "auto_shape_type": 20
+    },
+    "donut": {
+      "count": 1,
+      "values": [
+        0.25
+      ],
+      "auto_shape_type": 18
+    },
+    "noSmoking": {
+      "count": 1,
+      "values": [
+        0.1875
+      ],
+      "auto_shape_type": 19
+    },
+    "rightArrow": {
+      "count": 2,
+      "values": [
+        0.5,
+        0.5
+      ],
+      "auto_shape_type": 33
+    },
+    "leftArrow": {
+      "count": 2,
+      "values": [
+        0.5,
+        0.5
+      ],
+      "auto_shape_type": 34
+    },
+    "upArrow": {
+      "count": 2,
+      "values": [
+        0.5,
+        0.5
+      ],
+      "auto_shape_type": 35
+    },
+    "downArrow": {
+      "count": 2,
+      "values": [
+        0.5,
+        0.5
+      ],
+      "auto_shape_type": 36
+    },
+    "stripedRightArrow": {
+      "count": 2,
+      "values": [
+        0.5,
+        0.5
+      ],
+      "auto_shape_type": 49
+    }
+  }
+}

@@ -48,6 +48,11 @@ impl Seg {
 
 /// Visual angle to the ellipse parameter, continuous in `theta` (radians).
 fn param_angle(wr: f64, hr: f64, theta: f64) -> f64 {
+    // A flat ellipse (one radius zero) has no radius-line angle to convert; Word then uses
+    // the visual angle as the parameter (measured on `blockArc` with the inner ellipse flat).
+    if wr == 0.0 || hr == 0.0 {
+        return theta;
+    }
     let base = (wr * theta.sin()).atan2(hr * theta.cos());
     let turns = ((theta - base) / std::f64::consts::TAU).round();
     base + turns * std::f64::consts::TAU
@@ -58,9 +63,11 @@ fn param_angle(wr: f64, hr: f64, theta: f64) -> f64 {
 /// `st` and `sw` are the start and swing angles in 60000ths of a degree; they are visual
 /// angles of the ellipse (the angle of the radius line, not the parameter). The current
 /// point is the point of the ellipse at `st`; the centre follows from that. Returns the
-/// segments and the new current point. A zero radius or swing yields nothing.
+/// segments and the new current point. A zero swing, a negative radius or two zero radii yield
+/// nothing. With one zero radius the arc is the flat curve Word draws, a line traced back and
+/// forth along the other axis.
 pub fn arc_to(cur: P, wr: f64, hr: f64, st: f64, sw: f64) -> (Vec<Seg>, P) {
-    if wr <= 0.0 || hr <= 0.0 || sw == 0.0 {
+    if wr < 0.0 || hr < 0.0 || (wr == 0.0 && hr == 0.0) || sw == 0.0 {
         return (Vec::new(), cur);
     }
     let th1 = (st / ANG).to_radians();
@@ -161,7 +168,25 @@ mod tests {
 
     #[test]
     fn degenerate_arcs_are_empty() {
-        assert!(arc_to(P::new(1.0, 1.0), 0.0, 5.0, 0.0, 100.0).0.is_empty());
+        assert!(arc_to(P::new(1.0, 1.0), 0.0, 0.0, 0.0, 100.0).0.is_empty());
+        assert!(arc_to(P::new(1.0, 1.0), -1.0, 5.0, 0.0, 100.0).0.is_empty());
         assert!(arc_to(P::new(1.0, 1.0), 5.0, 5.0, 0.0, 0.0).0.is_empty());
+    }
+
+    #[test]
+    fn flat_ellipse_full_sweep_is_a_line_there_and_back() {
+        // Radius 10 wide, 0 high, start at 90 degrees (visual angle used as the parameter, so
+        // the centre is the current point), full negative turn: a flat curve on y = 3.
+        let (segs, end) = arc_to(P::new(5.0, 3.0), 10.0, 0.0, 5_400_000.0, -21_600_000.0);
+        assert_eq!(segs.len(), 4);
+        assert!(close(end, P::new(5.0, 3.0)));
+        for s in &segs {
+            let Seg::Cubic(a, b, c) = *s else { panic!() };
+            assert!([a, b, c].iter().all(|p| (p.y - 3.0).abs() < 1e-9));
+        }
+        let xs: Vec<f64> = segs.iter().map(|s| s.end().unwrap().x).collect();
+        for (x, want) in xs.iter().zip([15.0, 5.0, -5.0, 5.0]) {
+            assert!((x - want).abs() < 1e-9, "{xs:?}");
+        }
     }
 }

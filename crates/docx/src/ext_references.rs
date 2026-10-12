@@ -68,6 +68,16 @@ fn parse_inlines(xml_fragment: &str) -> Result<Vec<Inline>, DocxError> {
     }
 }
 
+/// A run that only holds the `end` marker of a complex field.
+fn is_field_end(inline: &Inline) -> bool {
+    let Inline::Run(r) = inline else { return false };
+    !r.content.is_empty()
+        && r.content.iter().all(|c| {
+            matches!(c, RunContent::Raw(RawXml::Element(e))
+                if e.head.is_w("fldChar") && e.head.attr_w("fldCharType") == Some("end"))
+        })
+}
+
 fn insert_at_boundary(
     content: &mut Vec<Inline>,
     target: usize,
@@ -80,6 +90,10 @@ fn insert_at_boundary(
             return;
         }
         if *acc == target {
+            // Behind the end marker of a field that ends here, not inside its result.
+            while content.get(i).is_some_and(is_field_end) {
+                i += 1;
+            }
             if let Some(items) = items.take() {
                 content.splice(i..i, items);
             }

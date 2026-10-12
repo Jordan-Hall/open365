@@ -2,8 +2,8 @@
 //! statistics, notes, and sheet and workbook protection. Edits are `ReviewOp` commands (one undo
 //! step); the ribbon module `ribbon::sheets::review` maps control ids to these methods.
 
-use open365_commands::review_ops::{self, Note, SheetProtection, Thread};
-use open365_commands::{Command, ReviewOp};
+use open365_commands::review_ops::{self, Note, Password, SheetProtection, Thread};
+use open365_commands::{BorderChange, CellFormatChange, Command, RangeRef, ReviewOp};
 use open365_xlsx::CellValue;
 
 use super::super::SheetModel;
@@ -16,6 +16,9 @@ pub enum Request {
     Statistics,
     ProtectSheet,
     ProtectWorkbook,
+    /// A protected sheet needs its password before it can be unprotected.
+    UnprotectSheet,
+    UnprotectWorkbook,
 }
 
 /// What the Review tab keeps on the sheet model (none of it is in the file or the undo history).
@@ -102,6 +105,10 @@ impl WorkbookStats {
     }
 }
 
+/// What the command layer says for a wrong password, and Excel's full text for it.
+const PASSWORD_WRONG: &str = "The password you supplied is not correct.";
+pub const PASSWORD_WRONG_MESSAGE: &str = "The password you supplied is not correct. Verify that the CAPS LOCK key is off and be sure to use the correct capitalization.";
+
 /// The message Excel shows when a protected sheet refuses an edit.
 pub const PROTECTED_MESSAGE: &str = "The cell or chart you're trying to change is on a protected sheet. To make a change, unprotect the sheet. You might be requested to enter a password.";
 
@@ -138,25 +145,54 @@ impl SheetModel {
         review_ops::sheet_protection(self.target.xlsx()?, self.sheet)
     }
 
-    /// Protect Sheet's OK.
+    /// Protect Sheet's OK. While the dialog that asks for the options is still to open (a bare
+    /// click on the button left the request), nothing is protected: as in Excel, the dialog
+    /// comes first.
     pub fn review_protect_sheet(
         &mut self,
         options: SheetProtection,
         password: Option<&str>,
     ) -> Result<(), String> {
+        if self.ext_review.request == Some(Request::ProtectSheet) {
+            return Ok(());
+        }
         self.review_cmd(ReviewOp::ProtectSheet {
             options,
-            password: password.map(str::to_owned),
+            password: password.map(Password::new),
         })
         .map(|_| ())
     }
 
-    /// Unprotect Sheet.
+    /// Unprotect Sheet. Without a password, a sheet that has one asks for it in a dialog (the
+    /// request is left for the shell) instead of failing, as Excel's button does.
     pub fn review_unprotect_sheet(&mut self, password: Option<&str>) -> Result<(), String> {
-        self.review_cmd(ReviewOp::UnprotectSheet {
-            password: password.map(str::to_owned),
-        })
-        .map(|_| ())
+        let done = self
+            .review_cmd(ReviewOp::UnprotectSheet {
+                password: password.map(Password::new),
+            })
+            .map(|_| ());
+        self.password_prompt(password.is_none(), Request::UnprotectSheet, done)
+    }
+
+    /// Turns a wrong-password failure into Excel's text, or into the prompt when none was given.
+    fn password_prompt(
+        &mut self,
+        ask: bool,
+        request: Request,
+        done: Result<(), String>,
+    ) -> Result<(), String> {
+        match done {
+            Err(e) if e.contains(PASSWORD_WRONG) && ask => {
+                self.ext_review.request(request);
+                self.status.clear();
+                Ok(())
+            }
+            Err(e) if e.contains(PASSWORD_WRONG) => {
+                self.status = PASSWORD_WRONG_MESSAGE.to_owned();
+                Err(PASSWORD_WRONG_MESSAGE.to_owned())
+            }
+            other => other,
+        }
     }
 
     /// Whether Protect Workbook (structure) is on.
@@ -167,18 +203,24 @@ impl SheetModel {
             .is_some_and(review_ops::workbook_structure_locked)
     }
 
+    /// Protect Workbook's OK; the dialog comes first, as for the sheet.
     pub fn review_protect_workbook(&mut self, password: Option<&str>) -> Result<(), String> {
+        if self.ext_review.request == Some(Request::ProtectWorkbook) {
+            return Ok(());
+        }
         self.review_cmd(ReviewOp::ProtectWorkbook {
-            password: password.map(str::to_owned),
+            password: password.map(Password::new),
         })
         .map(|_| ())
     }
 
     pub fn review_unprotect_workbook(&mut self, password: Option<&str>) -> Result<(), String> {
-        self.review_cmd(ReviewOp::UnprotectWorkbook {
-            password: password.map(str::to_owned),
-        })
-        .map(|_| ())
+        let done = self
+            .review_cmd(ReviewOp::UnprotectWorkbook {
+                password: password.map(Password::new),
+            })
+            .map(|_| ());
+        self.password_prompt(password.is_none(), Request::UnprotectWorkbook, done)
     }
 
     /// Whether a protected sheet refuses to edit the cell: protected and the cell is locked.
@@ -520,5 +562,42 @@ impl SheetModel {
             })
             .count();
         s
+    }
+
+    // ---- Format Cells dialog ---------------------------------------------------------------
+
+    /// Applies what the Format Cells dialog set beyond the Home tab's buttons (strikethrough,
+    /// shrink to fit, any text angle, per-edge border styles and colours) to the selection: the
+    /// format change first, then the borders.
+    ///
+    /// # Errors
+    /// The command layer's message.
+    pub fn format_selection(
+        &mut self,
+        change: CellFormatChange,
+        borders: Option<BorderChange>,
+    ) -> Result<(), String> {
+        let (first_row, first_col, last_row, last_col) = self.range();
+        let range = RangeRef {
+            first_row,
+            first_col,
+            last_row,
+            last_col,
+        };
+        if change != CellFormatChange::default() {
+            self.apply(Command::FormatCells {
+                sheet: self.sheet,
+                range,
+                change: Box::new(change),
+            })?;
+        }
+        if let Some(b) = borders {
+            self.apply(Command::SetBorders {
+                sheet: self.sheet,
+                range,
+                borders: Box::new(b),
+            })?;
+        }
+        Ok(())
     }
 }

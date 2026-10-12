@@ -447,3 +447,50 @@ fn parts_charts_and_pivots_go_through_the_command_log() {
     let back: Command = serde_json::from_str(&text).expect("parses");
     assert_eq!(back.name(), "sheet_objects");
 }
+
+#[test]
+fn a_header_and_footer_is_written_read_back_and_one_undo_step() {
+    use open365_commands::{HeaderFooterRequest, header_footer};
+    let mut t = fixture("formulas-basic");
+    let h = HeaderFooterRequest {
+        odd_header: "&LLeft & <co>&RPage &P".to_owned(),
+        odd_footer: "&C&A".to_owned(),
+        first_footer: "Cover".to_owned(),
+        different_first: true,
+        align_with_margins: false,
+        ..HeaderFooterRequest::default()
+    };
+    one_undo_step(&mut t, 0, ObjectsOp::SetHeaderFooter(h.clone()));
+    op(&mut t, 0, ObjectsOp::SetHeaderFooter(h.clone()));
+    let bytes = t.snapshot_bytes().expect("snapshot");
+    let again = Target::open_xlsx(&bytes).expect("reopens");
+    assert_eq!(header_footer(again.xlsx().expect("xlsx"), 0), h);
+    // Emptying it removes the element (Excel writes none for an empty header and footer).
+    op(
+        &mut t,
+        0,
+        ObjectsOp::SetHeaderFooter(HeaderFooterRequest::default()),
+    );
+    assert_eq!(
+        header_footer(t.xlsx().expect("xlsx"), 0),
+        HeaderFooterRequest::default()
+    );
+}
+
+#[test]
+fn passwords_are_redacted_in_debug_output() {
+    use open365_commands::ReviewOp;
+    use open365_commands::review_ops::Password;
+    let op = ReviewOp::UnprotectSheet {
+        password: Some(Password::new("hunter2")),
+    };
+    let text = format!(
+        "{op:?} {:?}",
+        Command::ReviewOp {
+            sheet: 0,
+            op: op.clone(),
+        }
+    );
+    assert!(!text.contains("hunter2"), "{text}");
+    assert!(text.contains("redacted"));
+}

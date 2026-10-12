@@ -74,6 +74,13 @@ pub(crate) fn evaluate(
         FieldKind::StyleRef => style_ref(ev, view, index, inst, lang),
         FieldKind::If => conditional(ev, view, inst, lang),
         FieldKind::MergeField => merge_field(ev, inst, lang),
+        FieldKind::AddressBlock
+        | FieldKind::GreetingLine
+        | FieldKind::MergeRec
+        | FieldKind::MergeSeq => crate::ext_mailings::evaluate(ev.ctx.merge, inst),
+        FieldKind::SkipIf | FieldKind::NextIf | FieldKind::Next => {
+            merge_control(ev, view, inst, lang)
+        }
         FieldKind::Hyperlink | FieldKind::Tc => Outcome::Keep,
         FieldKind::Toc => crate::fields_toc::plan(ev, view, index, inst),
         _ => Outcome::Skip(SkipReason::UnsupportedType),
@@ -548,7 +555,21 @@ fn operand(view: &View<'_>, arg: &crate::fields::Arg) -> (String, bool) {
 }
 
 fn conditional(ev: &Evaluator<'_>, view: &View<'_>, inst: &Instruction, lang: &str) -> Outcome {
-    let args = &inst.args;
+    // An empty left operand (a merge field without data) leaves no word: `IF  = "x" "a" "b"`.
+    let is_op = |a: &crate::fields::Arg| {
+        !a.quoted && matches!(a.text.as_str(), "=" | "<>" | "<" | ">" | "<=" | ">=")
+    };
+    let mut padded;
+    let args = if inst.args.len() >= 3 && is_op(&inst.args[0]) && !is_op(&inst.args[1]) {
+        padded = vec![crate::fields::Arg {
+            text: String::new(),
+            quoted: true,
+        }];
+        padded.extend(inst.args.iter().cloned());
+        &padded
+    } else {
+        &inst.args
+    };
     if args.len() < 3 {
         return plain("Error! Missing comparison.");
     }
@@ -604,6 +625,20 @@ fn conditional(ev: &Evaluator<'_>, view: &View<'_>, inst: &Instruction, lang: &s
 // ---------------------------------------------------------------------------
 // MERGEFIELD
 // ---------------------------------------------------------------------------
+
+/// `SKIPIF`, `NEXTIF` and `NEXT`: the comparison is an `IF` one; a hit tells the merge driver.
+fn merge_control(ev: &Evaluator<'_>, view: &View<'_>, inst: &Instruction, lang: &str) -> Outcome {
+    let hit = if inst.kind == FieldKind::Next {
+        true
+    } else {
+        let probe = Instruction::parse(&format!("IF {} \"1\" \"\"", inst.body));
+        matches!(conditional(ev, view, &probe, lang), Outcome::Text { text, .. } if text == "1")
+    };
+    if hit && let Some(m) = ev.ctx.merge {
+        m.signal(&inst.name);
+    }
+    plain("")
+}
 
 fn merge_field(ev: &Evaluator<'_>, inst: &Instruction, lang: &str) -> Outcome {
     let Some(name) = inst.first_arg() else {

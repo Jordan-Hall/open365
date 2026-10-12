@@ -210,3 +210,98 @@ fn name_manager_requests_the_dialog() {
     cancels(&mut p, "Name Manager");
     assert!(p.shell.sheet().name_rows().is_empty());
 }
+
+#[test]
+fn define_name_use_in_formula_and_create_from_selection() {
+    let mut p = rig();
+    {
+        let s = p.shell.sheet_mut();
+        for (r, c, v) in [
+            (1, 1, "Price"),
+            (2, 1, "10"),
+            (3, 1, "20"),
+            (1, 2, "Qty"),
+            (2, 2, "1"),
+            (3, 2, "2"),
+        ] {
+            s.enter(r, c, v).unwrap();
+        }
+        s.select_cell((2, 1));
+    }
+    run(&mut p, "formulas.defined-names.define-name=First");
+    let rows = p.shell.sheet().name_rows();
+    assert_eq!(rows.len(), 1);
+    assert_eq!(rows[0].name, "First");
+    assert!(rows[0].refers_to.ends_with("$A$2"), "{}", rows[0].refers_to);
+    p.shell.sheet_mut().undo();
+    assert!(p.shell.sheet().name_rows().is_empty(), "one undo step");
+
+    {
+        let s = p.shell.sheet_mut();
+        s.select_cell((1, 1));
+        s.extend_to((3, 2));
+    }
+    run(&mut p, "formulas.defined-names.create-from-selection=top");
+    let names: Vec<String> = p
+        .shell
+        .sheet()
+        .name_rows()
+        .into_iter()
+        .map(|r| r.name)
+        .collect();
+    assert_eq!(names, ["Price", "Qty"]);
+
+    p.shell.sheet_mut().select_cell((5, 1));
+    run(&mut p, "formulas.defined-names.use-in-formula.Price");
+    assert_eq!(p.shell.sheet().source(5, 1), "=Price");
+}
+
+#[test]
+fn calculation_options_and_calculate_commands_run() {
+    use open365_xlsx::CalcMode;
+    let mut p = rig();
+    assert_eq!(p.shell.sheet().calculation_mode(), CalcMode::Automatic);
+    run(&mut p, "formulas.calculation.calculation-options.manual");
+    assert_eq!(p.shell.sheet().calculation_mode(), CalcMode::Manual);
+    run(
+        &mut p,
+        "formulas.calculation.calculation-options.automatic-except-tables",
+    );
+    assert_eq!(
+        p.shell.sheet().calculation_mode(),
+        CalcMode::AutomaticExceptTables
+    );
+    p.shell.sheet_mut().undo();
+    assert_eq!(p.shell.sheet().calculation_mode(), CalcMode::Manual);
+    run(&mut p, "formulas.calculation.calculation-options.automatic");
+    assert_eq!(p.shell.sheet().calculation_mode(), CalcMode::Automatic);
+    p.shell.sheet_mut().enter(1, 1, "=1+2").unwrap();
+    run(&mut p, "formulas.calculation.calculate-now");
+    run(&mut p, "formulas.calculation.calculate-sheet");
+    assert_eq!(p.shell.sheet().display(1, 1), "3");
+}
+
+#[test]
+fn watch_window_lists_watched_cells_with_values() {
+    let mut p = rig();
+    p.shell.sheet_mut().enter(1, 1, "=2*4").unwrap();
+    p.shell.sheet_mut().select_cell((1, 1));
+    run(&mut p, "formulas.formula-auditing.watch-window.add");
+    assert!(p.shell.sheet().watch_visible());
+    let rows = p.shell.sheet().watch_rows();
+    assert_eq!(rows.len(), 1);
+    assert_eq!(
+        (
+            rows[0].cell.as_str(),
+            rows[0].value.as_str(),
+            rows[0].formula.as_str()
+        ),
+        ("A1", "8", "=2*4")
+    );
+    p.shell.sheet_mut().enter(1, 1, "=3*4").unwrap();
+    assert_eq!(p.shell.sheet().watch_rows()[0].value, "12");
+    run(&mut p, "formulas.formula-auditing.watch-window.delete=0");
+    assert!(p.shell.sheet().watch_rows().is_empty());
+    run(&mut p, "formulas.formula-auditing.watch-window");
+    assert!(!p.shell.sheet().watch_visible(), "bare toggles the window");
+}

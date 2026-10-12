@@ -24,7 +24,5 @@ end to end: `tools/office/grid-autofit-oracle.ps1` -> `fixtures/reference/xlsx/g
   near a step. The cause is unknown.
 - The fit scaling is only measured with Normal = Calibri 11 at 120 dpi (mdw 9); other digit widths
   are left unscaled until measured at other display scales.
-- Excel's 255-character cap counts the padding (2302 px for 9 px digits). Stored widths here stop at 255
-  characters plus the cell padding (`Workbook::max_column_width`, using the widest padding ratio of the
-  96, 120, 144 and 192 dpi scales), so a width that Excel accepts is accepted and one past it is refused.
+- Excel's 255-character cap counts the padding (2302 px); stored widths here stop at 255.
 - Wrapped text containing a line break is 5 px narrower than Excel.

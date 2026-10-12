@@ -3,7 +3,10 @@
 
 use std::path::Path;
 
-use open365_commands::{Command, HfAlign, HfKind, LinkTarget, WriterInsertOp, to_hex};
+use open365_commands::{
+    Command, CoverDesign, HfAlign, HfKind, InsertMoreOp, LinkTarget, WriterInsertOp, XRefKind,
+    to_hex,
+};
 use open365_docx::{CivilDateTime, DocPos, LocaleNames, format_date_picture};
 
 use super::WriterPane;
@@ -344,9 +347,243 @@ impl WriterPane {
         self.insert_text(&text);
     }
 
+    // ---- cover page, fields, cross-references, text boxes, quick tables, text from file -----
+
+    fn clock() -> (i32, u8, u8, u8, u8, u8) {
+        let n = now_utc();
+        (n.year, n.month, n.day, n.hour, n.minute, n.second)
+    }
+
+    fn para_len(&self, para: usize) -> usize {
+        self.target
+            .docx()
+            .and_then(|d| d.paragraph(para).map(|p| p.char_len()))
+            .unwrap_or(0)
+    }
+
+    /// Cover Page: a design (`classic`, `banner`, `stripe`) before the first paragraph.
+    pub fn insert_cover_page(&mut self, design: &str) -> bool {
+        if self.models.is_empty() {
+            return false;
+        }
+        let name = if design.is_empty() { "classic" } else { design };
+        let Some(design) = CoverDesign::parse(name) else {
+            self.status = Some(format!("{name} is not a cover page design"));
+            return false;
+        };
+        let (before, caret) = (self.models.len(), self.caret);
+        let ok = self.insert_op(WriterInsertOp::More {
+            more: InsertMoreOp::CoverPage { design },
+        });
+        if ok {
+            let added = self.models.len().saturating_sub(before);
+            self.set_caret(DocPos::new(caret.para + added, caret.offset));
+            self.reveal_caret();
+        }
+        ok
+    }
+
+    /// Field dialog: a field with the code `instruction` (`PAGE`, `DATE \@ "dd/MM/yyyy"`) at
+    /// the caret, already evaluated.
+    pub fn insert_field(&mut self, instruction: &str) -> bool {
+        self.field_op(|at, pages, now| InsertMoreOp::Field {
+            at,
+            instruction: instruction.to_owned(),
+            pages,
+            now,
+        })
+    }
+
+    fn field_op(
+        &mut self,
+        make: impl FnOnce(DocPos, Vec<u32>, (i32, u8, u8, u8, u8, u8)) -> InsertMoreOp,
+    ) -> bool {
+        if self.models.is_empty() {
+            return false;
+        }
+        self.delete_selection();
+        let pos = self.caret;
+        let len = self.para_len(pos.para);
+        let op = make(pos, self.paragraph_pages(), Self::clock());
+        let ok = self.insert_op(WriterInsertOp::More { more: op });
+        if ok {
+            let grown = self.para_len(pos.para).saturating_sub(len);
+            self.set_caret(DocPos::new(pos.para, pos.offset + grown));
+            self.reveal_caret();
+        } else if self.status.is_none() {
+            self.status = Some("The field could not be inserted".to_owned());
+        }
+        ok
+    }
+
+    /// Cross-reference: `[kind:]target`, kind `text` (default), `page`, `number` or `above`;
+    /// target a bookmark name or the text of a heading.
+    pub fn insert_cross_reference(&mut self, spec: &str) -> bool {
+        let (kind, target) = match spec.split_once(':') {
+            Some(("text", t)) => (XRefKind::Text, t),
+            Some(("page", t)) => (XRefKind::Page, t),
+            Some(("number", t)) => (XRefKind::Number, t),
+            Some(("above" | "below" | "position", t)) => (XRefKind::Position, t),
+            _ => (XRefKind::Text, spec),
+        };
+        if target.trim().is_empty() {
+            self.status = Some("Cross-reference: type a bookmark or heading after the control id, for example insert.links.cross-reference=page:Intro".to_owned());
+            return false;
+        }
+        let target = target.trim().to_owned();
+        self.field_op(|at, pages, now| InsertMoreOp::CrossReference {
+            at,
+            target,
+            kind,
+            pages,
+            now,
+        })
+    }
+
+    /// Text Box: `simple` has sample text; otherwise an empty box. A selection moves into the
+    /// box.
+    pub fn insert_text_box(&mut self, simple: bool) -> bool {
+        if self.models.is_empty() {
+            return false;
+        }
+        let mut text = self.selected_text();
+        if text.is_empty() && simple {
+            text = "[Type a quote from the document or the summary of an interesting point.]"
+                .to_owned();
+        }
+        self.delete_selection();
+        let at = self.caret;
+        let width_pt = self
+            .target
+            .docx()
+            .map_or(468.0, |d| d.text_width_pt(at.para))
+            .min(180.0);
+        self.insert_op(WriterInsertOp::More {
+            more: InsertMoreOp::TextBox {
+                at,
+                text,
+                width_pt,
+                height_pt: if simple { 90.0 } else { 72.0 },
+            },
+        })
+    }
+
+    /// Quick Tables: `list`, `matrix` or `schedule`, tables with sample content.
+    pub fn insert_quick_table(&mut self, name: &str) -> bool {
+        if self.models.is_empty() {
+            return false;
+        }
+        let rows: &[&[&str]] = match name {
+            "list" => &[
+                &["Item", "Description", "Amount"],
+                &["Item 1", "Description", "0"],
+                &["Item 2", "Description", "0"],
+                &["Item 3", "Description", "0"],
+            ],
+            "matrix" => &[
+                &["", "Column 1", "Column 2", "Column 3"],
+                &["Row 1", "", "", ""],
+                &["Row 2", "", "", ""],
+                &["Row 3", "", "", ""],
+            ],
+            "schedule" => &[
+                &["Time", "Event", "Notes"],
+                &["09:00", "", ""],
+                &["10:00", "", ""],
+                &["11:00", "", ""],
+                &["12:00", "", ""],
+            ],
+            _ => {
+                self.status = Some(format!("{name} is not a quick table"));
+                return false;
+            }
+        };
+        self.delete_selection();
+        let pos = self.caret;
+        let Some(text_width_pt) = self.target.docx().map(|d| d.text_width_pt(pos.para)) else {
+            return false;
+        };
+        let cells = rows
+            .iter()
+            .map(|r| r.iter().map(|c| (*c).to_owned()).collect())
+            .collect();
+        let ok = self.insert_op(WriterInsertOp::More {
+            more: InsertMoreOp::QuickTable {
+                pos,
+                cells,
+                text_width_pt,
+            },
+        });
+        if ok {
+            let first = if pos.offset > 0 {
+                pos.para + 1
+            } else {
+                pos.para
+            };
+            self.set_caret(DocPos::new(first, 0));
+            self.reveal_caret();
+        }
+        ok
+    }
+
+    /// Object > Text from File: the text of a plain text or document file at the caret.
+    pub fn insert_text_from_file(&mut self, path: &Path) -> bool {
+        const MAX: u64 = 16 * 1024 * 1024;
+        if self.models.is_empty() {
+            return false;
+        }
+        if std::fs::metadata(path).is_ok_and(|m| m.len() > MAX) {
+            self.status = Some("The file is too large".to_owned());
+            return false;
+        }
+        let bytes = match std::fs::read(path) {
+            Ok(b) => b,
+            Err(e) => {
+                self.status = Some(format!("Cannot read {}: {e}", path.display()));
+                return false;
+            }
+        };
+        let is_docx = path
+            .extension()
+            .and_then(|e| e.to_str())
+            .is_some_and(|e| e.eq_ignore_ascii_case("docx"));
+        let text = if is_docx {
+            match open365_docx::Document::open(&bytes, &open365_opc::Limits::default()) {
+                Ok(d) => (0..d.paragraph_count())
+                    .filter_map(|i| d.paragraph(i).map(|p| p.text()))
+                    .collect::<Vec<_>>()
+                    .join("\n"),
+                Err(e) => {
+                    self.status = Some(format!("Cannot open {}: {e}", path.display()));
+                    return false;
+                }
+            }
+        } else {
+            String::from_utf8_lossy(&bytes).into_owned()
+        };
+        self.paste_text(&text);
+        true
+    }
+
+    /// Asks for a text or document file (the `rfd` dialog; never in a test binary).
+    #[must_use]
+    pub fn choose_text_file_path() -> Option<std::path::PathBuf> {
+        let in_test_binary = std::env::current_exe()
+            .ok()
+            .and_then(|e| e.parent().and_then(|d| d.file_name()).map(|n| n == "deps"))
+            .unwrap_or(false);
+        if in_test_binary {
+            return None;
+        }
+        rfd::FileDialog::new()
+            .add_filter("Text and documents", &["txt", "md", "docx"])
+            .set_title("Insert File")
+            .pick_file()
+    }
+
     /// Symbol: inserts the character (or `U+XXXX`).
     pub fn insert_symbol(&mut self, symbol: &str) -> bool {
-        let s = symbol.trim();
+        let s = symbol.trim_matches(|c: char| c.is_ascii_whitespace());
         let ch = match s.strip_prefix("U+").or_else(|| s.strip_prefix("u+")) {
             Some(hex) => u32::from_str_radix(hex, 16).ok().and_then(char::from_u32),
             None => {
