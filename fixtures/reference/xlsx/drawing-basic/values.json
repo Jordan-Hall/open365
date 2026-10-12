@@ -1,0 +1,88 @@
+{
+  "source": "fixtures/xlsx/drawing-basic.xlsx",
+  "sheets": [
+    {
+      "name": "Basic",
+      "visible": -1,
+      "usedRange": "A1:C6",
+      "truncatedAt2000": false,
+      "cells": {
+        "A1": {
+          "value2": "Item",
+          "text": "Item",
+          "formula": null
+        },
+        "B1": {
+          "value2": "A",
+          "text": "A",
+          "formula": null
+        },
+        "C1": {
+          "value2": "B",
+          "text": "B",
+          "formula": null
+        },
+        "A2": {
+          "value2": "r1",
+          "text": "r1",
+          "formula": null
+        },
+        "B2": {
+          "value2": 12.0,
+          "text": "12",
+          "formula": null
+        },
+        "C2": {
+          "value2": 8.0,
+          "text": "8",
+          "formula": null
+        },
+        "A3": {
+          "value2": "r2",
+          "text": "r2",
+          "formula": null
+        },
+        "B3": {
+          "value2": 19.0,
+          "text": "19",
+          "formula": null
+        },
+        "C3": {
+          "value2": 14.0,
+          "text": "14",
+          "formula": null
+        },
+        "A4": {
+          "value2": "r3",
+          "text": "r3",
+          "formula": null
+        },
+        "B4": {
+          "value2": 7.0,
+          "text": "7",
+          "formula": null
+        },
+        "C4": {
+          "value2": 11.0,
+          "text": "11",
+          "formula": null
+        },
+        "A5": {
+          "value2": "r4",
+          "text": "r4",
+          "formula": null
+        },
+        "B5": {
+          "value2": 15.0,
+          "text": "15",
+          "formula": null
+        },
+        "C5": {
+          "value2": 9.0,
+          "text": "9",
+          "formula": null
+        }
+      }
+    }
+  ]
+}

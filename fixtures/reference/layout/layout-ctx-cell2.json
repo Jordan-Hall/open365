@@ -1,0 +1,36 @@
+{
+  "source": "fixtures/docx/layout-ctx-cell2.docx",
+  "oracle": "Microsoft Word 16.0 (16.0.20430), Print Layout, tools/office/word-layout-oracle.ps1",
+  "units": "points; page and top/left/baseline measured from the page top-left corner; start/end are UTF-16 offsets in the main story",
+  "precision": "top/left/lastX are screen-quantised (+-0.3 pt); baseline/inkLeft and cell rectangles come from the 600 dpi PDF and are exact",
+  "pageCount": 1,
+  "cells": [
+    {"page": 1, "x": 72.024, "y": 85.466, "w": 240.1, "h": 38.904},
+    {"page": 1, "x": 72.024, "y": 137.81, "w": 240.1, "h": 38.88},
+    {"page": 1, "x": 72.024, "y": 190.126, "w": 240.1, "h": 30.744},
+    {"page": 1, "x": 72.024, "y": 234.31, "w": 240.1, "h": 25.44},
+    {"page": 1, "x": 72.024, "y": 273.196, "w": 240.1, "h": 50.904},
+    {"page": 1, "x": 72.024, "y": 337.536, "w": 240.1, "h": 52.344}
+  ],
+  "lines": [
+    {"page": 1, "start": 0, "end": 9, "top": 72.0, "left": 72.0, "lastX": 104.4, "baseline": 82.58, "inkLeft": 72.024, "text": "i0 plain\u000d"},
+    {"page": 1, "start": 9, "end": 15, "top": 96.02, "left": 77.304, "lastX": null, "baseline": 96.02, "inkLeft": 77.304, "text": "i1 ctx", "cell": true},
+    {"page": 1, "start": 16, "end": 16, "top": 109.46, "left": 77.304, "lastX": null, "baseline": 109.46, "inkLeft": 77.304, "text": "", "cell": true},
+    {"page": 1, "start": 18, "end": 27, "top": 124.2, "left": 72.0, "lastX": 104.4, "baseline": 134.93, "inkLeft": 72.024, "text": "i2 plain\u000d"},
+    {"page": 1, "start": 27, "end": 33, "top": 148.37, "left": 77.304, "lastX": null, "baseline": 148.37, "inkLeft": 77.304, "text": "j1 ctx", "cell": true},
+    {"page": 1, "start": 34, "end": 56, "top": 161.81, "left": 77.304, "lastX": null, "baseline": 161.81, "inkLeft": 77.304, "text": "j2 ctx direct after 12", "cell": true},
+    {"page": 1, "start": 58, "end": 67, "top": 176.4, "left": 72.0, "lastX": 104.4, "baseline": 187.25, "inkLeft": 72.024, "text": "j3 plain\u000d"},
+    {"page": 1, "start": 67, "end": 73, "top": 200.71, "left": 77.304, "lastX": null, "baseline": 200.71, "inkLeft": 77.304, "text": "k1 ctx", "cell": true},
+    {"page": 1, "start": 74, "end": 74, "top": 214.15, "left": 77.304, "lastX": null, "baseline": 214.15, "inkLeft": 77.304, "text": "", "cell": true},
+    {"page": 1, "start": 76, "end": 85, "top": 220.8, "left": 72.0, "lastX": 106.8, "baseline": 231.43, "inkLeft": 72.024, "text": "k2 plain\u000d"},
+    {"page": 1, "start": 85, "end": 100, "top": 244.87, "left": 77.304, "lastX": null, "baseline": 244.87, "inkLeft": 77.304, "text": "l1 plain direct", "cell": true},
+    {"page": 1, "start": 102, "end": 111, "top": 259.8, "left": 72.0, "lastX": 104.4, "baseline": 270.31, "inkLeft": 72.024, "text": "l2 plain\u000d"},
+    {"page": 1, "start": 111, "end": 117, "top": 283.78, "left": 77.304, "lastX": null, "baseline": 283.78, "inkLeft": 77.304, "text": "m1 ctx", "cell": true},
+    {"page": 1, "start": 118, "end": 118, "top": 309.22, "left": 77.304, "lastX": null, "baseline": 309.22, "inkLeft": 77.304, "text": "", "cell": true},
+    {"page": 1, "start": 120, "end": 129, "top": 324.0, "left": 72.0, "lastX": 111.0, "baseline": 334.66, "inkLeft": 72.024, "text": "m2 plain\u000d"},
+    {"page": 1, "start": 129, "end": 135, "top": 348.1, "left": 77.304, "lastX": null, "baseline": 348.1, "inkLeft": 77.304, "text": "n1 ctx", "cell": true},
+    {"page": 1, "start": 136, "end": 142, "top": 361.56, "left": 77.304, "lastX": null, "baseline": 361.56, "inkLeft": 77.304, "text": "n2 ctx", "cell": true},
+    {"page": 1, "start": 143, "end": 143, "top": 375.0, "left": 77.304, "lastX": null, "baseline": 375.0, "inkLeft": 77.304, "text": "", "cell": true},
+    {"page": 1, "start": 145, "end": 154, "top": 389.4, "left": 72.0, "lastX": 108.0, "baseline": 400.44, "inkLeft": 72.024, "text": "n3 plain\u000d"}
+  ]
+}

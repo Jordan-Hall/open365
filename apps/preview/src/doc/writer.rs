@@ -17,7 +17,7 @@ use std::time::{Duration, Instant};
 
 use accesskit::{Action, Node as AkNode, NodeId as AkId, Role, TextPosition, TextSelection};
 use open365_commands::{Command, Outcome, Target};
-use open365_docx::{DocPos, Inline, RunContent, RunPropsPatch, VertAlign};
+use open365_docx::{DocPos, RunPropsPatch, VertAlign};
 use open365_gfx::{Color, DrawList, FontId, GlyphPos, GlyphRun, Rect as GRect};
 use open365_layout::{ClusterKind, IncrementalLayout, LayoutOptions, Line, ParaRole};
 use open365_text::{FaceId, FontLibrary, FontStyle, ShapeFeatures, shape_run};
@@ -27,8 +27,17 @@ use open365_ui_core::{
 };
 
 mod cells;
+mod ext_design;
+mod ext_file;
+mod ext_home;
+mod ext_insert;
+mod ext_layout;
+mod ext_references;
+mod ext_review;
+mod ext_view;
 mod findbar;
 mod pictures;
+mod replacebar;
 mod rulerbar;
 
 use super::docmodel::{ParaModel, build_models};
@@ -63,49 +72,6 @@ pub enum Toggle {
     Sub,
     /// Superscript (Ctrl+Shift+=).
     Sup,
-}
-
-/// Walks a paragraph's runs in character order, reading the vertical alignment of those that
-/// overlap `range` (the offsets count characters, as the models do).
-struct VertWalk {
-    at: usize,
-    range: (usize, usize),
-    found: Option<VertAlign>,
-    mixed: bool,
-}
-
-impl VertWalk {
-    fn run(&mut self, content: &[Inline]) {
-        for inline in content {
-            match inline {
-                Inline::Run(run) => {
-                    let len: usize = run
-                        .content
-                        .iter()
-                        .map(|c| match c {
-                            RunContent::Text { text, .. } => text.chars().count(),
-                            RunContent::Tab | RunContent::Break(_) => 1,
-                            RunContent::Raw(_) => 0,
-                        })
-                        .sum();
-                    let (s, e) = (self.at, self.at + len);
-                    self.at = e;
-                    if len > 0 && s < self.range.1 && e > self.range.0 {
-                        let v = run
-                            .props
-                            .vert_align()
-                            .map_or(VertAlign::Baseline, VertAlign::parse);
-                        match self.found {
-                            Some(f) if f != v => self.mixed = true,
-                            _ => self.found = Some(v),
-                        }
-                    }
-                }
-                Inline::Group(g) => self.run(&g.content),
-                Inline::Raw(_) => {}
-            }
-        }
-    }
 }
 
 impl Toggle {
@@ -374,6 +340,8 @@ pub struct PaintStats {
     pub raised_runs: usize,
     /// Markers and tab stops on the ruler.
     pub ruler_items: usize,
+    /// Margin edges and table rows on the vertical ruler.
+    pub vruler_items: usize,
     /// Highlighted find matches.
     pub find_marks: usize,
 }
@@ -433,6 +401,7 @@ pub struct WriterPane {
     pictures: pictures::Cache,
     ruler: rulerbar::RulerState,
     find: findbar::FindState,
+    replace: replacebar::ReplaceState,
     stats: PaintStats,
     /// Horizontal scroll in device pixels (a page wider than the pane).
     scroll_x: f32,
@@ -487,6 +456,7 @@ impl WriterPane {
             pictures: pictures::Cache::default(),
             ruler: rulerbar::RulerState::default(),
             find: findbar::FindState::default(),
+            replace: replacebar::ReplaceState::default(),
             stats: PaintStats::default(),
             scroll_x: 0.0,
             zoom_changed: false,
@@ -742,7 +712,8 @@ impl WriterPane {
             .map(|p| p.section.page_width)
             .fold(0.0f64, f64::max) as f32
             * self.s();
-        let over = (widest + 2.0 * SIDE_PAD * self.scale - self.area.w as f32).max(0.0);
+        let over = (widest + 2.0 * SIDE_PAD * self.scale + self.left_inset() - self.area.w as f32)
+            .max(0.0);
         self.scroll_x = self.scroll_x.clamp(0.0, over);
     }
 
@@ -851,7 +822,9 @@ impl WriterPane {
             .get(page)
             .map_or(612.0, |p| p.section.page_width) as f32
             * self.s();
-        ((self.area.w as f32 - width) / 2.0).max(SIDE_PAD * self.scale) - self.scroll_x
+        let left = self.left_inset();
+        ((self.area.w as f32 - left - width) / 2.0).max(SIDE_PAD * self.scale) + left
+            - self.scroll_x
     }
 
     /// Top of `page` in canvas-local device pixels.
@@ -1569,34 +1542,21 @@ impl WriterPane {
         });
     }
 
-    /// The vertical alignment shared by every character of `start..end` in paragraph `para`,
-    /// `None` when mixed. An empty range reads the character before `start`, as the caret does.
-    fn vert_of(&self, para: usize, start: usize, end: usize) -> Option<VertAlign> {
-        let doc = self.target.docx()?;
-        let p = *doc.body().paragraphs().get(para)?;
-        let range = if start < end {
-            (start, end)
-        } else {
-            (start.saturating_sub(1), start.max(1))
-        };
-        let mut walk = VertWalk {
-            at: 0,
-            range,
-            found: None,
-            mixed: false,
-        };
-        walk.run(&p.content);
-        if walk.mixed { None } else { walk.found }
+    /// The vertical alignment at the caret, effective through the style chain: the text typed next
+    /// if a toggle is pending, else the character before the caret.
+    fn caret_vert(&self) -> Option<VertAlign> {
+        let c = self.caret;
+        self.pending.vert_align.or_else(|| {
+            self.models
+                .get(c.para)
+                .map(|m| m.style_at(c.offset).vert_align)
+        })
     }
 
     /// Ctrl+= and Ctrl+Shift+=: sets `v`, or goes back to baseline when the text already has it.
     fn toggle_vert(&mut self, v: VertAlign) {
         if !self.has_selection() {
-            let c = self.caret;
-            let cur = self
-                .pending
-                .vert_align
-                .or_else(|| self.vert_of(c.para, c.offset, c.offset));
+            let cur = self.caret_vert();
             self.pending.vert_align = Some(if cur == Some(v) {
                 VertAlign::Baseline
             } else {
@@ -1609,7 +1569,7 @@ impl WriterPane {
             let len = self.models[p].char_len;
             let start = if p == a.para { a.offset } else { 0 };
             let end = if p == b.para { b.offset } else { len };
-            start >= end || self.vert_of(p, start, end) == Some(v)
+            start >= end || self.models[p].all(start, end, |s| s.vert_align == v)
         });
         self.run(Command::DocxSetRunProps {
             start: a,
@@ -1621,12 +1581,7 @@ impl WriterPane {
     /// Whether the character formatting at the caret has the toggle on (for button states).
     pub fn toggle_state(&self, which: Toggle) -> bool {
         if let Some(v) = which.vert() {
-            let c = self.caret;
-            let cur = self
-                .pending
-                .vert_align
-                .or_else(|| self.vert_of(c.para, c.offset, c.offset));
-            return cur == Some(v);
+            return self.caret_vert() == Some(v);
         }
         let Some(m) = self.models.get(self.caret.para) else {
             return false;
@@ -1979,6 +1934,10 @@ impl WriterPane {
                 clicks,
                 shift,
             } if mine(node) => {
+                if self.replace_press(at.x * self.scale, at.y * self.scale) {
+                    self.update_node(ui);
+                    return true;
+                }
                 if self.ruler_press(at.x * self.scale, at.y * self.scale) {
                     self.update_node(ui);
                     return true;
@@ -2086,6 +2045,7 @@ impl WriterPane {
             Key::Char(c) if m.ctrl && !m.alt => match c.to_ascii_uppercase() {
                 'A' => self.select_all(),
                 'F' => self.find_open(),
+                'H' => self.replace_open(),
                 'B' => self.toggle(Toggle::Bold),
                 'I' => self.toggle(Toggle::Italic),
                 'U' => self.toggle(Toggle::Underline),
@@ -2163,7 +2123,12 @@ impl WriterPane {
         list.fill_rect(GRect::from_edges(ox, oy, ox + w, oy + h), pal.canvas);
         // The pages scroll under the ruler band, not through it.
         let view = (oy + self.top_inset(), oy + h);
-        list.push_clip(GRect::from_edges(ox, view.0, ox + w, view.1));
+        list.push_clip(GRect::from_edges(
+            ox + self.left_inset(),
+            view.0,
+            ox + w,
+            view.1,
+        ));
         let pages = self.engine.layout().pages.len();
         let sel = self.selection();
         for page in 0..pages {
@@ -2298,6 +2263,8 @@ impl WriterPane {
             );
         }
         self.paint_ruler(ui, list, pal);
+        self.paint_vruler(ui, list, pal);
+        self.paint_replace_box(ui, list, pal);
         self.paint_find_box(ui, list, pal);
         if let Some((top, th)) = self.thumb() {
             let bw = self.bar_w();
@@ -2645,6 +2612,7 @@ impl WriterPane {
             nodes.push((Self::para_id(para), p));
             children.push(Self::para_id(para));
         }
+        children.extend(self.access_shapes(&mut nodes));
         let mut doc = AkNode::new(Role::MultilineTextInput);
         doc.set_label(format!("Document, {} paragraphs", self.models.len()));
         doc.set_children(children);
@@ -2659,6 +2627,168 @@ impl WriterPane {
         }
         let _ = ak_id(canvas);
         Some(CanvasAccess { node: doc, nodes })
+    }
+
+    /// Nodes for the pictures, shapes and text boxes in view: an image (or text box) with its
+    /// alternative text (`wp:docPr/@descr`) as the name, as Word exposes them. A picture without
+    /// alternative text is named "Picture". Returns the ids, in page order, for the document node.
+    pub fn access_shapes(&self, nodes: &mut Vec<(AkId, AkNode)>) -> Vec<AkId> {
+        let s = self.s();
+        let (ox, oy) = (self.area.x as f32, self.area.y as f32);
+        let mut ids = Vec::new();
+        let rect = |page: usize, x: f64, y: f64, w: f64, h: f64| accesskit::Rect {
+            x0: f64::from(ox + self.page_x(page)) + x * f64::from(s),
+            y0: f64::from(oy + self.page_y(page)) + y * f64::from(s),
+            x1: f64::from(ox + self.page_x(page)) + (x + w) * f64::from(s),
+            y1: f64::from(oy + self.page_y(page)) + (y + h) * f64::from(s),
+        };
+        let (top, bottom) = (
+            f64::from(oy + self.top_inset()),
+            f64::from(oy) + f64::from(self.area.h),
+        );
+        for (pi, page) in self.engine.layout().pages.iter().enumerate() {
+            let groups = [
+                &page.images,
+                &page.header_images,
+                &page.note_images,
+                &page.footer_images,
+            ];
+            for (gi, group) in groups.into_iter().enumerate() {
+                for (ii, im) in group.iter().enumerate() {
+                    let r = rect(pi, im.x, im.y, im.width, im.height);
+                    if r.y1 < top || r.y0 > bottom {
+                        continue;
+                    }
+                    let mut node = AkNode::new(Role::Image);
+                    let alt = im
+                        .description
+                        .as_deref()
+                        .map(str::trim)
+                        .filter(|d| !d.is_empty());
+                    node.set_label(alt.unwrap_or("Picture"));
+                    if let Some(alt) = alt {
+                        node.set_description(alt);
+                    }
+                    node.set_bounds(r);
+                    let id = AkId(
+                        (1u64 << 58)
+                            | ((pi as u64) << 24)
+                            | ((gi as u64) << 20)
+                            | ii as u64 & 0xF_FFFF,
+                    );
+                    nodes.push((id, node));
+                    ids.push(id);
+                }
+            }
+            for (fi, f) in page.frames.iter().enumerate() {
+                let r = rect(pi, f.x, f.y, f.width, f.height);
+                if r.y1 < top || r.y0 > bottom {
+                    continue;
+                }
+                let mut node = AkNode::new(Role::GenericContainer);
+                node.set_label("Text Box");
+                node.set_bounds(r);
+                // The text inside the box: one text run per line, in reading order.
+                let mut kids = Vec::new();
+                let (mut para, mut consumed) = (None, 0usize);
+                for (li, line) in f.lines.iter().enumerate() {
+                    if para != Some(line.paragraph) {
+                        para = Some(line.paragraph);
+                        consumed = 0;
+                    }
+                    let (chars, xs) = Self::box_line_chars(line, consumed);
+                    consumed += chars.len();
+                    let (x0, x1) = (xs[0], xs[chars.len()]);
+                    let mut run = AkNode::new(Role::TextRun);
+                    let mut value: String = chars
+                        .iter()
+                        .map(|c| if matches!(c, '\r' | '\n') { '\n' } else { *c })
+                        .collect();
+                    if value.is_empty() {
+                        value.push('\n');
+                    }
+                    let lengths: Vec<u8> = value.chars().map(|c| c.len_utf8() as u8).collect();
+                    let n = lengths.len();
+                    run.set_value(value);
+                    run.set_bounds(rect(pi, x0, line.top, x1 - x0, line.height));
+                    run.set_character_lengths(lengths);
+                    run.set_character_positions(
+                        (0..n)
+                            .map(|i| (xs.get(i).copied().unwrap_or(x1) - x0) as f32 * s)
+                            .collect::<Vec<_>>(),
+                    );
+                    run.set_character_widths(
+                        (0..n)
+                            .map(|i| {
+                                (xs.get(i + 1).copied().unwrap_or(x1)
+                                    - xs.get(i).copied().unwrap_or(x1))
+                                    as f32
+                                    * s
+                            })
+                            .collect::<Vec<_>>(),
+                    );
+                    let rid = AkId(
+                        (1u64 << 56)
+                            | ((pi as u64 & 0xFFF) << 44)
+                            | ((fi as u64 & 0xFFF) << 32)
+                            | li as u64 & 0xFFFF_FFFF,
+                    );
+                    kids.push(rid);
+                    nodes.push((rid, run));
+                }
+                node.set_children(kids);
+                let id = AkId((1u64 << 57) | ((pi as u64) << 24) | fi as u64 & 0xFF_FFFF);
+                nodes.push((id, node));
+                ids.push(id);
+            }
+        }
+        ids
+    }
+
+    /// The characters of a text-box line (those after the first `skip` of its paragraph) and
+    /// the x of each character's left edge plus the line's end, in page points.
+    fn box_line_chars(line: &Line, skip: usize) -> (Vec<char>, Vec<f64>) {
+        let units = line.end.saturating_sub(line.start);
+        let (mut chars, mut u) = (Vec::new(), 0usize);
+        for c in line.text.chars().skip(skip) {
+            if u >= units {
+                break;
+            }
+            u += c.len_utf16();
+            chars.push(c);
+        }
+        let mut spans: Vec<(usize, usize, f64, f64)> = Vec::new();
+        for g in line.runs.iter().flat_map(|r| &r.glyphs) {
+            let r = line.cluster_story(g);
+            if g.cluster.kind != ClusterKind::Text || r.is_empty() {
+                continue;
+            }
+            match spans.last_mut() {
+                Some(last) if last.0 == r.start && last.1 == r.end => {
+                    last.3 = last.3.max(g.x + g.advance)
+                }
+                _ => spans.push((r.start, r.end, g.x, g.x + g.advance)),
+            }
+        }
+        let mut xs = Vec::with_capacity(chars.len() + 1);
+        let (mut pen, mut at, mut si) = (line.left, line.start, 0usize);
+        for c in &chars {
+            while si < spans.len() && spans[si].1 <= at {
+                si += 1;
+            }
+            let n = c.len_utf16();
+            match spans.get(si) {
+                Some(&(start, end, x0, x1)) if start <= at => {
+                    let w = (end - start) as f64;
+                    xs.push(x0 + (x1 - x0) * (at - start) as f64 / w);
+                    pen = x0 + (x1 - x0) * ((at + n).min(end) - start) as f64 / w;
+                }
+                _ => xs.push(pen),
+            }
+            at += n;
+        }
+        xs.push(pen);
+        (chars, xs)
     }
 
     /// A screen reader's `SetTextSelection` or `ReplaceSelectedText` request.

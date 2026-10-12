@@ -43,6 +43,7 @@ pub struct Modifiers {
 pub enum PointerButton {
     Primary,
     Secondary,
+    Middle,
 }
 
 /// IME composition events (`Preedit` carries the cursor as byte offsets into the text).
@@ -110,15 +111,29 @@ pub enum Emit {
         clicks: u8,
         shift: bool,
     },
+    /// A secondary or middle press on a canvas (`at` relative to the canvas origin). The primary
+    /// button reports [`Emit::CanvasPointer`] instead, so existing canvases keep working.
+    CanvasButton {
+        node: NodeId,
+        at: Point,
+        button: PointerButton,
+        clicks: u8,
+        modifiers: Modifiers,
+    },
     /// The pointer moved while a canvas holds the primary press (`at` relative to the canvas).
     CanvasDrag {
         node: NodeId,
         at: Point,
+        button: PointerButton,
+        modifiers: Modifiers,
     },
-    /// The primary button was released after a press on a canvas.
+    /// The primary button was released after a press on a canvas; `modifiers` are those held at
+    /// the release (Ctrl+drag of the fill handle).
     CanvasRelease {
         node: NodeId,
         at: Point,
+        button: PointerButton,
+        modifiers: Modifiers,
     },
     /// The wheel turned over a canvas (`delta_y` in notches, positive up).
     CanvasWheel {

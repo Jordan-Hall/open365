@@ -13,11 +13,19 @@
 //! `Widget::TextField`.
 
 use open365_ui_core::geom::Point;
-use open365_ui_core::{ImeInput, Key, Modifiers};
+use open365_ui_core::{ImeInput, Key, Modifiers, PointerButton};
 
 use super::*;
 use crate::sheet::{self, Geo, Gesture, Paste, SheetModel, Zone};
 use open365_ui_core::ScrollState;
+
+// The context menus and the dialogs are part of the grid; their files sit beside this one.
+#[path = "dialogs/mod.rs"]
+pub(super) mod dialogs;
+#[path = "grid_chrome.rs"]
+mod grid_chrome;
+#[path = "menus_ctx.rs"]
+mod menus_ctx;
 
 /// The in-cell editor while a cell is being edited.
 #[derive(Debug, Clone)]
@@ -35,8 +43,9 @@ const H_BAR: &str = "Horizontal scroll bar";
 /// Scroll bar thickness in logical pixels.
 const SCROLL_BAR_W: f32 = 14.0;
 
-const COMMIT_KEYS: [Key; 3] = [Key::Tab, Key::Enter, Key::Escape];
-const ENTER_MODE_KEYS: [Key; 7] = [
+const COMMIT_KEYS: [Key; 4] = [Key::Tab, Key::Enter, Key::Escape, Key::F2];
+const ENTER_MODE_KEYS: [Key; 8] = [
+    Key::F2,
     Key::Tab,
     Key::Enter,
     Key::Escape,
@@ -45,10 +54,6 @@ const ENTER_MODE_KEYS: [Key; 7] = [
     Key::Left,
     Key::Right,
 ];
-
-fn step(up: bool) -> i64 {
-    if up { -1 } else { 1 }
-}
 
 impl Shell {
     pub fn sheet(&self) -> &SheetModel {
@@ -67,6 +72,12 @@ impl Shell {
     /// The text of the open editor.
     pub fn editor_text(&self) -> Option<&str> {
         self.editor.as_ref().map(|e| e.text.as_str())
+    }
+
+    /// The last message of a grid command (a refused entry, a filter result), as the status bar
+    /// shows it.
+    pub fn note_text(&self) -> &str {
+        &self.note
     }
 
     /// The text of the formula bar.
@@ -91,20 +102,27 @@ impl Shell {
     }
 
     /// The grid geometry in device pixels, with the sheet's own column widths and row heights.
+    /// Headings off and the outline gutter move where the cells start (`doc::sheetchrome`).
     pub(super) fn grid_geom(&self) -> Geo {
-        let u = |v: i32| (v as f32 * self.scale / crate::spec::REF_SCALE).round();
         let hdr = (
-            u(self.spec.row_header_w.unwrap_or(34)),
-            u(self.spec.col_header_h.unwrap_or(24)),
+            self.spec.row_header_w.unwrap_or(34),
+            self.spec.col_header_h.unwrap_or(24),
         );
-        let a = self.content;
-        Geo::new(
-            (a.x as f32, a.y as f32, a.right() as f32, a.bottom() as f32),
-            hdr,
-            self.scale,
-            self.sheet.geometry(),
-            self.sheet.top_left,
-        )
+        crate::doc::sheetchrome::sheet_geo(self.content, hdr, self.scale, &self.sheet)
+    }
+
+    /// Device rectangle `(left, top, right, bottom)` of a cell: in the grid, or on its page
+    /// tile in the Page Layout view.
+    pub fn cell_dev_rect(&self, row: u32, col: u32) -> (f32, f32, f32, f32) {
+        if self.sheet.ext_view.mode == crate::sheet_ext::view::ViewMode::PageLayout {
+            let geo = self.sheet.geometry();
+            for t in crate::doc::sheetchrome::layout_tiles(&self.sheet, self.content, self.scale) {
+                if let Some(r) = t.cell(&geo, row, col) {
+                    return (r.x0, r.y0, r.x1, r.y1);
+                }
+            }
+        }
+        self.grid_geom().cell(row, col)
     }
 
     /// Rebuilds the canvas node (and the editor over the active cell) and puts the keyboard focus
@@ -124,12 +142,13 @@ impl Shell {
             || self.content.h <= 0
         {
             self.editor = None;
+            ui.set_animating(false);
             return;
         }
+        self.sync_animation(ui);
         let (rows, cols) = self.grid_geom().visible();
         self.sheet.reveal_active(rows, cols);
-        let g = self.grid_geom();
-        let (l, t, r, b) = g.cell(self.sheet.active.0, self.sheet.active.1);
+        let (l, t, r, b) = self.cell_dev_rect(self.sheet.active.0, self.sheet.active.1);
         let root = ui.tree.root();
         let area = self.content;
         let caret = Rect::new(
@@ -187,14 +206,29 @@ impl Shell {
         } else if !in_bar {
             ui.set_focus(Some(canvas));
         }
+        // The AutoFill Options button, then a dialog over everything (modal).
+        self.sheet.ui.nodes.clear();
+        self.build_autofill_button(ui, root);
+        let nodes = std::mem::take(&mut self.sheet.ui.nodes);
+        if let Some(first) = self.build_dialog(ui) {
+            ui.set_focus(Some(first));
+        }
+        self.sheet.ui.nodes.extend(nodes);
+    }
+
+    /// The copy outline marches while a range is copied or cut: the frame source runs only then.
+    fn sync_animation(&mut self, ui: &mut Ui) {
+        ui.set_animating(self.sheet.copied_range().is_some());
     }
 
     /// The two scroll bars along the right and bottom edges of the grid body.
     fn add_scroll_bars(&mut self, ui: &mut Ui, root: NodeId, rows: u32, cols: u32) {
         let (total_rows, total_cols) = self.sheet.scroll_extent(rows, cols);
         let t = ((SCROLL_BAR_W * self.scale).round() as i32).max(8);
-        let hdr_h = self.grid_geom().col_header_h as i32;
-        let hdr_w = self.grid_geom().row_header_w as i32;
+        let geo = self.grid_geom();
+        let hdr_h = geo.col_header_h as i32;
+        let hdr_w = geo.row_header_w as i32;
+        let (gx, gy) = (geo.x0 as i32, geo.y0 as i32);
         let a = self.content;
         let (top, left) = (self.sheet.top_left.0, self.sheet.top_left.1);
         // The bars span the scrolling rows and columns only: the frozen ones never move.
@@ -219,18 +253,18 @@ impl Shell {
                 V_BAR,
                 PxRect {
                     x: a.right() - t,
-                    y: a.y + hdr_h,
+                    y: gy + hdr_h,
                     w: t,
-                    h: (a.h - hdr_h - t).max(1),
+                    h: (a.bottom() - gy - hdr_h - t).max(1),
                 },
             ),
             (
                 Widget::ScrollBar(horizontal),
                 H_BAR,
                 PxRect {
-                    x: a.x + hdr_w,
+                    x: gx + hdr_w,
                     y: a.bottom() - t,
-                    w: (a.w - hdr_w - t).max(1),
+                    w: (a.right() - gx - hdr_w - t).max(1),
                     h: t,
                 },
             ),
@@ -280,6 +314,11 @@ impl Shell {
             return;
         }
         let (r, c) = self.sheet.active;
+        if self.sheet.review_cell_protected(r, c) {
+            // A locked cell on a protected sheet cannot be edited: Excel says so instead.
+            self.note = "The cell or chart you're trying to change is on a protected sheet. To make a change, unprotect the sheet.".to_owned();
+            return;
+        }
         let text = if replace {
             String::new()
         } else {
@@ -295,11 +334,64 @@ impl Shell {
 
     /// Writes the editor text to the active cell and moves by `by` (rows, columns).
     fn commit_edit(&mut self, ui: &mut Ui, by: (i64, i64)) {
+        self.write_editor(ui);
+        self.move_active(ui, by);
+    }
+
+    fn write_editor(&mut self, ui: &mut Ui) {
         if let Some(ed) = self.editor.take() {
             let (r, c) = self.sheet.active;
-            let _ = self.sheet.enter(r, c, &ed.text);
+            self.enter_checked(ui, r, c, &ed.text);
         }
-        self.move_active(ui, by);
+    }
+
+    /// Enters `text` as Excel's entry does: a locked cell of a protected sheet refuses it, then
+    /// the cell's data validation. A rule the entry breaks opens its Error Alert (Stop, Warning
+    /// or Information; the cell keeps its value until the user confirms); a protected cell's
+    /// refusal is shown in the status bar.
+    pub(super) fn enter_checked(&mut self, ui: &mut Ui, row: u32, col: u32, text: &str) -> bool {
+        if !self.sheet.review_cell_protected(row, col)
+            && let Err(rejected) = self.sheet.data_check_entry(row, col, text)
+            && self.open_validation_alert(ui, (row, col), text, &rejected)
+        {
+            return false;
+        }
+        match self.sheet.review_enter(row, col, text) {
+            Ok(()) => true,
+            Err(message) => {
+                self.note = message;
+                false
+            }
+        }
+    }
+
+    /// Tab (or Shift+Tab) after the edit, if any: along the row, or through the selection.
+    fn nav_tab(&mut self, ui: &mut Ui, back: bool) {
+        self.write_editor(ui);
+        if self.sheet.is_range() {
+            self.sheet.advance_in_selection(false, back);
+        } else {
+            self.sheet.tab_move(back);
+        }
+        self.after_nav(ui);
+    }
+
+    /// Enter (or Shift+Enter): down, back to the column where a run of Tabs began, or through
+    /// the selection.
+    fn nav_enter(&mut self, ui: &mut Ui, back: bool) {
+        self.write_editor(ui);
+        if self.sheet.is_range() {
+            self.sheet.advance_in_selection(true, back);
+        } else {
+            self.sheet.enter_after_tabs(back);
+        }
+        self.after_nav(ui);
+    }
+
+    fn after_nav(&mut self, ui: &mut Ui) {
+        self.sync_bars(ui);
+        self.build_grid(ui);
+        ui.set_focus(self.canvas);
     }
 
     fn cancel_edit(&mut self, ui: &mut Ui) {
@@ -327,7 +419,29 @@ impl Shell {
     /// when the event was one of them.
     pub(super) fn grid_event(&mut self, ui: &mut Ui, ev: &Emit) -> bool {
         let editor_node = self.editor.as_ref().and_then(|e| e.node);
+        if self.dialog_open() && self.dialog_event(ui, ev) {
+            return true;
+        }
         match ev {
+            Emit::Clicked(n)
+                if self
+                    .sheet
+                    .ui
+                    .nodes
+                    .iter()
+                    .any(|(id, a)| id == n && a == "autofill") =>
+            {
+                self.open_autofill_menu(ui, *n);
+                true
+            }
+            Emit::MenuCommand(_, id) if id.starts_with("gridx.") => {
+                self.gridx_command(ui, id);
+                true
+            }
+            Emit::MenuCommand(_, id) if id.starts_with("ctx.") => {
+                self.ctx_command(ui, id);
+                true
+            }
             Emit::CanvasPointer {
                 at, clicks, shift, ..
             } => {
@@ -339,13 +453,31 @@ impl Shell {
                 self.grid_press(ui, x, y, *clicks, *shift);
                 true
             }
-            Emit::CanvasDrag { node, at } if Some(*node) == self.canvas => {
+            Emit::CanvasButton {
+                node, at, button, ..
+            } if Some(*node) == self.canvas => {
+                // A secondary press opens the context menu; the middle button does nothing here.
+                if *button == PointerButton::Secondary && self.editor.is_none() {
+                    let x = self.content.x as f32 + at.x * self.scale;
+                    let y = self.content.y as f32 + at.y * self.scale;
+                    self.context_menu_at(ui, x, y);
+                }
+                true
+            }
+            Emit::CanvasDrag { node, at, .. } if Some(*node) == self.canvas => {
                 let x = self.content.x as f32 + at.x * self.scale;
                 let y = self.content.y as f32 + at.y * self.scale;
                 self.grid_drag(ui, x, y);
                 true
             }
-            Emit::CanvasRelease { node, .. } if Some(*node) == self.canvas => {
+            Emit::CanvasRelease {
+                node, modifiers, ..
+            } if Some(*node) == self.canvas => {
+                // Ctrl held as the fill handle is released: copy instead of continuing a series
+                // (or the other way round for a lone number), as Excel does.
+                if modifiers.ctrl && matches!(self.sheet.gesture, Some(Gesture::Fill { .. })) {
+                    self.sheet.fill_ctrl = true;
+                }
                 self.grid_release(ui);
                 true
             }
@@ -359,6 +491,10 @@ impl Shell {
                 true
             }
             Emit::CanvasText(n, s) if Some(*n) == self.canvas => {
+                // Ctrl+Space and Shift+Space select a column or row: not a typed space.
+                if std::mem::take(&mut self.sheet.swallow_space) && s == " " {
+                    return true;
+                }
                 self.begin_edit(ui, true, true);
                 ui.handle(InputEvent::Text(s.clone()));
                 true
@@ -407,7 +543,7 @@ impl Shell {
                 self.formula.clone_from(t);
                 self.editor = None;
                 let (r, c) = self.sheet.active;
-                let _ = self.sheet.enter(r, c, t);
+                self.enter_checked(ui, r, c, t);
                 self.move_active(ui, (1, 0));
                 true
             }
@@ -458,6 +594,9 @@ impl Shell {
     }
 
     fn canvas_key(&mut self, ui: &mut Ui, key: Key, m: Modifiers) {
+        if self.dialog_open() {
+            return;
+        }
         if self.sheet.has_pending_paste() {
             // The paste would overwrite data: Enter or Y replaces, Esc or N keeps the cells.
             match key {
@@ -485,9 +624,17 @@ impl Shell {
                 self.sheet.select_all();
                 self.selection_changed(ui);
             }
-            Key::Char('C') if m.ctrl => self.copy_cells(false),
-            Key::Char('X') if m.ctrl => self.copy_cells(true),
+            Key::Char('C') if m.ctrl => self.copy_cells(ui, false),
+            Key::Char('X') if m.ctrl => self.copy_cells(ui, true),
+            Key::Char('K') if m.ctrl => {
+                self.open_dialog(ui, crate::dialogs::request::DialogRequest::InsertLink);
+            }
+            Key::Char('T' | 'L') if m.ctrl => {
+                self.open_dialog(ui, crate::dialogs::request::DialogRequest::CreateTable);
+            }
+            Key::Char('V') if m.ctrl && m.alt => self.open_paste_special_dialog(ui),
             Key::Char('V') if m.ctrl => self.paste_cells(ui),
+            Key::F10 if m.shift => self.context_menu_from_keyboard(ui),
             Key::Char(c @ ('D' | 'R')) if m.ctrl => {
                 self.note = match self.sheet.fill_copy(c == 'D') {
                     Ok(true) => if c == 'D' {
@@ -502,8 +649,37 @@ impl Shell {
                 self.sync_bars(ui);
                 self.build_grid(ui);
             }
-            Key::Tab => self.move_active(ui, (0, step(m.shift))),
-            Key::Enter => self.move_active(ui, (step(m.shift), 0)),
+            Key::Tab => self.nav_tab(ui, m.shift),
+            Key::Enter => self.nav_enter(ui, m.shift),
+            Key::Space if m.ctrl || m.shift => {
+                // Ctrl+Space: the columns of the selection; Shift+Space: its rows.
+                self.sheet.swallow_space = true;
+                let (r1, c1, r2, c2) = self.sheet.range();
+                if m.ctrl {
+                    self.sheet.select_cols(c1, c2, true);
+                    self.sheet.active = (self.sheet.active.0, self.sheet.active.1.clamp(c1, c2));
+                } else {
+                    self.sheet.select_rows(r1, r2, true);
+                }
+                self.selection_changed(ui);
+                self.build_grid(ui);
+            }
+            Key::Char(';') if m.ctrl => {
+                // Ctrl+; the date, Ctrl+Shift+; the time.
+                let _ = self.sheet.enter_now(m.shift);
+                self.sync_bars(ui);
+                self.build_grid(ui);
+            }
+            Key::Char('`') if m.ctrl => {
+                // Ctrl+` toggles Show Formulas.
+                self.sheet.toggle_show_formulas();
+                self.build_grid(ui);
+            }
+            Key::Char('=') if m.alt => self.auto_sum(ui),
+            Key::Char('+' | '=') if m.ctrl => self.open_insert_dialog(ui),
+            Key::Char('-') if m.ctrl => self.open_delete_dialog(ui),
+            Key::Escape if self.sheet.clear_copied() => self.build_grid(ui),
+            Key::Escape if self.sheet.dismiss_autofill() => self.build_grid(ui),
             Key::PageDown => {
                 let (rows, _) = self.grid_geom().visible();
                 self.move_active(ui, (i64::from(rows), 0));
@@ -531,9 +707,10 @@ impl Shell {
             Key::F2 => self.begin_edit(ui, false, false),
             Key::F12 => self.save_as(),
             Key::Delete => {
-                let (r, c) = self.sheet.active;
-                let _ = self.sheet.clear(r, c);
+                // Delete empties the whole selection (formats stay).
+                let _ = self.sheet.clear_range();
                 self.sync_bars(ui);
+                self.build_grid(ui);
             }
             Key::Backspace => {
                 let (r, c) = self.sheet.active;
@@ -547,17 +724,51 @@ impl Shell {
         }
     }
 
+    /// The Insert / Delete Sheet Rows and Columns commands of the cell and header context menus.
+    pub fn insert_rows_cols(&mut self, ui: &mut Ui, rows: bool, insert: bool) {
+        let _ = if insert {
+            self.sheet.insert_selected(rows)
+        } else {
+            self.sheet.delete_selected(rows)
+        };
+        self.after_nav(ui);
+    }
+
     fn editor_key(&mut self, ui: &mut Ui, key: Key, m: Modifiers) {
         match key {
             Key::Escape => self.cancel_edit(ui),
-            Key::Enter => self.commit_edit(ui, (step(m.shift), 0)),
-            Key::Tab => self.commit_edit(ui, (0, step(m.shift))),
+            Key::F2 => {
+                // F2 flips between Edit mode (arrows move the caret) and Enter mode.
+                if let Some(ed) = self.editor.as_mut() {
+                    ed.enter_mode = !ed.enter_mode;
+                    let keys = if ed.enter_mode {
+                        ENTER_MODE_KEYS.to_vec()
+                    } else {
+                        COMMIT_KEYS.to_vec()
+                    };
+                    if let Some(n) = ed.node.and_then(|n| ui.tree.get_mut(n)) {
+                        n.intercept = keys;
+                    }
+                }
+            }
+            Key::Enter => self.nav_enter(ui, m.shift),
+            Key::Tab => self.nav_tab(ui, m.shift),
             Key::Up => self.commit_edit(ui, (-1, 0)),
             Key::Down => self.commit_edit(ui, (1, 0)),
             Key::Left => self.commit_edit(ui, (0, -1)),
             Key::Right => self.commit_edit(ui, (0, 1)),
             _ => {}
         }
+    }
+
+    /// Alt+=: AutoSum over the cells above or left of the active cell.
+    pub fn auto_sum(&mut self, ui: &mut Ui) {
+        self.note = match self.sheet.auto_sum("SUM") {
+            Ok(()) => "summed".to_owned(),
+            Err(e) => format!("AutoSum failed: {e}"),
+        };
+        self.sync_bars(ui);
+        self.build_grid(ui);
     }
 
     /// Ctrl+S: saves to the workbook's own path; an unnamed workbook opens Save As.
@@ -581,12 +792,14 @@ impl Shell {
         };
     }
 
-    fn copy_cells(&mut self, cut: bool) {
+    fn copy_cells(&mut self, ui: &mut Ui, cut: bool) {
         self.note = match self.sheet.copy(cut) {
             Ok(()) if cut => "cut".to_owned(),
             Ok(()) => "copied".to_owned(),
             Err(e) => format!("copy failed: {e}"),
         };
+        // The copy outline starts (or the old one moves) and animates.
+        self.sync_animation(ui);
     }
 
     fn paste_cells(&mut self, ui: &mut Ui) {
@@ -603,6 +816,16 @@ impl Shell {
     }
 
     /// True while a paste waits for the person to confirm overwriting data.
+    /// Paste Special (values, formulas, formats or transposed) of the last copy.
+    pub fn paste_special(&mut self, ui: &mut Ui, kind: sheet::PasteKind) {
+        self.note = match self.sheet.paste_special(kind) {
+            Ok(Paste::Done) => "pasted".to_owned(),
+            Ok(_) => "nothing to paste".to_owned(),
+            Err(e) => format!("paste failed: {e}"),
+        };
+        self.after_nav(ui);
+    }
+
     pub fn paste_pending(&self) -> bool {
         self.sheet.has_pending_paste()
     }
@@ -693,9 +916,26 @@ impl Shell {
 
     /// A primary press on the grid at device point `(x, y)`.
     pub fn grid_press(&mut self, ui: &mut Ui, x: f32, y: f32, clicks: u8, shift: bool) {
-        let geo = self.grid_geom();
-        let zone = geo.zone(x, y, Some(self.sheet.range()));
         self.sheet.gesture = None;
+        if self.chrome_press(ui, x, y) {
+            return;
+        }
+        let geo = self.grid_geom();
+        let zone = if self.sheet.ext_view.mode == crate::sheet_ext::view::ViewMode::PageLayout {
+            // The Page Layout view shows page tiles: a press picks the cell on the tile.
+            match crate::doc::sheetchrome::layout_cell_at(
+                &self.sheet,
+                self.content,
+                self.scale,
+                x,
+                y,
+            ) {
+                Some((r, c)) => Zone::Cell(r, c),
+                None => Zone::Outside,
+            }
+        } else {
+            geo.zone(x, y, Some(self.sheet.range()))
+        };
         match zone {
             Zone::Corner => {
                 self.sheet.select_all();
@@ -858,7 +1098,12 @@ impl Shell {
                 let _ = self.sheet.set_row_px(row, px);
             }
             Gesture::Fill { to } => {
-                let _ = self.sheet.fill_to(to);
+                let mode = if std::mem::take(&mut self.sheet.fill_ctrl) {
+                    sheet::FillMode::Ctrl
+                } else {
+                    sheet::FillMode::Auto
+                };
+                let _ = self.sheet.fill_with(to, mode);
             }
             _ => {}
         }

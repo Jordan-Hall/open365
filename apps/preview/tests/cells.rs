@@ -38,8 +38,8 @@ fn typing_into_a1_and_b1_and_a_formula_in_c1_shows_the_sum() {
     assert_eq!(s.display(1, 2), "3");
     assert_eq!(s.display(1, 3), "5", "C1 shows the recalculated value");
     assert_eq!(s.source(1, 3), "=A1+B1");
-    // Enter moved down from C1.
-    assert_eq!(s.active, (2, 3));
+    // Enter after a run of Tabs returns to the column where the run began (A), one row down.
+    assert_eq!(s.active, (2, 1));
     // Changing a precedent recalculates the formula.
     p.shell.sheet_mut().enter(1, 1, "10").unwrap();
     assert_eq!(p.shell.sheet().display(1, 3), "13");

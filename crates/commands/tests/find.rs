@@ -88,11 +88,8 @@ fn word_replace_all_matches_word() {
     let mut checked = 0;
     for scenario in reference["scenarios"].as_array().unwrap() {
         let name = scenario["name"].as_str().unwrap();
-        // Known differences: Word's star runs through paragraph marks; Word's `?@` matches
-        // differently from the other lazy repeats.
-        if scenario.get("error").is_some()
-            || matches!(name, "wc-star-crosses-paragraphs" | "wc-at-any")
-        {
+        // Known difference: Word's `?@` matches differently from the other lazy repeats.
+        if scenario.get("error").is_some() || matches!(name, "wc-at-any") {
             continue;
         }
         let mut target = open_word();
@@ -102,6 +99,7 @@ fn word_replace_all_matches_word() {
             match_case: scenario["matchCase"].as_bool().unwrap(),
             whole_word: scenario["wholeWord"].as_bool().unwrap(),
             wildcards: scenario["wildcards"].as_bool().unwrap(),
+            clipboard: None,
         };
         let outcome = match target.apply(command) {
             Ok(o) => o,

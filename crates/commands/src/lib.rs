@@ -15,6 +15,7 @@ mod command;
 mod conditional;
 mod error;
 mod eval;
+mod ext;
 mod find;
 mod format;
 mod merge;
@@ -33,6 +34,18 @@ pub use eval::{
     EvalValue, Evaluated, FormulaEngine, MAX_FORMULA_CHARS, MAX_RESULT_DIM, MAX_RESULT_TEXT,
     evaluate_formula,
 };
+pub use ext::data::{self as data_ops, DataOp};
+pub use ext::review::{self as review_ops, ReviewOp};
+pub use ext::sheet_objects::{self as objects_ops, ObjectsOp};
+pub use ext::sheets_home::{HomeOp, SortLevel};
+pub use ext::writer_design::{self as design_ops, DesignOp};
+pub use ext::writer_home::{BorderKind, CaseMode, ListKind, WriterHomeOp, char_format_xml};
+pub use ext::writer_insert::{HfAlign, HfKind, LinkTarget, WriterInsertOp, to_hex};
+pub use ext::writer_layout::{self as layout_ops, LayoutOp};
+pub use ext::writer_margins::SectionMargins;
+pub use ext::writer_references::{FieldScope, RefOp};
+pub use ext::writer_review::WriterReviewOp;
+pub use ext::writer_search::{self as search_ops, ReplaceOne};
 pub use find::{
     DocMatch, FindError, FindOptions, FindScope, LookIn, PlannedEdit, XlsxFind, cell_display_text,
     cell_source_text, excel_matches, next_match, xlsx_find_all, xlsx_replace_plan,

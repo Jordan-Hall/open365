@@ -752,3 +752,41 @@ fn removing_a_node_while_hovered_does_not_leave_dangling_state() {
     h.move_to(30.0, 30.0);
     assert_eq!(h.ui.hover(), None);
 }
+
+#[test]
+fn a_focused_canvas_gets_alt_chords() {
+    let mut h = harness();
+    let c = node(
+        &mut h,
+        Widget::Canvas {
+            caret: Rect::new(0.0, 0.0, 1.0, 1.0),
+        },
+        Rect::new(0.0, 0.0, 400.0, 300.0),
+        "Grid",
+    );
+    h.ui.set_focus(Some(c));
+    h.ui.take_events();
+    let alt = Modifiers {
+        alt: true,
+        ..Modifiers::default()
+    };
+    // Alt+= is AutoSum; Alt+Down opens the validation list.
+    h.key_with(Key::Char('='), alt);
+    assert!(
+        h.ui.take_events()
+            .contains(&Emit::KeyPressed(c, Key::Char('='), alt))
+    );
+    h.key_with(Key::Down, alt);
+    assert!(
+        h.ui.take_events()
+            .contains(&Emit::KeyPressed(c, Key::Down, alt))
+    );
+    // A plain letter still arrives as text, not as a key.
+    h.key(Key::Char('a'));
+    assert!(
+        !h.ui
+            .take_events()
+            .iter()
+            .any(|e| matches!(e, Emit::KeyPressed(_, Key::Char('a'), _)))
+    );
+}

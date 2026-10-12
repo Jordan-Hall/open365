@@ -39,7 +39,9 @@ pub use conditional::{
     CellIsOp, CfBlock, CfKind, CfRule, Cfvo, CfvoKind, DataBarAxis, DataBarDirection, DataBarExt,
     Dxf, DxfBorder, DxfFill, DxfFont, TimePeriod,
 };
-pub use drawing::{Anchor, AnchorMarker, DrawingChart, EMU_PER_POINT, EditAs, RectPt};
+pub use drawing::{
+    Anchor, AnchorMarker, DrawingChart, EMU_PER_POINT, EditAs, RectPt, SheetAnchor, SheetObject,
+};
 pub use error::XlsxError;
 pub use format::{
     Alignment, Border, BorderEdge, BorderStyle, CellFormat, Color, ColorSource, Fill, FillPattern,
@@ -80,6 +82,12 @@ pub use tables::{Table, TableColumn, TableStyle};
 pub use workbook::{
     BorderSpec, CellInput, DefinedName, DroppedItem, FormatSnapshot, MergeKind, SheetInfo,
     SheetKind, SheetState, Workbook, WorkbookKind, merge_areas,
+};
+pub use workbook::{
+    CalcMode, CalcSettings, CfRuleSpec, CfSpec, ChartAnchor, ChartInsert, HeaderChoice,
+    HyperlinkSpec, HyperlinkTarget, NameSource, NameSpec, NoteSpec, PivotInsert, PivotSpec,
+    ShiftDirection, TabColor, TableInfo, TableSpec, TableStyleChoice,
+    content_type as content_types, rel as relationship_types, validate_defined_name,
 };
 pub use xml::{
     Attr, ElementHead, MAIN_NS, MAIN_NS_STRICT, MAX_XML_DEPTH, ParsedXml, RawXml, XmlElement,

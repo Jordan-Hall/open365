@@ -629,6 +629,7 @@ pub struct GridView {
     cf_today: Option<f64>,
     /// Hinted glyph advances for the cell text decisions.
     hints: RefCell<HintCache>,
+    drawings: RefCell<crate::grid_drawing::DrawingCache>,
     /// Message for the status bar, taken by the application each frame.
     pub status: Option<String>,
     /// Milliseconds spent drawing the grid in the last frame.
@@ -738,6 +739,7 @@ impl GridView {
             cf: None,
             cf_today: None,
             hints: RefCell::new(HintCache::default()),
+            drawings: RefCell::new(crate::grid_drawing::DrawingCache::default()),
             status: None,
             last_frame_ms: 0.0,
             colors: None,
@@ -779,6 +781,12 @@ impl GridView {
             owns_fonts: false,
             ..Self::new()
         }
+    }
+
+    /// The floating objects (pictures, shapes, charts) painted in the last frame, by name with
+    /// their screen rectangles; one entry per painted region.
+    pub fn drawn_objects(&self) -> Vec<(String, Rect)> {
+        self.drawings.borrow().drawn.clone()
     }
 
     /// The cells drawn in the last frame, with the text as shown.
@@ -2011,6 +2019,15 @@ impl GridView {
                 });
             }
             self.painted.borrow_mut().clear();
+            self.drawings.borrow_mut().drawn.clear();
+            self.drawings.borrow_mut().prepare(
+                wb,
+                sheet,
+                Arc::as_ptr(&layout) as usize,
+                layout.geo.metrics(),
+                layout_dpi(ppp),
+                ppp,
+            );
             let paint = Paint {
                 wb,
                 ws,
@@ -2019,6 +2036,7 @@ impl GridView {
                 fonts: &self.fonts,
                 log: &self.painted,
                 hints: &self.hints,
+                drawings: &self.drawings,
                 ppp,
                 cf: cf.as_deref(),
             };
@@ -3462,6 +3480,7 @@ struct Paint<'a> {
     fonts: &'a RefCell<FontBook>,
     log: &'a RefCell<Vec<PaintedCell>>,
     hints: &'a RefCell<HintCache>,
+    drawings: &'a RefCell<crate::grid_drawing::DrawingCache>,
     ppp: f32,
     /// Conditional formats of the sheet, if it has any.
     cf: Option<&'a ConditionalFormats>,
@@ -3792,6 +3811,16 @@ fn paint_region(
             paint_border_box(&p, paint, ws, (row, col), (row, col), false, rect);
         }
     }
+
+    // Floating objects (pictures, shapes, charts) sit over the cells and under the selection.
+    paint.drawings.borrow_mut().paint(
+        &p,
+        wb,
+        Pos2::new(
+            view.edge_x(1, region.shift.x),
+            view.edge_y(1, region.shift.y),
+        ),
+    );
 
     // Selection: tinted range, outlined, with the active cell (or its merge) outlined too.
     let overlaps = selection.0 <= region.rows.1

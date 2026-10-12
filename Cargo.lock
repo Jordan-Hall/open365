@@ -3313,6 +3313,7 @@ dependencies = [
  "open365-calc",
  "open365-docx",
  "open365-layout",
+ "open365-locale",
  "open365-opc",
  "open365-pdf",
  "open365-text",
@@ -3339,6 +3340,13 @@ dependencies = [
  "quick-xml 0.42.0",
  "serde",
  "thiserror 2.0.21",
+]
+
+[[package]]
+name = "open365-drawing"
+version = "0.1.0"
+dependencies = [
+ "quick-xml 0.42.0",
 ]
 
 [[package]]
@@ -3443,12 +3451,16 @@ dependencies = [
  "arboard",
  "image",
  "open365-calc",
+ "open365-chart",
  "open365-commands",
  "open365-docx",
+ "open365-drawing",
  "open365-gfx",
  "open365-layout",
  "open365-locale",
  "open365-opc",
+ "open365-pivot",
+ "open365-spell",
  "open365-text",
  "open365-ui-core",
  "open365-ui-host",
@@ -3572,8 +3584,10 @@ dependencies = [
  "fontdb",
  "image",
  "open365-calc",
+ "open365-chart",
  "open365-commands",
  "open365-docx",
+ "open365-drawing",
  "open365-layout",
  "open365-opc",
  "open365-pdf",
@@ -3634,6 +3648,7 @@ name = "open365-xlsx"
 version = "0.1.0"
 dependencies = [
  "open365-calc",
+ "open365-drawing",
  "open365-locale",
  "open365-opc",
  "quick-xml 0.42.0",

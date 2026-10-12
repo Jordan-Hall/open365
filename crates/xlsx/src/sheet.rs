@@ -19,9 +19,11 @@ use crate::xml::{
 pub(crate) mod cellformat;
 mod filter;
 mod merge;
+mod objects;
 mod resize;
 mod sort;
 mod structure;
+pub(crate) use objects::{CellShift, RectFate, parse_fragment};
 mod validation;
 pub use filter::{
     AutoFilter, ColorFilter, CustomFilter, CustomFilters, DateGroup, DateTimeGrouping,

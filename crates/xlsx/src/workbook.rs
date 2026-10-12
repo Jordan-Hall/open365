@@ -200,6 +200,9 @@ pub use cellformat::{BorderSpec, FormatSnapshot};
 mod merge;
 pub use merge::{MergeKind, merge_areas};
 mod structure;
+#[path = "write/mod.rs"]
+mod write;
+pub use write::*;
 
 fn is_true(v: &str) -> bool {
     matches!(v.trim(), "1" | "true")

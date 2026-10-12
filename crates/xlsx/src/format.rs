@@ -307,7 +307,8 @@ fn hls_to_rgb(h: i64, l: i64, s: i64) -> Rgb {
 /// Resolves a colour against the theme and palette. Automatic is black.
 pub(crate) fn resolve(color: &Color, theme: &Theme, palette: &[Rgb]) -> Rgb {
     let base = match color.source {
-        ColorSource::Auto => return Rgb::BLACK,
+        // Automatic is the system text colour (black); Excel tints it like any other base.
+        ColorSource::Auto => Rgb::BLACK,
         ColorSource::Rgb(c) => c,
         ColorSource::Theme(i) => theme.color(i).unwrap_or(Rgb::BLACK),
         ColorSource::Indexed(i) => palette_color(palette, i),
@@ -528,20 +529,27 @@ impl BorderStyle {
         }
     }
 
-    /// Drawing weight used to settle which of two borders on the same edge wins: heavier
-    /// lines win over lighter ones.
+    /// Precedence of a line style where two cells draw different ones on a shared edge: the
+    /// higher rank is shown (measured against `Range.DisplayFormat` for all 14 x 14 pairs, in
+    /// `fixtures/reference/xlsx/styles-border-conflicts`). It is a total order that is not the
+    /// order of line widths: double, thick, medium, medium dashed, medium dash-dot, slanted
+    /// dash-dot, medium dash-dot-dot, thin, dashed, dotted, dash-dot, dash-dot-dot, hair.
     pub fn rank(self) -> u8 {
         match self {
             Self::None => 0,
             Self::Hair => 1,
-            Self::Dotted => 2,
-            Self::DashDotDot | Self::DashDot | Self::Dashed => 3,
-            Self::Thin => 4,
-            Self::MediumDashDotDot | Self::SlantDashDot | Self::MediumDashDot => 5,
-            Self::MediumDashed => 6,
-            Self::Medium => 7,
-            Self::Double => 8,
-            Self::Thick => 9,
+            Self::DashDotDot => 2,
+            Self::DashDot => 3,
+            Self::Dotted => 4,
+            Self::Dashed => 5,
+            Self::Thin => 6,
+            Self::MediumDashDotDot => 7,
+            Self::SlantDashDot => 8,
+            Self::MediumDashDot => 9,
+            Self::MediumDashed => 10,
+            Self::Medium => 11,
+            Self::Thick => 12,
+            Self::Double => 13,
         }
     }
 
@@ -597,8 +605,8 @@ impl BorderEdge {
 
 /// The edge drawn (and reported by Excel) where two cells meet. `near` belongs to the left or
 /// upper cell, `far` to the right or lower one. Excel keeps both cells' copies of a shared edge
-/// in step, so files it wrote never disagree; for files that do, the heavier line wins and on a
-/// tie the later cell's (the right or lower one's) edge.
+/// in step, so files it wrote never disagree; for files that do, the higher [`BorderStyle::rank`]
+/// wins and on a tie the later cell's (the right or lower one's) edge, colour included.
 pub fn shared_edge(near: BorderEdge, far: BorderEdge) -> BorderEdge {
     if near.style == BorderStyle::None {
         far
@@ -616,12 +624,43 @@ pub struct Border {
     pub right: BorderEdge,
     pub top: BorderEdge,
     pub bottom: BorderEdge,
+    /// The one `diagonal` line both diagonals share; `diagonal_up` and `diagonal_down` say which
+    /// of them it is drawn as. Prefer [`Self::diagonal_up_edge`] and [`Self::diagonal_down_edge`].
     pub diagonal: BorderEdge,
+    /// `diagonalUp`: the line from the bottom left to the top right corner is drawn.
+    pub diagonal_up: bool,
+    /// `diagonalDown`: the line from the top left to the bottom right corner is drawn.
+    pub diagonal_down: bool,
 }
 
 impl Border {
+    /// The line drawn from the bottom left to the top right corner (Excel's `xlDiagonalUp`
+    /// border): the shared diagonal line when `diagonalUp` is set, else nothing. Diagonals are
+    /// never shared with a neighbouring cell.
+    pub fn diagonal_up_edge(&self) -> BorderEdge {
+        if self.diagonal_up {
+            self.diagonal
+        } else {
+            BorderEdge::default()
+        }
+    }
+
+    /// The line from the top left to the bottom right corner (`xlDiagonalDown`).
+    pub fn diagonal_down_edge(&self) -> BorderEdge {
+        if self.diagonal_down {
+            self.diagonal
+        } else {
+            BorderEdge::default()
+        }
+    }
+
     fn parse(e: &XmlElement) -> Self {
-        let mut b = Self::default();
+        let flag = |n: &str| matches!(e.head.attr(n).map(str::trim), Some("1" | "true"));
+        let mut b = Self {
+            diagonal_up: flag("diagonalUp"),
+            diagonal_down: flag("diagonalDown"),
+            ..Self::default()
+        };
         for c in e.elements() {
             let edge = BorderEdge::parse(c);
             match c.head.local_name() {

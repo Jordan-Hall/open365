@@ -14,6 +14,7 @@ pub mod docmodel;
 mod parts;
 #[path = "../../../crates/ui-egui/src/ruler.rs"]
 pub mod ruler;
+pub mod sheetchrome;
 mod writer;
 
 pub use writer::{CanvasAccess, Format, Nav, PaintStats, PathChooser, Toggle, WriterPane};
@@ -215,6 +216,29 @@ fn dashed(list: &mut DrawList, r: Rect, color: Color, dash: f32) {
     }
 }
 
+/// Dashed outline of a rectangle whose dash runs start `phase` pixels before the corner
+/// (marching ants). Each run is clipped to the rectangle.
+fn dashed_phase(list: &mut DrawList, r: Rect, color: Color, dash: f32, phase: f32) {
+    let mut x = r.x0 - phase;
+    while x < r.x1 {
+        let (s, e) = (x.max(r.x0), (x + dash).min(r.x1));
+        if e > s {
+            list.fill_rect(Rect::from_edges(s, r.y0, e, r.y0 + 1.0), color);
+            list.fill_rect(Rect::from_edges(s, r.y1 - 1.0, e, r.y1), color);
+        }
+        x += dash * 2.0;
+    }
+    let mut y = r.y0 - phase;
+    while y < r.y1 {
+        let (s, e) = (y.max(r.y0), (y + dash).min(r.y1));
+        if e > s {
+            list.fill_rect(Rect::from_edges(r.x0, s, r.x0 + 1.0, e), color);
+            list.fill_rect(Rect::from_edges(r.x1 - 1.0, s, r.x1, e), color);
+        }
+        y += dash * 2.0;
+    }
+}
+
 /// The Sheets canvas: headers, grid lines with the sheet's own column widths and row heights,
 /// cell values, the selected range, the active cell and the resize or fill preview.
 pub fn paint_sheet(
@@ -226,22 +250,14 @@ pub fn paint_sheet(
     header: (i32, i32),
     view: &SheetView<'_>,
 ) {
-    use crate::sheet::{Geo, Gesture};
-    let u = |v: i32| (v as f32 * scale / REF_SCALE).round();
+    use crate::sheet::Gesture;
     let model = view.model;
-    let top_left = model.top_left;
-    let g = Geo::new(
-        (
-            area.x as f32,
-            area.y as f32,
-            area.right() as f32,
-            area.bottom() as f32,
-        ),
-        (u(header.0), u(header.1)),
-        scale,
-        model.geometry(),
-        top_left,
-    );
+    if sheetchrome::paint_layout_view(ui, list, pal, area, scale, model) {
+        return;
+    }
+    let g = sheetchrome::sheet_geo(area, header, scale, model);
+    let headings = model.ext_view.headings(model.sheet);
+    let gridlines = model.ext_view.gridlines(model.sheet);
     let (row_header_w, col_header_h) = (g.row_header_w, g.col_header_h);
     let (x0, y0, x1, y1) = (g.x0, g.y0, g.x1, g.y1);
     let (bx, by) = (x0 + row_header_w, y0 + col_header_h);
@@ -265,18 +281,22 @@ pub fn paint_sheet(
         let (t, b) = (g.row_top(r).max(g.min_y(r)), g.row_bottom(r));
         list.fill_rect(Rect::from_edges(x0, t, bx, b), pal.grid_header_selected);
     }
-    // Grid lines.
+    // Grid lines (the sheet's own View > Gridlines setting) and the heading borders.
     for &c in &cols {
         let x = g.col_right(c) - 1.0;
-        list.fill_rect(Rect::from_edges(x, g.min_y(1), x + 1.0, y1), pal.grid_line);
+        if gridlines {
+            list.fill_rect(Rect::from_edges(x, g.min_y(1), x + 1.0, y1), pal.grid_line);
+        }
         list.fill_rect(Rect::from_edges(x, y0, x + 1.0, by), pal.grid_header_border);
     }
     for &r in &rows {
         let y = g.row_bottom(r) - 1.0;
-        list.fill_rect(Rect::from_edges(g.min_x(1), y, x1, y + 1.0), pal.grid_line);
+        if gridlines {
+            list.fill_rect(Rect::from_edges(g.min_x(1), y, x1, y + 1.0), pal.grid_line);
+        }
         list.fill_rect(Rect::from_edges(x0, y, bx, y + 1.0), pal.grid_header_border);
     }
-    for &c in &cols {
+    for &c in cols.iter().filter(|_| headings) {
         let name = col_name(c as usize - 1);
         let w = width(ui, &name, px);
         let (left, right) = (g.col_left(c).max(g.min_x(c)), g.col_right(c));
@@ -291,7 +311,7 @@ pub fn paint_sheet(
             pal.grid_header_text,
         );
     }
-    for &r in &rows {
+    for &r in rows.iter().filter(|_| headings) {
         let name = r.to_string();
         let w = width(ui, &name, px);
         let (top, bottom) = (g.row_top(r).max(g.min_y(r)), g.row_bottom(r));
@@ -313,7 +333,7 @@ pub fn paint_sheet(
             if view.editing && (row, col) == model.active {
                 continue;
             }
-            let Some((value, numeric)) = model.shown(row, col) else {
+            let Some((value, numeric)) = model.shown_for_view(row, col) else {
                 continue;
             };
             let (left, top, right, bottom) = g.cell(row, col);
@@ -345,6 +365,8 @@ pub fn paint_sheet(
         let y = g.scroll_y0() - 1.0;
         list.fill_rect(Rect::from_edges(bx, y, x1, y + 1.0), split);
     }
+    sheetchrome::paint_under(ui, list, pal, &g, scale, model);
+    crate::sheet_ext::drawing::paint(ui, list, &g, model);
     // The selected range: a light wash over the body, the active cell left clear.
     list.push_clip(Rect::from_edges(bx, by, x1, y1));
     let (rl, rt, rr, rb) = g.range_rect((r1, c1, r2, c2));
@@ -375,6 +397,20 @@ pub fn paint_sheet(
             pal.grid_accent,
         );
     }
+    // Marching ants: a dashed outline round the copied or cut range until Esc or a paste.
+    if let Some(copied) = model.copied_range() {
+        let (l, t, r, b) = g.range_rect(copied);
+        let phase = crate::sheet::ants_phase(ui.anim_frame(), 4.0 * scale);
+        dashed_phase(
+            list,
+            Rect::from_edges(l, t, r, b),
+            pal.grid_accent,
+            4.0 * scale,
+            phase,
+        );
+    }
+    // Markers, AutoFilter and validation buttons, formula trace arrows.
+    sheetchrome::paint_over(ui, list, pal, &g, scale, model);
     // Fill handle at the bottom right corner of the range.
     let hs = (6.0 * scale / REF_SCALE).round().max(3.0);
     list.fill_rect(
@@ -409,5 +445,7 @@ pub fn paint_sheet(
         _ => {}
     }
     list.pop_clip();
+    // The outline gutter and the note or comment under the pointer sit over everything.
+    sheetchrome::paint_gutter_and_hover(ui, list, pal, &g, scale, model);
     list.pop_clip();
 }

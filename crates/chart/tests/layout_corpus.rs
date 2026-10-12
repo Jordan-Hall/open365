@@ -24,9 +24,13 @@ use common::{CarlitoMeasure, f64s, scale_corpus};
 const TOLERANCE: f64 = 1.0;
 
 /// Share of cases (percent) whose every compared quantity matches, measured on the train set.
-const FLOOR_TRAIN_ALL: f64 = 0.0;
+const FLOOR_TRAIN_ALL: f64 = 29.0;
 /// Same for the hold-out set.
-const FLOOR_HOLDOUT_ALL: f64 = 0.0;
+const FLOOR_HOLDOUT_ALL: f64 = 35.0;
+/// Share of value-axis scales (min, max, major, minor) that match, train and hold-out. This is
+/// the interval budget of `axis::max_intervals` working on our own plot-area rectangle.
+const FLOOR_TRAIN_VALUE_AXIS: f64 = 98.0;
+const FLOOR_HOLDOUT_VALUE_AXIS: f64 = 97.0;
 
 fn kind_of(name: &str) -> BuildKind {
     match name {
@@ -216,6 +220,11 @@ fn pct(st: &Stats) -> f64 {
     100.0 * st.all as f64 / st.cases.max(1) as f64
 }
 
+fn value_axis_pct(st: &Stats) -> f64 {
+    let (a, b) = st.by_quantity.get("value_axis").copied().unwrap_or((0, 1));
+    100.0 * a as f64 / b.max(1) as f64
+}
+
 #[test]
 fn train_corpus_matches_excel() {
     let Some(st) = evaluate("layout-train.json") else {
@@ -224,6 +233,11 @@ fn train_corpus_matches_excel() {
     };
     report("train", &st);
     assert!(pct(&st) >= FLOOR_TRAIN_ALL, "train {:.1} %", pct(&st));
+    assert!(
+        value_axis_pct(&st) >= FLOOR_TRAIN_VALUE_AXIS,
+        "train value axis {:.1} %",
+        value_axis_pct(&st)
+    );
 }
 
 #[test]
@@ -234,4 +248,9 @@ fn hold_out_corpus_matches_excel_without_refitting() {
     };
     report("hold-out", &st);
     assert!(pct(&st) >= FLOOR_HOLDOUT_ALL, "hold-out {:.1} %", pct(&st));
+    assert!(
+        value_axis_pct(&st) >= FLOOR_HOLDOUT_VALUE_AXIS,
+        "hold-out value axis {:.1} %",
+        value_axis_pct(&st)
+    );
 }

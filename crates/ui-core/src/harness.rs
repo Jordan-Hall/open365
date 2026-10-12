@@ -160,6 +160,19 @@ impl Harness {
         ));
     }
 
+    /// Presses and releases `button` at `(x, y)` after moving there.
+    pub fn click_with(&mut self, button: PointerButton, x: f32, y: f32) {
+        self.move_to(x, y);
+        let p = Point::new(x, y);
+        self.ui.handle(InputEvent::PointerDown(button, p));
+        self.ui.handle(InputEvent::PointerUp(button, p));
+    }
+
+    /// A right click.
+    pub fn right_click(&mut self, x: f32, y: f32) {
+        self.click_with(PointerButton::Secondary, x, y);
+    }
+
     /// Move, press and release at the centre of `id`.
     pub fn click_node(&mut self, id: NodeId) {
         let c = self.ui.tree.abs_rect(id).center();

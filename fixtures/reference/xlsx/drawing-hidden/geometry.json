@@ -1,0 +1,10 @@
+{
+  "source": "fixtures/xlsx/drawing-hidden.xlsx",
+  "oracle": "Microsoft Excel via COM, Range.Width / Range.Height in points at 100% zoom",
+  "dpi": 120,
+  "excel_build": "20430",
+  "sheets": [
+    {"name": "AfterHide", "col_widths_pt": [48, 48, 0, 48, 20.4, 48, 48, 48, 48, 48, 48, 48], "row_heights_pt": [14.4, 14.4, 14.4, 0, 14.4, 14.4, 14.4, 14.4, 14.4, 14.4, 14.4, 0, 0, 14.4, 14.4, 14.4, 14.4, 14.4, 14.4, 33.6, 14.4, 14.4, 14.4]},
+    {"name": "BeforeHide", "col_widths_pt": [48, 48, 0, 48, 48, 18, 48, 48, 48, 48, 48, 48], "row_heights_pt": [14.4, 14.4, 14.4, 0, 45, 14.4, 14.4, 14.4, 0, 14.4, 14.4, 14.4]}
+  ]
+}

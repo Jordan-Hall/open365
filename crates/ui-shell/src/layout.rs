@@ -8,7 +8,7 @@
 
 use crate::chrome;
 use crate::spec::{
-    AppSpec, Chrome, Control, Group, Kind, REF_SCALE, Rect4, Scale, Size, StateRef, Tab,
+    AppSpec, Block, Chrome, Control, Group, Kind, REF_SCALE, Rect4, Scale, Size, StateRef, Tab,
 };
 
 /// A rectangle in physical pixels.
@@ -792,4 +792,124 @@ fn hidden_add_x(s: &crate::spec::SheetTabs) -> i32 {
         .map(|c| c.x)
         .min()
         .unwrap_or(0)
+}
+
+/// Breaks a label into at most two centred lines. A multi-word label of more than `min_len` bytes
+/// breaks at the word gap that makes the wider line narrowest (Office: "Ink to / Shape", not "Ink /
+/// to Shape"). When the widest line is still wider than `max_w`, a slash is a break too ("Win/ /
+/// Loss"), so a word is never cut. `text_w` measures a string.
+pub fn wrap_label(
+    label: &str,
+    min_len: usize,
+    max_w: f32,
+    text_w: impl Fn(&str) -> f32,
+) -> Vec<String> {
+    let widest = |lines: &[String]| lines.iter().map(|l| text_w(l)).fold(0.0, f32::max);
+    let best = |breaks: &[char]| -> Vec<String> {
+        let tokens: Vec<&str> = label.split_inclusive(breaks).collect();
+        (1..tokens.len())
+            .map(|k| {
+                vec![
+                    tokens[..k].concat().trim_end().to_owned(),
+                    tokens[k..].concat().trim_end().to_owned(),
+                ]
+            })
+            .min_by(|a, b| widest(a).total_cmp(&widest(b)))
+            .unwrap_or_else(|| vec![label.to_owned()])
+    };
+    let one = vec![label.to_owned()];
+    let lines = if label.len() > min_len {
+        best(&[' '])
+    } else {
+        one.clone()
+    };
+    if widest(&lines) <= max_w {
+        return lines;
+    }
+    let slashed = best(&[' ', '/']);
+    if widest(&slashed) < widest(&lines) {
+        slashed
+    } else {
+        lines
+    }
+}
+
+/// The text a ribbon button shows: Office keeps the "..." of a command that opens a dialog in its
+/// accessible name only, never on the face of the button.
+pub fn ribbon_label(label: &str) -> &str {
+    label.strip_suffix("...").unwrap_or(label)
+}
+
+/// Room (in `u`) a large button keeps around its label: Office sizes a large ribbon button to its
+/// label plus this padding instead of truncating or renaming the label.
+pub const LARGE_LABEL_PAD_U: i32 = 4;
+
+fn blocks_extent(blocks: &[Block]) -> i32 {
+    let mut right = 0;
+    for (bi, block) in blocks.iter().enumerate() {
+        let bx = if bi == 0 {
+            0
+        } else {
+            right + block.gap.unwrap_or(2)
+        };
+        let mut block_right = bx;
+        for row in &block.rows {
+            let mut x = bx + row.dx;
+            for (ii, it) in row.items.iter().enumerate() {
+                if ii > 0 {
+                    x += it.gap.unwrap_or(2);
+                }
+                x += it.w;
+            }
+            block_right = block_right.max(x);
+        }
+        right = block_right;
+    }
+    right
+}
+
+/// Grows `blocks` so every large button fits its label; returns how much wider the content got.
+fn fit_blocks(blocks: &mut [Block], text_w: &impl Fn(&str) -> f32, scale: f32) -> i32 {
+    let before = blocks_extent(blocks);
+    for it in blocks
+        .iter_mut()
+        .flat_map(|b| &mut b.rows)
+        .flat_map(|r| &mut r.items)
+    {
+        if it.size != Size::Large || it.label.is_empty() {
+            continue;
+        }
+        if !matches!(it.kind, Kind::Button | Kind::Split | Kind::Dropdown) {
+            continue;
+        }
+        let room = it.w as f32 / scale;
+        let lines = wrap_label(ribbon_label(&it.label), 7, room, text_w);
+        let need = lines.iter().map(|l| text_w(l)).fold(0.0, f32::max);
+        let want = (need * scale).ceil() as i32 + LARGE_LABEL_PAD_U;
+        it.w = it.w.max(want);
+    }
+    blocks_extent(blocks) - before
+}
+
+/// Widens every large ribbon button whose label (plus [`LARGE_LABEL_PAD_U`]) is wider than its
+/// measured width, and the groups that hold it, in every state. Office sizes a large button to its
+/// label; the spec widths were measured for the reference labels only. `text_w` measures a label in
+/// points at the ribbon label size; `scale` is `u` per point (the reference scale).
+pub fn fit_large_labels(spec: &mut AppSpec, text_w: impl Fn(&str) -> f32, scale: f32) {
+    for tab in &mut spec.tabs {
+        for g in &mut tab.groups {
+            let d = fit_blocks(&mut g.blocks, &text_w, scale);
+            g.w += d;
+            if let Some(m) = &mut g.min_w {
+                *m += d;
+            }
+            for st in &mut g.states {
+                let d = fit_blocks(&mut st.blocks, &text_w, scale);
+                st.w += d;
+                if let Some(m) = &mut st.min_w {
+                    *m += d;
+                }
+            }
+        }
+    }
 }

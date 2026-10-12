@@ -3,6 +3,7 @@
 use super::Out;
 use super::calendars;
 use super::hijri;
+use super::lunisolar;
 use super::parse::{Section, Tok};
 use crate::fmtlocale::FormatLocale;
 use crate::functions::serial_to_ymd;
@@ -20,10 +21,29 @@ pub(super) fn render_date(
 ) -> bool {
     // A `[$-LCID]` prefix selects the names of that language.
     // The Thai calendar (byte 7) and the untagged Thai letters use Thai names; the US Gregorian calendar (byte 2) English ones.
+    // Languages 0, 1 and 2 are not cultures to Excel: names come from the default (English) locale, and the Hebrew, Persian and
+    // Saka calendars show the English name of the month number (nothing for 13).
+    let invalid_lang = sec.lcid.is_some_and(|l| l & 0xFFFF < 3) && !matches!(sec.calendar, 6 | 23);
     let names_lcid = match (sec.calendar, sec.thai) {
+        _ if invalid_lang => None,
         (7, _) | (_, true) => Some(0x041E),
         (2, _) => Some(0x0409),
         (9, _) => Some(0x040C),
+        // Gregorian calendars with English names (13 and 21), and the lunisolar calendars 18 and 19, whatever the tag says
+        (13 | 18 | 19 | 21, _) => Some(0x0409),
+        // Japanese and Korean lunisolar: Japanese weekday names unless the tag is Korean
+        (14, _) => Some(if sec.lcid.is_some_and(|l| l & 0x3FF == 0x12) {
+            0x0412
+        } else {
+            0x0411
+        }),
+        // Chinese lunisolar: Taiwan names for a Taiwan tag with byte 15, simplified names otherwise (always for byte 17)
+        (15, _) => Some(if sec.lcid.is_some_and(|l| l & 0xFFFF == 0x0404) {
+            0x0404
+        } else {
+            0x0804
+        }),
+        (17, _) => Some(0x0804),
         // Japanese and Korean (Tangun) calendars use English names unless the tag is Japanese or Korean
         (3, _) => Some(if sec.lcid.is_some_and(|l| l & 0xFFFF == 0x411) {
             0x0411
@@ -39,6 +59,12 @@ pub(super) fn render_date(
     };
     let by_lcid = names_lcid.and_then(FormatLocale::for_lcid);
     let loc: &FormatLocale = by_lcid.as_deref().unwrap_or(default_locale);
+    // AM and PM follow the language of the tag, also where the calendar brings its own names (measured for bytes 13 to 21).
+    let ampm_lcid = sec
+        .lcid
+        .filter(|_| matches!(sec.calendar, 13 | 14 | 15 | 17 | 18 | 19 | 21) && !invalid_lang);
+    let by_ampm = ampm_lcid.and_then(FormatLocale::for_lcid);
+    let ampm_loc: &FormatLocale = by_ampm.as_deref().unwrap_or(loc);
     if !v.is_finite() || v < 0.0 {
         return false;
     }
@@ -95,8 +121,25 @@ pub(super) fn render_date(
     let hijri = sec.calendar == 6 || sec.calendar == 23;
     let japanese_tag = sec.lcid.is_some_and(|l| l & 0xFFFF == 0x411);
     let other_cal = matches!(sec.calendar, 8 | 16 | 22);
-    let named_cal = other_cal || matches!(sec.calendar, 4 | 10 | 20);
-    let ymd = if calendar && other_cal {
+    let lunar = matches!(sec.calendar, 14 | 15 | 17 | 18 | 19);
+    let named_cal = (other_cal && !invalid_lang)
+        || matches!(sec.calendar, 4 | 10 | 11 | 12 | 14 | 15 | 17 | 20);
+    let ymd = if calendar && lunar {
+        // The tables count real days of the 1900 date system; serial 60 (the fictitious 29 February 1900) is refused.
+        let serial = if date1904 {
+            days as i64 + 1462
+        } else {
+            (days as i64).max(1)
+        };
+        if serial == 60 {
+            return false;
+        }
+        let real_day = if serial < 60 { serial } else { serial - 1 };
+        match lunisolar::from_day(real_day, matches!(sec.calendar, 15 | 17)) {
+            Some(x) => x,
+            None => return false,
+        }
+    } else if calendar && other_cal {
         match calendars::convert(sec.calendar, days as i64, date1904) {
             Some(x) => x,
             None => return false,
@@ -107,6 +150,15 @@ pub(super) fn render_date(
             None => return false,
         }
     } else if calendar {
+        // Calendar bytes 11 and 12 refuse serial 60 and show serial 0 as 1 January 1900 (measured; byte 13 shows 29 February and day 0).
+        let days = if matches!(sec.calendar, 11 | 12) && !date1904 {
+            if days == 60.0 {
+                return false;
+            }
+            days.max(1.0)
+        } else {
+            days
+        };
         match serial_to_ymd(days, date1904) {
             Some(x) => x,
             None => return false,
@@ -163,6 +215,9 @@ pub(super) fn render_date(
     for tok in &sec.toks {
         match tok {
             Tok::Lit(s) => out.push_lit(s),
+            Tok::DigitMode(on) if sec.thai => {
+                out.digits = on.then_some(super::THAI_DIGITS);
+            }
             Tok::Pad(c) => out.pad(*c),
             Tok::Fill(c) => out.fill(*c),
             Tok::Year(_) if sec.calendar == 4 => out.push(&format!("{:04}", ymd.0)),
@@ -184,6 +239,9 @@ pub(super) fn render_date(
             }
             Tok::Month(n) => {
                 let m = (ymd.1.clamp(1, 12) - 1) as usize;
+                if invalid_lang && other_cal && ymd.1 > 12 && *n >= 3 {
+                    continue;
+                }
                 if named_cal
                     && *n >= 3
                     && let Some(name) = calendars::month_name(sec.calendar, sec.lcid, ymd.0, ymd.1)
@@ -273,7 +331,7 @@ pub(super) fn render_date(
             Tok::AmPm { short, upper } => {
                 let pm = hour24 >= 12.0;
                 // `AM/PM` is always upper case; `a/p` keeps the case written in the format code.
-                let full = if pm { &loc.pm } else { &loc.am };
+                let full = if pm { &ampm_loc.pm } else { &ampm_loc.am };
                 if !*short {
                     out.push_lit(full);
                 } else {
@@ -300,7 +358,11 @@ pub(super) fn render_date(
             }
             Tok::Era(n)
                 if sec.calendar == 3
-                    || (japanese_tag && !matches!(sec.calendar, 4 | 5 | 9 | 10 | 20)) =>
+                    || (japanese_tag
+                        && !matches!(
+                            sec.calendar,
+                            4 | 5 | 9 | 10 | 11 | 12 | 13 | 14 | 15 | 17 | 18 | 19 | 20 | 21
+                        )) =>
             {
                 let (kanji, initial, _) = japanese_era(ymd);
                 match n {
@@ -311,7 +373,11 @@ pub(super) fn render_date(
             }
             Tok::EraYear(n) => {
                 if sec.calendar == 3
-                    || (japanese_tag && !matches!(sec.calendar, 4 | 5 | 9 | 10 | 20))
+                    || (japanese_tag
+                        && !matches!(
+                            sec.calendar,
+                            4 | 5 | 9 | 10 | 11 | 12 | 13 | 14 | 15 | 17 | 18 | 19 | 20 | 21
+                        ))
                 {
                     let (_, _, year) = japanese_era(ymd);
                     if *n >= 2 {

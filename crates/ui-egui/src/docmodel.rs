@@ -9,7 +9,7 @@ use std::sync::Arc;
 
 use open365_docx::{
     Alignment, Document, EffectiveParagraph, Inline, Paragraph, RawXml, RunContent, RunPropItem,
-    Styles,
+    Styles, VertAlign,
 };
 
 /// Font used when a document has no styles part and the run names no font.
@@ -30,6 +30,8 @@ pub struct SpanStyle {
     pub color: Option<[u8; 3]>,
     /// The font comes from the document's theme (body or headings), not a literal name.
     pub theme_font: Option<ThemeFont>,
+    /// `w:vertAlign` after the style chain: baseline, superscript or subscript.
+    pub vert_align: VertAlign,
 }
 
 /// Which theme font slot a run's font is.
@@ -50,6 +52,7 @@ impl Default for SpanStyle {
             strike: false,
             color: None,
             theme_font: None,
+            vert_align: VertAlign::Baseline,
         }
     }
 }
@@ -189,6 +192,7 @@ fn span_style(p: &Paragraph, run: &open365_docx::Run, styles: Option<&Styles>) -
             underline: e.underline,
             strike: e.strike,
             color: e.color,
+            vert_align: styles.effective_run_layout(p, run).vert_align,
         };
     }
     let props = &run.props;
@@ -204,6 +208,9 @@ fn span_style(p: &Paragraph, run: &open365_docx::Run, styles: Option<&Styles>) -
         underline: props.underline().is_some_and(|u| u != "none"),
         strike: props.strike().unwrap_or(false),
         color: props.color().and_then(parse_color),
+        vert_align: props
+            .vert_align()
+            .map_or(VertAlign::Baseline, VertAlign::parse),
     }
 }
 
@@ -347,5 +354,36 @@ mod tests {
                 .any(|s| s.page.width_twips > s.page.height_twips),
             "a landscape section"
         );
+    }
+
+    #[test]
+    fn vertical_alignment_resolves_through_the_style_chain() {
+        use std::io::Write;
+        const W: &str = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
+        let mut zip = zip::ZipWriter::new(std::io::Cursor::new(Vec::new()));
+        let opts = zip::write::SimpleFileOptions::default();
+        let parts = [
+            ("[Content_Types].xml", r#"<?xml version="1.0"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/><Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/></Types>"#.to_owned()),
+            ("_rels/.rels", r#"<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>"#.to_owned()),
+            ("word/_rels/document.xml.rels", r#"<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>"#.to_owned()),
+            ("word/styles.xml", format!(r#"<?xml version="1.0"?><w:styles xmlns:w="{W}"><w:style w:type="character" w:styleId="Sup"><w:name w:val="Sup"/><w:rPr><w:vertAlign w:val="superscript"/></w:rPr></w:style></w:styles>"#)),
+            ("word/document.xml", format!(r#"<?xml version="1.0"?><w:document xmlns:w="{W}"><w:body><w:p><w:r><w:t>a</w:t></w:r><w:r><w:rPr><w:rStyle w:val="Sup"/></w:rPr><w:t>b</w:t></w:r><w:r><w:rPr><w:rStyle w:val="Sup"/><w:vertAlign w:val="baseline"/></w:rPr><w:t>c</w:t></w:r><w:r><w:rPr><w:vertAlign w:val="subscript"/></w:rPr><w:t>d</w:t></w:r></w:p></w:body></w:document>"#)),
+        ];
+        for (name, content) in parts {
+            zip.start_file(name, opts).expect("start");
+            zip.write_all(content.as_bytes()).expect("write");
+        }
+        let bytes = zip.finish().expect("finish").into_inner();
+        let doc = Document::open(&bytes, &Limits::default()).expect("open");
+        let m = &build_models(&doc)[0];
+        let at = |i: usize| m.style_at(i + 1).vert_align;
+        assert_eq!(at(0), VertAlign::Baseline);
+        assert_eq!(at(1), VertAlign::Superscript, "from the character style");
+        assert_eq!(
+            at(2),
+            VertAlign::Baseline,
+            "direct baseline overrides the style"
+        );
+        assert_eq!(at(3), VertAlign::Subscript);
     }
 }

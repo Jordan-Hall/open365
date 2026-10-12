@@ -52,6 +52,10 @@ total = 10
 matched = 10
 total = 10
 
+[fixtures.layout-autospacing]
+matched = 0
+total = 25
+
 [fixtures.layout-caps]
 matched = 32
 total = 87
@@ -63,6 +67,14 @@ total = 39
 [fixtures.layout-caps-sizes]
 matched = 13
 total = 27
+
+[fixtures.layout-cell-after-border]
+matched = 78
+total = 78
+
+[fixtures.layout-cell-after-last]
+matched = 80
+total = 80
 
 [fixtures.layout-cols-balance]
 matched = 51
@@ -139,6 +151,22 @@ total = 168
 [fixtures.layout-cols-unequal-two]
 matched = 217
 total = 217
+
+[fixtures.layout-ctx-border]
+matched = 73
+total = 73
+
+[fixtures.layout-ctx-cell]
+matched = 22
+total = 22
+
+[fixtures.layout-ctx-cell2]
+matched = 25
+total = 25
+
+[fixtures.layout-ctx-cell3]
+matched = 73
+total = 73
 
 [fixtures.layout-float-align]
 matched = 44
@@ -412,6 +440,14 @@ total = 138
 matched = 135
 total = 136
 
+[fixtures.layout-table-hborders]
+matched = 118
+total = 118
+
+[fixtures.layout-table-hpad]
+matched = 105
+total = 105
+
 [fixtures.layout-table-pages]
 matched = 1208
 total = 1208
@@ -564,6 +600,10 @@ total = 10
 matched = 10
 total = 10
 
+[system.layout-autospacing]
+matched = 0
+total = 25
+
 [system.layout-caps]
 matched = 87
 total = 87
@@ -575,6 +615,14 @@ total = 39
 [system.layout-caps-sizes]
 matched = 27
 total = 27
+
+[system.layout-cell-after-border]
+matched = 78
+total = 78
+
+[system.layout-cell-after-last]
+matched = 80
+total = 80
 
 [system.layout-cols-balance]
 matched = 51
@@ -651,6 +699,22 @@ total = 168
 [system.layout-cols-unequal-two]
 matched = 217
 total = 217
+
+[system.layout-ctx-border]
+matched = 73
+total = 73
+
+[system.layout-ctx-cell]
+matched = 22
+total = 22
+
+[system.layout-ctx-cell2]
+matched = 25
+total = 25
+
+[system.layout-ctx-cell3]
+matched = 73
+total = 73
 
 [system.layout-face-multiple]
 matched = 66
@@ -939,6 +1003,14 @@ total = 138
 [system.layout-table-flow]
 matched = 135
 total = 136
+
+[system.layout-table-hborders]
+matched = 118
+total = 118
+
+[system.layout-table-hpad]
+matched = 105
+total = 105
 
 [system.layout-table-pages]
 matched = 1208

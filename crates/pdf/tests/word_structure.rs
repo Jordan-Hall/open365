@@ -140,6 +140,13 @@ fn report() {
             let mc = |s: &Structure| s.elems.iter().map(|e| e.mcids).collect::<Vec<_>>();
             let (mw, mo) = (mc(&w), mc(&o));
             let bad = mw.iter().zip(&mo).filter(|(a, b)| a != b).count();
+            if bad > 0 && std::env::var("O365_STRUCT_VERBOSE").is_ok() {
+                for (i, (a, b)) in mw.iter().zip(&mo).enumerate() {
+                    if a != b {
+                        println!("  {name} elem {i} {}: word {a} ours {b}", w.elems[i].role);
+                    }
+                }
+            }
             if bad > 0 {
                 diffs.push(format!(
                     "marked content per element differs in {bad}/{} elements (word {} ours {})",
@@ -491,5 +498,83 @@ fn blanks_and_marked_content_equal_words() {
                 );
             }
         }
+    }
+}
+
+/// The (y, x) of every blank (`[( )] TJ`) in a content stream: the text matrix before it.
+fn blank_positions(stream: &str) -> Vec<(f64, f64)> {
+    let toks: Vec<&str> = stream.split_whitespace().collect();
+    let mut out = Vec::new();
+    let mut last = None;
+    for (i, t) in toks.iter().enumerate() {
+        if *t == "Tm" && i >= 6 {
+            last = Some((
+                toks[i - 1].parse::<f64>().unwrap_or(0.0),
+                toks[i - 2].parse::<f64>().unwrap_or(0.0),
+            ));
+        }
+        if *t == "[(" && toks.get(i + 1) == Some(&")]") && toks.get(i + 2) == Some(&"TJ") {
+            out.extend(last);
+        }
+    }
+    out
+}
+
+/// Consecutive tabs with custom stops (`probes/p-tabs3`): each tab after the first starts where
+/// the one before it ended, at its stop (a leader ends a little earlier, with a blank of its
+/// own). Every line but the one with hyphen and underscore leaders agrees with Word's blanks.
+#[test]
+fn blanks_of_consecutive_tabs_with_custom_stops_equal_words() {
+    let fonts = FontLibrary::bundled();
+    let word = std::fs::read(root().join("fixtures/reference/pdf/probes/p-tabs3.pdf")).unwrap();
+    let (w, o) = (
+        blank_positions(&page_streams(&word)[0]),
+        blank_positions(&page_streams(&our_pdf("probes/p-tabs3", &fonts))[0]),
+    );
+    let lines = |v: &[(f64, f64)]| {
+        let mut g: Vec<(f64, Vec<f64>)> = Vec::new();
+        for (y, x) in v {
+            match g.iter_mut().find(|l| (l.0 - y).abs() < 0.6) {
+                Some(l) => l.1.push(*x),
+                None => g.push((*y, vec![*x])),
+            }
+        }
+        g
+    };
+    let (gw, go) = (lines(&w), lines(&o));
+    assert_eq!(gw.len(), go.len());
+    for (i, (a, b)) in gw.iter().zip(&go).enumerate() {
+        if i == 4 {
+            continue;
+        }
+        assert_eq!(a.1.len(), b.1.len(), "line {i}: {:?} vs {:?}", a.1, b.1);
+        for (p, q) in a.1.iter().zip(&b.1) {
+            assert!((p - q).abs() < 0.6, "line {i}: {:?} vs {:?}", a.1, b.1);
+        }
+    }
+}
+
+/// Marked content per element equals Word's in tables and bordered paragraphs: a shaded cell is
+/// an artifact plus a `P` sequence of the cell's first paragraph, the border of a paragraph is an
+/// artifact after each of its lines (so each line is a sequence of its own), the cells of a row
+/// are drawn one after the other, and the empty paragraph after a nested table draws its blank.
+#[test]
+fn marked_content_of_tables_and_bordered_paragraphs_equals_words() {
+    let fonts = FontLibrary::bundled();
+    for name in [
+        "layout-pbdr-edges",
+        "layout-pbdr-groups",
+        "layout-pbdr-pages",
+        "layout-table-flow",
+        "layout-table-rows",
+        "probes/p-thead-nest",
+        "probes/p-thead-nest2",
+        "probes/p-tnest",
+        "probes/p-tshd",
+    ] {
+        let (w, o) = (word(name).expect("word"), ours(name, &fonts).expect("ours"));
+        let mc = |s: &Structure| s.elems.iter().map(|e| e.mcids).collect::<Vec<_>>();
+        assert_eq!(roles(&w), roles(&o), "{name}: elements");
+        assert_eq!(mc(&w), mc(&o), "{name}: marked content per element");
     }
 }

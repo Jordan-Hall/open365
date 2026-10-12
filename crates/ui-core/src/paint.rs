@@ -119,6 +119,50 @@ impl Ui {
         x
     }
 
+    /// Underlines the access key of `node` in its label `text`, which starts at `x` (the value
+    /// `put_text_px` returned) inside `r`: Windows underlines the letter after the `&` of a
+    /// dialog caption. Only nodes with an access key (dialog controls) get it; the first
+    /// occurrence of the letter stands for the marked one.
+    #[allow(clippy::too_many_arguments)]
+    fn underline_access(
+        &mut self,
+        list: &mut DrawList,
+        node: &Node,
+        text: &str,
+        x: f32,
+        r: DeviceRect,
+        px: f32,
+        ink: Color,
+    ) {
+        let Some(key) = node.access_key else { return };
+        let Some((at, ch)) = text
+            .char_indices()
+            .find(|(_, c)| c.to_lowercase().eq(key.to_lowercase()))
+        else {
+            return;
+        };
+        let Some(m) = self.assets.font_metrics(self.font, px) else {
+            return;
+        };
+        let x0 = x + self.measure_px(&text[..at], px);
+        let x1 = x0 + self.measure_px(&text[at..at + ch.len_utf8()], px);
+        let base =
+            (r.y0 as f32 + (r.height() as f32 - (m.ascent + m.descent)) / 2.0 + m.ascent).round();
+        list.text_decoration(
+            &self.assets,
+            self.font,
+            px,
+            x0,
+            x1,
+            base,
+            Decorations {
+                underline: true,
+                strikethrough: false,
+            },
+            ink,
+        );
+    }
+
     /// Splits `text` into at most two lines no wider than `max_px`: at a newline, else at the
     /// space nearest the middle when it does not fit.
     fn wrap_two(&self, text: &str, max_px: f32, px: f32) -> Vec<String> {
@@ -329,7 +373,8 @@ impl Ui {
                     x1: (r.x1 - pad - right).max(r.x0 + pad),
                     ..r
                 };
-                self.put_text_px(list, &node.label, tr, look.align, ink, decor, px);
+                let x = self.put_text_px(list, &node.label, tr, look.align, ink, decor, px);
+                self.underline_access(list, node, &node.label, x, tr, px, ink);
                 if look.chevron {
                     let cx = (r.x1 - pad) as f32 - self.scale.0 * 6.0;
                     self.chevron(list, cx, (r.y0 + r.y1) as f32 / 2.0, ink, false);
@@ -672,7 +717,10 @@ impl Ui {
                         x0: box_r.x1 + self.scale.edge(8.0),
                         ..r
                     };
-                    self.put_text(list, &node.label, label, 0.0, ink, Decorations::default());
+                    let x =
+                        self.put_text(list, &node.label, label, 0.0, ink, Decorations::default());
+                    let px = self.text_px();
+                    self.underline_access(list, &node, &node.label, x, label, px, ink);
                 }
                 self.focus_ring(list, r, id);
             }
@@ -706,7 +754,10 @@ impl Ui {
                         x0: r.x0 + b + self.scale.edge(8.0),
                         ..r
                     };
-                    self.put_text(list, &node.label, label, 0.0, ink, Decorations::default());
+                    let x =
+                        self.put_text(list, &node.label, label, 0.0, ink, Decorations::default());
+                    let px = self.text_px();
+                    self.underline_access(list, &node, &node.label, x, label, px, ink);
                 }
                 self.focus_ring(list, r, id);
             }

@@ -213,6 +213,27 @@ pub(super) fn fact(ctx: &EvalContext<'_>, args: &[Arg]) -> Res<Value> {
     number(factorial(count_arg(ctx, &args[0])?)?)
 }
 
+/// `C(n, k)` as Excel's `COMBIN` computes it (identified from 10,141 measured values, 10,132 bit-exact): with `m = min(k, n - k)`
+/// and `c = n - m`, the running product of the ratios `(c + i - 1) / i` for `i = 2..=m` (each ratio rounded first), then the
+/// product times `c + m`. The result is not rounded to a whole number (`COMBIN(9,3)` is 83.99999999999999). `None` when the
+/// product leaves the double range.
+pub(super) fn binomial(n: u64, k: u64) -> Option<f64> {
+    let m = k.min(n - k);
+    if m == 0 {
+        return Some(1.0);
+    }
+    let c = n - m;
+    let mut r = 1.0f64;
+    for i in 2..=m {
+        r *= (c + i - 1) as f64 / i as f64;
+        if !r.is_finite() {
+            return None;
+        }
+    }
+    let r = r * (c + m) as f64;
+    r.is_finite().then_some(r)
+}
+
 pub(super) fn combin(ctx: &EvalContext<'_>, args: &[Arg]) -> Res<Value> {
     arity(args, 2, 2)?;
     let n = count_arg(ctx, &args[0])?;
@@ -220,13 +241,7 @@ pub(super) fn combin(ctx: &EvalContext<'_>, args: &[Arg]) -> Res<Value> {
     if k > n {
         return Err(ErrorKind::Num);
     }
-    let k = k.min(n - k) as u64;
-    let n = n as u64;
-    let mut r = 1.0f64;
-    for i in 1..=k {
-        r = r * (n - k + i) as f64 / i as f64;
-    }
-    number(r.round())
+    number(binomial(n as u64, k as u64).ok_or(ErrorKind::Num)?)
 }
 
 pub(super) fn permut(ctx: &EvalContext<'_>, args: &[Arg]) -> Res<Value> {

@@ -43,7 +43,11 @@ fn pdf_baselines_agree_with_word() {
                 .header
                 .iter()
                 .chain(&page.footer)
-                .chain(&page.lines)
+                .chain(
+                    open365_pdf::line_draw_order(page)
+                        .into_iter()
+                        .map(|i| &page.lines[i]),
+                )
                 .chain(page.frames.iter().flat_map(|f| f.lines.iter()))
                 .chain(&page.notes)
                 .filter(|l| {

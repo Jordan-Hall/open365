@@ -1,0 +1,11 @@
+{
+  "dpi": 120,
+  "sheets": [
+    {"name": "Basic", "shapes": [
+      {"name": "Pic 1", "type": 13, "placement": 2, "visible": true, "left": 55.5, "top": 18.649999618530273, "width": 90, "height": 60, "topLeftCell": "B2", "bottomRightCell": "C5"},
+      {"name": "Rect 1", "type": 1, "placement": 3, "visible": true, "left": 248.60000610351562, "top": 38.70000076293945, "width": 100.5, "height": 40.25, "topLeftCell": "E3", "bottomRightCell": "G5"},
+      {"name": "Chart 1", "type": 3, "placement": 3, "visible": true, "left": 48, "top": 169.1999969482422, "width": 0, "height": 0, "topLeftCell": "B12", "bottomRightCell": "B12"},
+      {"name": "Rect rot", "type": 1, "placement": 3, "visible": true, "left": 468.20001220703125, "top": 33.79999923706055, "width": 120, "height": 40, "topLeftCell": "J3", "bottomRightCell": "L5"}
+    ]}
+  ]
+}

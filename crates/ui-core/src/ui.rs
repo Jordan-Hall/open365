@@ -21,11 +21,15 @@ use crate::tree::{
 pub const TOOLTIP_DELAY: Duration = Duration::from_millis(500);
 /// Two presses within this time and 4 px are a double click.
 pub const CLICK_INTERVAL: Duration = Duration::from_millis(500);
+/// Step of the frame time source while something animates (the copy outline of Excel moves
+/// about every 60 ms).
+pub const FRAME_INTERVAL: Duration = Duration::from_millis(60);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum TimerKind {
     Tooltip(NodeId),
     Blink,
+    Frame,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -88,6 +92,11 @@ pub struct Ui {
     last_click: Option<(Instant, Point, u8)>,
     shift_down: bool,
     ctrl_down: bool,
+    alt_down: bool,
+    /// Something animates: [`TimerKind::Frame`] re-arms itself and asks for a frame.
+    animating: bool,
+    anim_frame: u64,
+    ctx_menu: Option<NodeId>,
     /// Accessibility subtree a canvas owner publishes (see `set_canvas_access`).
     pub(crate) canvas_access:
         HashMap<NodeId, (accesskit::Node, Vec<(accesskit::NodeId, accesskit::Node)>)>,
@@ -154,6 +163,10 @@ impl Ui {
             last_click: None,
             shift_down: false,
             ctrl_down: false,
+            alt_down: false,
+            animating: false,
+            anim_frame: 0,
+            ctx_menu: None,
             canvas_access: HashMap::new(),
         }
     }
@@ -287,6 +300,84 @@ impl Ui {
         }
     }
 
+    /// The modifier keys held now (tracked from the key events).
+    pub fn modifiers(&self) -> Modifiers {
+        Modifiers {
+            shift: self.shift_down,
+            ctrl: self.ctrl_down,
+            alt: self.alt_down,
+        }
+    }
+
+    /// Starts or stops the frame time source. While on, a timer fires every [`FRAME_INTERVAL`],
+    /// asks the host for a frame and advances [`Self::anim_frame`]; the host sleeps when it is off.
+    pub fn set_animating(&mut self, on: bool) {
+        if on == self.animating {
+            return;
+        }
+        self.animating = on;
+        if on {
+            let at = self.now + FRAME_INTERVAL;
+            self.schedule(at, TimerKind::Frame);
+        } else {
+            self.timers.retain(|t| t.kind != TimerKind::Frame);
+        }
+    }
+
+    pub fn animating(&self) -> bool {
+        self.animating
+    }
+
+    /// Frames elapsed since the first `set_animating(true)` (one per [`FRAME_INTERVAL`]).
+    pub fn anim_frame(&self) -> u64 {
+        self.anim_frame
+    }
+
+    /// Opens a context menu at logical point `at` (the window's coordinate space) and gives it
+    /// the keyboard focus. It is the shared menu widget, so painting, hover, arrow keys, access
+    /// keys and Esc work as in the ribbon menus; a pick arrives as `Emit::MenuCommand(node, id)`.
+    /// The menu flips up and left to stay inside the window, as Windows menus do.
+    pub fn open_context_menu(&mut self, items: Vec<MenuItem>, at: Point) -> NodeId {
+        let root = self.tree.root();
+        if let Some(old) = self.ctx_menu.take() {
+            self.tree.remove(old);
+        }
+        let widest = items
+            .iter()
+            .map(|i| self.measure(&i.label) / self.scale.0)
+            .fold(0.0f32, f32::max);
+        let width = (widest + 56.0).max(160.0);
+        let height = MenuState::panel_height(&items);
+        let bounds = self
+            .tree
+            .get(root)
+            .map_or(Rect::new(0.0, 0.0, 0.0, 0.0), |r| r.bounds);
+        let x = if at.x + width > bounds.w {
+            (at.x - width).max(0.0)
+        } else {
+            at.x
+        };
+        let y = if at.y + height > bounds.h {
+            (at.y - height).max(0.0)
+        } else {
+            at.y
+        };
+        let node = Node::new(
+            Widget::Menu(MenuState::new(items)),
+            Rect::new(x, y, width, height),
+        )
+        .with_label("Context menu");
+        let id = self.tree.add(root, node);
+        self.ctx_menu = Some(id);
+        self.open_menu(id, Point::new(x, y));
+        id
+    }
+
+    /// The context menu node, once one was opened.
+    pub fn context_menu(&self) -> Option<NodeId> {
+        self.ctx_menu.filter(|m| self.tree.contains(*m))
+    }
+
     fn schedule(&mut self, at: Instant, kind: TimerKind) {
         self.timers.retain(|t| t.kind != kind);
         self.timers.push(Timer { at, kind });
@@ -308,7 +399,8 @@ impl Ui {
             }
             InputEvent::PointerDown(PointerButton::Primary, p) => self.pointer_down(p),
             InputEvent::PointerUp(PointerButton::Primary, p) => self.pointer_up(p),
-            InputEvent::PointerDown(..) | InputEvent::PointerUp(..) => {}
+            InputEvent::PointerDown(b, p) => self.pointer_button_down(b, p),
+            InputEvent::PointerUp(..) => {}
             InputEvent::Wheel { delta_y } => self.wheel(delta_y),
             InputEvent::Key {
                 key,
@@ -354,6 +446,13 @@ impl Ui {
                             at: self.pointer,
                         });
                         self.redraw = true;
+                    }
+                }
+                TimerKind::Frame => {
+                    if self.animating {
+                        self.anim_frame = self.anim_frame.wrapping_add(1);
+                        self.redraw = true;
+                        self.schedule(now + FRAME_INTERVAL, TimerKind::Frame);
                     }
                 }
                 TimerKind::Blink => {
@@ -504,6 +603,42 @@ impl Ui {
         }
     }
 
+    /// A press of the secondary or middle button: it closes open popups, focuses a canvas and
+    /// reports `Emit::CanvasButton`; other widgets ignore it.
+    fn pointer_button_down(&mut self, button: PointerButton, p: Point) {
+        if button == PointerButton::Primary {
+            self.pointer_down(p);
+            return;
+        }
+        self.pointer = p;
+        self.keytips.cancel();
+        self.tooltip = None;
+        let hit = self.tree.hit_test(p);
+        self.close_popups(hit);
+        self.redraw = true;
+        let Some(h) = hit else { return };
+        if !self.tree.get(h).is_some_and(|n| n.enabled) {
+            return;
+        }
+        if self
+            .tree
+            .get(h)
+            .is_some_and(|n| matches!(n.widget, Widget::Canvas { .. }))
+        {
+            self.focus_visible = false;
+            self.set_focus(Some(h));
+            let rect = self.tree.abs_rect(h);
+            let modifiers = self.modifiers();
+            self.emit(Emit::CanvasButton {
+                node: h,
+                at: Point::new(p.x - rect.x, p.y - rect.y),
+                button,
+                clicks: 1,
+                modifiers,
+            });
+        }
+    }
+
     fn pointer_up(&mut self, p: Point) {
         self.pointer = p;
         self.drag = None;
@@ -515,9 +650,12 @@ impl Ui {
                 .is_some_and(|n| matches!(n.widget, Widget::Canvas { .. }))
         {
             let rect = self.tree.abs_rect(c);
+            let modifiers = self.modifiers();
             self.emit(Emit::CanvasRelease {
                 node: c,
                 at: Point::new(p.x - rect.x, p.y - rect.y),
+                button: PointerButton::Primary,
+                modifiers,
             });
         }
         self.redraw = true;
@@ -926,9 +1064,12 @@ impl Ui {
             .get(id)
             .is_some_and(|n| matches!(n.widget, Widget::Canvas { .. }))
         {
+            let modifiers = self.modifiers();
             self.emit(Emit::CanvasDrag {
                 node: id,
                 at: Point::new(p.x - rect.x, p.y - rect.y),
+                button: PointerButton::Primary,
+                modifiers,
             });
             self.redraw = true;
             return;
@@ -1055,6 +1196,12 @@ impl Ui {
         }
         // Alt tips.
         if key == Key::Alt {
+            self.alt_down = pressed;
+            // A dialog has its own access keys; the ribbon's key tips stay hidden behind it.
+            if crate::dialog::scrim_serial(self).is_some() {
+                self.keytips.cancel();
+                return;
+            }
             if pressed {
                 let out = self.keytips.alt_pressed(false);
                 self.apply_tip(out);
@@ -1085,7 +1232,7 @@ impl Ui {
             && self.tree.get(f).is_some_and(|n| {
                 n.enabled
                     && match &n.widget {
-                        Widget::Canvas { .. } => !matches!(key, Key::Char(_)) || m.ctrl,
+                        Widget::Canvas { .. } => !matches!(key, Key::Char(_)) || m.ctrl || m.alt,
                         _ => n.intercept.contains(&key),
                     }
             })

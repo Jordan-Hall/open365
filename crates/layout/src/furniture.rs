@@ -56,7 +56,8 @@ pub(crate) struct Furniture {
     links: HashMap<String, HashMap<String, String>>,
     heights: Vec<[[f64; 3]; 2]>,
     /// Sections whose missing header and footer stories Word keeps as empty paragraphs.
-    implied: Vec<bool>,
+    /// Per section and story kind (default, first, even): Word keeps an empty story there.
+    implied: Vec<[bool; 3]>,
 }
 
 fn kind_index(t: HeaderFooterType) -> usize {
@@ -166,13 +167,25 @@ fn empty_story_paragraph(style: &str) -> Option<Paragraph> {
 
 /// Word keeps an empty header and footer story for a section with a different first page even when
 /// the file defines none (`titlePg` without references), and reserves their height.
-fn stories_implied(doc_sections: &[open365_docx::Section], section: usize) -> bool {
+///
+/// Measured on the template corpus: a section that names two or more stories of one kind (header
+/// or footer) and none of the other keeps empty stories (`0a90ca9d`, `d52c20af`), and a later
+/// section with `titlePg` that follows a section with header or footer parts has an empty first-page
+/// header and footer of its own (`4e493df5` section 2: Word lists both, the body of its first page
+/// starts below the header). `titlePg` alone is not enough (`a2a7720e`, `ad265748`, `65cf689e` have
+/// no header or footer part anywhere and lose every line when it is).
+fn stories_implied(doc_sections: &[open365_docx::Section], section: usize) -> [bool; 3] {
     let Some(s) = doc_sections.get(section) else {
-        return false;
+        return [false; 3];
     };
     let footers = s.header_footer_refs.iter().filter(|r| r.footer).count();
     let headers = s.header_footer_refs.len() - footers;
-    (headers == 0 && footers >= 2) || (footers == 0 && headers >= 2)
+    let named = (headers == 0 && footers >= 2) || (footers == 0 && headers >= 2);
+    let inherits = doc_sections[..section]
+        .iter()
+        .any(|p| !p.header_footer_refs.is_empty());
+    let first = named || (s.title_pg && inherits);
+    [named, first, named]
 }
 
 fn height_of(paras: &[ParaLayout]) -> f64 {
@@ -196,7 +209,12 @@ impl Furniture {
                 links
                     .entry(r.rel_id.clone())
                     .or_insert_with(|| related_links(doc, |id, _| id == r.rel_id));
-                let blocks = doc.header_footer_blocks(&r.rel_id).map(Arc::new);
+                // A block-level content control (the page number gallery of a footer) is part
+                // of the story: its paragraphs lay out and its two marker characters count
+                // (4e493df5: the footer's page number was missing).
+                let blocks = doc.header_footer_blocks(&r.rel_id).map(|b| {
+                    Arc::new(open365_docx::flatten_content_controls(&b).map_or(b, |f| f.blocks))
+                });
                 current[usize::from(r.footer)][kind_index(r.kind)] = blocks;
                 current_rels[usize::from(r.footer)][kind_index(r.kind)] = Some(r.rel_id.clone());
             }
@@ -212,7 +230,7 @@ impl Furniture {
             implied.push(implies);
             for (f, row) in st.iter().enumerate() {
                 for (k, blocks) in row.iter().enumerate() {
-                    if blocks.is_none() && implies {
+                    if blocks.is_none() && implies[k] {
                         let style = if f == 0 { "Header" } else { "Footer" };
                         if let Some(p) = empty_story_paragraph(style) {
                             h[f][k] = height_of(&layout_blocks(ctx, &[Block::Paragraph(p)], width));
@@ -257,10 +275,10 @@ impl Furniture {
         let (mut top, mut bottom) = (sp.margin_top, sp.page_height - sp.margin_bottom);
         if let Some(h) = self.heights.get(section) {
             let k = self.kind(section, page, first);
-            if self.stories[section][0][k].is_some() || self.implied[section] {
+            if self.stories[section][0][k].is_some() || self.implied[section][k] {
                 top = top.max(sp.header_distance + h[0][k]);
             }
-            if self.stories[section][1][k].is_some() || self.implied[section] {
+            if self.stories[section][1][k].is_some() || self.implied[section][k] {
                 bottom = bottom.min(sp.page_height - sp.footer_distance - h[1][k]);
             }
         }

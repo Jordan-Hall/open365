@@ -1,0 +1,5 @@
+feature = "layout-ctx-border"
+made_with = "hand-written OOXML (generated from layout-table-basic.docx parts); reference taken with Microsoft Word 16.0"
+author = "project member"
+expect_dropped = []
+notes = "space after of the last (empty) paragraph of a cell with contextual spacing, style spacing inherited or explicit, with and without a 3 pt bottom border"

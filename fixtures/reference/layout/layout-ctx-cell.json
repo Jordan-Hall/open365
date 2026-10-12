@@ -1,0 +1,33 @@
+{
+  "source": "fixtures/docx/layout-ctx-cell.docx",
+  "oracle": "Microsoft Word 16.0 (16.0.20430), Print Layout, tools/office/word-layout-oracle.ps1",
+  "units": "points; page and top/left/baseline measured from the page top-left corner; start/end are UTF-16 offsets in the main story",
+  "precision": "top/left/lastX are screen-quantised (+-0.3 pt); baseline/inkLeft and cell rectangles come from the 600 dpi PDF and are exact",
+  "pageCount": 1,
+  "cells": [
+    {"page": 1, "x": 72.024, "y": 176.686, "w": 240.1, "h": 25.464},
+    {"page": 1, "x": 72.024, "y": 215.59, "w": 240.1, "h": 38.64},
+    {"page": 1, "x": 72.024, "y": 267.676, "w": 240.1, "h": 38.904},
+    {"page": 1, "x": 72.024, "y": 320.02, "w": 240.1, "h": 38.88}
+  ],
+  "lines": [
+    {"page": 1, "start": 0, "end": 7, "top": 72.0, "left": 72.0, "lastX": 98.4, "baseline": 82.58, "inkLeft": 72.024, "text": "a1 ctx\u000d"},
+    {"page": 1, "start": 7, "end": 16, "top": 97.2, "left": 72.0, "lastX": 107.4, "baseline": 108.02, "inkLeft": 72.024, "text": "a2 plain\u000d"},
+    {"page": 1, "start": 16, "end": 23, "top": 111.0, "left": 72.0, "lastX": 99.0, "baseline": 121.49, "inkLeft": 72.024, "text": "b1 ctx\u000d"},
+    {"page": 1, "start": 23, "end": 30, "top": 124.2, "left": 72.0, "lastX": 99.0, "baseline": 134.93, "inkLeft": 72.024, "text": "b2 ctx\u000d"},
+    {"page": 1, "start": 30, "end": 39, "top": 150.0, "left": 72.0, "lastX": 108.0, "baseline": 160.37, "inkLeft": 72.024, "text": "b3 plain\u000d"},
+    {"page": 1, "start": 39, "end": 48, "top": 163.2, "left": 72.0, "lastX": 106.8, "baseline": 173.81, "inkLeft": 72.024, "text": "c0 plain\u000d"},
+    {"page": 1, "start": 48, "end": 64, "top": 187.25, "left": 77.304, "lastX": null, "baseline": 187.25, "inkLeft": 77.304, "text": "d1 cell ctx last", "cell": true},
+    {"page": 1, "start": 66, "end": 87, "top": 202.2, "left": 72.0, "lastX": 156.6, "baseline": 212.71, "inkLeft": 72.024, "text": "d2 plain after table\u000d"},
+    {"page": 1, "start": 87, "end": 93, "top": 226.15, "left": 77.304, "lastX": null, "baseline": 226.15, "inkLeft": 77.304, "text": "e1 ctx", "cell": true},
+    {"page": 1, "start": 94, "end": 105, "top": 239.59, "left": 77.304, "lastX": null, "baseline": 239.59, "inkLeft": 77.304, "text": "e2 ctx last", "cell": true},
+    {"page": 1, "start": 107, "end": 116, "top": 254.4, "left": 72.0, "lastX": 107.4, "baseline": 264.79, "inkLeft": 72.024, "text": "e3 plain\u000d"},
+    {"page": 1, "start": 116, "end": 124, "top": 278.23, "left": 77.304, "lastX": null, "baseline": 278.23, "inkLeft": 77.304, "text": "f1 plain", "cell": true},
+    {"page": 1, "start": 125, "end": 136, "top": 291.7, "left": 77.304, "lastX": null, "baseline": 291.7, "inkLeft": 77.304, "text": "f2 ctx last", "cell": true},
+    {"page": 1, "start": 138, "end": 147, "top": 306.6, "left": 72.0, "lastX": 105.0, "baseline": 317.14, "inkLeft": 72.024, "text": "f3 plain\u000d"},
+    {"page": 1, "start": 147, "end": 153, "top": 330.58, "left": 77.304, "lastX": null, "baseline": 330.58, "inkLeft": 77.304, "text": "g1 ctx", "cell": true},
+    {"page": 1, "start": 154, "end": 167, "top": 356.02, "left": 77.304, "lastX": null, "baseline": 356.02, "inkLeft": 77.304, "text": "g2 plain last", "cell": true},
+    {"page": 1, "start": 169, "end": 178, "top": 358.8, "left": 72.0, "lastX": 107.4, "baseline": 369.48, "inkLeft": 72.024, "text": "g3 plain\u000d"},
+    {"page": 1, "start": 178, "end": 205, "top": 372.0, "left": 72.0, "lastX": 190.2, "baseline": 382.92, "inkLeft": 72.024, "text": "h1 ctx before page end-ish\u000d"}
+  ]
+}

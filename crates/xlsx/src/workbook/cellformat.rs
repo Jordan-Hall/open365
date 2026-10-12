@@ -152,6 +152,39 @@ impl Workbook {
         self.styles.cell_format(self.cell_xf(sheet, row, col))
     }
 
+    /// Gives many cells a `cellXfs` index in one step: one snapshot of the sheet for the whole
+    /// list (returned for undo) instead of one per cell. Nothing changes when any entry is out
+    /// of range or names an unknown `xf`. Later entries for the same cell win.
+    pub fn set_cell_xfs(
+        &mut self,
+        sheet: usize,
+        cells: &[(u32, u32, u32)],
+    ) -> Result<FormatSnapshot, XlsxError> {
+        let xfs = self.styles.cell_xf_count();
+        for &(r, c, xf) in cells {
+            check_rect((r, c, r, c))?;
+            if xf as usize >= xfs.max(1) {
+                return Err(XlsxError::UnsupportedEdit(format!(
+                    "cell format {xf} does not exist"
+                )));
+            }
+        }
+        self.worksheet_mut(sheet)?;
+        let before = self.format_snapshot(sheet)?;
+        self.edited()?;
+        let Some(ws) = self.sheets.get_mut(sheet).and_then(|e| e.data.as_mut()) else {
+            return Err(XlsxError::NotAWorksheet(sheet));
+        };
+        for &(r, c, xf) in cells {
+            ws.set_cell_style(r, c, xf);
+        }
+        if let Some(e) = self.sheets.get_mut(sheet) {
+            e.dirty = true;
+        }
+        self.styles_dirty = true;
+        Ok(before)
+    }
+
     /// Core of every action: restyles `rect` with `f(styles, old xf, row, col)`, undoing the
     /// action if `f` fails.
     pub(super) fn restyle(

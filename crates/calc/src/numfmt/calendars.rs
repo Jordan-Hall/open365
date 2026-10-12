@@ -3,8 +3,10 @@
 //! Measured on Excel (about 2,400 serials per calendar from 1900 to 9999): all three follow the real calendar. Hebrew
 //! matches the standard molad arithmetic for every year below 6000 (the end of Windows' table; later years drift by
 //! a few days in Excel and are computed with the same arithmetic here). Persian uses the 33-year leap cycle
-//! (leap years 1, 5, 9, 13, 17, 22, 26, 30 of 33), which Excel follows up to year 1535; later years differ by up to
-//! three days at year 9378. Saka is the Indian national calendar (Chaitra 1 on 22 March, 21 March in a leap year).
+//! (leap years 1, 5, 9, 13, 17, 22, 26, 30 of 33), which Excel follows up to year 1502; later years come from a measured
+//! table of leap years (`persian_leap.bin`). Saka is the Indian national calendar (Chaitra 1 on 22 March, 21 March in a leap year).
+
+use std::sync::OnceLock;
 
 use crate::functions::serial_to_ymd;
 
@@ -285,6 +287,26 @@ const KOREAN_MONTHS: [&str; 12] = [
     "\u{c123}\u{b2ec}",
 ];
 
+/// Month names of the Gregorian calendars with transliterated English names (calendar bytes 11 and 12): measured, the same for
+/// every language tag; `mmm` equals `mmmm`.
+const ARABIC_GREGORIAN_MONTHS: [&str; 12] = [
+    "\u{64a}\u{646}\u{627}\u{64a}\u{631}",
+    "\u{641}\u{628}\u{631}\u{627}\u{64a}\u{631}",
+    "\u{645}\u{627}\u{631}\u{633}",
+    "\u{623}\u{628}\u{631}\u{64a}\u{644}",
+    "\u{645}\u{627}\u{64a}\u{648}",
+    "\u{64a}\u{648}\u{646}\u{64a}\u{648}",
+    "\u{64a}\u{648}\u{644}\u{64a}\u{648}",
+    "\u{623}\u{63a}\u{633}\u{637}\u{633}",
+    "\u{633}\u{628}\u{62a}\u{645}\u{628}\u{631}",
+    "\u{623}\u{643}\u{62a}\u{648}\u{628}\u{631}",
+    "\u{646}\u{648}\u{641}\u{645}\u{628}\u{631}",
+    "\u{62f}\u{64a}\u{633}\u{645}\u{628}\u{631}",
+];
+
+/// The first lunisolar month is zhengyue, except under a Taiwan tag with calendar byte 15 (month one, `一月`).
+const LUNAR_FIRST_MONTH: &str = "\u{6b63}\u{6708}";
+
 const KOREAN_DAYS: [&str; 7] = [
     "\u{c77c}\u{c694}\u{c77c}",
     "\u{c6d4}\u{c694}\u{c77c}",
@@ -370,7 +392,8 @@ fn hebrew_month_lengths(y: i64) -> Vec<i64> {
 
 /// (year, month, day) with Tishri as month 1; the leap-year Adar I is month 6 and Adar II month 7.
 fn hebrew(serial: i64, date1904: bool) -> Option<(i64, i64, i64)> {
-    let day = real_days(serial, date1904)? + 2_067_022;
+    let real = real_days(serial, date1904)?;
+    let day = real + 2_067_022;
     let mut y = (day as f64 / 365.2468) as i64 + 1;
     while hebrew_new_year(y) > day {
         y -= 1;
@@ -394,14 +417,59 @@ fn hebrew(serial: i64, date1904: bool) -> Option<(i64, i64, i64)> {
 
 const PERSIAN_LEAP: [i64; 8] = [1, 5, 9, 13, 17, 22, 26, 30];
 
-fn persian_leap(y: i64) -> bool {
+/// Excel's leap years from Persian year 1279 on, one bit per year (`persian_leap.bin`, written by
+/// `tools/office/calc-calendar-tables.py` from the measured year length of every year up to 9377). Excel follows the 33-year
+/// cycle above only up to about year 1500; later its leap pattern drifts like a mean solar year, and no rule reproduces it.
+static PERSIAN_LEAP_BITS: &[u8] = include_bytes!("persian_leap.bin");
+const PERSIAN_TABLE_FIRST: i64 = 1279;
+const PERSIAN_TABLE_YEARS: i64 = 8099;
+
+fn persian_rule_leap(y: i64) -> bool {
     PERSIAN_LEAP.contains(&y.rem_euclid(33))
 }
 
-fn persian_year_start(y: i64) -> i64 {
+fn persian_leap(y: i64) -> bool {
+    let i = y - PERSIAN_TABLE_FIRST;
+    if (0..PERSIAN_TABLE_YEARS).contains(&i) {
+        return PERSIAN_LEAP_BITS
+            .get((i / 8) as usize)
+            .is_some_and(|b| b >> (i % 8) & 1 == 1);
+    }
+    persian_rule_leap(y)
+}
+
+fn persian_rule_start(y: i64) -> i64 {
     let n = y - 1;
     let (full, rest) = (n.div_euclid(33), n.rem_euclid(33));
     365 * n + full * 8 + PERSIAN_LEAP.iter().filter(|&&t| t <= rest).count() as i64
+}
+
+/// Days before 1 Farvardin of year `y`, counted from 1 Farvardin of year 1.
+fn persian_year_start(y: i64) -> i64 {
+    if y <= PERSIAN_TABLE_FIRST {
+        return persian_rule_start(y);
+    }
+    static STARTS: OnceLock<Vec<i64>> = OnceLock::new();
+    let starts = STARTS.get_or_init(|| {
+        let mut v = Vec::with_capacity(PERSIAN_TABLE_YEARS as usize + 1);
+        let mut s = persian_rule_start(PERSIAN_TABLE_FIRST);
+        v.push(s);
+        for k in 0..PERSIAN_TABLE_YEARS {
+            s += 365 + i64::from(persian_leap(PERSIAN_TABLE_FIRST + k));
+            v.push(s);
+        }
+        v
+    });
+    match starts.get((y - PERSIAN_TABLE_FIRST) as usize) {
+        Some(&s) => s,
+        None => {
+            let mut s = starts[starts.len() - 1];
+            for k in PERSIAN_TABLE_FIRST + PERSIAN_TABLE_YEARS..y {
+                s += 365 + i64::from(persian_rule_leap(k));
+            }
+            s
+        }
+    }
 }
 
 fn persian(serial: i64, date1904: bool) -> Option<(i64, i64, i64)> {
@@ -522,6 +590,18 @@ pub(super) fn month_name(calendar: u8, lcid: Option<u32>, year: i64, month: i64)
         4 => CHINESE_MONTHS.get(i)?,
         10 => SYRIAC_MONTHS.get(i)?,
         20 => KOREAN_MONTHS.get(i)?,
+        11 | 12 => ARABIC_GREGORIAN_MONTHS.get(i)?,
+        // Lunisolar calendars: the month number counts a leap month, and numbers above 12 show the name of month 12.
+        14 | 15 | 17 => {
+            let i = i.min(11);
+            if calendar == 14 && lcid.is_some_and(|l| l & 0x3FF == 0x12) {
+                KOREAN_MONTHS.get(i)?
+            } else if i == 0 && !(calendar == 15 && lcid.is_some_and(|l| l & 0xFFFF == 0x0404)) {
+                &LUNAR_FIRST_MONTH
+            } else {
+                CHINESE_MONTHS.get(i)?
+            }
+        }
         _ => return None,
     };
     Some((*name).to_string())
@@ -559,7 +639,7 @@ pub(super) fn weekday_name(
         }
         (4, _, false) => CHINESE_DAYS[wd],
         (4, _, true) => CHINESE_ABBR[wd],
-        (10, ..) => ARABIC_DAYS[wd],
+        (10..=12, ..) => ARABIC_DAYS[wd],
         (20, _, false) => KOREAN_DAYS[wd],
         (20, _, true) => KOREAN_ABBR[wd],
         _ => return None,

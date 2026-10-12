@@ -1,0 +1,5 @@
+feature = "layout-table-hborders"
+made_with = "hand-written OOXML (generated from layout-table-basic.docx parts); reference taken with Microsoft Word 16.0"
+author = "project member"
+expect_dropped = []
+notes = "horizontal cell borders between rows: only the upper row's bottom border, only the lower row's top border, both with different widths, one cell only, insideH, table top and bottom borders"

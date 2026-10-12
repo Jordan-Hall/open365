@@ -20,13 +20,16 @@ pub mod layout;
 pub mod spec;
 
 pub mod compare;
+pub mod dialogs;
 pub mod doc;
 pub mod fonts;
 pub mod headless;
 pub mod icons;
 pub mod menus;
 pub mod palette;
+pub mod ribbon;
 pub mod sheet;
+pub use sheet::sheet_ext;
 pub mod shell;
 
 mod app;

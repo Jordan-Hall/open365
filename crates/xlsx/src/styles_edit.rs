@@ -310,8 +310,8 @@ fn quantise_tint(tint: f64) -> f64 {
     steps / 32767.0
 }
 
-/// 17 significant digits as Excel writes them; below 0.1 in magnitude it switches to the
-/// `E-2` form.
+/// 17 significant digits as Excel writes them, trailing zeros dropped (`0.499984740745262`);
+/// below 0.1 in magnitude it switches to the `E-2` form.
 fn tint_text(tint: f64) -> String {
     let sci = format!("{tint:.16e}");
     let Some((mantissa, exp)) = sci.split_once('e') else {
@@ -320,6 +320,8 @@ fn tint_text(tint: f64) -> String {
     let exp: i32 = exp.parse().unwrap_or(0);
     let negative = mantissa.starts_with('-');
     let digits: String = mantissa.chars().filter(char::is_ascii_digit).collect();
+    let digits = digits.trim_end_matches('0');
+    let digits = if digits.is_empty() { "0" } else { digits };
     let sign = if negative { "-" } else { "" };
     if exp == -1 {
         format!("{sign}0.{digits}")
@@ -331,7 +333,7 @@ fn tint_text(tint: f64) -> String {
 
 /// A `color`-like element (`color`, `fgColor`, `bgColor`) for `c`. `auto_index` is what an
 /// automatic colour is written as, or `None` to write nothing.
-fn color_element(
+pub(crate) fn color_element(
     tpl: &XmlElement,
     local: &str,
     c: &Color,
@@ -470,7 +472,7 @@ fn fill_element(tpl: &XmlElement, spec: &FillSpec) -> XmlElement {
     fill
 }
 
-fn pattern_name(p: FillPattern) -> &'static str {
+pub(crate) fn pattern_name(p: FillPattern) -> &'static str {
     match p {
         FillPattern::None => "none",
         FillPattern::Solid => "solid",
@@ -494,7 +496,7 @@ fn pattern_name(p: FillPattern) -> &'static str {
     }
 }
 
-fn border_style_name(s: BorderStyle) -> Option<&'static str> {
+pub(crate) fn border_style_name(s: BorderStyle) -> Option<&'static str> {
     Some(match s {
         BorderStyle::None => return None,
         BorderStyle::Thin => "thin",
@@ -534,8 +536,25 @@ fn empty_border(tpl: &XmlElement) -> XmlElement {
 
 fn set_edge(border: &mut XmlElement, local: &str, edge: &BorderEdge) {
     let tpl = border.sibling("x");
-    let new = edge_element(&tpl, local, edge);
+    let mut new = edge_element(&tpl, local, edge);
     if let Some(slot) = child_mut(border, local) {
+        // An edge that is automatic by `<color auto="1"/>` (what Excel keeps for it, apart from
+        // the `indexed="64"` of an edge it drew itself) stays that way when it is restyled.
+        let old = BorderEdge::parse(slot);
+        if old.style != BorderStyle::None
+            && edge.style != BorderStyle::None
+            && old.color == Color::AUTO
+            && edge.color == Color::AUTO
+        {
+            new = el(
+                &tpl,
+                local,
+                &[("style", border_style_name(edge.style).unwrap_or("thin"))],
+            );
+            let mut c = tpl.sibling("color");
+            c.head.attrs.push(Attr::plain("auto", "1"));
+            new.children.push(RawXml::Element(c));
+        }
         *slot = new;
         return;
     }
@@ -767,7 +786,11 @@ impl Styles {
     }
 
     /// The `numFmtId` for `fmt`, adding a custom format when needed.
-    fn number_format_id(root: &mut XmlElement, fmt: &NumberFormat, locale: Option<u32>) -> u32 {
+    pub(crate) fn number_format_id(
+        root: &mut XmlElement,
+        fmt: &NumberFormat,
+        locale: Option<u32>,
+    ) -> u32 {
         let code = match fmt {
             NumberFormat::Builtin(id) => return *id,
             NumberFormat::Code(code) => code,

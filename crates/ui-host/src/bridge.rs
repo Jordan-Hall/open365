@@ -154,6 +154,7 @@ impl InputBridge {
                 let b = match button {
                     MouseButton::Left => PointerButton::Primary,
                     MouseButton::Right => PointerButton::Secondary,
+                    MouseButton::Middle => PointerButton::Middle,
                     _ => return,
                 };
                 out.push(match state {
@@ -247,6 +248,27 @@ mod tests {
             mv(&mut b, 100.0, 40.0),
             [InputEvent::PointerMoved(Point::new(50.0, 20.0))]
         );
+    }
+
+    #[test]
+    fn mouse_buttons_map_to_pointer_buttons() {
+        let mut b = InputBridge::default();
+        for (mouse, want) in [
+            (MouseButton::Left, PointerButton::Primary),
+            (MouseButton::Right, PointerButton::Secondary),
+            (MouseButton::Middle, PointerButton::Middle),
+        ] {
+            let mut out = Vec::new();
+            b.translate(
+                &WindowEvent::MouseInput {
+                    device_id: DeviceId::dummy(),
+                    state: ElementState::Pressed,
+                    button: mouse,
+                },
+                &mut out,
+            );
+            assert!(matches!(out.as_slice(), [InputEvent::PointerDown(got, _)] if *got == want));
+        }
     }
 
     #[test]

@@ -23,7 +23,11 @@ fn lines_with_glyphs(page: &open365_layout::Page) -> Vec<&Line> {
     page.header
         .iter()
         .chain(&page.footer)
-        .chain(&page.lines)
+        .chain(
+            open365_pdf::line_draw_order(page)
+                .into_iter()
+                .map(|i| &page.lines[i]),
+        )
         .chain(page.frames.iter().flat_map(|f| f.lines.iter()))
         .chain(&page.notes)
         .filter(|l| l.runs.iter().any(|r| !r.glyphs.is_empty()) && !common::clipped_away(page, l))

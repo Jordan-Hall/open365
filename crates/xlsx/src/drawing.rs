@@ -6,6 +6,9 @@
 //! [`Anchor::rect_pt`] turns an anchor into a rectangle in points, taking column widths and row
 //! heights from the sheet the way Excel does (`Shape.Width` of a move-and-size chart).
 
+use open365_drawing::DrawingObject;
+use open365_drawing::theme::ThemeData;
+use open365_drawing::xml as dnode;
 use open365_opc::{PartName, Relationships, rels_part_name, resolve_target};
 
 use crate::geometry::GridMetrics;
@@ -246,8 +249,186 @@ impl Workbook {
     }
 }
 
+/// The anchor of a worksheet drawing object (`twoCellAnchor`, `oneCellAnchor`, `absoluteAnchor`;
+/// the shift behaviour of a two-cell anchor follows its `editAs`).
+pub type SheetAnchor = Anchor;
+
+/// One object of a worksheet's drawing part: the anchor that places it, the object read through
+/// `open365-drawing`, and the drawing part's relationships so a renderer can find its image or chart.
+#[derive(Debug, Clone, PartialEq)]
+pub struct SheetObject {
+    pub anchor: SheetAnchor,
+    pub object: DrawingObject,
+    pub drawing_part: PartName,
+    /// Position in the drawing part (z order, back to front).
+    pub z: usize,
+    targets: Vec<(String, PartName)>,
+}
+
+impl SheetObject {
+    /// The part a relationship id of the drawing part points at (`r:embed`, chart `r:id`).
+    pub fn target(&self, rid: &str) -> Option<&PartName> {
+        self.targets
+            .iter()
+            .find(|(id, _)| id == rid)
+            .map(|(_, p)| p)
+    }
+}
+
+fn is_object_name(local: &str) -> bool {
+    matches!(local, "sp" | "pic" | "graphicFrame" | "grpSp" | "cxnSp")
+}
+
+/// The object elements of an anchor, looking through `mc:AlternateContent` (the `Choice` Excel
+/// understands, else the `Fallback`).
+fn object_nodes(anchor: &dnode::Node) -> Vec<&dnode::Node> {
+    let mut out = Vec::new();
+    for c in &anchor.children {
+        let name = c.local_name();
+        if is_object_name(name) {
+            out.push(c);
+        } else if name == "AlternateContent" {
+            let pick = |branch: &str| {
+                c.children
+                    .iter()
+                    .filter(|b| b.local_name() == branch)
+                    .flat_map(|b| b.children.iter())
+                    .filter(|n| is_object_name(n.local_name()))
+                    .collect::<Vec<_>>()
+            };
+            let chosen = pick("Choice");
+            out.extend(if chosen.is_empty() {
+                pick("Fallback")
+            } else {
+                chosen
+            });
+        }
+    }
+    out
+}
+
+fn objects_in_drawing(
+    drawing: &PartName,
+    bytes: &[u8],
+    rels: &Relationships,
+    first_z: usize,
+) -> Vec<SheetObject> {
+    let (Ok(text), Ok(doc)) = (std::str::from_utf8(bytes), xml::parse(bytes)) else {
+        return Vec::new();
+    };
+    let Ok(tree) = dnode::parse(text) else {
+        return Vec::new();
+    };
+    let targets: Vec<(String, PartName)> = rels
+        .iter()
+        .filter_map(|r| {
+            resolve_target(Some(drawing), &r.target)
+                .ok()
+                .map(|p| (r.id.clone(), p))
+        })
+        .collect();
+    let mut out = Vec::new();
+    // Both trees list the same children in the same order.
+    for (anchor_el, anchor_node) in doc.root.elements().zip(&tree.children) {
+        let Some(anchor) = parse_anchor(anchor_el) else {
+            continue;
+        };
+        for node in object_nodes(anchor_node) {
+            let Some(src) = text.get(node.span.clone()) else {
+                continue;
+            };
+            let Ok(object) = open365_drawing::parse_fragment(src) else {
+                continue;
+            };
+            out.push(SheetObject {
+                anchor,
+                object,
+                drawing_part: drawing.clone(),
+                z: first_z + out.len(),
+                targets: targets.clone(),
+            });
+        }
+    }
+    out
+}
+
+impl Workbook {
+    /// The drawing parts worksheet `sheet` points at (cheap: no part is parsed).
+    pub fn sheet_drawing_parts(&self, sheet: usize) -> Vec<PartName> {
+        let Some(sheet_part) = self.sheet_part(sheet) else {
+            return Vec::new();
+        };
+        self.package()
+            .part(rels_part_name(Some(sheet_part)).as_str())
+            .and_then(|p| Relationships::parse(p.data()).ok())
+            .map(|rels| {
+                rels.iter()
+                    .filter(|r| r.rel_type.ends_with(DRAWING_REL))
+                    .filter_map(|r| resolve_target(Some(sheet_part), &r.target).ok())
+                    .collect()
+            })
+            .unwrap_or_default()
+    }
+
+    /// Every drawing object of worksheet `sheet` (pictures, shapes, charts, groups, anything else
+    /// the drawing crate keeps), in z order. Empty for a sheet without a drawing.
+    pub fn sheet_drawing_objects(&self, sheet: usize) -> Vec<SheetObject> {
+        let Some(sheet_part) = self.sheet_part(sheet) else {
+            return Vec::new();
+        };
+        let package = self.package();
+        let Some(rels) = package
+            .part(rels_part_name(Some(sheet_part)).as_str())
+            .and_then(|p| Relationships::parse(p.data()).ok())
+        else {
+            return Vec::new();
+        };
+        let mut out = Vec::new();
+        for rel in rels.iter().filter(|r| r.rel_type.ends_with(DRAWING_REL)) {
+            let Ok(drawing) = resolve_target(Some(sheet_part), &rel.target) else {
+                continue;
+            };
+            let Some(part) = package.part(drawing.as_str()) else {
+                continue;
+            };
+            let drawing_rels = package
+                .part(rels_part_name(Some(&drawing)).as_str())
+                .and_then(|p| Relationships::parse(p.data()).ok())
+                .unwrap_or_default();
+            let z = out.len();
+            out.extend(objects_in_drawing(&drawing, part.data(), &drawing_rels, z));
+        }
+        out
+    }
+}
+
+impl Workbook {
+    /// The workbook theme as the drawing layer needs it (colour scheme and fill and line styles).
+    /// Without a theme part, or one that does not parse, the Office default theme.
+    pub fn drawing_theme(&self) -> ThemeData {
+        let package = self.package();
+        let workbook = self.workbook_part();
+        let theme = package
+            .part(rels_part_name(Some(workbook)).as_str())
+            .and_then(|p| Relationships::parse(p.data()).ok())
+            .and_then(|rels| {
+                rels.iter()
+                    .find(|r| r.rel_type.ends_with("/relationships/theme"))
+                    .and_then(|r| resolve_target(Some(workbook), &r.target).ok())
+            })
+            .and_then(|name| package.part(name.as_str()))
+            .and_then(|p| {
+                std::str::from_utf8(p.data())
+                    .ok()
+                    .and_then(|t| ThemeData::parse(t).ok())
+            });
+        theme.unwrap_or_default()
+    }
+}
+
 /// Top edge of 0-based `row` from the sheet origin in points: the default height for every
-/// row, corrected for the rows that carry their own height or are hidden.
+/// row, corrected for the rows that carry their own height or are hidden. Heights are the stored
+/// points, not pixel-quantised.
 fn row_top_pt(ws: &Worksheet, row: u32) -> f64 {
     let format = ws.sheet_format();
     let default = if format.zero_height {
@@ -275,11 +456,29 @@ impl Anchor {
     /// The anchored rectangle in points. Columns follow Excel's pixel quantisation (`metrics`
     /// at 96 dpi gives a default column of 48 pt); rows use their height in points.
     pub fn rect_pt(&self, ws: &Worksheet, metrics: GridMetrics) -> RectPt {
+        self.rect_with(ws, metrics, false)
+    }
+
+    /// Like [`Self::rect_pt`] with row heights quantised to whole pixels at `metrics.dpi`, as
+    /// Excel positions objects on a display of that resolution (`Shape.Top`, `Shape.Height`) and
+    /// as the grid draws its rows. Use this to paint objects over the grid.
+    pub fn rect_px_pt(&self, ws: &Worksheet, metrics: GridMetrics) -> RectPt {
+        self.rect_with(ws, metrics, true)
+    }
+
+    fn rect_with(&self, ws: &Worksheet, metrics: GridMetrics, quantised: bool) -> RectPt {
         let geometry = ws.geometry(metrics);
         let col_x = |m: &AnchorMarker| {
             metrics.px_to_pt(geometry.col_x(m.col + 1) as u32) + m.col_off as f64 / EMU_PER_POINT
         };
-        let row_y = |m: &AnchorMarker| row_top_pt(ws, m.row) + m.row_off as f64 / EMU_PER_POINT;
+        let row_y = |m: &AnchorMarker| {
+            let top = if quantised {
+                metrics.px_to_pt(geometry.row_y(m.row + 1) as u32)
+            } else {
+                row_top_pt(ws, m.row)
+            };
+            top + m.row_off as f64 / EMU_PER_POINT
+        };
         match *self {
             Self::TwoCell { from, to, .. } => {
                 let (x0, y0) = (col_x(&from), row_y(&from));

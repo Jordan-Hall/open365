@@ -49,7 +49,7 @@ pub enum Action {
     /// Ask first (Excel's "Merging cells only keeps the upper-left value" prompt); run the command on OK.
     Confirm {
         text: &'static str,
-        command: Command,
+        command: Box<Command>,
     },
 }
 
@@ -79,7 +79,7 @@ fn merge_action(wb: &Workbook, sel: Sel, mode: MergeMode) -> Action {
     if loses {
         Action::Confirm {
             text: MERGE_WARNING,
-            command,
+            command: Box::new(command),
         }
     } else {
         Action::Apply(vec![command])

@@ -193,6 +193,7 @@ impl FindDialog {
                 match_case: opts.match_case,
                 whole_word: opts.whole_word,
                 wildcards: opts.wildcards,
+                clipboard: None,
             };
             return match target.apply(command) {
                 Ok(out) => format!("{} replacements made", out.replaced),

@@ -15,6 +15,7 @@ mod date;
 mod decimal;
 mod hijri;
 mod layout;
+mod lunisolar;
 mod parse;
 
 use std::fmt;
@@ -87,7 +88,8 @@ pub(crate) struct Out {
     /// numbers and dates (literal text and names keep theirs).
     digits: Option<[char; 10]>,
     /// `[DBNum1]`: an unpadded date part of 10 or more is written in tens (`十五`).
-    /// 0 none, 1 `[DBNum1]` (`十五`), 2 `[DBNum2]` (`壱拾伍`, the tens digit is always written).
+    /// 0 none, 1 `[DBNum1]` (`十五`), 2 `[DBNum2]` (`壱拾伍`, the tens digit is always written), 3 `[DBNum2]`
+    /// under a Korean prefix (the same, with the compatibility ideograph U+F973 for 拾).
     tens: u8,
 }
 
@@ -233,13 +235,13 @@ impl Out {
             Some(table) if self.tens > 0 && n >= 10 => {
                 let (t, u) = ((n / 10) as usize, (n % 10) as usize);
                 let mut s = String::new();
-                if t > 1 || self.tens == 2 {
+                if t > 1 || self.tens >= 2 {
                     s.push(table[t]);
                 }
-                s.push(if self.tens == 2 {
-                    '\u{62fe}'
-                } else {
-                    '\u{5341}'
+                s.push(match self.tens {
+                    3 => '\u{f973}',
+                    2 => '\u{62fe}',
+                    _ => '\u{5341}',
                 });
                 if u > 0 {
                     s.push(table[u]);
@@ -578,9 +580,9 @@ fn render_section(
         .dbnum
         .zip(sec.lcid)
         .and_then(|(n, lcid)| dbnum_digits(n, lcid))
-        .or_else(|| shape_digits(sec.shape))
-        .or_else(|| sec.thai.then_some(THAI_DIGITS));
+        .or_else(|| shape_digits(sec.shape));
     out.tens = match sec.dbnum {
+        Some(2) if out.digits.is_some() && sec.lcid.is_some_and(|l| l & 0xFFFF == 0x412) => 3,
         Some(n @ (1 | 2)) if out.digits.is_some() => n,
         _ => 0,
     };

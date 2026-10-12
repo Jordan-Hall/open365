@@ -125,7 +125,7 @@ impl State {
         match action {
             Action::None => {}
             Action::Apply(commands) => commands.into_iter().for_each(|c| self.apply(c)),
-            Action::Confirm { text, command } => self.prompt = Some((text, command)),
+            Action::Confirm { text, command } => self.prompt = Some((text, *command)),
         }
     }
 

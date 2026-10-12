@@ -206,11 +206,35 @@ impl Worksheet {
         col: u32,
         column_styles: &[(u32, u32, u32)],
     ) -> crate::format::Border {
+        self.display_border(styles, row, col, column_styles, &|_, _| None)
+    }
+
+    /// Like [`Self::resolved_border`] with conditional formats: `conditional(row, col)` gives the
+    /// border part of the winning `dxf`s of a cell (the caller evaluates the rules; use
+    /// [`crate::Dxf::fill_missing_from`] to merge several). A conditional edge replaces the
+    /// cell's own edge whatever its style (measured: a thin conditional edge hides a thick own
+    /// one); the two cells' resulting edges then compete as any shared edge does. Measured in
+    /// `fixtures/reference/xlsx/styles-border-cf`.
+    pub fn display_border(
+        &self,
+        styles: &Styles,
+        row: u32,
+        col: u32,
+        column_styles: &[(u32, u32, u32)],
+        conditional: &dyn Fn(u32, u32) -> Option<crate::conditional::DxfBorder>,
+    ) -> crate::format::Border {
         use crate::format::shared_edge;
         let own = |r: u32, c: u32| {
-            styles
+            let mut b = styles
                 .cell_format(self.resolved_style(r, c, column_styles))
-                .border
+                .border;
+            if let Some(o) = conditional(r, c) {
+                b.left = o.left.unwrap_or(b.left);
+                b.right = o.right.unwrap_or(b.right);
+                b.top = o.top.unwrap_or(b.top);
+                b.bottom = o.bottom.unwrap_or(b.bottom);
+            }
+            b
         };
         let mut b = own(row, col);
         if col > 1 {

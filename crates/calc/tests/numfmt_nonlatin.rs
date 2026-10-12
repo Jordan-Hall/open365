@@ -30,24 +30,33 @@ fn run() -> (usize, BTreeSet<String>) {
             Some(v) => Value::Number(v.as_f64().unwrap()),
             None => Value::Text(case["text"].as_str().unwrap().into()),
         };
-        let tfn_ok = match text_function_in(&value, code, false, &gb) {
+        let d1904 = case.get("d1904").and_then(serde_json::Value::as_bool) == Some(true);
+        let tfn_ok = match text_function_in(&value, code, d1904, &gb) {
             Ok(Some(s)) => {
                 result
                     .get("tfn_error")
                     .is_none_or(|e| e.as_bool() != Some(true))
                     && result["tfn"].as_str() == Some(&s)
             }
-            Ok(None) => false,
+            // a value the format cannot show (a date out of range, serial 60 of a calendar that refuses it): #VALUE!
+            Ok(None) => result.get("tfn_error").and_then(serde_json::Value::as_bool) == Some(true),
             Err(_) => {
                 result.get("tfn_rejected").is_some() || result["tfn"].as_str() == Some("#VALUE!")
             }
         };
         let cell_ok = match result["text"].as_str() {
-            Some(want) => open365_calc::numfmt::try_format_value_in(&value, code, false, &gb)
-                .is_ok_and(|s| s == want || format_value_in(&value, code, false, &gb) == want),
+            Some(want) => open365_calc::numfmt::try_format_value_in(&value, code, d1904, &gb)
+                .is_ok_and(|s| s == want || format_value_in(&value, code, d1904, &gb) == want),
             None => open365_calc::numfmt::validate_format(code).is_err(),
         };
         if !(tfn_ok && cell_ok) {
+            if std::env::var_os("NUMFMT_SHOW_DIFF").is_some() {
+                eprintln!(
+                    "DIFF {id} {code:?} excel={:?} ours={:?}",
+                    result["text"],
+                    open365_calc::numfmt::format_value_in(&value, code, d1904, &gb)
+                );
+            }
             failed.insert(id.to_owned());
         }
     }

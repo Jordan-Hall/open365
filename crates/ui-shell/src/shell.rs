@@ -41,6 +41,8 @@ struct ComboEdit {
 /// The chrome of one application.
 pub struct Shell {
     spec: std::rc::Rc<AppSpec>,
+    /// Large buttons were widened to their labels (once, when the first frame has the fonts).
+    fitted: bool,
     kind: AppKind,
     pub theme: Theme,
     pub options: ShellOptions,
@@ -176,6 +178,7 @@ impl Shell {
         });
         Self {
             spec,
+            fitted: false,
             kind,
             theme: Theme::new(kind, mode),
             options: ShellOptions::default(),
@@ -257,6 +260,22 @@ impl Shell {
         let ppp = ctx.pixels_per_point();
         let full = ui.max_rect();
         let origin = full.min;
+        if !self.fitted {
+            self.fitted = true;
+            if let Some(spec) = std::rc::Rc::get_mut(&mut self.spec) {
+                let text_w = |s: &str| {
+                    ui.painter()
+                        .layout_no_wrap(
+                            s.to_owned(),
+                            FontId::proportional(size::LABEL),
+                            Color32::BLACK,
+                        )
+                        .size()
+                        .x
+                };
+                layout::fit_large_labels(spec, text_w, REF_SCALE);
+            }
+        }
         let spec = std::rc::Rc::clone(&self.spec);
         let chrome_was_open = self.chrome_open();
         let base = LayoutInput {
@@ -1265,13 +1284,29 @@ impl Shell {
                 continue;
             }
             let lr = rect_of(origin, ppp, g.label);
-            painter.text(
-                lr.center(),
-                Align2::CENTER_CENTER,
-                &g.group.label,
-                FontId::proportional(size::GROUP),
-                t.text,
-            );
+            // A group squeezed below its label's width wraps the label onto two lines.
+            let gfont = FontId::proportional(size::GROUP);
+            let gw = |s: &str| {
+                painter
+                    .layout_no_wrap(s.to_owned(), gfont.clone(), t.text)
+                    .size()
+                    .x
+            };
+            let lines = if gw(&g.group.label) > lr.width() {
+                crate::layout::wrap_label(&g.group.label, 0, lr.width(), gw)
+            } else {
+                vec![g.group.label.clone()]
+            };
+            for (i, line) in lines.iter().enumerate() {
+                let dy = (i as f32 - (lines.len() - 1) as f32 / 2.0) * 12.0;
+                painter.text(
+                    lr.center() + vec2(0.0, dy),
+                    Align2::CENTER_CENTER,
+                    line,
+                    gfont.clone(),
+                    t.text,
+                );
+            }
             if let Some(l) = g.launcher {
                 let r = rect_of(origin, ppp, l);
                 let id = format!("{}.launcher", g.group.id);
@@ -1359,13 +1394,13 @@ impl Shell {
         );
         let label = &g.group.label;
         let font = FontId::proportional(size::LABEL);
-        let words: Vec<&str> = label.split(' ').collect();
-        let lines = if words.len() > 1 && label.len() > 8 {
-            let half = words.len().div_ceil(2);
-            vec![words[..half].join(" "), words[half..].join(" ")]
-        } else {
-            vec![label.clone()]
+        let measure = |s: &str| {
+            painter
+                .layout_no_wrap(s.to_owned(), font.clone(), ink)
+                .size()
+                .x
         };
+        let lines = crate::layout::wrap_label(label, 8, r.width(), measure);
         let last = lines.len() - 1;
         for (i, line) in lines.iter().enumerate() {
             let y = r.top() + (56.0 + 19.0 * i as f32) * k;
@@ -1571,14 +1606,18 @@ impl Shell {
                         vec2(36.0 * k, 36.0 * k),
                     );
                     self.glyph(ui, painter, icon, &c.label, ir, ink);
-                    let words: Vec<&str> = c.label.split(' ').collect();
-                    let lines = if words.len() > 1 && c.label.len() > 7 {
-                        let half = words.len() / 2;
-                        vec![words[..half].join(" "), words[half..].join(" ")]
-                    } else {
-                        vec![c.label.clone()]
-                    };
                     let font = FontId::proportional(size::LABEL);
+                    let lines = crate::layout::wrap_label(
+                        crate::layout::ribbon_label(&c.label),
+                        7,
+                        r.width(),
+                        |s| {
+                            painter
+                                .layout_no_wrap(s.to_owned(), font.clone(), ink)
+                                .size()
+                                .x
+                        },
+                    );
                     let has_arrow = split || c.kind == Kind::Dropdown;
                     let two = lines.len() > 1;
                     for (i, line) in lines.iter().enumerate() {
@@ -1623,19 +1662,40 @@ impl Shell {
                         );
                     }
                 } else {
+                    // Office never cuts a label mid-word: a control too narrow for its label shows
+                    // the icon alone.
+                    let label_w = painter
+                        .layout_no_wrap(
+                            crate::layout::ribbon_label(&c.label).to_owned(),
+                            FontId::proportional(size::LABEL),
+                            ink,
+                        )
+                        .size()
+                        .x;
+                    let room = main.width() - if c.kind == Kind::Dropdown { 14.0 } else { 0.0 };
                     let icon_only = main.width() < 36.0 * k + 2.0 && c.kind != Kind::Dropdown
-                        || c.w <= 50 && c.label.len() > 7;
+                        || c.w <= 50 && c.label.len() > 7
+                        || 24.0 + label_w > room + 3.0;
                     let ir = Rect::from_min_size(
                         pos2(main.left() + 6.0, main.center().y - 8.0),
                         vec2(16.0, 16.0),
                     );
-                    if icon_only && !(c.kind == Kind::Dropdown && c.w > 50) {
+                    if icon_only {
                         self.glyph(
                             ui,
                             painter,
                             icon,
                             &c.label,
-                            Rect::from_center_size(main.center(), vec2(16.0, 16.0)),
+                            Rect::from_center_size(
+                                pos2(
+                                    main.left()
+                                        + (main.width()
+                                            - if c.kind == Kind::Dropdown { 14.0 } else { 0.0 })
+                                            / 2.0,
+                                    main.center().y,
+                                ),
+                                vec2(16.0, 16.0),
+                            ),
                             ink,
                         );
                     } else {
@@ -1643,7 +1703,7 @@ impl Shell {
                         painter.text(
                             pos2(ir.right() + 6.0, main.center().y),
                             Align2::LEFT_CENTER,
-                            &c.label,
+                            crate::layout::ribbon_label(&c.label),
                             FontId::proportional(size::LABEL),
                             ink,
                         );

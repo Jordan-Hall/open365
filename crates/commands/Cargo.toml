@@ -11,6 +11,7 @@ publish.workspace = true
 open365-calc.workspace = true
 open365-docx.workspace = true
 open365-layout.workspace = true
+open365-locale.workspace = true
 open365-opc.workspace = true
 open365-pdf.workspace = true
 open365-text.workspace = true

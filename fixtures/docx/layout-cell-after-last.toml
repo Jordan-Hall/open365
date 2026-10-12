@@ -1,0 +1,5 @@
+feature = "layout-cell-after-last"
+made_with = "hand-written OOXML (generated from layout-table-basic.docx parts); reference taken with Microsoft Word 16.0"
+author = "project member"
+expect_dropped = []
+notes = "row height when the cells of one row end in paragraphs with different space after: which cell's trailing space counts"

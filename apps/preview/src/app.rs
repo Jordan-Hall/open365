@@ -95,6 +95,10 @@ impl UiHandler for Handler {
                 Err(e) => eprintln!("cannot open {}: {e}", path.display()),
             }
         }
+        if self.kind == AppKind::Sheets {
+            // The OS dialogs; headless runs and tests leave the choosers unset.
+            self.shell.install_sheet_choosers();
+        }
         cx.set_title(&self.shell.title());
     }
 

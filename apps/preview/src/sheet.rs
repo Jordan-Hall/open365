@@ -8,8 +8,8 @@ use std::rc::Rc;
 use std::sync::Arc;
 
 use open365_commands::{
-    CellEntry, CellRef, Command, EffectClass, Target, cell_display_text, cell_source_text,
-    grid_copy, parse_tsv, paste_rows,
+    CellEntry, CellRef, Command, EffectClass, RangeRef, Target, cell_display_text,
+    cell_source_text, grid_copy, parse_tsv, paste_rows,
 };
 use open365_xlsx::{CellValue, GridMetrics, SheetGeometry};
 
@@ -17,6 +17,8 @@ use open365_xlsx::{CellValue, GridMetrics, SheetGeometry};
 pub mod barfmt;
 #[path = "../../sheets/src/blank.rs"]
 mod blank;
+#[path = "sheet_ext/mod.rs"]
+pub mod sheet_ext;
 
 /// Last row and column of a worksheet.
 pub const MAX_ROW: u32 = 1_048_576;
@@ -125,6 +127,241 @@ struct Copied {
     cut: Option<(u32, u32, u32, u32)>,
 }
 
+/// Which neighbours move when cells are inserted or deleted (the Insert and Delete dialogs).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CellShift {
+    Right,
+    Down,
+    Left,
+    Up,
+}
+
+/// What a Paste Special puts in the destination.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PasteWhat {
+    All,
+    Formulas,
+    Values,
+    Formats,
+}
+
+/// The choices of the Paste Special dialog.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct PasteSpecialOpts {
+    pub what: PasteWhat,
+    /// Blank source cells leave the destination as it is.
+    pub skip_blanks: bool,
+    pub transpose: bool,
+}
+
+/// A modal dialog over the grid. The choices live here so the dialog survives grid rebuilds.
+#[derive(Debug, Clone, PartialEq)]
+pub enum Dialog {
+    /// Insert (`insert`) or Delete: `choice` 0 and 1 are the two shift directions (right/down,
+    /// left/up), 2 the entire row and 3 the entire column.
+    InsertDelete {
+        insert: bool,
+        choice: usize,
+    },
+    PasteSpecial(PasteSpecialOpts),
+}
+
+/// Popup and dialog state of the grid, kept with the model because the shell struct is owned
+/// elsewhere. The widget nodes are rebuilt with the grid; `nodes` maps them to action names.
+#[derive(Debug, Default)]
+pub struct GridUi {
+    pub dialog: Option<Dialog>,
+    pub nodes: Vec<(open365_ui_core::NodeId, String)>,
+    /// What the open context menu was opened for.
+    pub menu_for: Option<MenuFor>,
+    /// The last Insert and Delete dialog choices, which Excel offers again.
+    pub last_shift: [Option<usize>; 2],
+    /// What the open pop-up menu of the grid (a filter drop-down or a validation list) is for.
+    pub pop: Option<GridPop>,
+    /// The marks the grid draws, cached for one document revision (see [`SheetModel::grid_marks`]).
+    pub marks: RefCell<Option<Rc<GridMarks>>>,
+}
+
+/// The target of a pop-up menu the grid opened from a button in a cell.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum GridPop {
+    /// The AutoFilter drop-down of a column; `anchor` is the logical point it opened at.
+    Filter { col: u32, anchor: (i32, i32) },
+    /// The in-cell validation list of a cell, with its items.
+    Validation {
+        row: u32,
+        col: u32,
+        items: Vec<String>,
+    },
+}
+
+/// One outline group: the detail rows (or columns) `first..=last` at `level`; the summary is the
+/// row (column) right after `last`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct OutlineGroup {
+    pub level: u32,
+    pub first: u32,
+    pub last: u32,
+    /// The detail is hidden (the button shows `+`).
+    pub collapsed: bool,
+}
+
+/// What the grid draws besides cell text: AutoFilter buttons, outline groups, note and comment
+/// markers. Built once per document revision and sheet.
+#[derive(Debug, Clone, Default)]
+pub struct GridMarks {
+    /// The AutoFilter range and its filtered columns.
+    pub filter: Option<(Rect4, Vec<u32>)>,
+    pub row_groups: Vec<OutlineGroup>,
+    pub col_groups: Vec<OutlineGroup>,
+    pub row_levels: u32,
+    pub col_levels: u32,
+    pub notes: Vec<open365_commands::review_ops::Note>,
+    pub threads: Vec<open365_commands::review_ops::Thread>,
+    /// Last row and column of the used range (1 when the sheet is empty).
+    pub used: (u32, u32),
+    key: (u64, usize),
+}
+
+impl GridMarks {
+    /// The note on a cell.
+    pub fn note_at(&self, row: u32, col: u32) -> Option<&open365_commands::review_ops::Note> {
+        self.notes.iter().find(|n| (n.row, n.col) == (row, col))
+    }
+
+    /// The comment thread on a cell.
+    pub fn thread_at(&self, row: u32, col: u32) -> Option<&open365_commands::review_ops::Thread> {
+        self.threads.iter().find(|t| (t.row, t.col) == (row, col))
+    }
+}
+
+/// Groups of consecutive indices at or above each level, from `(index, level)` pairs sorted by
+/// index. `hidden` says whether an index is hidden (a collapsed group).
+fn outline_groups(levels: &[(u32, u32)], hidden: impl Fn(u32) -> bool) -> Vec<OutlineGroup> {
+    let max = levels.iter().map(|l| l.1).max().unwrap_or(0).min(8);
+    let mut out = Vec::new();
+    for level in 1..=max {
+        let mut run: Option<(u32, u32)> = None;
+        for &(i, _) in levels.iter().filter(|l| l.1 >= level) {
+            run = match run {
+                Some((a, b)) if b + 1 == i => Some((a, i)),
+                Some((a, b)) => {
+                    out.push(OutlineGroup {
+                        level,
+                        first: a,
+                        last: b,
+                        collapsed: hidden(b),
+                    });
+                    Some((i, i))
+                }
+                None => Some((i, i)),
+            };
+        }
+        if let Some((a, b)) = run {
+            out.push(OutlineGroup {
+                level,
+                first: a,
+                last: b,
+                collapsed: hidden(b),
+            });
+        }
+    }
+    out
+}
+
+impl SheetModel {
+    /// The revision of the document (it grows with every edit, undo and redo).
+    pub fn revision(&self) -> u64 {
+        self.target.revision()
+    }
+
+    /// The marks of the active sheet for the grid, rebuilt only when the document changed.
+    pub fn grid_marks(&self) -> Rc<GridMarks> {
+        let key = (self.target.revision(), self.sheet);
+        if let Some(m) = self.ui.marks.borrow().as_ref()
+            && m.key == key
+        {
+            return Rc::clone(m);
+        }
+        let geo = self.geometry();
+        let mut marks = GridMarks {
+            key,
+            used: (1, 1),
+            ..GridMarks::default()
+        };
+        if let Some(wb) = self.target.xlsx()
+            && let Some(ws) = wb.sheet(self.sheet)
+        {
+            let mut rows: Vec<(u32, u32)> = ws
+                .rows()
+                .iter()
+                .filter_map(|r| {
+                    let level = r
+                        .attrs()
+                        .iter()
+                        .find(|a| a.name == "outlineLevel")
+                        .and_then(|a| a.value.parse::<u32>().ok())?;
+                    (level > 0).then_some((r.r, level))
+                })
+                .collect();
+            rows.sort_unstable();
+            marks.row_levels = rows.iter().map(|r| r.1).max().unwrap_or(0).min(8);
+            marks.row_groups = outline_groups(&rows, |r| geo.row_hidden(r));
+            let xml = String::from_utf8_lossy(&ws.to_bytes()).into_owned();
+            if let Some(start) = xml.find("<cols>") {
+                let end = xml[start..]
+                    .find("</cols>")
+                    .map_or(xml.len(), |e| start + e);
+                let attr = |tag: &str, name: &str| -> Option<u32> {
+                    let key = format!(" {name}=\"");
+                    let at = tag.find(&key)? + key.len();
+                    tag[at..].split('"').next()?.parse().ok()
+                };
+                let mut cols: Vec<(u32, u32)> = Vec::new();
+                for tag in xml[start..end].split("<col ").skip(1) {
+                    let tag = format!(" {tag}");
+                    let (Some(min), Some(max)) = (attr(&tag, "min"), attr(&tag, "max")) else {
+                        continue;
+                    };
+                    let level = attr(&tag, "outlineLevel").unwrap_or(0);
+                    if level > 0 {
+                        cols.extend((min..=max.min(min + 2000)).map(|c| (c, level)));
+                    }
+                }
+                cols.sort_unstable();
+                marks.col_levels = cols.iter().map(|c| c.1).max().unwrap_or(0).min(8);
+                marks.col_groups = outline_groups(&cols, |c| geo.col_hidden(c));
+            }
+            if let Some(u) = ws.used_range() {
+                marks.used = (u.2.max(1), u.3.max(1));
+            }
+            marks.filter = ws.auto_filter().map(|f| {
+                let cols = f
+                    .columns
+                    .iter()
+                    .filter(|c| c.criteria.is_some())
+                    .map(|c| f.range.1 + c.col_id)
+                    .collect();
+                (f.range, cols)
+            });
+        }
+        marks.notes = self.review_notes();
+        marks.threads = self.review_comments();
+        let marks = Rc::new(marks);
+        *self.ui.marks.borrow_mut() = Some(Rc::clone(&marks));
+        marks
+    }
+}
+
+/// The target of a context menu: it decides the items and what they act on.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MenuFor {
+    Cell,
+    Row(u32),
+    Col(u32),
+    AutoFill,
+}
+
 /// The open workbook, the active cell and the first visible cell (1-based row, column).
 pub struct SheetModel {
     target: Target,
@@ -139,9 +376,38 @@ pub struct SheetModel {
     geo_cache: RefCell<Option<(u64, usize, GridGeometry)>>,
     clipboard: Box<dyn ClipboardIo>,
     copied: Option<Copied>,
-    pending_paste: Option<(Command, Option<Rect4>)>,
+    pending_paste: Option<(Command, Option<Rect4>, Option<Rect4>)>,
+    /// The column where a run of Tab presses began: Enter returns there on the next row.
+    pub tab_start: Option<u32>,
+    /// A Ctrl+Space or Shift+Space just selected: its text event is not typed.
+    pub swallow_space: bool,
+    /// Ctrl was held at fill-handle release (set by the host: the UI core reports no modifiers there).
+    pub fill_ctrl: bool,
+    /// User-defined AutoFill lists (Excel's Custom Lists); the day and month names are built in.
+    pub custom_lists: Vec<Vec<String>>,
+    /// The last fill, so the AutoFill Options button can redo it another way.
+    last_fill: Option<(Rect4, (u32, u32), usize)>,
+    /// The range the last fill produced and how it filled: the floating AutoFill Options button
+    /// stays until the next edit, undo or selection change.
+    autofill: Option<(Rect4, FillMode)>,
+    /// Dialogs and popups the grid shows (see [`GridUi`]).
+    pub ui: GridUi,
     chooser: SaveChooser,
     locale: Arc<open365_calc::FormatLocale>,
+    /// View tab state: view mode, zoom, gridlines, headings, freeze panes (not in the file yet).
+    pub ext_view: sheet_ext::view::ViewState,
+    /// Page Layout tab state: margins, orientation, paper size, print area, breaks, scaling.
+    pub ext_page: sheet_ext::page_layout::PageState,
+    /// File tab state: the Open dialog.
+    pub ext_file: sheet_ext::file::FileState,
+    /// Home tab state: the Format Painter's picked-up cell and the last border and colours used.
+    pub ext_home: sheet_ext::home::HomeState,
+    /// Formulas tab state: Show Formulas, audit arrows, recent functions, a pending dialog.
+    pub ext_formulas: sheet_ext::formulas::FormulasState,
+    /// Data tab state: the dialog the shell should open.
+    pub ext_data: sheet_ext::data::DataState,
+    /// Review tab state: the dialog to open, ignored spelling words, the last spelling run.
+    pub ext_review: sheet_ext::review::ReviewState,
 }
 
 impl std::fmt::Debug for SheetModel {
@@ -186,8 +452,22 @@ impl SheetModel {
             clipboard: Box::new(SystemClipboard),
             copied: None,
             pending_paste: None,
+            tab_start: None,
+            swallow_space: false,
+            fill_ctrl: false,
+            custom_lists: Vec::new(),
+            last_fill: None,
+            autofill: None,
+            ui: GridUi::default(),
             chooser: system_save_chooser(),
             locale: barfmt::default_locale(),
+            ext_view: sheet_ext::view::ViewState::default(),
+            ext_page: sheet_ext::page_layout::PageState::default(),
+            ext_file: sheet_ext::file::FileState::default(),
+            ext_home: sheet_ext::home::HomeState::default(),
+            ext_formulas: sheet_ext::formulas::FormulasState::default(),
+            ext_data: sheet_ext::data::DataState::default(),
+            ext_review: sheet_ext::review::ReviewState::default(),
         }
     }
 
@@ -340,6 +620,7 @@ impl SheetModel {
     }
 
     fn apply(&mut self, command: Command) -> Result<(), String> {
+        self.autofill = None;
         match self.target.apply(command) {
             Ok(_) => {
                 self.status.clear();
@@ -361,10 +642,12 @@ impl SheetModel {
     }
 
     pub fn undo(&mut self) -> bool {
+        self.autofill = None;
         self.target.undo().is_ok()
     }
 
     pub fn redo(&mut self) -> bool {
+        self.autofill = None;
         self.target.redo().is_ok()
     }
 
@@ -411,6 +694,36 @@ const MAX_ROW_PT: f64 = 409.5;
 /// Largest copy, in cells.
 const MAX_COPY_CELLS: usize = 4_000_000;
 
+/// How a fill-handle drag fills (the drag itself, with Ctrl, or an AutoFill Options choice).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FillMode {
+    /// A plain drag: series for dates, names and `Item1`; a lone number copies.
+    Auto,
+    /// A drag with Ctrl held: a lone number counts up, everything else copies.
+    Ctrl,
+    /// Copy Cells.
+    Copy,
+    /// Fill Series: a lone number counts up by one.
+    Series,
+    /// Fill Formatting Only.
+    FormatsOnly,
+    /// Fill Without Formatting.
+    WithoutFormatting,
+}
+
+/// What Paste Special puts in the destination.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PasteKind {
+    /// Values only: formulas become their results.
+    Values,
+    /// Formulas only, no formats.
+    Formulas,
+    /// Formats only.
+    Formats,
+    /// Rows become columns and columns rows.
+    Transpose,
+}
+
 /// The result of a paste request.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Paste {
@@ -423,6 +736,14 @@ pub enum Paste {
 }
 
 type Rect4 = (u32, u32, u32, u32);
+
+/// How far the dashes of the copy outline have marched at animation frame `frame` (one device
+/// pixel per 60 ms step, repeating every dash period). Paint the dashes starting `phase` pixels
+/// before the corner.
+pub fn ants_phase(frame: u64, dash: f32) -> f32 {
+    let period = (dash * 2.0).round().max(1.0) as u64;
+    (frame % period) as f32
+}
 
 fn rect_of(a: (u32, u32), b: (u32, u32)) -> Rect4 {
     (a.0.min(b.0), a.1.min(b.1), a.0.max(b.0), a.1.max(b.1))
@@ -449,6 +770,8 @@ impl SheetModel {
     }
 
     pub fn select_cell(&mut self, cell: (u32, u32)) {
+        self.autofill = None;
+        self.tab_start = None;
         self.active = cell;
         self.anchor = cell;
         self.focus = cell;
@@ -465,6 +788,7 @@ impl SheetModel {
 
     /// Moves the moving corner (Shift+click, Shift+arrows, drag).
     pub fn extend_to(&mut self, cell: (u32, u32)) {
+        self.autofill = None;
         if rect_of(self.anchor, self.focus) != self.range() {
             self.anchor = self.active;
         }
@@ -481,6 +805,7 @@ impl SheetModel {
 
     /// Ctrl+A: every cell of the sheet.
     pub fn select_all(&mut self) {
+        self.autofill = None;
         self.anchor = (1, 1);
         self.focus = (MAX_ROW, MAX_COL);
     }
@@ -488,6 +813,7 @@ impl SheetModel {
     /// Click or drag on column headers: whole columns `a..=b`. The active cell moves to the
     /// first visible row of column `a` unless `keep_active`.
     pub fn select_cols(&mut self, a: u32, b: u32, keep_active: bool) {
+        self.autofill = None;
         if !keep_active {
             self.active = (self.top_left.0, a);
         }
@@ -496,6 +822,7 @@ impl SheetModel {
     }
 
     pub fn select_rows(&mut self, a: u32, b: u32, keep_active: bool) {
+        self.autofill = None;
         if !keep_active {
             self.active = (a, self.top_left.1);
         }
@@ -585,7 +912,7 @@ impl SheetModel {
         if let Some((rev, sheet, geo)) = self.geo_cache.borrow().as_ref()
             && (*rev, *sheet) == key
         {
-            return geo.clone();
+            return self.ext_view.apply_freeze(self.sheet, geo.clone());
         }
         let (geo, frozen) = match self.target.xlsx() {
             Some(wb) => {
@@ -605,7 +932,7 @@ impl SheetModel {
             frozen,
         };
         *self.geo_cache.borrow_mut() = Some((key.0, key.1, geo.clone()));
-        geo
+        self.ext_view.apply_freeze(self.sheet, geo)
     }
 
     /// Rows and columns frozen at the top and left of the sheet, as the file says.
@@ -780,11 +1107,13 @@ impl SheetModel {
             row: r1,
             col: c1,
         };
-        let (rows, cut) = match &self.copied {
-            Some(c) if c.tsv.replace("\r\n", "\n") == text.replace("\r\n", "\n") => {
-                (paste_rows(&c.rows, Some(c.origin), dest), c.cut)
-            }
-            _ => (paste_rows(&parse_tsv(&text), None, dest), None),
+        let (rows, cut, fmt_src) = match &self.copied {
+            Some(c) if c.tsv.replace("\r\n", "\n") == text.replace("\r\n", "\n") => (
+                paste_rows(&c.rows, Some(c.origin), dest),
+                c.cut,
+                Some(c.rect()),
+            ),
+            _ => (paste_rows(&parse_tsv(&text), None, dest), None, None),
         };
         if rows.is_empty() {
             return Ok(Paste::Empty);
@@ -796,10 +1125,10 @@ impl SheetModel {
             rows,
         };
         if command.effect_in(&self.target) == EffectClass::Destructive {
-            self.pending_paste = Some((command, cut));
+            self.pending_paste = Some((command, cut, fmt_src));
             return Ok(Paste::NeedsConfirm);
         }
-        self.run_paste(command, cut)?;
+        self.run_paste(command, cut, fmt_src)?;
         Ok(Paste::Done)
     }
 
@@ -810,7 +1139,7 @@ impl SheetModel {
     /// The person agreed to overwrite.
     pub fn confirm_paste(&mut self) -> Result<(), String> {
         match self.pending_paste.take() {
-            Some((command, cut)) => self.run_paste(command, cut),
+            Some((command, cut, fmt)) => self.run_paste(command, cut, fmt),
             None => Ok(()),
         }
     }
@@ -819,7 +1148,12 @@ impl SheetModel {
         self.pending_paste = None;
     }
 
-    fn run_paste(&mut self, command: Command, cut: Option<Rect4>) -> Result<(), String> {
+    fn run_paste(
+        &mut self,
+        command: Command,
+        cut: Option<Rect4>,
+        fmt_src: Option<Rect4>,
+    ) -> Result<(), String> {
         let Command::XlsxPaste {
             row, col, ref rows, ..
         } = command
@@ -835,6 +1169,11 @@ impl SheetModel {
                 .unwrap_or(1)
                 .saturating_sub(1) as u32,
         );
+        if let Some(src) = fmt_src {
+            // Formats travel with the cells; a cut leaves its source unformatted. They go first
+            // so one undo takes back the pasted values.
+            self.copy_formats(src, (row, col, end.0, end.1), cut.is_some());
+        }
         if let Some((r1, c1, r2, c2)) = cut {
             let blank = vec![vec![String::new(); (c2 - c1 + 1) as usize]; (r2 - r1 + 1) as usize];
             self.apply(Command::XlsxPaste {
@@ -858,6 +1197,11 @@ impl SheetModel {
     /// step, else a straight-line fit), `Item1` text counts up, formulas shift and other text
     /// repeats. One paste command, so one undo step. Returns whether cells changed.
     pub fn fill_to(&mut self, to: (u32, u32)) -> Result<bool, String> {
+        self.fill_with(to, FillMode::Auto)
+    }
+
+    /// [`Self::fill_to`] with an explicit [`FillMode`] (Ctrl drag, AutoFill Options).
+    pub fn fill_with(&mut self, to: (u32, u32), mode: FillMode) -> Result<bool, String> {
         let (r1, c1, r2, c2) = self.range();
         let rows_out = to.0.saturating_sub(r2).max(r1.saturating_sub(to.0));
         let cols_out = to.1.saturating_sub(c2).max(c1.saturating_sub(to.1));
@@ -865,6 +1209,7 @@ impl SheetModel {
             return Ok(false);
         }
         let vertical = rows_out >= cols_out;
+        let custom = self.custom_lists.clone();
         let (block, row0, col0) = if vertical {
             let (first, last) = if to.0 > r2 {
                 (r2 + 1, to.0)
@@ -881,6 +1226,8 @@ impl SheetModel {
                         i64::from(t) - i64::from(r1),
                         true,
                         date,
+                        mode,
+                        &custom,
                     ));
                 }
             }
@@ -897,18 +1244,55 @@ impl SheetModel {
                 let date = self.is_date_cell(r, c1);
                 block.push(
                     (first..=last)
-                        .map(|t| series_value(&src, i64::from(t) - i64::from(c1), false, date))
+                        .map(|t| {
+                            series_value(
+                                &src,
+                                i64::from(t) - i64::from(c1),
+                                false,
+                                date,
+                                mode,
+                                &custom,
+                            )
+                        })
                         .collect(),
                 );
             }
             (block, r1, first)
         };
-        self.apply(Command::XlsxPaste {
-            sheet: self.sheet,
-            row: row0,
-            col: col0,
-            rows: block,
-        })?;
+        let (br2, bc2) = (
+            row0 + block.len() as u32 - 1,
+            col0 + block.first().map_or(1, Vec::len) as u32 - 1,
+        );
+        // Formats first: one undo then takes back the values, the step the person sees.
+        let mut steps = 0;
+        if mode != FillMode::WithoutFormatting {
+            let copied = self.apply(Command::CopyFormat {
+                sheet: self.sheet,
+                from: RangeRef {
+                    first_row: r1,
+                    first_col: c1,
+                    last_row: r2,
+                    last_col: c2,
+                },
+                to: RangeRef {
+                    first_row: row0,
+                    first_col: col0,
+                    last_row: br2,
+                    last_col: bc2,
+                },
+            });
+            steps += usize::from(copied.is_ok());
+        }
+        if mode != FillMode::FormatsOnly {
+            steps += 1;
+            self.apply(Command::XlsxPaste {
+                sheet: self.sheet,
+                row: row0,
+                col: col0,
+                rows: block,
+            })?;
+        }
+        self.last_fill = Some(((r1, c1, r2, c2), to, steps));
         if vertical {
             self.anchor = (r1.min(to.0), c1);
             self.focus = (r2.max(to.0), c2);
@@ -916,7 +1300,22 @@ impl SheetModel {
             self.anchor = (r1, c1.min(to.1));
             self.focus = (r2, c2.max(to.1));
         }
+        self.autofill = Some((self.range(), mode));
         Ok(true)
+    }
+
+    /// The AutoFill Options button: undoes the last fill and does it again as `mode`.
+    pub fn refill(&mut self, mode: FillMode) -> Result<bool, String> {
+        let Some(((r1, c1, r2, c2), to, steps)) = self.last_fill.take() else {
+            return Ok(false);
+        };
+        for _ in 0..steps {
+            self.undo();
+        }
+        self.anchor = (r1, c1);
+        self.focus = (r2, c2);
+        self.active = (r1, c1);
+        self.fill_with(to, mode)
     }
 
     /// Whether the cell holds a number that its format shows as a date or time (so a fill
@@ -977,6 +1376,422 @@ impl SheetModel {
             rows: block,
         })?;
         Ok(true)
+    }
+
+    // ---- paste special, copy marker -----------------------------------------------------------
+
+    /// The copied or cut range of this sheet, the one the marching ants outline.
+    pub fn copied_range(&self) -> Option<(u32, u32, u32, u32)> {
+        let c = self.copied.as_ref()?;
+        (c.origin.sheet == self.sheet).then(|| c.rect())
+    }
+
+    /// Esc: drops the marching ants. The clipboard keeps its text, but a later paste is a plain
+    /// text paste (a cut no longer clears its source).
+    pub fn clear_copied(&mut self) -> bool {
+        self.copied.take().is_some()
+    }
+
+    fn copy_formats(&mut self, src: Rect4, to: Rect4, clear_source: bool) {
+        let rr = |r: Rect4| RangeRef {
+            first_row: r.0,
+            first_col: r.1,
+            last_row: r.2,
+            last_col: r.3,
+        };
+        let _ = self.apply(Command::CopyFormat {
+            sheet: self.sheet,
+            from: rr(src),
+            to: rr(to),
+        });
+        let overlap = src.0 <= to.2 && to.0 <= src.2 && src.1 <= to.3 && to.1 <= src.3;
+        if clear_source && !overlap {
+            let _ = self.apply(Command::ClearFormats {
+                sheet: self.sheet,
+                range: rr(src),
+            });
+        }
+    }
+
+    /// The value a cell holds, as text that enters back as the same value.
+    fn value_text(&self, row: u32, col: u32) -> String {
+        match self
+            .target
+            .xlsx()
+            .and_then(|wb| wb.cell(self.sheet, row, col))
+            .map(|c| &c.value)
+        {
+            Some(CellValue::Number(n)) => number_text(*n),
+            Some(CellValue::Bool(b)) => if *b { "TRUE" } else { "FALSE" }.to_owned(),
+            Some(CellValue::Empty) | None => String::new(),
+            _ => self.display(row, col),
+        }
+    }
+
+    /// True after a copy or cut made in this window (Paste Special needs it).
+    pub fn has_copied(&self) -> bool {
+        self.copied.is_some()
+    }
+
+    /// Esc: hides the AutoFill Options button. True when it was showing.
+    pub fn dismiss_autofill(&mut self) -> bool {
+        self.autofill.take().is_some()
+    }
+
+    /// The range of the last fill and how it filled, while the AutoFill Options button shows.
+    pub fn autofill_button(&self) -> Option<(Rect4, FillMode)> {
+        self.autofill
+    }
+
+    /// Paste Special from the last copy made in this window, at the top-left of the selection.
+    pub fn paste_special(&mut self, kind: PasteKind) -> Result<Paste, String> {
+        let opts = match kind {
+            PasteKind::Values => (PasteWhat::Values, false),
+            PasteKind::Formulas => (PasteWhat::Formulas, false),
+            PasteKind::Formats => (PasteWhat::Formats, false),
+            PasteKind::Transpose => (PasteWhat::All, true),
+        };
+        self.paste_special_with(PasteSpecialOpts {
+            what: opts.0,
+            skip_blanks: false,
+            transpose: opts.1,
+        })
+    }
+
+    /// Paste Special with the dialog's choices: what to paste, skipping blank source cells,
+    /// transposing.
+    pub fn paste_special_with(&mut self, o: PasteSpecialOpts) -> Result<Paste, String> {
+        let Some(c) = self.copied.clone() else {
+            return Ok(Paste::Empty);
+        };
+        let (r1, c1, ..) = self.range();
+        let dest = CellRef {
+            sheet: self.sheet,
+            row: r1,
+            col: c1,
+        };
+        let src = c.rect();
+        let (h, w) = (src.2 - src.0 + 1, src.3 - src.1 + 1);
+        let (dh, dw) = if o.transpose { (w, h) } else { (h, w) };
+        let dest_rect = (
+            r1,
+            c1,
+            (r1 + dh - 1).min(MAX_ROW),
+            (c1 + dw - 1).min(MAX_COL),
+        );
+        let formats = matches!(o.what, PasteWhat::All | PasteWhat::Formats);
+        if o.what == PasteWhat::Formats {
+            self.copy_formats(src, dest_rect, false);
+            self.select_pasted(dest_rect.0, dest_rect.1, dest_rect.2, dest_rect.3);
+            return Ok(Paste::Done);
+        }
+        let mut rows: Vec<Vec<String>> = match o.what {
+            PasteWhat::Values => (src.0..=src.2)
+                .map(|r| (src.1..=src.3).map(|cc| self.value_text(r, cc)).collect())
+                .collect(),
+            _ => paste_rows(&c.rows, Some(c.origin), dest),
+        };
+        if o.transpose {
+            rows = (0..w as usize)
+                .map(|j| {
+                    rows.iter()
+                        .map(|row| row.get(j).cloned().unwrap_or_default())
+                        .collect()
+                })
+                .collect();
+        }
+        if o.skip_blanks {
+            // A blank source cell keeps what the destination holds.
+            for (i, row) in rows.iter_mut().enumerate() {
+                for (j, cell) in row.iter_mut().enumerate() {
+                    if cell.is_empty() {
+                        *cell = self.source(r1 + i as u32, c1 + j as u32);
+                    }
+                }
+            }
+        }
+        if formats {
+            self.copy_formats(src, dest_rect, false);
+        }
+        let (bh, bw) = (rows.len() as u32, rows.first().map_or(0, Vec::len) as u32);
+        self.apply(Command::XlsxPaste {
+            sheet: self.sheet,
+            row: r1,
+            col: c1,
+            rows,
+        })?;
+        self.select_pasted(r1, c1, r1 + bh.max(1) - 1, c1 + bw.max(1) - 1);
+        Ok(Paste::Done)
+    }
+
+    fn select_pasted(&mut self, r1: u32, c1: u32, r2: u32, c2: u32) {
+        self.active = (r1, c1);
+        self.anchor = (r1, c1);
+        self.focus = (r2.min(MAX_ROW), c2.min(MAX_COL));
+    }
+
+    // ---- insert and delete ---------------------------------------------------------------------
+
+    /// Insert Sheet Rows / Columns for the selection: as many as are selected, before the first.
+    /// `rows` picks rows, else columns.
+    pub fn insert_selected(&mut self, rows: bool) -> Result<(), String> {
+        let (r1, c1, r2, c2) = self.range();
+        let (at, count) = if rows {
+            (r1, r2 - r1 + 1)
+        } else {
+            (c1, c2 - c1 + 1)
+        };
+        let sheet = self.sheet;
+        self.apply(if rows {
+            Command::InsertRows { sheet, at, count }
+        } else {
+            Command::InsertColumns { sheet, at, count }
+        })
+    }
+
+    /// Delete Sheet Rows / Columns for the selection; what lies below (right) moves up (left).
+    pub fn delete_selected(&mut self, rows: bool) -> Result<(), String> {
+        let (r1, c1, r2, c2) = self.range();
+        let (at, count) = if rows {
+            (r1, r2 - r1 + 1)
+        } else {
+            (c1, c2 - c1 + 1)
+        };
+        let sheet = self.sheet;
+        self.apply(if rows {
+            Command::DeleteRows { sheet, at, count }
+        } else {
+            Command::DeleteColumns { sheet, at, count }
+        })
+    }
+
+    /// Last row and column that hold data or formats on this sheet.
+    fn used_end(&self) -> Option<(u32, u32)> {
+        self.target
+            .xlsx()?
+            .sheet(self.sheet)?
+            .used_range()
+            .map(|u| (u.2, u.3))
+    }
+
+    /// Insert Cells (shift right or down): the selected block becomes empty and its neighbours
+    /// make room. Formats move with the cells; the new cells take the format of the cells above
+    /// (left of) them, as Excel's default. References in formulas are not rewritten.
+    pub fn insert_cells(&mut self, shift: CellShift) -> Result<(), String> {
+        self.shift_cells(shift, true)
+    }
+
+    /// Delete Cells (shift left or up): the neighbours close the gap.
+    pub fn delete_cells(&mut self, shift: CellShift) -> Result<(), String> {
+        self.shift_cells(shift, false)
+    }
+
+    fn shift_cells(&mut self, dir: CellShift, insert: bool) -> Result<(), String> {
+        let (r1, c1, r2, c2) = self.range();
+        let vertical = matches!(dir, CellShift::Down | CellShift::Up);
+        let Some((ur, uc)) = self.used_end() else {
+            return Ok(());
+        };
+        // Lines run along the shift axis; the band is the span across it.
+        let (lo, hi, used, limit, b1, b2) = if vertical {
+            (r1, r2, ur, MAX_ROW, c1, c2)
+        } else {
+            (c1, c2, uc, MAX_COL, r1, r2)
+        };
+        if used < lo {
+            return Ok(());
+        }
+        let n = hi - lo + 1;
+        let end = if insert { (used + n).min(limit) } else { used };
+        let range = |a: u32, b: u32| {
+            let (first, last) = (a.min(b), a.max(b));
+            if vertical {
+                RangeRef {
+                    first_row: first,
+                    first_col: b1,
+                    last_row: last,
+                    last_col: b2,
+                }
+            } else {
+                RangeRef {
+                    first_row: b1,
+                    first_col: first,
+                    last_row: b2,
+                    last_col: last,
+                }
+            }
+        };
+        let at = |line: u32, across: u32| {
+            if vertical {
+                self.source(line, across)
+            } else {
+                self.source(across, line)
+            }
+        };
+        let mut lines: Vec<Vec<String>> = Vec::new();
+        for l in lo..=end {
+            let from = if insert {
+                l.checked_sub(n).filter(|f| *f >= lo)
+            } else {
+                Some(l + n).filter(|f| *f <= limit && *f <= used)
+            };
+            lines.push(
+                (b1..=b2)
+                    .map(|a| from.map_or_else(String::new, |f| at(f, a)))
+                    .collect(),
+            );
+        }
+        let rows: Vec<Vec<String>> = if vertical {
+            lines
+        } else {
+            (0..(b2 - b1 + 1) as usize)
+                .map(|a| lines.iter().map(|line| line[a].clone()).collect())
+                .collect()
+        };
+        let sheet = self.sheet;
+        if insert {
+            if end >= lo + n {
+                let _ = self.apply(Command::CopyFormat {
+                    sheet,
+                    from: range(lo, end - n),
+                    to: range(lo + n, end),
+                });
+            }
+            let vacated = range(lo, lo + n - 1);
+            let _ = if lo > 1 {
+                self.apply(Command::CopyFormat {
+                    sheet,
+                    from: range(lo - 1, lo - 1),
+                    to: vacated,
+                })
+            } else {
+                self.apply(Command::ClearFormats {
+                    sheet,
+                    range: vacated,
+                })
+            };
+        } else if lo + n <= end {
+            let _ = self.apply(Command::CopyFormat {
+                sheet,
+                from: range(lo + n, end),
+                to: range(lo, end - n),
+            });
+            let _ = self.apply(Command::ClearFormats {
+                sheet,
+                range: range(end - n + 1, end),
+            });
+        } else {
+            let _ = self.apply(Command::ClearFormats {
+                sheet,
+                range: range(lo, end),
+            });
+        }
+        let (row, col) = if vertical { (lo, b1) } else { (b1, lo) };
+        self.apply(Command::XlsxPaste {
+            sheet,
+            row,
+            col,
+            rows,
+        })
+    }
+
+    /// Delete / Clear Contents: empties every cell of the selection (formats stay).
+    pub fn clear_range(&mut self) -> Result<(), String> {
+        let (r1, c1, r2, c2) = self.range();
+        let Some((ur, uc)) = self.used_end() else {
+            return Ok(());
+        };
+        let (r2, c2) = (r2.min(ur), c2.min(uc));
+        if r1 > r2 || c1 > c2 {
+            return Ok(());
+        }
+        if (r1, c1) == (r2, c2) {
+            return self.clear(r1, c1);
+        }
+        let any = (r1..=r2).any(|r| (c1..=c2).any(|c| !self.source(r, c).is_empty()));
+        if !any {
+            return Ok(());
+        }
+        let blank = vec![vec![String::new(); (c2 - c1 + 1) as usize]; (r2 - r1 + 1) as usize];
+        self.apply(Command::XlsxPaste {
+            sheet: self.sheet,
+            row: r1,
+            col: c1,
+            rows: blank,
+        })
+    }
+
+    // ---- Tab and Enter ---------------------------------------------------------------------------
+
+    /// Tab (`row_major` false) or Enter (`true`) inside a multi-cell selection moves the active
+    /// cell through the selection (wrapping) and keeps the selection. `back` is Shift.
+    pub fn advance_in_selection(&mut self, row_major: bool, back: bool) {
+        let (r1, c1, r2, c2) = self.range();
+        let (mut r, mut c) = self.active;
+        // Enter walks down a column, then to the top of the next; Tab walks along a row.
+        let (pos, lo, hi, other, olo, ohi) = if row_major {
+            (&mut r, r1, r2, &mut c, c1, c2)
+        } else {
+            (&mut c, c1, c2, &mut r, r1, r2)
+        };
+        if back {
+            if *pos > lo {
+                *pos -= 1;
+            } else {
+                *pos = hi;
+                *other = if *other > olo { *other - 1 } else { ohi };
+            }
+        } else if *pos < hi {
+            *pos += 1;
+        } else {
+            *pos = lo;
+            *other = if *other < ohi { *other + 1 } else { olo };
+        }
+        self.active = (r, c);
+        self.tab_start = None;
+    }
+
+    /// Enter after a run of Tabs returns to the column where the run began, one row down.
+    pub fn enter_after_tabs(&mut self, back: bool) {
+        match self.tab_start.take() {
+            Some(col) if !back => {
+                let r = (self.active.0 + 1).min(MAX_ROW);
+                self.select_cell((r, col));
+            }
+            _ => self.move_by(if back { -1 } else { 1 }, 0),
+        }
+    }
+
+    /// Tab / Shift+Tab: moves along the row and remembers where the run began.
+    pub fn tab_move(&mut self, back: bool) {
+        let start = self.tab_start.unwrap_or(self.active.1);
+        self.move_by(0, if back { -1 } else { 1 });
+        self.tab_start = Some(start);
+    }
+
+    // ---- Ctrl+; and Ctrl+Shift+; -----------------------------------------------------------------
+
+    /// Ctrl+; (`time` false) or Ctrl+Shift+; writes today's date (the current time) into the
+    /// active cell as a constant: `yyyy-mm-dd` or `hh:mm`.
+    pub fn enter_now(&mut self, time: bool) -> Result<(), String> {
+        let (r, c) = self.active;
+        let (serial, builtin) =
+            now_serial(time, self.target.xlsx().is_some_and(|wb| wb.date1904()));
+        let rr = RangeRef::cell(r, c);
+        self.apply(Command::FormatCells {
+            sheet: self.sheet,
+            range: rr,
+            change: Box::new(open365_commands::CellFormatChange {
+                number_format: Some(open365_commands::NumberFormatSpec::Builtin(builtin)),
+                ..Default::default()
+            }),
+        })?;
+        self.apply(Command::XlsxSetCellValue {
+            sheet: self.sheet,
+            row: r,
+            col: c,
+            value: CellEntry::Number(serial),
+        })
     }
 
     // ---- saving ----------------------------------------------------------------------------------
@@ -1053,7 +1868,14 @@ fn split_number(s: &str) -> Option<(String, f64)> {
 }
 
 /// The value at source index `i` (outside `0..src.len()` it extends the series).
-fn series_value(src: &[String], i: i64, vertical: bool, date: bool) -> String {
+fn series_value(
+    src: &[String],
+    i: i64,
+    vertical: bool,
+    date: bool,
+    mode: FillMode,
+    custom: &[Vec<String>],
+) -> String {
     let len = src.len() as i64;
     let k = i.rem_euclid(len) as usize;
     let offset = i - k as i64;
@@ -1065,7 +1887,24 @@ fn series_value(src: &[String], i: i64, vertical: bool, date: bool) -> String {
             open365_xlsx::shift_formula(item, 0, offset)
         };
     }
-    if let Some(v) = name_series(src, i) {
+    let lone_number = len == 1 && split_number(item).is_some_and(|p| p.0.is_empty()) && !date;
+    match mode {
+        FillMode::Copy => return item.clone(),
+        // Ctrl: a lone number counts up; anything else copies.
+        FillMode::Ctrl => {
+            return if lone_number {
+                split_number(item).map_or_else(|| item.clone(), |p| number_text(p.1 + i as f64))
+            } else {
+                item.clone()
+            };
+        }
+        FillMode::Series if lone_number => {
+            return split_number(item)
+                .map_or_else(|| item.clone(), |p| number_text(p.1 + i as f64));
+        }
+        _ => {}
+    }
+    if let Some(v) = name_series(src, i, custom) {
         return v;
     }
     let parts: Option<Vec<(String, f64)>> = src.iter().map(|s| split_number(s)).collect();
@@ -1074,6 +1913,13 @@ fn series_value(src: &[String], i: i64, vertical: bool, date: bool) -> String {
     {
         let prefix = &parts[0].0;
         let ys: Vec<f64> = parts.iter().map(|p| p.1).collect();
+        if date
+            && prefix.is_empty()
+            && ys.len() > 1
+            && let Some(v) = month_series(&ys, i)
+        {
+            return number_text(v);
+        }
         let v = if ys.len() == 1 {
             // One number copies; one `Item1` counts up.
             if prefix.is_empty() && !date {
@@ -1102,6 +1948,71 @@ fn series_value(src: &[String], i: i64, vertical: bool, date: bool) -> String {
         return format!("{prefix}{}", number_text(v));
     }
     item.clone()
+}
+
+/// Days since 1970-01-01 for a civil date (proleptic Gregorian).
+fn days_from_civil(y: i64, m: i64, d: i64) -> i64 {
+    let y = if m <= 2 { y - 1 } else { y };
+    let era = y.div_euclid(400);
+    let yoe = y - era * 400;
+    let doy = (153 * (if m > 2 { m - 3 } else { m + 9 }) + 2) / 5 + d - 1;
+    let doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
+    era * 146_097 + doe - 719_468
+}
+
+/// The civil date `(year, month, day)` of a day count since 1970-01-01.
+fn civil_from_days(z: i64) -> (i64, i64, i64) {
+    let z = z + 719_468;
+    let era = z.div_euclid(146_097);
+    let doe = z - era * 146_097;
+    let yoe = (doe - doe / 1460 + doe / 36_524 - doe / 146_096) / 365;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    let mp = (5 * doy + 2) / 153;
+    let d = doy - (153 * mp + 2) / 5 + 1;
+    let m = if mp < 10 { mp + 3 } else { mp - 9 };
+    (yoe + era * 400 + i64::from(m <= 2), m, d)
+}
+
+/// Excel's serial number of a civil date (1900 system, valid from 1900-03-01).
+fn serial_from_civil(y: i64, m: i64, d: i64) -> f64 {
+    (days_from_civil(y, m, d) - days_from_civil(1899, 12, 30)) as f64
+}
+
+fn civil_from_serial(serial: f64) -> (i64, i64, i64) {
+    civil_from_days(serial.floor() as i64 + days_from_civil(1899, 12, 30))
+}
+
+fn days_in_month(y: i64, m: i64) -> i64 {
+    match m {
+        2 if (y % 4 == 0 && y % 100 != 0) || y % 400 == 0 => 29,
+        2 => 28,
+        4 | 6 | 9 | 11 => 30,
+        _ => 31,
+    }
+}
+
+/// Dates a whole number of months apart on the same day of the month continue by month (Excel's
+/// Auto series unit); `None` when the dates are not month-spaced.
+fn month_series(ys: &[f64], i: i64) -> Option<f64> {
+    if ys.iter().any(|y| *y < 61.0 || y.fract() != 0.0) {
+        return None;
+    }
+    let civil: Vec<_> = ys.iter().map(|y| civil_from_serial(*y)).collect();
+    let months = |c: (i64, i64, i64)| c.0 * 12 + c.1 - 1;
+    let step = months(civil[1]) - months(civil[0]);
+    let steady = civil
+        .windows(2)
+        .all(|w| months(w[1]) - months(w[0]) == step);
+    let same_day = civil.iter().all(|c| c.2 == civil[0].2);
+    let days_regular = ys
+        .windows(2)
+        .all(|w| (w[1] - w[0] - (ys[1] - ys[0])).abs() < 1e-9);
+    if step == 0 || !steady || !same_day || (days_regular && (ys[1] - ys[0]).abs() < 28.0) {
+        return None;
+    }
+    let total = months(civil[0]) + step * i;
+    let (y, m) = (total.div_euclid(12), total.rem_euclid(12) + 1);
+    Some(serial_from_civil(y, m, civil[0].2.min(days_in_month(y, m))))
 }
 
 const DAYS_LONG: [&str; 7] = [
@@ -1134,8 +2045,16 @@ const MONTHS_SHORT: [&str; 12] = [
 
 /// Weekday and month names continue as a cycle (`Mon, Tue` gives `Wed`; one name steps by one).
 /// The case of the first item is kept.
-fn name_series(src: &[String], i: i64) -> Option<String> {
-    let lists: [&[&str]; 4] = [&DAYS_LONG, &DAYS_SHORT, &MONTHS_LONG, &MONTHS_SHORT];
+fn name_series(src: &[String], i: i64, custom: &[Vec<String>]) -> Option<String> {
+    let built_in: [&[&str]; 4] = [&DAYS_LONG, &DAYS_SHORT, &MONTHS_LONG, &MONTHS_SHORT];
+    let custom: Vec<Vec<&str>> = custom
+        .iter()
+        .map(|l| l.iter().map(String::as_str).collect())
+        .collect();
+    let lists = built_in
+        .iter()
+        .copied()
+        .chain(custom.iter().map(Vec::as_slice));
     for list in lists {
         let pos = |s: &str| list.iter().position(|n| n.eq_ignore_ascii_case(s.trim()));
         let idx: Option<Vec<usize>> = src.iter().map(|s| pos(s)).collect();
@@ -1554,5 +2473,89 @@ mod tests {
         assert_eq!(m.display(1, 3), "3");
         assert!(m.undo());
         assert_eq!(m.display(1, 3), "13");
+    }
+}
+
+impl Copied {
+    fn rect(&self) -> Rect4 {
+        let h = self.rows.len().max(1) as u32;
+        let w = self.rows.iter().map(Vec::len).max().unwrap_or(1).max(1) as u32;
+        (
+            self.origin.row,
+            self.origin.col,
+            self.origin.row + h - 1,
+            self.origin.col + w - 1,
+        )
+    }
+}
+
+/// Today's date as a serial number (format 14, m/d/yyyy) or the time of day as a fraction
+/// (format 20, h:mm), from the system clock in the OS local time zone (as Excel's Ctrl+; does).
+fn now_serial(time: bool, date1904: bool) -> (f64, u32) {
+    let secs = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |d| d.as_secs() as i64);
+    now_serial_at(secs, open365_ui_core::utc_offset_minutes(), time, date1904)
+}
+
+/// [`now_serial`] for the instant `utc_secs` (Unix seconds) in a zone `offset_minutes` east of UTC.
+fn now_serial_at(utc_secs: i64, offset_minutes: i32, time: bool, date1904: bool) -> (f64, u32) {
+    let secs = utc_secs + i64::from(offset_minutes) * 60;
+    let day = secs.div_euclid(86_400);
+    let (y, m, d) = civil_from_days(day);
+    let mut serial = serial_from_civil(y, m, d);
+    if date1904 {
+        serial -= 1462.0;
+    }
+    if time {
+        let t = secs.rem_euclid(86_400) / 60 * 60;
+        (t as f64 / 86_400.0, 20)
+    } else {
+        (serial, 14)
+    }
+}
+
+#[cfg(test)]
+mod fill_dates {
+    use super::*;
+
+    #[test]
+    fn ctrl_semicolon_uses_the_local_zone() {
+        // 2024-01-01 23:30 UTC is already 2024-01-02 04:00 in UTC+4:30 and still the 1st in UTC-5.
+        let utc = 1_704_151_800;
+        assert_eq!(now_serial_at(utc, 0, false, false), (45_292.0, 14));
+        assert_eq!(now_serial_at(utc, 270, false, false), (45_293.0, 14));
+        assert_eq!(now_serial_at(utc, -300, false, false), (45_292.0, 14));
+        let (t, f) = now_serial_at(utc, 270, true, false);
+        assert_eq!(f, 20);
+        assert!((t - 4.0 / 24.0).abs() < 1e-9, "{t}");
+        let (t, _) = now_serial_at(utc, -300, true, false);
+        assert!((t - (18.0 + 30.0 / 60.0) / 24.0).abs() < 1e-9, "{t}");
+    }
+
+    #[test]
+    fn civil_dates_round_trip_through_excel_serials() {
+        assert_eq!(serial_from_civil(2024, 1, 1), 45292.0);
+        assert_eq!(civil_from_serial(45292.0), (2024, 1, 1));
+        assert_eq!(serial_from_civil(1900, 3, 1), 61.0);
+    }
+
+    #[test]
+    fn dates_a_month_apart_continue_by_month_end_clamped() {
+        let ys = [
+            serial_from_civil(2024, 1, 31),
+            serial_from_civil(2024, 2, 29),
+        ];
+        // Same day of month is required: 31 Jan then 29 Feb is not month-spaced.
+        assert_eq!(month_series(&ys, 2), None);
+        let ys = [
+            serial_from_civil(2024, 1, 15),
+            serial_from_civil(2024, 2, 15),
+        ];
+        assert_eq!(month_series(&ys, 2), Some(serial_from_civil(2024, 3, 15)));
+        assert_eq!(month_series(&ys, -1), Some(serial_from_civil(2023, 12, 15)));
+        // Weekly dates stay a day series.
+        let ys = [serial_from_civil(2024, 1, 1), serial_from_civil(2024, 1, 8)];
+        assert_eq!(month_series(&ys, 2), None);
     }
 }

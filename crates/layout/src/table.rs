@@ -163,6 +163,9 @@ pub(crate) struct CellLayout {
     pub images: Vec<FlowImage>,
     /// Height of the content including the space before the first and after the last paragraph.
     pub content_h: f64,
+    /// Style of the cell's first paragraph and the end of its last one (see [`Tail`]).
+    head_style: Option<String>,
+    tail: Option<Tail>,
     /// Top of the content box relative to the table's top, vertical alignment applied.
     pub content_top: f64,
     pub valign: VerticalAlign,
@@ -331,6 +334,19 @@ pub(crate) struct CellContent {
     pub boxes: Vec<FlowBox>,
     pub images: Vec<FlowImage>,
     pub height: f64,
+    /// Style of the first block when it is a paragraph.
+    pub head_style: Option<String>,
+    /// The last block when it is a paragraph: its style, whether the style has contextual
+    /// spacing, and the space after that `height` includes.
+    pub tail: Option<Tail>,
+}
+
+/// The space after the last paragraph of a cell and what decides whether it stays.
+#[derive(Debug, Clone)]
+pub(crate) struct Tail {
+    pub style: Option<String>,
+    pub contextual: bool,
+    pub after: f64,
 }
 
 /// Content of a cell laid out in a box `content_w` wide, with `pad` around it.
@@ -354,11 +370,18 @@ pub(crate) fn layout_cell(
     let mut run_prev: Option<usize> = None;
     let mut pending_bottom = 0.0;
     let count = blocks.len();
+    let mut head_style: Option<String> = None;
+    // A paragraph or table has been laid out (raw blocks do not count).
+    let mut seen_block = false;
     for (bi, block) in blocks.iter().enumerate() {
         match block {
             Block::Paragraph(p) => {
                 let idx = b.paragraph(p, content_w, Some(fmt));
                 let pl = &b.arena[idx];
+                if !seen_block {
+                    head_style = pl.style_id.clone();
+                }
+                seen_block = true;
                 // Measured (layout-table-flow): the empty paragraph that must follow a nested
                 // table at the end of a cell takes no height.
                 let after_table = bi > 0 && matches!(blocks[bi - 1], Block::Table(_));
@@ -493,6 +516,7 @@ pub(crate) fn layout_cell(
                 });
             }
             Block::Table(t) => {
+                seen_block = true;
                 y += std::mem::take(&mut pending_bottom);
                 run_prev = None;
                 y += prev.take().map_or(0.0, |p| p.after);
@@ -511,12 +535,19 @@ pub(crate) fn layout_cell(
         }
     }
     y += pending_bottom;
-    y += prev.map_or(0.0, |p| p.after);
+    let tail = prev.map(|p| Tail {
+        style: p.style,
+        contextual: p.contextual,
+        after: p.after,
+    });
+    y += tail.as_ref().map_or(0.0, |t| t.after);
     CellContent {
         lines,
         boxes,
         images,
         height: y,
+        head_style,
+        tail,
     }
 }
 
@@ -581,6 +612,8 @@ impl TableLayout {
             boxes,
             images,
             height: self.height(),
+            head_style: None,
+            tail: None,
         }
     }
 
@@ -713,6 +746,8 @@ pub(crate) fn layout_table(b: &mut Builder<'_>, table: &Table, avail: f64) -> Ta
                 boxes,
                 images,
                 height: content_h,
+                head_style,
+                tail,
             } = layout_cell(b, &c.cell.blocks, content_w, pad, &fmt);
             // Borders: the cell's own, then its table style's, then the table's. A style's
             // cell borders name its region's outer edges (`left`, `right`) and the edges between
@@ -780,6 +815,8 @@ pub(crate) fn layout_table(b: &mut Builder<'_>, table: &Table, avail: f64) -> Ta
                 boxes,
                 images,
                 content_h,
+                head_style,
+                tail,
                 content_top: 0.0,
                 valign,
                 inset_l: 0.0,
@@ -823,6 +860,9 @@ pub(crate) fn layout_table(b: &mut Builder<'_>, table: &Table, avail: f64) -> Ta
     // table's top border sits above the first row (measured with 0.25 to 6 pt borders).
     let mut vlines = vec![0.0f64; col_x.len()];
     let mut hlines = vec![0.0f64; nrows + 1];
+    // The border bottom of the row above and the border top of the row below, per grid line.
+    let mut h_up = vec![0.0f64; nrows + 1];
+    let mut h_low = vec![0.0f64; nrows + 1];
     let last_line = vlines.len() - 1;
     for (r, row) in rows.iter().enumerate() {
         for (cv, cell) in view.rows[r].cells.iter().zip(&row.cells) {
@@ -830,14 +870,33 @@ pub(crate) fn layout_table(b: &mut Builder<'_>, table: &Table, avail: f64) -> Ta
             vlines[a] = vlines[a].max(cell.border_left);
             vlines[e] = vlines[e].max(cell.border_right);
             if cv.row_span > 0 {
-                hlines[r] = hlines[r].max(cell.border_top);
+                h_low[r] = h_low[r].max(cell.border_top);
                 let end = (r + cv.row_span).min(nrows);
-                hlines[end] = hlines[end].max(cell.border_bottom);
+                h_up[end] = h_up[end].max(cell.border_bottom);
                 if cv.row_span > 1 {
                     hlines[r + 1] = hlines[r + 1].max(cell.border_bottom);
                 }
             }
         }
+    }
+    for r in 0..=nrows {
+        let (up, low) = (h_up[r], h_low[r]);
+        // Measured (layout-table-hpad, layout-table-hborders): between two rows the space is
+        // `pad bottom above + max(pad top below + own top border below, bottom border above)`.
+        // The border of the row above hides in the top padding of the row below; the border
+        // below adds to it. At the table's edges the border is whole.
+        let inner = r > 0 && r < nrows;
+        let pad_top = if inner {
+            rows[r].cells.iter().fold(0.0f64, |m, c| m.max(c.pad.top))
+        } else {
+            0.0
+        };
+        let v = if inner {
+            low.max(up - pad_top)
+        } else {
+            up.max(low)
+        };
+        hlines[r] = hlines[r].max(v);
     }
     for (r, row) in rows.iter_mut().enumerate() {
         row.above = if r == 0 { hlines[0] } else { 0.0 };
@@ -863,6 +922,31 @@ pub(crate) fn layout_table(b: &mut Builder<'_>, table: &Table, avail: f64) -> Ta
     } else {
         x + vlines[0] / 2.0
     };
+
+    // Measured (layout-ctx-border, layout-cell-after-last, `5ff67a28`): contextual spacing looks
+    // at the next paragraph of the story, which for the last paragraph of a cell is the first one
+    // of the next cell (the next row's first cell after the last cell of a row). Their styles being
+    // the same drops the space after of the last paragraph.
+    {
+        let order: Vec<(usize, usize)> = rows
+            .iter()
+            .enumerate()
+            .flat_map(|(r, row)| (0..row.cells.len()).map(move |c| (r, c)))
+            .collect();
+        for w in order.windows(2) {
+            let (a, n) = (w[0], w[1]);
+            let head = rows[n.0].cells[n.1].head_style.clone();
+            let cell = &mut rows[a.0].cells[a.1];
+            if let Some(t) = cell.tail.take()
+                && t.contextual
+                && t.after > 0.0
+                && t.style.is_some()
+                && t.style == head
+            {
+                cell.content_h = (cell.content_h - t.after).max(0.0);
+            }
+        }
+    }
 
     // Row heights: the tallest single-row cell, then the row height rule, then the extra
     // that vertically merged cells need goes to the last row they cover.
@@ -902,7 +986,13 @@ pub(crate) fn layout_table(b: &mut Builder<'_>, table: &Table, avail: f64) -> Ta
                 let total: f64 = rows[r..=last].iter().map(|x| x.height).sum::<f64>()
                     - rows[r].above
                     - rows[last].below;
-                let extra = need(&rows[r].cells[c]) - total;
+                // The merged cell takes the bottom padding of the row it ends in (below).
+                let end_pad = rows[last]
+                    .cells
+                    .iter()
+                    .fold(0.0f64, |m, x| m.max(x.pad.bottom));
+                let cell = &rows[r].cells[c];
+                let extra = cell.pad.top + cell.content_h + end_pad - total;
                 if extra > 0.0 && !rows[last].exact {
                     rows[last].height += extra;
                 }

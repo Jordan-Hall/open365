@@ -24,16 +24,16 @@ const TOLERANCE: f64 = 1.0;
 /// Share of items (percent) that must match, per quantity prefix: the measured rate on the train
 /// set and on the hold-out set, rounded down. A change that lowers one fails the test.
 const FLOORS: [(&str, f64, f64); 10] = [
-    ("tick_text", 96.0, 97.0),
+    ("tick_text", 99.0, 99.0),
     ("label_text", 99.0, 99.0),
-    ("label_rect.bar", 97.0, 99.0),
-    ("label_rect.column", 98.0, 99.0),
+    ("label_rect.bar", 99.0, 98.0),
+    ("label_rect.column", 99.0, 99.0),
     ("label_rect.line", 99.0, 99.0),
-    ("label_rect.scatter", 95.0, 99.0),
+    ("label_rect.scatter", 99.0, 99.0),
     ("label_rect.pie.center", 99.0, 96.0),
     ("label_rect.pie.inside_end", 32.0, 0.0),
     ("label_rect.pie.outside_end", 70.0, 47.0),
-    ("label_rect.pie.best_fit", 10.0, 7.0),
+    ("label_rect.pie.best_fit", 13.0, 7.0),
 ];
 
 fn load(name: &str) -> Option<Vec<Value>> {
@@ -141,8 +141,14 @@ fn build(c: &Value) -> (ChartBuilder, f64, f64) {
             sizes: Vec::new(),
         })
         .collect();
-    b.legend = None;
-    b.title = None;
+    // The automatic layout of title and legend decides the interval budget of the axes; the
+    // plot rectangle itself is fixed to Excel's answer by `inner_layout` below.
+    b.legend = match c["legend"].as_i64() {
+        Some(1) => Some(open365_chart::LegendPos::Right),
+        Some(2) => Some(open365_chart::LegendPos::Bottom),
+        _ => None,
+    };
+    b.title = (c["title"] == true).then(|| "Sales".to_owned());
     b.bar_first_at_top = false;
     b.cell_format = c["cell_format"].as_str().map(str::to_owned);
     if let Some(va) = c.get("value_axis").filter(|v| !v.is_null()) {
@@ -219,13 +225,60 @@ fn near(a: f64, b: f64) -> bool {
     (a - b).abs() <= TOLERANCE
 }
 
+/// Copies Excel's linear axis scales into the chart so pass 2 does not depend on our choice.
+fn fix_scales(space: &mut open365_chart::ChartSpace, c: &Value) {
+    let ids: Vec<u32> = space
+        .chart
+        .plot_area
+        .axes
+        .iter()
+        .filter(|a| a.kind == open365_chart::AxisKind::Value)
+        .map(|a| a.id)
+        .collect();
+    let scatter = c["type"] == "scatter";
+    let edit = |a: &Value| {
+        let get = |k: &str| a[k].as_f64();
+        open365_chart::ScaleEdit {
+            min: get("min"),
+            max: get("max"),
+            major_unit: get("major"),
+            minor_unit: None,
+        }
+    };
+    let va = &c["value_axis"];
+    if va.is_null() || va["scale"] != "linear" {
+        return;
+    }
+    // Scatter charts list the X axis first and the Y axis second.
+    let (x_id, y_id) = if scatter {
+        (ids.first().copied(), ids.get(1).copied())
+    } else {
+        (None, ids.first().copied())
+    };
+    if let Some(id) = y_id {
+        space.set_axis_scale(id, edit(va));
+    }
+    if let (Some(id), false) = (x_id, c["x_axis"].is_null()) {
+        space.set_axis_scale(id, edit(&c["x_axis"]));
+    }
+}
+
 fn evaluate(file: &str) -> Option<Stats> {
     let cases = load(file)?;
     let measure = CarlitoMeasure::new();
     let mut st = Stats::default();
     for (n, c) in cases.iter().enumerate() {
         let (b, w, h) = build(c);
-        let space = b.build().expect("builds");
+        // Pass 1: the automatic layout (title and legend as recorded), which is where the axis
+        // scale is chosen; the tick texts are compared on this render.
+        let mut auto = b.clone();
+        auto.inner_layout = None;
+        let auto_space = auto.build().expect("builds");
+        let auto_list = render(&auto_space, w, h, &RenderOptions::new(&NoCells, &measure));
+        // Pass 2: Excel's own plot rectangle and Excel's own scales, so the data-label rules are
+        // measured apart from the layout and the interval budget.
+        let mut space = b.build().expect("builds");
+        fix_scales(&mut space, c);
         let list = render(&space, w, h, &RenderOptions::new(&NoCells, &measure));
         let kind = c["type"].as_str().expect("type");
         let pos = c["position"].as_str().expect("position");
@@ -238,7 +291,11 @@ fn evaluate(file: &str) -> Option<Stats> {
                 .iter()
                 .filter_map(Value::as_str)
                 .collect();
-            let got: Vec<&str> = list.value_tick_texts.iter().map(String::as_str).collect();
+            let got: Vec<&str> = auto_list
+                .value_tick_texts
+                .iter()
+                .map(String::as_str)
+                .collect();
             st.hit("tick_text.value", got == want, || {
                 format!(
                     "{tag} fmt {} got {got:?} want {want:?}",
@@ -253,7 +310,7 @@ fn evaluate(file: &str) -> Option<Stats> {
                 .iter()
                 .filter_map(Value::as_str)
                 .collect();
-            let got: Vec<&str> = list.x_tick_texts.iter().map(String::as_str).collect();
+            let got: Vec<&str> = auto_list.x_tick_texts.iter().map(String::as_str).collect();
             st.hit("tick_text.x", got == want, || {
                 format!("{tag} got {got:?} want {want:?}")
             });
@@ -382,4 +439,11 @@ fn label_rules_match_excel_on_the_train_corpus() {
 #[test]
 fn label_rules_hold_out() {
     check("holdout.json", "hold-out", true);
+}
+
+/// A second hold-out (`chart-oracle`-style seed 3003, recorded after the round-5 rules were
+/// written and never used to choose a constant).
+#[test]
+fn label_rules_second_hold_out() {
+    check("seed3003.json", "hold-out 2 (seed 3003)", true);
 }

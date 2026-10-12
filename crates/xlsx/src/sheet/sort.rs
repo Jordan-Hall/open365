@@ -912,7 +912,7 @@ impl SortState {
 }
 
 /// Local names of the worksheet children that follow `sheetData`, in schema order.
-const AFTER_SHEET_DATA: [&str; 33] = [
+pub(crate) const AFTER_SHEET_DATA: [&str; 33] = [
     "sheetCalcPr",
     "sheetProtection",
     "protectedRanges",

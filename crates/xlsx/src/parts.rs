@@ -314,3 +314,92 @@ pub(crate) fn invalidate_stale_parts(
     }
     Ok(())
 }
+
+/// Adds a `Default` extension entry to `[Content_Types].xml` unless the extension has one.
+pub(crate) fn add_default(
+    package: &mut Package,
+    extension: &str,
+    content_type: &str,
+) -> Result<(), XlsxError> {
+    let Some(mut tree) = load_tree(package, CONTENT_TYPES)? else {
+        return Err(XlsxError::MissingPart(CONTENT_TYPES.to_owned()));
+    };
+    let exists = tree.root.elements().any(|e| {
+        e.head.local_name() == "Default"
+            && e.head
+                .attr("Extension")
+                .is_some_and(|x| x.eq_ignore_ascii_case(extension))
+    });
+    if exists {
+        return Ok(());
+    }
+    let mut el: XmlElement = tree.root.sibling("Default");
+    el.head.attrs = vec![
+        Attr::plain("Extension", extension),
+        Attr::plain("ContentType", content_type),
+    ];
+    // Excel lists the defaults before the overrides.
+    let at = tree
+        .root
+        .children
+        .iter()
+        .position(|c| {
+            c.as_element()
+                .is_some_and(|e| e.head.local_name() == "Override")
+        })
+        .unwrap_or(tree.root.children.len());
+    tree.root.children.insert(at, RawXml::Element(el));
+    let name = PartName::new(CONTENT_TYPES)?;
+    package.set_part(name, tree.to_bytes());
+    Ok(())
+}
+
+/// The content type of `part` as `[Content_Types].xml` gives it (override, then extension default).
+pub(crate) fn content_type_of(package: &Package, part: &str) -> Option<String> {
+    let types = package.part(CONTENT_TYPES)?;
+    let ct = open365_opc::ContentTypes::parse(types.data()).ok()?;
+    let name = PartName::new(part).ok()?;
+    ct.content_type_of(&name).map(str::to_owned)
+}
+
+/// Adds a relationship of either mode and returns its new id (`rId` plus the next free number).
+pub(crate) fn add_relationship_mode(
+    package: &mut Package,
+    source: Option<&PartName>,
+    rel_type: &str,
+    target: &str,
+    external: bool,
+) -> Result<String, XlsxError> {
+    let rels_name = rels_part_name(source);
+    let mut tree = match load_tree(package, rels_name.as_str())? {
+        Some(t) => t,
+        None => xml::parse(
+            br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"/>"#,
+        )?,
+    };
+    let mut next = 1u32;
+    for e in tree.root.elements() {
+        if let Some(n) = e
+            .head
+            .attr("Id")
+            .and_then(|id| id.strip_prefix("rId"))
+            .and_then(|n| n.parse::<u32>().ok())
+        {
+            next = next.max(n + 1);
+        }
+    }
+    let id = format!("rId{next}");
+    let mut rel = tree.root.sibling("Relationship");
+    rel.head.attrs = vec![
+        Attr::plain("Id", &id),
+        Attr::plain("Type", rel_type),
+        Attr::plain("Target", target),
+    ];
+    if external {
+        rel.head.attrs.push(Attr::plain("TargetMode", "External"));
+    }
+    tree.root.children.push(RawXml::Element(rel));
+    package.set_part(rels_name, tree.to_bytes());
+    Ok(id)
+}

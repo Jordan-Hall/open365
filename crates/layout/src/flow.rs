@@ -297,7 +297,7 @@ impl PageBuild {
             number: self.number,
             section: self.section,
             lines: self.lines,
-            cells: self.cells.into_iter().map(snap_cell).collect(),
+            cells: snap_cells(self.cells),
             images: self.images,
             frames: Vec::new(),
             floats: self.floats,
@@ -551,9 +551,38 @@ pub(crate) fn snap_edge(v: f64) -> f64 {
     ((v / BASELINE_GRID) + 1e-9).round() * BASELINE_GRID
 }
 
-fn snap_cell(c: CellBox) -> CellBox {
-    let snap = snap_edge;
-    let (left, right) = (snap(c.x), snap(c.x + c.width));
+/// Snaps the cell rectangles of a page. Vertical edges are measured from the top of their table
+/// when that lies exactly between two grid lines (1044 twips = 52.2 pt, `ca4e5536`): Word puts
+/// the table on the line below, and every edge under it keeps its distance from that line (rows
+/// 36 pt apart stand at 52.08, 88.08, 124.08, ...). A tie further down (`114ed224`: an exact row
+/// of 900 twips under a top on the grid is 45.12 pt high) goes up, as everywhere.
+fn snap_cells(cells: Vec<CellBox>) -> Vec<CellBox> {
+    let mut tops: std::collections::HashMap<usize, f64> = std::collections::HashMap::new();
+    for c in &cells {
+        let t = tops.entry(c.table).or_insert(c.y);
+        *t = t.min(c.y);
+    }
+    cells
+        .into_iter()
+        .map(|c| {
+            let top = tops[&c.table];
+            snap_cell(c, top)
+        })
+        .collect()
+}
+
+fn snap_cell(c: CellBox, table_top: f64) -> CellBox {
+    let units = table_top / BASELINE_GRID;
+    let tie = (units - units.floor() - 0.5).abs() < 1e-6;
+    let base = units.floor() * BASELINE_GRID;
+    let snap = |v: f64| {
+        if tie {
+            base + snap_edge(v - table_top)
+        } else {
+            snap_edge(v)
+        }
+    };
+    let (left, right) = (snap_edge(c.x), snap_edge(c.x + c.width));
     let (top, bottom) = (snap(c.y), snap(c.y + c.height));
     // Word snaps the clip rectangle (the box inset by the padding), not the padding: a 2 pt
     // padding is no multiple of 0.24 pt (`layout-trh-asym`).
@@ -1203,6 +1232,34 @@ impl<'a> Paginator<'a> {
                 .all(|s| s.end_row == r)
     }
 
+    /// Whether the leading header rows of `table` fit in `avail` but the first body row has not
+    /// even a line left below them: Word then moves the header rows to the next page.
+    fn header_strands(table: &TableLayout, avail: f64) -> bool {
+        let n = table.header_rows;
+        if n == 0 || n >= table.rows.len() {
+            return false;
+        }
+        let head: f64 = table.rows[..n].iter().map(|r| r.height).sum();
+        if head > avail + EPS
+            || table.rows[..n]
+                .iter()
+                .any(|r| r.cells.iter().any(|c| c.row_span != 1))
+        {
+            return false;
+        }
+        let rest = avail - head;
+        let body = &table.rows[n];
+        if body.height <= rest + EPS {
+            return false;
+        }
+        if !Self::splittable(table, n, &[]) {
+            return true;
+        }
+        let parts = Self::row_parts(table, n, &[]);
+        let zero: Vec<usize> = parts.iter().map(|p| p.first).collect();
+        Self::split_fragment(&parts, &zero, rest).1 <= 0.0
+    }
+
     /// The cells whose lines make up row `r` when it is split: its own and the merged cells that
     /// end in it.
     fn row_parts<'t>(table: &'t TableLayout, r: usize, active: &[ActiveSpan]) -> Vec<RowPart<'t>> {
@@ -1351,6 +1408,13 @@ impl<'a> Paginator<'a> {
             let row = &table.rows[r];
             let avail = self.page.bottom() - y;
             let at_top = !self.page.has_content();
+            if r == 0 && !at_top && Self::header_strands(table, avail) {
+                // Measured (layout-table-pages): a header row with no body row after it on
+                // the page goes to the next page with the row that follows.
+                self.page.y = y;
+                self.break_in_table(table, 0, &mut y, &mut active);
+                continue;
+            }
             if let Some(cursors) = resume.clone() {
                 let parts = Self::row_parts(table, r, &active);
                 let (to, h, finished) = Self::split_fragment(&parts, &cursors, avail);
@@ -1379,6 +1443,14 @@ impl<'a> Paginator<'a> {
                 let parts = Self::row_parts(table, r, &active);
                 let zero: Vec<usize> = parts.iter().map(|p| p.first).collect();
                 let (to, mut h, finished) = Self::split_fragment(&parts, &zero, avail);
+                if finished && !at_top {
+                    // Measured (`d52c20af`): the content fits but the row's "at least" height
+                    // does not. Word moves the whole row to the next page and does not cut the
+                    // height short.
+                    self.page.y = y;
+                    self.break_in_table(table, r, &mut y, &mut active);
+                    continue;
+                }
                 if at_top && finished && !row.exact {
                     // Measured (layout-trh-tall): a row taller than the page whose content fits
                     // is clamped to the page, not split.

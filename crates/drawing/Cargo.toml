@@ -1,0 +1,14 @@
+[package]
+name = "open365-drawing"
+description = "Shared DrawingML layer: object model, preset-geometry evaluator, paint, display list and read-only parsers."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+quick-xml = "0.42.0"
+
+[lints]
+workspace = true

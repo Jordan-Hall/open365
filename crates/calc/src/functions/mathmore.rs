@@ -60,17 +60,9 @@ pub(super) fn combina(ctx: &EvalContext<'_>, args: &[Arg]) -> Res<Value> {
     if n >= 2_147_483_647.0 || k >= 2_147_483_647.0 {
         return Err(ErrorKind::Num);
     }
-    // Product of (n - 1 + i) / i over the shorter side; Excel does not round the result (46375.99999999999).
+    // COMBIN(n + k - 1, k); Excel does not round the result (46375.99999999999).
     let total = (n + k - 1.0) as u64;
-    let steps = k.min(n - 1.0) as u64;
-    let mut r = 1.0f64;
-    for i in 1..=steps {
-        r = r / i as f64 * (total - steps + i) as f64;
-        if !r.is_finite() {
-            return Err(ErrorKind::Num);
-        }
-    }
-    number(r)
+    number(super::arith::binomial(total, k as u64).ok_or(ErrorKind::Num)?)
 }
 
 pub(super) fn multinomial(ctx: &EvalContext<'_>, args: &[Arg]) -> Res<Value> {

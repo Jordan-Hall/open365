@@ -13,6 +13,10 @@ mod document;
 mod drawing;
 mod edit;
 mod error;
+mod ext_design;
+mod ext_layout;
+mod ext_margins;
+mod ext_references;
 mod fields;
 mod fields_date;
 mod fields_eval;
@@ -56,6 +60,12 @@ pub use drawing::{
     TextBoxAnchor, VerticalRelativeFrom, WrapSide, WrapType,
 };
 pub use error::DocxError;
+pub use ext_design::{
+    PageBorderSide, PageBorders, StyleOverride, THEME_COLOUR_SLOTS, ThemeSpec, Watermark,
+};
+pub use ext_layout::{ColumnSpec, LineNumberRestart, TextBreak};
+pub use ext_margins::MarginEdit;
+pub use ext_references::{NoteRef, escape_xml};
 pub use fields::{
     Arg, DateNames, Field, FieldContext, FieldKind, FieldUpdateReport, GeneralFormat, Instruction,
     MergeData, NoPages, PageInfo, PageProvider, SkipReason, SkippedField, Switch,

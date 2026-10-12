@@ -1,0 +1,36 @@
+{
+  "source": "fixtures/docx/layout-autospacing.docx",
+  "oracle": "Microsoft Word 16.0 (16.0.20430), Print Layout, tools/office/word-layout-oracle.ps1",
+  "units": "points; page and top/left/baseline measured from the page top-left corner; start/end are UTF-16 offsets in the main story",
+  "precision": "top/left/lastX are screen-quantised (+-0.3 pt); baseline/inkLeft and cell rectangles come from the 600 dpi PDF and are exact",
+  "pageCount": 1,
+  "cells": [
+    {"page": 1, "x": 72.024, "y": 334.656, "w": 240.1, "h": 95.064},
+    {"page": 1, "x": 72.024, "y": 443.18, "w": 240.1, "h": 26.88}
+  ],
+  "lines": [
+    {"page": 1, "start": 0, "end": 31, "top": 72.0, "left": 72.0, "lastX": 206.4, "baseline": 82.58, "inkLeft": 72.024, "text": "A1 first paragraph before auto\u000d"},
+    {"page": 1, "start": 31, "end": 48, "top": 85.2, "left": 72.0, "lastX": 139.8, "baseline": 96.02, "inkLeft": 72.024, "text": "A2 plain after 0\u000d"},
+    {"page": 1, "start": 48, "end": 67, "top": 112.8, "left": 72.0, "lastX": 157.8, "baseline": 123.41, "inkLeft": 72.024, "text": "A3 before auto 100\u000d"},
+    {"page": 1, "start": 67, "end": 87, "top": 126.0, "left": 72.0, "lastX": 154.8, "baseline": 136.85, "inkLeft": 72.024, "text": "A4 plain after 20pt\u000d"},
+    {"page": 1, "start": 87, "end": 106, "top": 159.6, "left": 72.0, "lastX": 157.8, "baseline": 170.21, "inkLeft": 72.024, "text": "A5 before auto 100\u000d"},
+    {"page": 1, "start": 106, "end": 120, "top": 173.4, "left": 72.0, "lastX": 130.8, "baseline": 183.65, "inkLeft": 72.024, "text": "A6 after auto\u000d"},
+    {"page": 1, "start": 120, "end": 138, "top": 200.4, "left": 72.0, "lastX": 148.2, "baseline": 211.27, "inkLeft": 72.024, "text": "A7 plain before 0\u000d"},
+    {"page": 1, "start": 138, "end": 152, "top": 214.2, "left": 72.0, "lastX": 130.8, "baseline": 224.71, "inkLeft": 72.024, "text": "A8 after auto\u000d"},
+    {"page": 1, "start": 152, "end": 178, "top": 241.2, "left": 72.0, "lastX": 185.4, "baseline": 252.07, "inkLeft": 72.024, "text": "A9 before auto after auto\u000d"},
+    {"page": 1, "start": 178, "end": 208, "top": 268.8, "left": 72.0, "lastX": 206.4, "baseline": 279.43, "inkLeft": 72.024, "text": "A10 before auto only no value\u000d"},
+    {"page": 1, "start": 208, "end": 218, "top": 282.0, "left": 72.0, "lastX": 114.0, "baseline": 292.9, "inkLeft": 72.024, "text": "A11 plain\u000d"},
+    {"page": 1, "start": 218, "end": 242, "top": 307.8, "left": 72.0, "lastX": 174.6, "baseline": 318.34, "inkLeft": 72.024, "text": "A12 before 240 explicit\u000d"},
+    {"page": 1, "start": 242, "end": 252, "top": 321.0, "left": 72.0, "lastX": 114.0, "baseline": 331.78, "inkLeft": 72.024, "text": "A13 plain\u000d"},
+    {"page": 1, "start": 252, "end": 277, "top": 345.22, "left": 77.304, "lastX": null, "baseline": 345.22, "inkLeft": 77.304, "text": "B1 cell first before auto", "cell": true},
+    {"page": 1, "start": 278, "end": 304, "top": 372.6, "left": 77.304, "lastX": null, "baseline": 372.6, "inkLeft": 77.304, "text": "B2 cell second before auto", "cell": true},
+    {"page": 1, "start": 305, "end": 324, "top": 386.04, "left": 77.304, "lastX": null, "baseline": 386.04, "inkLeft": 77.304, "text": "B3 cell third plain", "cell": true},
+    {"page": 1, "start": 325, "end": 338, "top": 399.48, "left": 77.304, "lastX": null, "baseline": 399.48, "inkLeft": 77.304, "text": "B4 after auto", "cell": true},
+    {"page": 1, "start": 339, "end": 347, "top": 426.84, "left": 77.304, "lastX": null, "baseline": 426.84, "inkLeft": 77.304, "text": "B5 plain", "cell": true},
+    {"page": 1, "start": 349, "end": 359, "top": 429.6, "left": 72.0, "lastX": 114.0, "baseline": 440.28, "inkLeft": 72.024, "text": "A14 plain\u000d"},
+    {"page": 1, "start": 359, "end": 367, "top": 453.74, "left": 77.304, "lastX": null, "baseline": 453.74, "inkLeft": 77.304, "text": "C1 plain", "cell": true},
+    {"page": 1, "start": 368, "end": 381, "top": 467.18, "left": 77.304, "lastX": null, "baseline": 467.18, "inkLeft": 77.304, "text": "C2 after auto", "cell": true},
+    {"page": 1, "start": 383, "end": 411, "top": 483.6, "left": 72.0, "lastX": 192.6, "baseline": 494.54, "inkLeft": 72.024, "text": "A15 before auto after table\u000d"},
+    {"page": 1, "start": 411, "end": 425, "top": 497.4, "left": 72.0, "lastX": 133.2, "baseline": 507.98, "inkLeft": 72.024, "text": "A16 plain end\u000d"}
+  ]
+}

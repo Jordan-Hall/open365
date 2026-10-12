@@ -88,6 +88,9 @@ pub(super) enum Tok {
     Elapsed(char, usize),
     /// Fractional seconds: `.0`, `.00`, `.000`.
     SubSec(usize),
+    /// Thai digits on or off for the token after it: only the Thai date letters write Thai digits in a section without a
+    /// `[$-]` tag (`h ว` is `18 ๑๕`).
+    DigitMode(bool),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -214,6 +217,8 @@ struct Tokenizer<'a> {
     shape: u8,
     calendar: u8,
     thai: bool,
+    /// Positions in `out` of the Thai hour letter (`ช`).
+    thai_hours: Vec<usize>,
     _src: &'a str,
 }
 
@@ -229,6 +234,7 @@ impl<'a> Tokenizer<'a> {
             shape: 0,
             calendar: 0,
             thai: false,
+            thai_hours: Vec::new(),
             _src: src,
         }
     }
@@ -433,6 +439,10 @@ impl<'a> Tokenizer<'a> {
                 '\u{0e27}' | '\u{0e14}' | '\u{0e1b}' | '\u{0e0a}' | '\u{0e19}' | '\u{0e17}' => {
                     let n = self.run_of(c);
                     self.thai = true;
+                    self.out.push(Tok::DigitMode(true));
+                    if c == '\u{0e0a}' {
+                        self.thai_hours.push(self.out.len());
+                    }
                     self.out.push(match c {
                         '\u{0e27}' => Tok::Day(n),
                         '\u{0e14}' => Tok::Month(n),
@@ -441,6 +451,7 @@ impl<'a> Tokenizer<'a> {
                         '\u{0e19}' => Tok::Minute(n),
                         _ => Tok::Second(n),
                     });
+                    self.out.push(Tok::DigitMode(false));
                 }
                 'g' | 'G' => {
                     let n = self.run_of(c);
@@ -775,6 +786,12 @@ impl NumberFormat {
             let dbnum = tk.dbnum;
             let extra = (tk.shape, tk.calendar, tk.thai);
             let mut toks = tk.out;
+            // The Thai hour letter writes nothing in a section with AM/PM (measured).
+            if toks.iter().any(|t| matches!(t, Tok::AmPm { .. })) {
+                for &at in &tk.thai_hours {
+                    toks[at] = Tok::Lit(String::new());
+                }
+            }
             // Fractional seconds are recognised here, where the token order is known.
             let mut i = 0;
             while i + 1 < toks.len() {

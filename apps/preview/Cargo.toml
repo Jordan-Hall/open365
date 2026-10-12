@@ -20,12 +20,15 @@ accesskit.workspace = true
 arboard.workspace = true
 image.workspace = true
 open365-calc.workspace = true
+open365-chart.workspace = true
 open365-commands.workspace = true
 open365-docx.workspace = true
+open365-drawing.workspace = true
 open365-gfx.workspace = true
 open365-layout.workspace = true
 open365-locale.workspace = true
 open365-opc.workspace = true
+open365-spell.workspace = true
 open365-text.workspace = true
 open365-ui-core.workspace = true
 open365-ui-host.workspace = true
@@ -36,6 +39,7 @@ serde_json.workspace = true
 zip = { version = "9.0.1", default-features = false, features = ["deflate"] }
 
 [dev-dependencies]
+open365-pivot.workspace = true
 image.workspace = true
 open365-opc.workspace = true
 

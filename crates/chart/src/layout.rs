@@ -992,6 +992,7 @@ fn cartesian_layout(
         let mut in_w = base_w;
         let space = |len: f64| AxisSpace {
             len,
+            outer: o.width,
             labels_in_plot: false,
             horizontal: true,
             font_pt: label_pt,
@@ -1008,6 +1009,7 @@ fn cartesian_layout(
         let mut in_h = (o.height - cat_h - title_h).max(1.0);
         let space = |len: f64, moved: bool| AxisSpace {
             len,
+            outer: o.height,
             labels_in_plot: moved,
             horizontal: false,
             font_pt: label_pt,
@@ -1044,21 +1046,21 @@ fn cartesian_layout(
         vw += title_w;
         let mut in_w = (o.width - vw).max(1.0);
         if scatter {
-            let pick = |w: f64| {
+            let pick = || {
                 resolve_scale(
                     cat_axis.and_then(|a| a.min),
                     cat_axis.and_then(|a| a.max),
                     cat_axis.and_then(|a| a.major_unit),
                     cat_axis.and_then(|a| a.minor_unit),
                     xext,
-                    max_intervals(w, true, label_pt),
+                    max_intervals(o.width, true, label_pt),
                 )
             };
             let base_w = in_w;
-            let mut xs = pick(in_w);
+            let mut xs = pick();
             for _ in 0..2 {
                 in_w = (base_w - half_label(&xs, &xfmt)).max(1.0);
-                xs = pick(in_w);
+                xs = pick();
             }
             x_scale = Some(xs);
         } else if first.def.kind == GroupKind::Area && cat_labels.len() > 1 && !cat_deleted {
@@ -1072,6 +1074,13 @@ fn cartesian_layout(
         inside = Rect::new(o.x + vw, o.y + 0.1, in_w, in_h - 0.1);
     }
     // A manual inner plot layout fixes the plot rectangle; the scales are then picked for it.
+    // What the auto layout puts around the plot along the axis (tick labels, gaps): a manual
+    // inner rectangle keeps the same surroundings when the budget is worked out.
+    let auto_extra = if horizontal_bars {
+        o.width - inside.width
+    } else {
+        o.height - inside.height
+    };
     let (value, x_scale, inside) = match fixed_inside {
         Some(r) => {
             let along = if horizontal_bars { r.width } else { r.height };
@@ -1083,6 +1092,7 @@ fn cartesian_layout(
                     percent,
                     AxisSpace {
                         len: along,
+                        outer: along + auto_extra,
                         labels_in_plot: moved,
                         horizontal: horizontal_bars,
                         font_pt: label_pt,
@@ -1108,7 +1118,7 @@ fn cartesian_layout(
                     cat_axis.and_then(|a| a.major_unit),
                     cat_axis.and_then(|a| a.minor_unit),
                     xext,
-                    max_intervals(r.width, true, label_pt),
+                    max_intervals(r.width + (o.width - inside.width), true, label_pt),
                 )
             });
             (v, xs, r)
@@ -1206,7 +1216,11 @@ fn cartesian_layout(
 /// The plot axis the scale is picked for: its length in points, direction and label size.
 #[derive(Clone, Copy)]
 struct AxisSpace {
+    /// Inside length of the plot (log axes are budgeted on it).
     len: f64,
+    /// Length of the plot area's outer rectangle along the axis: what the linear interval budget
+    /// follows ([`max_intervals`]).
+    outer: f64,
     /// Category labels sit inside the plot (log axes that reach below 1).
     labels_in_plot: bool,
     horizontal: bool,
@@ -1221,7 +1235,7 @@ fn pick_scale(
     percent: bool,
     space: AxisSpace,
 ) -> AxisScale {
-    let n = max_intervals(space.len, space.horizontal, space.font_pt);
+    let n = max_intervals(space.outer, space.horizontal, space.font_pt);
     if let Some(base) = axis.and_then(|a| a.log_base).filter(|b| *b > 1.0) {
         let (lo, hi) = (log_lo.unwrap_or(1.0), ext.map_or(1.0, |e| e.1));
         let mut s = crate::axis::log_scale(
@@ -2256,15 +2270,25 @@ fn draw_pie(cv: &mut Canvas<'_>, g: &Group<'_>, area: Rect, base_pt: f64, date19
                 parts.push(c.clone());
             }
             if lb.show_value {
-                let code = lb
-                    .num_fmt
-                    .clone()
+                // With the percentage shown too, a custom label format belongs to the
+                // percentage and the value keeps the format of its cells.
+                let own = if lb.show_percent {
+                    None
+                } else {
+                    lb.num_fmt.clone()
+                };
+                let code = own
                     .or_else(|| s.format_code.clone())
                     .unwrap_or_else(|| "General".to_owned());
                 parts.push(format_number(v, &code, date1904));
             }
             if lb.show_percent {
-                let code = lb.num_fmt.as_deref().unwrap_or("0%");
+                // A percentage in the General format reads as a whole-number percentage.
+                let code = lb
+                    .num_fmt
+                    .as_deref()
+                    .filter(|c| !c.eq_ignore_ascii_case("general"))
+                    .unwrap_or("0%");
                 parts.push(pie_percent(&shares, i, code, date1904));
             }
             let text = parts.join(lb.separator.as_deref().unwrap_or(", "));

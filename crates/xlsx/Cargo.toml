@@ -9,6 +9,7 @@ publish.workspace = true
 
 [dependencies]
 open365-calc.workspace = true
+open365-drawing.workspace = true
 open365-locale.workspace = true
 open365-opc.workspace = true
 quick-xml = "0.42.0"

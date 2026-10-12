@@ -51,6 +51,10 @@ total = 84
 agree = 84
 total = 84
 
+[fixtures.layout-autospacing]
+agree = 0
+total = 339
+
 [fixtures.layout-caps]
 agree = 1019
 total = 2136
@@ -62,6 +66,14 @@ total = 74
 [fixtures.layout-caps-sizes]
 agree = 119
 total = 208
+
+[fixtures.layout-cell-after-border]
+agree = 234
+total = 234
+
+[fixtures.layout-cell-after-last]
+agree = 254
+total = 254
 
 [fixtures.layout-cols-balance]
 agree = 1228
@@ -138,6 +150,22 @@ total = 3826
 [fixtures.layout-cols-unequal-two]
 agree = 7202
 total = 7202
+
+[fixtures.layout-ctx-border]
+agree = 247
+total = 247
+
+[fixtures.layout-ctx-cell]
+agree = 155
+total = 155
+
+[fixtures.layout-ctx-cell2]
+agree = 110
+total = 110
+
+[fixtures.layout-ctx-cell3]
+agree = 227
+total = 227
 
 [fixtures.layout-float-align]
 agree = 2505
@@ -411,6 +439,14 @@ total = 1055
 agree = 923
 total = 923
 
+[fixtures.layout-table-hborders]
+agree = 544
+total = 544
+
+[fixtures.layout-table-hpad]
+agree = 611
+total = 611
+
 [fixtures.layout-table-pages]
 agree = 15484
 total = 15740
@@ -559,6 +595,10 @@ total = 84
 agree = 84
 total = 84
 
+[system.layout-autospacing]
+agree = 0
+total = 339
+
 [system.layout-caps]
 agree = 2076
 total = 2136
@@ -570,6 +610,14 @@ total = 74
 [system.layout-caps-sizes]
 agree = 206
 total = 208
+
+[system.layout-cell-after-border]
+agree = 234
+total = 234
+
+[system.layout-cell-after-last]
+agree = 254
+total = 254
 
 [system.layout-cols-balance]
 agree = 1228
@@ -646,6 +694,22 @@ total = 3826
 [system.layout-cols-unequal-two]
 agree = 7202
 total = 7202
+
+[system.layout-ctx-border]
+agree = 247
+total = 247
+
+[system.layout-ctx-cell]
+agree = 155
+total = 155
+
+[system.layout-ctx-cell2]
+agree = 110
+total = 110
+
+[system.layout-ctx-cell3]
+agree = 227
+total = 227
 
 [system.layout-face-multiple]
 agree = 209
@@ -934,6 +998,14 @@ total = 1055
 [system.layout-table-flow]
 agree = 923
 total = 923
+
+[system.layout-table-hborders]
+agree = 544
+total = 544
+
+[system.layout-table-hpad]
+agree = 611
+total = 611
 
 [system.layout-table-pages]
 agree = 15484

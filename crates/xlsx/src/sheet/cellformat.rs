@@ -203,6 +203,12 @@ impl Worksheet {
         &mut self.rows[ri].cells[ci]
     }
 
+    /// Sets the cell format of one cell (creating the cell blank when it does not exist).
+    pub(crate) fn set_cell_style(&mut self, row: u32, col: u32, xf: u32) {
+        let cell = self.cell_slot_plain(row, col);
+        cell.style = (xf != 0).then_some(xf);
+    }
+
     fn new_row(&self, row: u32) -> Row {
         let mut head = self.sheet_data_head.sibling("row");
         head.attrs.push(Attr::plain("r", &row.to_string()));

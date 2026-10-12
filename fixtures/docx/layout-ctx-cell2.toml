@@ -1,0 +1,5 @@
+feature = "layout-ctx-cell2"
+made_with = "hand-written OOXML (generated from layout-table-basic.docx parts); reference taken with Microsoft Word 16.0"
+author = "project member"
+expect_dropped = []
+notes = "contextual spacing: space after of an empty or directly spaced last paragraph of a table cell"

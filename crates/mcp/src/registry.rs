@@ -213,6 +213,24 @@ pub const COMMANDS: &[CommandSpec] = &[
         },
     },
     CommandSpec {
+        name: "docx_replace_one",
+        domain: Domain::Docx,
+        summary: "Replace one match of Find and Replace (the range docx find gave) with the expanded replacement.",
+        example: || {
+            json!({"command": "docx_replace_one", "op": {"find": "F", "replacement": "G",
+                "para": 0, "start": 0, "end": 1}})
+        },
+    },
+    CommandSpec {
+        name: "docx_section_margins",
+        domain: Domain::Docx,
+        summary: "Set the page margins of one section, in points (ruler drag, Page Setup).",
+        example: || {
+            json!({"command": "docx_section_margins", "op": {"section": 0,
+                "top_pt": 72.0, "bottom_pt": 72.0, "left_pt": 72.0, "right_pt": 72.0}})
+        },
+    },
+    CommandSpec {
         name: "xlsx_replace_all",
         domain: Domain::Xlsx,
         summary: "Replace every match of a text over cell formulas and constants (Excel's Replace All).",
@@ -377,6 +395,90 @@ pub const COMMANDS: &[CommandSpec] = &[
                 "range": {"first_row": 40, "first_col": 1, "last_row": 40, "last_col": 3},
                 "mode": "cells"})
         },
+    },
+    CommandSpec {
+        name: "docx_references",
+        domain: Domain::Docx,
+        summary: "Writer References tab: tables of contents and figures, captions, footnotes and endnotes, index, authorities, field updates.",
+        example: || {
+            json!({"command": "docx_references",
+                "op": {"update_fields": {"scope": "toc", "pages": []}}})
+        },
+    },
+    CommandSpec {
+        name: "docx_home",
+        domain: Domain::Docx,
+        summary: "Writer Home tab operations beyond the text model: highlight, underline style, change case, lists, borders.",
+        example: || {
+            json!({"command": "docx_home",
+                "op": {"op": "underline", "start": {"para": 0, "offset": 0},
+                    "end": {"para": 0, "offset": 5}, "style": "single"}})
+        },
+    },
+    CommandSpec {
+        name: "docx_insert",
+        domain: Domain::Docx,
+        summary: "Writer Insert tab: page and section breaks, tables, links, bookmarks, pictures, headers and footers.",
+        example: || {
+            json!({"command": "docx_insert",
+                "op": {"op": "page_break", "pos": {"para": 0, "offset": 0}}})
+        },
+    },
+    CommandSpec {
+        name: "docx_review",
+        domain: Domain::Docx,
+        summary: "Writer Review tab: track changes on or off, comments, accept and reject revisions.",
+        example: || {
+            json!({"command": "docx_review",
+                "op": {"track_changes": {"on": true, "author": "Agent"}}})
+        },
+    },
+    CommandSpec {
+        name: "docx_layout",
+        domain: Domain::Docx,
+        summary: "Writer Layout tab: margins, orientation, size, columns, breaks, line numbers, hyphenation, indent and spacing.",
+        example: || {
+            json!({"command": "docx_layout",
+                "op": {"op": "orientation", "sections": [0], "landscape": true}})
+        },
+    },
+    CommandSpec {
+        name: "docx_design",
+        domain: Domain::Docx,
+        summary: "Writer Design tab: themes, colours, fonts, effects, style sets, page colour and borders, watermark.",
+        example: || json!({"command": "docx_design", "op": {"op": "theme_effects", "level": 1}}),
+    },
+    CommandSpec {
+        name: "home_op",
+        domain: Domain::Xlsx,
+        summary: "Sheets Home tab operations on whole structures: Clear All, custom Sort, AutoFilter (destructive when it removes content).",
+        example: || {
+            json!({"command": "home_op", "sheet": 0,
+                "op": {"op": "clear_all",
+                    "range": {"first_row": 40, "first_col": 1, "last_row": 40, "last_col": 3}}})
+        },
+    },
+    CommandSpec {
+        name: "data_op",
+        domain: Domain::Xlsx,
+        summary: "Sheets Data tab: sort, AutoFilter and criteria, Advanced Filter, Text to Columns, validation, outline, subtotals.",
+        example: || {
+            json!({"command": "data_op", "sheet": 0,
+                "op": {"op": "auto_filter",
+                    "range": {"first_row": 1, "first_col": 1, "last_row": 3, "last_col": 3}}})
+        },
+    },
+    CommandSpec {
+        name: "review_op",
+        domain: Domain::Xlsx,
+        summary: "Sheets Review tab: protect or unprotect a sheet or workbook, notes.",
+        example: || json!({"command": "review_op", "sheet": 0, "op": {"op": "protect_workbook"}}),
+    },
+    CommandSpec {
+        name: "sheet_objects",
+        domain: Domain::Xlsx,
+        summary: "Sheets Insert and Formulas tabs and sheet management: tables, names, links, charts, pivots, conditional formats, sheet operations, cell shifts, recalculation.",
+        example: || json!({"command": "sheet_objects", "sheet": 0, "op": {"op": "calculate_now"}}),
     },
     CommandSpec {
         name: "save",

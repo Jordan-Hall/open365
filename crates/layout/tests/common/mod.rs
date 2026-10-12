@@ -314,6 +314,30 @@ pub fn score_doc(
                         && (x1 - x0 - c.w / PDF_SCALE_X).abs() <= CELL_TOLERANCE_X
                         && (y1 - y0 - c.h / PDF_SCALE).abs() <= CELL_TOLERANCE_Y
                 });
+        if hit.is_none() && !zone && std::env::var_os("PARITY_CELLDIFF").is_some() {
+            // Nearest engine rectangle and how far each edge is from Word's (diagnostic).
+            let near = layout
+                .pages
+                .iter()
+                .filter(|p| p.number as u64 == c.page)
+                .flat_map(|p| p.cells.iter())
+                .map(|b| {
+                    (
+                        b.x - c.x / PDF_SCALE_X,
+                        b.y + b.pad_top - c.y / PDF_SCALE,
+                        b.width - c.w / PDF_SCALE_X,
+                        b.height - b.pad_top - b.pad_bottom - c.h / PDF_SCALE,
+                    )
+                })
+                .min_by(|a, b| {
+                    let d =
+                        |q: &(f64, f64, f64, f64)| q.0.abs() + q.1.abs() + q.2.abs() + q.3.abs();
+                    d(a).total_cmp(&d(b))
+                });
+            if let Some((dx, dy, dw, dh)) = near {
+                println!("CELLD {name} dx {dx:.3} dy {dy:.3} dw {dw:.3} dh {dh:.3}");
+            }
+        }
         if let Some((pn, i, _)) = hit {
             used.push((pn, i));
             s.matched += 1;

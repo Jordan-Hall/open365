@@ -374,7 +374,12 @@ impl Target {
                 };
                 let log_len = s.doc.edit_log().len();
                 self.replaced = replay_docx(&mut s.doc, command)?;
-                self.notes = s.doc.edit_log()[log_len..]
+                // A command that reopens the document (Home/Insert package edits) starts a new log.
+                self.notes = s
+                    .doc
+                    .edit_log()
+                    .get(log_len..)
+                    .unwrap_or_default()
                     .iter()
                     .map(|e| e.description.clone())
                     .collect();
@@ -562,6 +567,58 @@ impl Target {
                 let before = Box::new(x.workbook.clone());
                 match crate::merge::run(x, *sheet, *range, *mode) {
                     Ok(changed) => Ok((Inverse::Workbook(before), changed)),
+                    Err(e) => {
+                        x.restore_workbook(*before);
+                        Err(e)
+                    }
+                }
+            }
+            (Content::Xlsx(x), Command::HomeOp { sheet, op }) => {
+                let before = Box::new(x.workbook.clone());
+                match crate::ext::sheets_home::run(x, *sheet, op) {
+                    Ok(changed) => Ok((Inverse::Workbook(before), changed)),
+                    Err(e) => {
+                        x.restore_workbook(*before);
+                        Err(e)
+                    }
+                }
+            }
+            (Content::Xlsx(x), Command::DataOp { sheet, op }) => {
+                let before = Box::new(x.workbook.clone());
+                let mut notes = Vec::new();
+                match crate::ext::data::run(x, *sheet, op, &mut notes) {
+                    Ok(changed) => {
+                        self.notes = notes;
+                        Ok((Inverse::Workbook(before), changed))
+                    }
+                    Err(e) => {
+                        x.restore_workbook(*before);
+                        Err(e)
+                    }
+                }
+            }
+            (Content::Xlsx(x), Command::ReviewOp { sheet, op }) => {
+                let before = Box::new(x.workbook.clone());
+                let mut notes = Vec::new();
+                match crate::ext::review::run(x, *sheet, op, &mut notes) {
+                    Ok(changed) => {
+                        self.notes = notes;
+                        Ok((Inverse::Workbook(before), changed))
+                    }
+                    Err(e) => {
+                        x.restore_workbook(*before);
+                        Err(e)
+                    }
+                }
+            }
+            (Content::Xlsx(x), Command::SheetObjects { sheet, op }) => {
+                let before = Box::new(x.workbook.clone());
+                let mut notes = Vec::new();
+                match crate::ext::sheet_objects::run(x, *sheet, op, &mut notes) {
+                    Ok(changed) => {
+                        self.notes = notes;
+                        Ok((Inverse::Workbook(before), changed))
+                    }
                     Err(e) => {
                         x.restore_workbook(*before);
                         Err(e)
@@ -764,6 +821,14 @@ fn is_docx_edit(command: &Command) -> bool {
             | Command::DocxReplaceRange { .. }
             | Command::DocxCorrectWord { .. }
             | Command::DocxReplaceAll { .. }
+            | Command::DocxReplaceOne { .. }
+            | Command::DocxSectionMargins { .. }
+            | Command::DocxReferences { .. }
+            | Command::DocxReview { .. }
+            | Command::DocxLayout { .. }
+            | Command::DocxDesign { .. }
+            | Command::DocxHome { .. }
+            | Command::DocxInsert { .. }
     )
 }
 
@@ -809,9 +874,27 @@ fn capture_docx(doc: &Document, command: &Command) -> Result<Vec<Snapshot>, Comm
                 whole_word: *whole_word,
                 wildcards: *wildcards,
             };
-            let mut paras: Vec<usize> = doc.find_all(&opts)?.iter().map(|m| m.para).collect();
-            paras.dedup();
-            paras.into_iter().map(one).collect::<Result<Vec<_>, _>>()?
+            let hits = doc.find_all(&opts)?;
+            // A match can run through paragraph marks (a wildcard star) and merge paragraphs, so
+            // one snapshot covers the first to the last matched paragraph; matches that stay in
+            // a paragraph (or sit in table cells) are saved paragraph by paragraph.
+            if hits.iter().any(|m| m.end_para != m.para)
+                && let (Some(first), Some(last)) = (
+                    hits.iter().map(|m| m.para).min(),
+                    hits.iter().map(|m| m.end_para.max(m.para)).max(),
+                )
+                && let Ok(snapshot) = doc.capture(first, last)
+            {
+                vec![snapshot]
+            } else {
+                let mut paras: Vec<usize> = hits.iter().map(|m| m.para).collect();
+                paras.dedup();
+                paras.into_iter().map(one).collect::<Result<Vec<_>, _>>()?
+            }
+        }
+        Command::DocxReplaceOne { op } => {
+            let (first, last) = op.paragraphs();
+            vec![doc.capture(first, last)?]
         }
         _ => return Err(CommandError::NotUndoable),
     };
@@ -827,6 +910,7 @@ fn replay_docx(doc: &mut Document, command: &Command) -> Result<usize, CommandEr
             match_case,
             whole_word,
             wildcards,
+            clipboard,
         } => {
             let opts = open365_docx::FindOptions {
                 pattern: find.clone(),
@@ -834,7 +918,7 @@ fn replay_docx(doc: &mut Document, command: &Command) -> Result<usize, CommandEr
                 whole_word: *whole_word,
                 wildcards: *wildcards,
             };
-            return Ok(doc.replace_all(&opts, replacement)?);
+            return Ok(doc.replace_all_with_clipboard(&opts, replacement, clipboard.as_deref())?);
         }
         Command::DocxInsertText { para, offset, text } => doc.insert_text(*para, *offset, text)?,
         Command::DocxSetBold {
@@ -897,6 +981,17 @@ fn replay_docx(doc: &mut Document, command: &Command) -> Result<usize, CommandEr
             };
             doc.replace_range(at(*start), at(*end), replacement)?;
         }
+        Command::DocxReplaceOne { op } => {
+            crate::ext::writer_search::apply(doc, op)?;
+            return Ok(1);
+        }
+        Command::DocxSectionMargins { op } => crate::ext::writer_margins::apply(doc, op)?,
+        Command::DocxReferences { op } => crate::ext::writer_references::apply(doc, op)?,
+        Command::DocxReview { op } => crate::ext::writer_review::apply(doc, op)?,
+        Command::DocxLayout { op } => crate::ext::writer_layout::apply(doc, op)?,
+        Command::DocxDesign { op } => crate::ext::writer_design::apply(doc, op)?,
+        Command::DocxHome { op } => crate::ext::writer_home::run(doc, op)?,
+        Command::DocxInsert { op } => crate::ext::writer_insert::run(doc, op)?,
         _ => {}
     }
     Ok(0)

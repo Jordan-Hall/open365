@@ -1,0 +1,5 @@
+feature = "layout-autospacing"
+made_with = "hand-written OOXML (generated from layout-table-basic.docx parts); reference taken with Microsoft Word 16.0"
+author = "project member"
+expect_dropped = []
+notes = "w:beforeAutospacing and w:afterAutospacing: at the top of a page, after plain paragraphs, between auto-spaced paragraphs, in table cells and after a table"

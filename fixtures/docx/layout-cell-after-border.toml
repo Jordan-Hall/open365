@@ -1,0 +1,5 @@
+feature = "layout-cell-after-border"
+made_with = "hand-written OOXML (generated from layout-table-basic.docx parts); reference taken with Microsoft Word 16.0"
+author = "project member"
+expect_dropped = []
+notes = "space after the last paragraph of a cell against a bottom cell border of 0.5 to 3 pt, with and without a top border on the next row"

@@ -13,6 +13,7 @@ mod docmodel;
 mod find;
 mod fonts;
 mod grid_cf;
+mod grid_drawing;
 mod grid_text;
 mod grid_view;
 mod parts;

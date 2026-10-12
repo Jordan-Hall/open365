@@ -156,6 +156,42 @@ pub enum Command {
         whole_word: bool,
         #[serde(default)]
         wildcards: bool,
+        /// The clipboard text `^c` stands for in the replacement.
+        #[serde(default)]
+        clipboard: Option<String>,
+    },
+    /// Replace (one match) of Find and Replace: the match range `find_all` gave, replaced by the
+    /// expanded replacement (`^p` splits the paragraph, `` is a wildcard group). One undo step.
+    DocxReplaceOne {
+        op: crate::ext::writer_search::ReplaceOne,
+    },
+    /// Page margins of one section (ruler drag, Page Setup). One undo step.
+    DocxSectionMargins {
+        op: crate::ext::writer_margins::SectionMargins,
+    },
+    /// Writer References tab (tables of contents and figures, captions, notes, index, authorities).
+    DocxReferences {
+        op: crate::ext::writer_references::RefOp,
+    },
+    /// Writer Home tab operations the text model has no call for (highlight, case, lists...).
+    DocxHome {
+        op: crate::ext::writer_home::WriterHomeOp,
+    },
+    /// Writer Insert tab operations (page break, table, link, bookmark, picture, header...).
+    DocxInsert {
+        op: crate::ext::writer_insert::WriterInsertOp,
+    },
+    /// Writer Review tab (tracked changes, comments).
+    DocxReview {
+        op: crate::ext::writer_review::WriterReviewOp,
+    },
+    /// Writer Layout tab (page setup, breaks, line numbers, hyphenation, indent and spacing).
+    DocxLayout {
+        op: crate::ext::writer_layout::LayoutOp,
+    },
+    /// Writer Design tab (themes, style sets, page colour and borders, watermark).
+    DocxDesign {
+        op: crate::ext::writer_design::DesignOp,
     },
     /// Excel's Replace All over the formula text (see [`crate::XlsxFind`]; `look_in` is
     /// ignored, replace always works on formulas). One undo step.
@@ -316,6 +352,27 @@ pub enum Command {
         range: RangeRef,
         mode: crate::MergeMode,
     },
+    /// Sheets Home tab operations on whole structures (Clear All, Sort, AutoFilter). One undo step.
+    HomeOp {
+        sheet: usize,
+        op: crate::HomeOp,
+    },
+    /// Sheets Data tab operations (sort, filter, text to columns, validation, outline...). One undo step.
+    DataOp {
+        sheet: usize,
+        op: crate::DataOp,
+    },
+    /// Sheets Review tab operations (protection, notes). One undo step.
+    ReviewOp {
+        sheet: usize,
+        op: crate::ReviewOp,
+    },
+    /// Sheets Insert and Formulas tab edits and sheet management (tables, names, links, notes, charts, pivots,
+    /// calculation, conditional formats, sheet operations, cell shifts, recalculation). One undo step.
+    SheetObjects {
+        sheet: usize,
+        op: crate::ObjectsOp,
+    },
     Save {
         path: PathBuf,
     },
@@ -401,6 +458,14 @@ impl Command {
             Self::DocxReplaceRange { .. } => "docx_replace_range",
             Self::DocxCorrectWord { .. } => "docx_correct_word",
             Self::DocxReplaceAll { .. } => "docx_replace_all",
+            Self::DocxReplaceOne { .. } => "docx_replace_one",
+            Self::DocxSectionMargins { .. } => "docx_section_margins",
+            Self::DocxReferences { .. } => "docx_references",
+            Self::DocxReview { .. } => "docx_review",
+            Self::DocxLayout { .. } => "docx_layout",
+            Self::DocxDesign { .. } => "docx_design",
+            Self::DocxHome { .. } => "docx_home",
+            Self::DocxInsert { .. } => "docx_insert",
             Self::XlsxReplaceAll { .. } => "xlsx_replace_all",
             Self::XlsxPaste { .. } => "xlsx_paste",
             Self::XlsxSetCellValue { .. } => "xlsx_set_cell_value",
@@ -424,6 +489,10 @@ impl Command {
             Self::CopyFormat { .. } => "copy_format",
             Self::ChangeDecimals { .. } => "change_decimals",
             Self::MergeCells { .. } => "merge_cells",
+            Self::HomeOp { .. } => "home_op",
+            Self::DataOp { .. } => "data_op",
+            Self::ReviewOp { .. } => "review_op",
+            Self::SheetObjects { .. } => "sheet_objects",
             Self::Save { .. } => "save",
             Self::ExportPdf { .. } => "export_pdf",
             Self::ShareSendCopy { .. } => "share_send_copy",
@@ -493,6 +562,14 @@ impl Command {
             Self::ShareInspect => EffectClass::Read,
             // Hands a file to the operating system's share sheet: data leaves this machine.
             Self::ShareOsSheet { .. } => EffectClass::Egress,
+            Self::DocxReplaceOne { op } => op.effect(),
+            Self::DocxSectionMargins { op } => op.effect(),
+            Self::DocxReferences { op } => op.effect(),
+            Self::DocxReview { op } => op.effect(),
+            Self::DocxLayout { op } => op.effect(),
+            Self::DocxDesign { op } => op.effect(),
+            Self::DocxHome { op } if op.destroys() => EffectClass::Destructive,
+            Self::DocxHome { .. } | Self::DocxInsert { .. } => EffectClass::Edit,
             Self::DocxDeleteRange { start, end } | Self::DocxReplaceRange { start, end, .. } => {
                 if start == end {
                     EffectClass::Edit
@@ -501,6 +578,9 @@ impl Command {
                 }
             }
             // Replaces existing text (the flagged word), so it is destructive like any non-empty replacement.
+            Self::HomeOp { op, .. } if op.destroys() => EffectClass::Destructive,
+            Self::DataOp { op, .. } if op.destroys() => EffectClass::Destructive,
+            Self::SheetObjects { op, .. } if op.destroys() => EffectClass::Destructive,
             Self::DocxCorrectWord { .. }
             | Self::DocxReplaceAll { .. }
             | Self::XlsxReplaceAll { .. }
@@ -535,7 +615,11 @@ impl Command {
             | Self::ClearFormats { .. }
             | Self::CopyFormat { .. }
             | Self::ChangeDecimals { .. }
-            | Self::MergeCells { .. } => EffectClass::Edit,
+            | Self::MergeCells { .. }
+            | Self::HomeOp { .. }
+            | Self::DataOp { .. }
+            | Self::SheetObjects { .. }
+            | Self::ReviewOp { .. } => EffectClass::Edit,
         }
     }
 
@@ -620,6 +704,14 @@ impl Command {
             | Self::DocxReplaceRange { .. }
             | Self::DocxCorrectWord { .. }
             | Self::DocxReplaceAll { .. }
+            | Self::DocxReplaceOne { .. }
+            | Self::DocxSectionMargins { .. }
+            | Self::DocxReferences { .. }
+            | Self::DocxReview { .. }
+            | Self::DocxLayout { .. }
+            | Self::DocxDesign { .. }
+            | Self::DocxHome { .. }
+            | Self::DocxInsert { .. }
             | Self::XlsxReplaceAll { .. }
             | Self::SetColumnWidth { .. }
             | Self::SetRowHeight { .. }
@@ -638,6 +730,10 @@ impl Command {
             | Self::ApplyCellStyle { .. }
             | Self::CopyFormat { .. }
             | Self::ChangeDecimals { .. }
+            | Self::HomeOp { .. }
+            | Self::DataOp { .. }
+            | Self::ReviewOp { .. }
+            | Self::SheetObjects { .. }
             | Self::Save { .. }
             | Self::ExportPdf { .. }
             | Self::ShareSendCopy { .. }

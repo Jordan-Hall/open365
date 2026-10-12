@@ -1,0 +1,5 @@
+feature = "layout-table-hpad"
+made_with = "hand-written OOXML (generated from layout-table-basic.docx parts); reference taken with Microsoft Word 16.0"
+author = "project member"
+expect_dropped = []
+notes = "cell top margin of the lower row against a border between rows: upper bottom border only, lower top margin 2 to 10.8 pt, with and without the lower row's own top border"

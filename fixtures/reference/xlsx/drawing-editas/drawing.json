@@ -1,0 +1,16 @@
+{
+  "dpi": 120,
+  "sheets": [
+    {"name": "EditAs", "shapes": [
+      {"name": "Pic p1", "type": 13, "placement": 1, "visible": true, "left": 250.39999389648438, "top": 96, "width": 90, "height": 60, "topLeftCell": "D5", "bottomRightCell": "E9"},
+      {"name": "Rect p1", "type": 1, "placement": 1, "visible": true, "left": 250.39999389648438, "top": 176, "width": 100, "height": 40, "topLeftCell": "D10", "bottomRightCell": "F13"},
+      {"name": "Chart p1", "type": 3, "placement": 1, "visible": true, "left": 250.39999389648438, "top": 236, "width": 180, "height": 110, "topLeftCell": "D14", "bottomRightCell": "G22"},
+      {"name": "Pic p2", "type": 13, "placement": 2, "visible": true, "left": 442.3999938964844, "top": 96, "width": 90, "height": 60, "topLeftCell": "H5", "bottomRightCell": "I9"},
+      {"name": "Rect p2", "type": 1, "placement": 2, "visible": true, "left": 442.3999938964844, "top": 176, "width": 100, "height": 40, "topLeftCell": "H10", "bottomRightCell": "J13"},
+      {"name": "Chart p2", "type": 3, "placement": 2, "visible": true, "left": 442.3999938964844, "top": 236, "width": 180, "height": 110, "topLeftCell": "H14", "bottomRightCell": "K22"},
+      {"name": "Pic p3", "type": 13, "placement": 3, "visible": true, "left": 533, "top": 60, "width": 90, "height": 60, "topLeftCell": "I2", "bottomRightCell": "K6"},
+      {"name": "Rect p3", "type": 1, "placement": 3, "visible": true, "left": 533, "top": 140, "width": 100, "height": 40, "topLeftCell": "I8", "bottomRightCell": "L11"},
+      {"name": "Chart p3", "type": 3, "placement": 3, "visible": true, "left": 533, "top": 200, "width": 180, "height": 110, "topLeftCell": "I12", "bottomRightCell": "M20"}
+    ]}
+  ]
+}

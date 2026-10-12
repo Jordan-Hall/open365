@@ -13,6 +13,7 @@ members = [
     "crates/spell",
     "crates/layout",
     "crates/pdf",
+    "crates/drawing",
     "crates/commands",
     "crates/mcp",
     "crates/ui-egui",
@@ -50,6 +51,7 @@ open365-text = { path = "crates/text" }
 open365-spell = { path = "crates/spell" }
 open365-layout = { path = "crates/layout" }
 open365-pdf = { path = "crates/pdf" }
+open365-drawing = { path = "crates/drawing" }
 open365-commands = { path = "crates/commands" }
 open365-mcp = { path = "crates/mcp" }
 open365-ui-egui = { path = "crates/ui-egui" }

@@ -80,25 +80,26 @@ fn snap(v: f64, unit: f64) -> f64 {
     (v * p).round() / p
 }
 
-/// Largest count of major units Excel allows along a plot axis of `length_pt` points with tick
-/// labels of `font_pt` points. Fitted to Excel's answers (`chart-axes/sweep.json` and the
-/// generated corpus):
+/// Largest count of major units Excel allows along a plot axis of `outer_pt` points with tick
+/// labels of `font_pt` points, where `outer_pt` is the length of the plot area's OUTER rectangle
+/// (`PlotArea.Width`/`Height`: the inside rectangle plus the category labels and their gaps, as
+/// they actually come out, so wrapped or rotated labels count). Fitted to Excel's answers
+/// (`chart-axes/sweep.json`, `chart-scale/layout-*.json`, `chart-labels/*.json`):
 ///
-/// * a vertical axis: `floor((length - 0.9 font) / (1.2207 font))`, one line of label text per
-///   interval;
-/// * a horizontal axis: `floor((length + 2.1 font) / (3.75 font))`, 37.5 pt per interval at
-///   10 pt;
+/// * a vertical axis: `floor(outer / (1.2207 font) - 2)`, one line of label text per interval
+///   less two lines of margin. 858 train and 343 hold-out cases, no miss. Measured against the
+///   inside height it fails 38 of 858: category labels that wrap or rotate change the inside
+///   height but not the budget;
+/// * a horizontal axis: `floor(outer / (3.82 font))`, 38.2 pt per interval at 10 pt. Labels
+///   wider than about 30 pt (six or more digits) need more room (open, see
+///   `docs/architecture/charts.md`);
 /// * never more than 10 and never less than 1.
-///
-/// `length_pt` is the plot's inside length measured as if the category labels sat outside the
-/// plot (Excel moves them into the plot when the data are all negative, and the budget does
-/// not follow).
-pub fn max_intervals(length_pt: f64, horizontal: bool, font_pt: f64) -> u32 {
+pub fn max_intervals(outer_pt: f64, horizontal: bool, font_pt: f64) -> u32 {
     let font = if font_pt > 0.0 { font_pt } else { 10.0 };
     let n = if horizontal {
-        ((length_pt + 2.1 * font) / (3.75 * font)).floor()
+        (outer_pt / (3.82 * font)).floor()
     } else {
-        ((length_pt - 0.9 * font) / (1.2207 * font)).floor()
+        (outer_pt / (1.2207 * font) - 2.0).floor()
     };
     n.clamp(1.0, 10.0) as u32
 }

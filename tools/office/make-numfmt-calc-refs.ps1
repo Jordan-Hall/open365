@@ -14,6 +14,9 @@ Modes
                 The code carries an explicit [$-xxx] tag whenever the answer must not depend on the machine's locale; a case
                 without a tag depends on the machine (en-GB on the reference machine). Nothing here changes Windows regional
                 settings or any Office setting.
+  -Mode Series  for every case {"id", "code", "start", "count", "step"?: 1} of the cases file: TEXT(start + i*step, code) for
+                i in 0..count-1, filled down a column in one COM call per 2000 rows. Writes {"id","code","start","step","values":[...]}
+                (an error value is written as its text). Used to measure a calendar for every day (fixtures/calc/numfmt-nonlatin/series).
   -Mode Arity   for every function name of fixtures/calc/arity/names.txt (the registry's function_names(), one per line) enter
                 =NAME(A1,A1,...) with 0 to 40 arguments (41 to 260 when 38 to 40 include an accepted count) through Range.Formula and
                 record which counts Excel accepts (assignment succeeds) and which it refuses (COM error).
@@ -30,7 +33,7 @@ AutomationSecurity is forced to 3 (macros disabled). Excel is quit in a finally 
   pwsh -NoProfile -File tools/office/make-numfmt-calc-refs.ps1 -Mode Arity
 #>
 param(
-  [ValidateSet('Numfmt', 'Arity')][string]$Mode = 'Numfmt',
+  [ValidateSet('Numfmt', 'Arity', 'Series')][string]$Mode = 'Numfmt',
   [string]$Cases,
   [string]$Output,
   [string]$RustOutput,
@@ -38,7 +41,7 @@ param(
 )
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
-if ($Mode -eq 'Numfmt') {
+if ($Mode -eq 'Numfmt' -or $Mode -eq 'Series') {
   if (-not $Cases) { $Cases = Join-Path $root 'fixtures/calc/numfmt-nonlatin/cases.json' }
   if (-not $Output) { $Output = Join-Path $root 'fixtures/calc/numfmt-nonlatin/results.json' }
 } else {
@@ -180,6 +183,29 @@ function Measure-Numfmt($case) {
   return $result
 }
 
+function Measure-Series($case) {
+  $ws = $script:ws
+  $step = 1.0
+  if ($case.PSObject.Properties['step']) { $step = [double]$case.step }
+  $code = [string]$case.code
+  $values = New-Object System.Collections.Generic.List[string]
+  $chunk = 2000
+  for ($off = 0; $off -lt [int]$case.count; $off += $chunk) {
+    $n = [Math]::Min($chunk, [int]$case.count - $off)
+    $ws.Cells.Clear() | Out-Null
+    $arr = New-Object 'object[,]' $n, 1
+    for ($i = 0; $i -lt $n; $i++) { $arr[$i, 0] = [double]$case.start + ($off + $i) * $step }
+    $ws.Range($ws.Cells.Item(1, 1), $ws.Cells.Item($n, 1)).Value2 = $arr
+    $ws.Range($ws.Cells.Item(1, 2), $ws.Cells.Item($n, 2)).Formula = '=TEXT(A1,"' + $code.Replace('"', '""') + '")'
+    $res = $ws.Range($ws.Cells.Item(1, 2), $ws.Cells.Item($n, 2)).Value2
+    for ($i = 1; $i -le $n; $i++) {
+      $v = $res[$i, 1]
+      if ($v -is [int]) { $values.Add([string]$errorText[[int]$v]) } else { $values.Add([string]$v) }
+    }
+  }
+  return @{ id = $case.id; code = $code; start = [double]$case.start; step = $step; values = $values }
+}
+
 function Test-Arity([string]$name, [int]$n) {
   $callArgs = @()
   for ($i = 0; $i -lt $n; $i++) {
@@ -224,7 +250,19 @@ try {
   Start-Excel
   $out = New-Object System.Collections.Generic.List[string]
   $count = 0
-  if ($Mode -eq 'Numfmt') {
+  if ($Mode -eq 'Series') {
+    $list = Get-Content -LiteralPath $Cases -Raw -Encoding UTF8 | ConvertFrom-Json
+    foreach ($case in $list) {
+      Reset-Book $false
+      $r = Measure-Series $case
+      $vals = ($r.values | ForEach-Object { Json-Str $_ }) -join ','
+      $out.Add('  {"id":' + (Json-Str $r.id) + ',"code":' + (Json-Str $r.code) + ',"start":' + $r.start + ',"step":' + $r.step + ',"values":[' + $vals + ']}')
+    }
+    $text = "[`n" + ($out -join ",`n") + "`n]`n"
+    New-Item -ItemType Directory -Force -Path (Split-Path -Parent $Output) | Out-Null
+    [IO.File]::WriteAllText($Output, $text, (New-Object Text.UTF8Encoding($false)))
+    Write-Host "wrote $($out.Count) series to $Output"
+  } elseif ($Mode -eq 'Numfmt') {
     $list = Get-Content -LiteralPath $Cases -Raw -Encoding UTF8 | ConvertFrom-Json
     foreach ($case in $list) {
       $count++

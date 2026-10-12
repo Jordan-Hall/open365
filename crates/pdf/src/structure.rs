@@ -113,6 +113,9 @@ pub struct ParaMeta {
     /// The paragraph is in a text frame: Word writes its element after the body and sets each
     /// line in a marked-content sequence of its own (`layout-frame-*`).
     pub framed: bool,
+    /// Tab stops of the paragraph in points from the text area's left edge: the custom ones and
+    /// the left indent of a hanging paragraph. Empty when only default stops apply.
+    pub tabs: Vec<f64>,
 }
 
 /// The font a paragraph mark is set in.
@@ -628,6 +631,24 @@ struct Walker<'a> {
     frame_tail: Vec<Node>,
 }
 
+/// The tab stops of a paragraph other than the default ones: custom stops, and the left indent
+/// of a hanging paragraph (an implicit stop), in points from the text area's left edge.
+fn tab_stops(styles: &Styles, para: &Paragraph) -> Vec<f64> {
+    let mut out: Vec<f64> = styles
+        .paragraph_flow_props(para)
+        .tabs
+        .iter()
+        .filter(|t| !matches!(t.kind, open365_docx::TabKind::Bar))
+        .map(|t| f64::from(t.pos_twips) / 20.0)
+        .collect();
+    let e = styles.effective_para_props(para);
+    if e.first_line_pt < 0.0 {
+        out.push(f64::from(e.indent_left_pt));
+    }
+    out.sort_by(f64::total_cmp);
+    out
+}
+
 /// The paragraph ends a section (`w:sectPr` in its properties).
 fn has_sect_pr(para: &Paragraph) -> bool {
     para.props.as_ref().is_some_and(|p| {
@@ -855,6 +876,7 @@ impl Walker<'_> {
                         sect: has_sect_pr(p),
                         label_blank: self.label_suffix_blank(p),
                         framed: self.depth == 0 && has_frame(p),
+                        tabs: self.styles.map_or_else(Vec::new, |st| tab_stops(st, p)),
                         mark: self.styles.map(|s| {
                             let m = s.paragraph_mark_props(p).run;
                             MarkFont {
@@ -1240,6 +1262,7 @@ pub fn story_spacing(styles: Option<&Styles>, blocks: &[Block]) -> Vec<ParaMeta>
                     sect: false,
                     label_blank: false,
                     framed: false,
+                    tabs: Vec::new(),
                 }),
                 Block::Table(t) => {
                     for row in t.view().rows {

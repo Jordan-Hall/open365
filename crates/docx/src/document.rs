@@ -371,6 +371,11 @@ impl Document {
         }
     }
 
+    /// The package, for the parts the model does not hold (footnotes, endnotes).
+    pub(crate) fn package_mut(&mut self) -> &mut Package {
+        &mut self.package
+    }
+
     pub(crate) fn body_mut(&mut self) -> &mut Body {
         match self.root.body_mut() {
             Some(body) => body,
@@ -514,6 +519,29 @@ impl Document {
         self.body_mut()
             .paragraph_mut(index)
             .ok_or(DocxError::ParagraphOutOfRange { index, count })
+    }
+
+    /// Layout and Design tabs (`ext_layout.rs`, `ext_design.rs`): the package, the `w:document`
+    /// root, and a re-read of the parts the model caches (styles with theme, settings, numbering).
+    pub(crate) fn ext_package_mut(&mut self) -> &mut Package {
+        &mut self.package
+    }
+
+    pub(crate) fn ext_root(&self) -> &DocumentRoot {
+        &self.root
+    }
+
+    pub(crate) fn ext_root_mut(&mut self) -> &mut DocumentRoot {
+        &mut self.root
+    }
+
+    pub(crate) fn ext_reload_parts(&mut self) {
+        if let Some(fresh) = load_styles(&self.package, &self.main_part) {
+            self.styles = Some(fresh);
+        }
+        self.settings = load_settings(&self.package, &self.main_part);
+        self.numbering = load_numbering(&self.package, &self.main_part);
+        self.edited();
     }
 
     /// Records a content change; the first one also drops stale parts.

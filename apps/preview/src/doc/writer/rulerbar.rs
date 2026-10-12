@@ -12,7 +12,7 @@ use open365_ui_core::Ui;
 use super::WriterPane;
 use crate::doc::ruler::{
     self, BAND_U, DIGIT_Y, RulerEdit, RulerHit, RulerInfo, RulerTab, RulerTabStop, TICK_SMALL_Y,
-    TICK_TALL_Y, TickKind, U_PER_PT, URect,
+    TICK_TALL_Y, TickKind, U_PER_PT, URect, VBAND_U,
 };
 use crate::palette::Palette;
 
@@ -25,6 +25,18 @@ pub struct RulerState {
     drag: Option<RulerHit>,
     /// The edit a drag in progress would make, shown live.
     preview: Option<RulerEdit>,
+}
+
+/// What the vertical ruler shows: the margins of the caret's page and, when the caret is in a
+/// table, the rows of that table on the page. All lengths are points from the page's top.
+#[derive(Debug, Clone, PartialEq)]
+pub struct VRulerInfo {
+    pub page: usize,
+    pub page_height_pt: f64,
+    pub margin_top_pt: f64,
+    pub margin_bottom_pt: f64,
+    /// Top and bottom of each row of the caret's table on this page (empty outside a table).
+    pub rows: Vec<(f64, f64)>,
 }
 
 fn command_of(edit: &RulerEdit) -> Command {
@@ -112,6 +124,56 @@ impl WriterPane {
         } else {
             0.0
         }
+    }
+
+    /// Width of the vertical ruler in device pixels (0 when the ruler is off).
+    pub(super) fn left_inset(&self) -> f32 {
+        if self.ruler.on {
+            (VBAND_U as f32 * self.pxu()).round()
+        } else {
+            0.0
+        }
+    }
+
+    /// What the vertical ruler shows for the caret's page (see [`VRulerInfo`]).
+    pub fn vruler_info(&self) -> Option<VRulerInfo> {
+        let info = self.ruler_info()?;
+        let layout_page = self.engine.layout().pages.get(info.page)?;
+        let mut rows = Vec::new();
+        if let Some((_, x, top, h)) = self.caret_geom(self.caret).filter(|g| g.0 == info.page) {
+            let mid = top + h / 2.0;
+            let cell = layout_page
+                .cells
+                .iter()
+                .filter(|c| {
+                    x >= c.x - 0.5
+                        && x <= c.x + c.width + 0.5
+                        && mid >= c.y
+                        && mid <= c.y + c.height
+                })
+                .min_by(|a, b| (a.width * a.height).total_cmp(&(b.width * b.height)));
+            if let Some(cell) = cell {
+                let mut by_row: std::collections::BTreeMap<usize, (f64, f64)> =
+                    std::collections::BTreeMap::new();
+                for c in layout_page
+                    .cells
+                    .iter()
+                    .filter(|c| c.table == cell.table && c.row_span <= 1)
+                {
+                    let e = by_row.entry(c.row).or_insert((c.y, c.y + c.height));
+                    e.0 = e.0.min(c.y);
+                    e.1 = e.1.max(c.y + c.height);
+                }
+                rows = by_row.into_values().collect();
+            }
+        }
+        Some(VRulerInfo {
+            page: info.page,
+            page_height_pt: info.page_height_pt,
+            margin_top_pt: info.margin_top_pt,
+            margin_bottom_pt: info.margin_bottom_pt,
+            rows,
+        })
     }
 
     /// Ruler units per document point at the current zoom.
@@ -207,6 +269,10 @@ impl WriterPane {
     /// A press at canvas-local device point (`x`, `y`) inside the band. Returns true when the
     /// ruler took it.
     pub(super) fn ruler_press(&mut self, x: f32, y: f32) -> bool {
+        if self.ruler.on && y >= self.top_inset() && x < self.left_inset() {
+            // The vertical ruler: a press on it does not move the caret.
+            return true;
+        }
         if !self.ruler.on || y >= self.top_inset() {
             return false;
         }
@@ -358,6 +424,95 @@ impl WriterPane {
         self.paint_tab_glyph(list, (ox, oy), pxu, &g, ink);
         list.pop_clip();
         self.stats.ruler_items += count;
+    }
+
+    /// The vertical ruler down the left of the pane: the caret page's margins as the white
+    /// track, centimetre ticks and numbers from the top margin, and a line at every row of the
+    /// table holding the caret.
+    pub(super) fn paint_vruler(&mut self, ui: &mut Ui, list: &mut DrawList, pal: &Palette) {
+        if !self.ruler.on {
+            return;
+        }
+        let (Some(v), Some(info)) = (self.vruler_info(), self.ruler_info()) else {
+            return;
+        };
+        let pxu = self.pxu();
+        let k = self.ruler_k();
+        let geom = ruler::vertical(&info, k);
+        let (ox, oy) = (self.area.x as f32, self.area.y as f32);
+        let band = GRect::from_edges(
+            ox,
+            oy + self.top_inset(),
+            ox + self.left_inset(),
+            oy + self.area.h as f32,
+        );
+        list.push_clip(band);
+        list.fill_rect(band, pal.canvas);
+        let ink = pal.page_text;
+        let top = oy + self.page_y(v.page);
+        let span = |x0: f64, x1: f64, y0: f64, y1: f64| {
+            GRect::from_edges(
+                ox + x0 as f32 * pxu,
+                top + y0 as f32 * pxu,
+                ox + (x1 as f32 * pxu).max(x0 as f32 * pxu + 1.0),
+                top + (y1 as f32 * pxu).max(y0 as f32 * pxu + 1.0),
+            )
+        };
+        let (tx0, tx1) = (geom.track.x0, geom.track.x1);
+        // The page's whole length is the grey strip; the white track is between the margins.
+        list.fill_rect(span(tx0, tx1, 0.0, geom.page_h), ink.with_opacity(0.18));
+        list.fill_rect(span(tx0, tx1, geom.track.y0, geom.track.y1), pal.page);
+        for t in &geom.ticks {
+            let x = if t.kind == TickKind::Tall {
+                TICK_TALL_Y
+            } else {
+                TICK_SMALL_Y
+            };
+            list.fill_rect(span(x.0, x.1, t.at, t.at + 1.0), ink.with_opacity(0.7));
+        }
+        let px = 10.0 * pxu * 1.25;
+        for d in &geom.digits {
+            let label = d.number.to_string();
+            let w = ui
+                .assets
+                .layout_text(ui.font, &label, px, 0.0, 0.0, TextLayoutOptions::default())
+                .width;
+            let cx = ox + ((DIGIT_Y.0 + DIGIT_Y.1) as f32 / 2.0 + 2.0) * pxu;
+            let base = top + (d.at as f32 + 0.5) * pxu + px * 0.35;
+            crate::doc::text(
+                ui,
+                list,
+                &label,
+                (cx - w / 2.0).floor(),
+                base.round(),
+                px,
+                ink,
+            );
+        }
+        let mut count = 0usize;
+        // Margin edges.
+        for y in [geom.track.y0, geom.track.y1] {
+            list.fill_rect(span(tx0, tx1, y, y + 1.0), ink.with_opacity(0.7));
+            count += 1;
+        }
+        // Table rows: a line across the track at each row's top and the last row's bottom.
+        let pt = k;
+        for (i, (y0, y1)) in v.rows.iter().enumerate() {
+            list.fill_rect(
+                span(tx0, tx1, y0 * pt, y0 * pt + 2.0),
+                ink.with_opacity(0.8),
+            );
+            count += 1;
+            if i + 1 == v.rows.len() {
+                list.fill_rect(
+                    span(tx0, tx1, y1 * pt, y1 * pt + 2.0),
+                    ink.with_opacity(0.8),
+                );
+                count += 1;
+            }
+        }
+        list.pop_clip();
+        self.stats.vruler_items += count;
     }
 
     fn paint_tab_glyph(

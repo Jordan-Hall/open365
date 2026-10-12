@@ -1,0 +1,16 @@
+{
+  "dpi": 120,
+  "sheets": [
+    {"name": "AfterHide", "shapes": [
+      {"name": "Over p1", "type": 1, "placement": 1, "visible": true, "left": 52, "top": 17.399999618530273, "width": 184.39999389648438, "height": 95.5999984741211, "topLeftCell": "B2", "bottomRightCell": "G9"},
+      {"name": "Over p2", "type": 1, "placement": 2, "visible": true, "left": 52, "top": 118.19999694824219, "width": 260, "height": 110, "topLeftCell": "B10", "bottomRightCell": "I19"},
+      {"name": "Over p3", "type": 1, "placement": 3, "visible": true, "left": 52, "top": 247.8000030517578, "width": 260, "height": 110, "topLeftCell": "B20", "bottomRightCell": "I27"}
+    ]},
+    {"name": "BeforeHide", "shapes": [
+      {"name": "Span", "type": 1, "placement": 1, "visible": true, "left": 50, "top": 16.399999618530273, "width": 162, "height": 102.5999984741211, "topLeftCell": "B2", "bottomRightCell": "G8"},
+      {"name": "Pic after", "type": 13, "placement": 1, "visible": true, "left": 99, "top": 134.39999389648438, "width": 90, "height": 60, "topLeftCell": "D10", "bottomRightCell": "E14"},
+      {"name": "In hidden col", "type": 1, "placement": 1, "visible": true, "left": 96, "top": 29.799999237060547, "width": 40, "height": 20, "topLeftCell": "C3", "bottomRightCell": "D5"},
+      {"name": "In hidden row", "type": 1, "placement": 1, "visible": true, "left": 49, "top": 131.39999389648438, "width": 40, "height": 20, "topLeftCell": "B9", "bottomRightCell": "B11"}
+    ]}
+  ]
+}

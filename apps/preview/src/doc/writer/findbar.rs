@@ -16,10 +16,14 @@ pub struct FindState {
     pub query: String,
     pub match_case: bool,
     pub whole_word: bool,
-    matches: Vec<DocMatch>,
-    current: Option<usize>,
+    /// Word wildcards (`Use wildcards`).
+    pub wildcards: bool,
+    /// Why the query cannot be searched (an invalid wildcard expression), else `None`.
+    pub error: Option<String>,
+    pub(super) matches: Vec<DocMatch>,
+    pub(super) current: Option<usize>,
     /// Document revision the matches were computed for.
-    revision: Option<u64>,
+    pub(super) revision: Option<u64>,
 }
 
 impl WriterPane {
@@ -37,6 +41,7 @@ impl WriterPane {
 
     pub fn find_close(&mut self) {
         self.find.open = false;
+        self.replace.open = false;
         self.find.matches.clear();
         self.find.current = None;
     }
@@ -58,6 +63,11 @@ impl WriterPane {
 
     pub fn set_find_match_case(&mut self, on: bool) {
         self.find.match_case = on;
+        self.find_refresh(true);
+    }
+
+    pub fn set_find_wildcards(&mut self, on: bool) {
+        self.find.wildcards = on;
         self.find_refresh(true);
     }
 
@@ -90,6 +100,9 @@ impl WriterPane {
         if self.find.query.is_empty() {
             return String::new();
         }
+        if self.find.error.is_some() {
+            return "Invalid pattern".to_owned();
+        }
         match (self.find.current, self.find.matches.len()) {
             (_, 0) => "No results".to_owned(),
             (Some(i), n) => format!("{} of {n}", i + 1),
@@ -110,7 +123,7 @@ impl WriterPane {
     // ---- internals ---------------------------------------------------------------------------
 
     /// Recomputes the matches; with `jump`, selects the first one at or after the caret.
-    fn find_refresh(&mut self, jump: bool) {
+    pub(super) fn find_refresh(&mut self, jump: bool) {
         self.find.revision = Some(self.target.revision());
         self.find.matches.clear();
         self.find.current = None;
@@ -121,12 +134,16 @@ impl WriterPane {
             pattern: self.find.query.clone(),
             match_case: self.find.match_case,
             whole_word: self.find.whole_word,
-            wildcards: false,
+            wildcards: self.find.wildcards,
         };
+        self.find.error = None;
         let Some(doc) = self.target.docx() else {
             return;
         };
-        self.find.matches = doc.find_all(&opts).unwrap_or_default();
+        match doc.find_all(&opts) {
+            Ok(m) => self.find.matches = m,
+            Err(e) => self.find.error = Some(e.to_string()),
+        }
         if jump {
             let from = self.selection().0;
             let first = self
@@ -152,7 +169,7 @@ impl WriterPane {
         }
     }
 
-    fn find_select(&mut self, i: usize) {
+    pub(super) fn find_select(&mut self, i: usize) {
         let Some(m) = self.find.matches.get(i).copied() else {
             return;
         };
@@ -161,7 +178,7 @@ impl WriterPane {
         self.reveal_caret();
     }
 
-    fn find_step(&mut self, forward: bool) -> bool {
+    pub(super) fn find_step(&mut self, forward: bool) -> bool {
         if self.find.revision != Some(self.target.revision()) {
             self.find_refresh(false);
         }
@@ -189,6 +206,9 @@ impl WriterPane {
 
     /// Keys while the find box is open. Returns true when the key was taken.
     pub(super) fn find_key(&mut self, key: Key, m: Modifiers) -> bool {
+        if self.replace.open {
+            return self.replace_key(key, m);
+        }
         match key {
             Key::Escape => self.find_close(),
             Key::Enter => {
@@ -205,6 +225,9 @@ impl WriterPane {
 
     pub(super) fn find_text(&mut self, text: &str) {
         let clean: String = text.chars().filter(|c| !c.is_control()).collect();
+        if self.replace.open && self.replace_text(&clean) {
+            return;
+        }
         if !clean.is_empty() {
             self.find.query.push_str(&clean);
             self.find_refresh(true);
@@ -270,7 +293,7 @@ impl WriterPane {
 
     /// The find box in the top right corner of the pane.
     pub(super) fn paint_find_box(&mut self, ui: &mut Ui, list: &mut DrawList, pal: &Palette) {
-        if !self.find.open {
+        if !self.find.open || self.replace.open {
             return;
         }
         let u = self.scale;

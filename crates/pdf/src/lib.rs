@@ -298,6 +298,8 @@ struct Export<'a> {
     shape_next: HashMap<usize, usize>,
     /// The default tab stop interval in points.
     tab_step: f64,
+    /// Left edge of the text area of the page being drawn.
+    margin_left: f64,
     /// Anchored drawings of each paragraph already seen, for their wrapping.
     anchor_next: HashMap<usize, usize>,
     /// The wrapping of the drawing being drawn is none and it is behind the text.
@@ -326,6 +328,8 @@ struct Export<'a> {
     /// Main-story paragraph -> page of its first line (empty lines count); the content on a later
     /// page is a continuation `Span` under the paragraph, as in Word's PDF.
     para_page: HashMap<usize, usize>,
+    /// Main-story paragraphs that have at least one line in the layout.
+    drawn_paras: std::collections::HashSet<usize>,
     /// (paragraph, page) -> the continuation `Span`.
     cont_spans: HashMap<(usize, usize), u32>,
     /// Every continuation `Span` made: (paragraph, element). A link or language run ends the open
@@ -655,6 +659,7 @@ pub fn export_pdf_with(
         cont_notes: Vec::new(),
         shape_next: HashMap::new(),
         tab_step: f64::from(doc.settings().default_tab_stop_pt()),
+        margin_left: 0.0,
         anchor_next: HashMap::new(),
         behind_none: Vec::new(),
         cur_image: 0,
@@ -693,6 +698,13 @@ pub fn export_pdf_with(
         },
         images: HashMap::new(),
         para_page: HashMap::new(),
+        drawn_paras: layout
+            .pages
+            .iter()
+            .flat_map(|p| p.lines.iter())
+            .filter(|l| l.story == StoryKind::Main)
+            .map(|l| l.paragraph)
+            .collect(),
         cont_spans: HashMap::new(),
         cont_all: Vec::new(),
         box_p: HashMap::new(),
@@ -1247,6 +1259,7 @@ fn cluster_text(
 impl Export<'_> {
     fn render_page(&mut self, index: usize, page: &Page) -> (String, Vec<u32>) {
         self.current_section = page.section_index;
+        self.margin_left = page.section.margin_left;
         // A cell whose content area (the box less its top and bottom margins) is empty clips
         // everything: Word draws none of its text and tags no paragraph for it
         // (`layout-trh-small`, `layout-trh-pad`).
@@ -1263,7 +1276,20 @@ impl Export<'_> {
             owners: Vec::new(),
             open: None,
         };
-        self.draw_cells(&mut buf, page);
+        let (order, cell_of) = line_order(page);
+        // A shaded cell that has a line to draw is painted when that line comes (Word: the
+        // cell's fill as an artifact, then the shading as marked content of the cell's first
+        // paragraph); the others are painted first.
+        let mut pending = vec![false; page.cells.len()];
+        for (i, line) in page.lines.iter().enumerate() {
+            if let Some(c) = cell_of[i]
+                && page.cells[c].fill.is_some()
+                && !self.clipped_away(line)
+            {
+                pending[c] = true;
+            }
+        }
+        self.draw_cells(&mut buf, page, &pending);
         let specs: Vec<Option<structure::ShapeSpec>> = page
             .images
             .iter()
@@ -1308,15 +1334,69 @@ impl Export<'_> {
             }
         }
         self.draw_borders(&mut buf, page);
-        self.draw_rules(&mut buf, page);
+        let (plan, used) = rule_plan(page);
+        self.draw_rules(&mut buf, page, &used);
         // Word writes the header and the footer first, each as one pagination artifact.
         for line in page.header.iter().chain(&page.footer) {
             self.draw_line(&mut buf, line);
         }
+        let trailing = self.nested_trailing(page, &cell_of);
+        for at in order {
+            let line = &page.lines[at];
+            if let Some(c) = cell_of[at]
+                && pending[c]
+                && !self.clipped_away(line)
+            {
+                pending[c] = false;
+                self.draw_cell_fill(&mut buf, &page.cells[c], line);
+            }
+            self.draw_line(&mut buf, line);
+            if let Some(&(para, x, baseline)) = trailing.get(&at) {
+                let mut fake = line.clone();
+                fake.paragraph = para;
+                fake.baseline = baseline;
+                let owner = self.owner_of(&fake, buf.index);
+                if matches!(owner, Owner::Struct(..))
+                    && let Some((face, _)) = self.blank_font(&fake, true)
+                {
+                    self.begin(&mut buf, &owner);
+                    self.put_blank(&mut buf, &fake, x, face, 0.48);
+                }
+            }
+            // Word writes the border of a bordered paragraph after each of its lines, as an
+            // artifact of its own, so every line is a marked-content sequence of its own.
+            if let Some(pieces) = plan.get(&at) {
+                self.end_seq(&mut buf);
+                buf.content.push_str(
+                    "/Artifact BMC
+",
+                );
+                for piece in pieces {
+                    let r = &page.rules[piece.rule];
+                    let line = BorderLine {
+                        width: r.width.min(r.height),
+                        color: r.color,
+                        style: r.style,
+                    };
+                    let rect = (r.x, piece.y0, r.width, piece.y1 - piece.y0);
+                    draw_border_strip(
+                        &mut buf.content,
+                        buf.height,
+                        &line,
+                        r.width >= r.height,
+                        rect,
+                    );
+                }
+                buf.content.push_str(
+                    "EMC
+",
+                );
+            }
+        }
         for line in page
-            .lines
+            .frames
             .iter()
-            .chain(page.frames.iter().flat_map(|f| f.lines.iter()))
+            .flat_map(|f| f.lines.iter())
             .chain(&page.notes)
         {
             self.draw_line(&mut buf, line);
@@ -1497,6 +1577,17 @@ impl Export<'_> {
     /// The tab characters of a line: for each, the index in `order` of the glyph it stands before,
     /// the pen position where it starts (the end of the text before it) and the run whose font
     /// Word draws its blank in (the run of the glyph after it, else the one before).
+    /// The page x where a tab that starts at `x` ends: the next custom stop, else the next
+    /// default one.
+    fn next_stop(&self, stops: &[f64], x: f64) -> f64 {
+        let rel = x - self.margin_left;
+        if let Some(s) = stops.iter().find(|s| **s > rel + 0.01) {
+            return self.margin_left + s;
+        }
+        let dt = self.tab_step.max(1.0);
+        self.margin_left + (((rel + 0.01) / dt).floor() + 1.0) * dt
+    }
+
     fn line_tabs(&self, line: &Line, order: &[(usize, usize, &PlacedGlyph)]) -> Vec<TabBlank> {
         let text: &str = &line.text;
         if order.is_empty() || !text.contains('\t') {
@@ -1536,6 +1627,16 @@ impl Export<'_> {
         let hi = if last { text.len() } else { hi_c.unwrap_or(0) };
         let mut out: Vec<TabBlank> = Vec::new();
         let mut leader_end: Option<f64> = None;
+        // Where the previous tab of a run of tabs ended, when the paragraph has custom stops.
+        let mut landing: Option<f64> = None;
+        let stops: &[f64] = if line.story == StoryKind::Main {
+            self.st
+                .paras
+                .get(line.paragraph)
+                .map_or(&[], |p| p.tabs.as_slice())
+        } else {
+            &[]
+        };
         let model = if line.story == StoryKind::Main {
             self.st.texts.get(&line.paragraph)
         } else {
@@ -1561,13 +1662,22 @@ impl Export<'_> {
                 .unwrap_or(line.left);
             // A tab right after a tab starts where that one ended: at the end of its leader,
             // else one default stop before the text that follows the tabs.
-            if t > 0 && text.as_bytes()[t - 1] == b'\t' && t > lo {
-                pen = match (leader_end, next_x) {
-                    (Some(e), _) => e,
-                    (None, Some(x)) => x - self.tab_step * (run_len + 1) as f64,
-                    (None, None) => pen,
+            let in_run = t > 0 && text.as_bytes()[t - 1] == b'\t' && t > lo;
+            if in_run {
+                pen = match (leader_end, landing, next_x) {
+                    // With custom stops the earlier tab ended at its stop (its leader a little
+                    // before, with a blank of its own).
+                    (_, Some(x), _) => x,
+                    (Some(e), None, _) => e,
+                    (None, None, Some(x)) => x - self.tab_step * (run_len + 1) as f64,
+                    (None, None, None) => pen,
                 };
             }
+            landing = if stops.is_empty() {
+                None
+            } else {
+                Some(self.next_stop(stops, pen))
+            };
             leader_end = None;
             let k = order
                 .iter()
@@ -2575,12 +2685,97 @@ impl Export<'_> {
         }
     }
 
-    fn draw_cells(&mut self, buf: &mut PageBuf, page: &Page) {
+    /// The empty paragraph that ends a table cell after a nested table has no line in the
+    /// layout, but Word draws its blank (0.48 pt, at the cell's bottom edge, a quarter point in
+    /// from the cell's text edge) in the marked content of that paragraph. For each such
+    /// paragraph: the index of the line after which it is drawn, the paragraph, the pen x and
+    /// the baseline.
+    fn nested_trailing(
+        &self,
+        page: &Page,
+        cell_of: &[Option<usize>],
+    ) -> HashMap<usize, (usize, f64, f64)> {
+        let mut out = HashMap::new();
+        for (i, line) in page.lines.iter().enumerate() {
+            let Some(c) = cell_of[i] else { continue };
+            if line.story != StoryKind::Main {
+                continue;
+            }
+            let inner = &page.cells[c];
+            let outer = page
+                .cells
+                .iter()
+                .filter(|o| {
+                    o.width * o.height > inner.width * inner.height + 0.01
+                        && inner.x >= o.x - 0.5
+                        && inner.x + inner.width <= o.x + o.width + 0.5
+                        && inner.y >= o.y - 0.5
+                        && inner.y + inner.height <= o.y + o.height + 0.5
+                })
+                .min_by(|a, b| (a.width * a.height).total_cmp(&(b.width * b.height)));
+            let Some(outer) = outer else { continue };
+            let next = line.paragraph + 1;
+            let last_of_paragraph = !page.lines[i + 1..]
+                .iter()
+                .any(|l| l.story == StoryKind::Main && l.paragraph == line.paragraph);
+            let silent = self
+                .st
+                .paras
+                .get(next)
+                .is_none_or(|p| self.st.section_breaks.contains(&p.node));
+            if last_of_paragraph && !silent && !self.drawn_paras.contains(&next) {
+                let pad = ((line.left - inner.x).max(0.0) / 0.48 + 1e-6).floor() * 0.48;
+                out.insert(i, (next, outer.x + pad + 0.24, outer.y + outer.height));
+            }
+        }
+        out
+    }
+
+    /// Paints a shaded cell as Word does: the cell rectangle as an artifact, then the shading
+    /// again inside the cell's margins as marked content of the paragraph that starts the cell.
+    fn draw_cell_fill(&mut self, buf: &mut PageBuf, cell: &open365_layout::CellBox, first: &Line) {
+        let Some(fill) = cell.fill else { return };
+        self.end_seq(buf);
+        buf.content.push_str(&format!(
+            "/Artifact BMC
+{} rg {} {} {} {} re f
+EMC
+",
+            pdf_color(fill),
+            num(cell.x, 4),
+            num(buf.y(cell.y + cell.height), 4),
+            num(cell.width, 4),
+            num(cell.height, 4)
+        ));
+        let owner = self.owner_of(first, buf.index);
+        if !matches!(owner, Owner::Struct(..)) {
+            return;
+        }
+        // The cell's left and right margin, on Word's 0.48 pt grid (5.4 pt is drawn as 5.28 pt).
+        let pad =
+            (((first.left - cell.x).max(0.0) / 0.48 + 1e-6).floor() * 0.48).min(cell.width / 2.0);
+        self.begin(buf, &owner);
+        buf.content.push_str(&format!(
+            "{} rg {} {} {} {} re f
+",
+            pdf_color(fill),
+            num(cell.x + pad, 4),
+            num(buf.y(cell.y + cell.height), 4),
+            num(cell.width - 2.0 * pad, 4),
+            num(cell.height, 4)
+        ));
+        self.end_seq(buf);
+    }
+
+    fn draw_cells(&mut self, buf: &mut PageBuf, page: &Page, pending: &[bool]) {
         let mut shaded = false;
-        for cell in &page.cells {
+        for (i, cell) in page.cells.iter().enumerate() {
             let Some(fill) = cell.fill else {
                 continue;
             };
+            if pending[i] {
+                continue;
+            }
             if !shaded {
                 buf.content.push_str("/Artifact BMC\n");
                 shaded = true;
@@ -2633,15 +2828,15 @@ impl Export<'_> {
     }
 
     /// Paragraph border rules (`Page::rules`), as artifacts.
-    fn draw_rules(&mut self, buf: &mut PageBuf, page: &Page) {
-        if page.rules.is_empty() {
+    fn draw_rules(&mut self, buf: &mut PageBuf, page: &Page, used: &[bool]) {
+        if used.iter().all(|u| *u) {
             return;
         }
         buf.content.push_str(
             "/Artifact BMC
 ",
         );
-        for r in &page.rules {
+        for (_, r) in page.rules.iter().enumerate().filter(|(i, _)| !used[*i]) {
             let line = BorderLine {
                 width: r.width.min(r.height),
                 color: r.color,
@@ -3334,6 +3529,155 @@ fn related(
         .iter()
         .find(|r| r.target_mode == TargetMode::Internal && pick(r))?;
     resolve_target(Some(from), &rel.target).ok()
+}
+
+/// The order in which the lines of a page are drawn, and the cell (index in `Page::cells`,
+/// the innermost) each line is in. Word draws a table cell by cell, so the lines of one cell
+/// follow each other even when the layout interleaves the cells of a row by height.
+fn line_order(page: &Page) -> (Vec<usize>, Vec<Option<usize>>) {
+    line_order_with_cells(page)
+}
+
+/// The indexes into `Page::lines` in the order the export draws them: in a table, cell by
+/// cell (the layout lists the lines of a row by height). Other lines keep their order.
+pub fn line_draw_order(page: &Page) -> Vec<usize> {
+    line_order_with_cells(page).0
+}
+
+fn line_order_with_cells(page: &Page) -> (Vec<usize>, Vec<Option<usize>>) {
+    let cell_of: Vec<Option<usize>> = page
+        .lines
+        .iter()
+        .map(|l| {
+            let x = (l.left + l.last_x) / 2.0;
+            let y = l.top + l.height / 2.0;
+            page.cells
+                .iter()
+                .enumerate()
+                .filter(|(_, c)| {
+                    x >= c.x - 0.5 && x <= c.x + c.width + 0.5 && y >= c.y && y <= c.y + c.height
+                })
+                .min_by(|a, b| (a.1.width * a.1.height).total_cmp(&(b.1.width * b.1.height)))
+                .map(|(i, _)| i)
+        })
+        .collect();
+    let mut order = Vec::with_capacity(page.lines.len());
+    let mut done = vec![false; page.lines.len()];
+    for i in 0..page.lines.len() {
+        if done[i] {
+            continue;
+        }
+        match cell_of[i] {
+            Some(c) if page.lines[i].story == StoryKind::Main => {
+                for j in i..page.lines.len() {
+                    if !done[j] && cell_of[j] == Some(c) {
+                        done[j] = true;
+                        order.push(j);
+                    }
+                }
+            }
+            _ => {
+                done[i] = true;
+                order.push(i);
+            }
+        }
+    }
+    (order, cell_of)
+}
+
+/// A rule, or a slice of one, that is drawn after one line.
+struct RulePiece {
+    rule: usize,
+    y0: f64,
+    y1: f64,
+}
+
+/// Splits the paragraph border rules of the main story over the lines they surround: the
+/// pieces to draw after each line (index in `Page::lines`) and which rules that covers.
+fn rule_plan(page: &Page) -> (HashMap<usize, Vec<RulePiece>>, Vec<bool>) {
+    let mut used = vec![false; page.rules.len()];
+    let mut plan: HashMap<usize, Vec<RulePiece>> = HashMap::new();
+    let mut groups: BTreeMap<usize, Vec<usize>> = BTreeMap::new();
+    for (i, r) in page.rules.iter().enumerate() {
+        if r.story == StoryKind::Main {
+            groups.entry(r.paragraph).or_default().push(i);
+        }
+    }
+    for rules in groups.values() {
+        let mut bbox = [f64::MAX, f64::MAX, f64::MIN, f64::MIN];
+        for &i in rules {
+            let r = &page.rules[i];
+            bbox = [
+                bbox[0].min(r.x),
+                bbox[1].min(r.y),
+                bbox[2].max(r.x + r.width),
+                bbox[3].max(r.y + r.height),
+            ];
+        }
+        let lines: Vec<usize> = page
+            .lines
+            .iter()
+            .enumerate()
+            .filter(|(_, l)| {
+                let mid = l.top + l.height / 2.0;
+                l.border.is_some()
+                    && l.last_x >= bbox[0] - 0.5
+                    && l.left <= bbox[2] + 0.5
+                    && mid >= bbox[1] - 0.5
+                    && mid <= bbox[3] + 0.5
+            })
+            .map(|(i, _)| i)
+            .collect();
+        let Some(&last) = lines.last() else { continue };
+        // The first line of each paragraph of the box is followed by an artifact even when no
+        // edge is drawn there (the top edge of a paragraph that joins the one above is empty).
+        for (k, &j) in lines.iter().enumerate() {
+            if k == 0 || page.lines[j].paragraph != page.lines[lines[k - 1]].paragraph {
+                plan.entry(j).or_default();
+            }
+        }
+        for &i in rules {
+            let r = &page.rules[i];
+            used[i] = true;
+            let whole = |at: usize, plan: &mut HashMap<usize, Vec<RulePiece>>| {
+                plan.entry(at).or_default().push(RulePiece {
+                    rule: i,
+                    y0: r.y,
+                    y1: r.y + r.height,
+                });
+            };
+            match r.side {
+                open365_layout::RuleSide::Top => whole(lines[0], &mut plan),
+                open365_layout::RuleSide::Bottom => whole(last, &mut plan),
+                open365_layout::RuleSide::Between => {
+                    let at = lines
+                        .iter()
+                        .copied()
+                        .rfind(|&j| page.lines[j].top < r.y)
+                        .unwrap_or(lines[0]);
+                    whole(at, &mut plan);
+                }
+                open365_layout::RuleSide::Left | open365_layout::RuleSide::Right => {
+                    if r.style != BorderStyle::Solid {
+                        whole(last, &mut plan);
+                        continue;
+                    }
+                    for (k, &j) in lines.iter().enumerate() {
+                        let y0 = if k == 0 { r.y } else { page.lines[j].top };
+                        let y1 = lines
+                            .get(k + 1)
+                            .map_or(r.y + r.height, |&n| page.lines[n].top);
+                        if y1 - y0 > 1e-6 {
+                            plan.entry(j)
+                                .or_default()
+                                .push(RulePiece { rule: i, y0, y1 });
+                        }
+                    }
+                }
+            }
+        }
+    }
+    (plan, used)
 }
 
 fn draw_border_strip(

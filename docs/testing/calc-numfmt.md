@@ -41,3 +41,17 @@ Cases: 1,028 (`cases.json`, `results.json`); 872 match Excel, 156 are listed in 
 generates `crates/calc/src/parser_arity.rs` (min, max, step; SORTBY has one extra count). The parser rejects other counts with
 `ParseErrorKind::ArgumentCount`. Names outside the registry are not checked. `crates/calc/tests/arity_excel.rs` checks the parser against the
 measured list. Conformance case `randarray.c0169` (six RANDARRAY arguments) is now rejected as in Excel.
+
+## Round 20 (lunisolar, Gregorian name calendars, Persian, neutral languages)
+
+* Bytes 14, 15, 17, 18, 19 (lunisolar): measured for every serial 1 to 2958465 (`make-numfmt-calc-refs.ps1 -Mode Series`), stored as one byte per month
+  (`numfmt/lunisolar_{f,e}.bin`, built by `tools/office/calc-calendar-tables.py`). The month number counts a leap month; names clamp at 12; AM/PM follow the tag.
+  Excel's calendar is real only from about 1960 to 2100; elsewhere it has 1-day and 28-day months and a mid-month year bump on 1 January of 1960+91k.
+  F (15, 17) and E (14, 18, 19) differ on 80 month starts. Byte 14 uses Japanese names (Korean tag: Korean), 15 zh-CN (404: zh-TW), 17 zh-CN, 18/19 English.
+* Bytes 11 and 12: Arabic transliterated month names and weekdays for every tag; serial 60 `####`, serial 0 shows 1 January 1900. Bytes 13 and 21: English names for every tag.
+* Languages 0, 1, 2 are not cultures: default names, and Hebrew/Persian/Saka show the English name of the month number (nothing for 13).
+* Persian: Excel's leap pattern leaves the 33-year cycle near year 1502; `numfmt/persian_leap.bin` holds the measured leap years (8,099 bits).
+* Thai letters: Thai digits only for the Thai letters; the hour letter prints nothing with AM/PM. Korean `[DBNum2]` tens use U+F973.
+* Open: Hebrew from year 5999 (month lengths and year starts follow a mean-year approximation with day glitches; 85 known cases). Note: consecutive-serial
+  series in Excel are path dependent for the Hebrew calendar (the same serial differs between a step-1 and a step-7 run), so only single-cell probes are evidence there.
+  The lunisolar tables came from consecutive runs; single-cell probes (p5 cases, 2,143) agree, a random-access check of the tables was not finished.

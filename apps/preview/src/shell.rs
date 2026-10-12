@@ -20,12 +20,16 @@ use open365_ui_core::{
 use crate::layout::{self, LayoutInput, PlacedChrome, PlacedControl, PlacedGroup, PxRect};
 use crate::menus;
 use crate::palette::Palette;
+use crate::ribbon::{self, RibbonCtx};
 use crate::sheet::SheetModel;
 use crate::spec::{AppSpec, Control, Kind, REF_SCALE, Scale as GroupScale, Size};
 use crate::{AppKind, doc, icons};
 
 mod grid;
 mod share;
+
+/// The ribbon control label size in points (`theme::size::LABEL` of the egui shell).
+const RIBBON_LABEL_PT: f32 = 12.0;
 
 /// What the window should do after a widget event.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -104,6 +108,10 @@ pub struct Shell {
     /// The Writer document (Writer only); `None` shows the placeholder page.
     writer: Option<doc::WriterPane>,
     refocus_doc: bool,
+    /// The operator the next Custom AutoFilter dialog preselects (index into its list).
+    filter_op: usize,
+    /// The open dialogs by scrim serial (see `shell::dialogs`).
+    dialogs: HashMap<u64, grid::dialogs::Entry>,
     share: Option<share::ShareDialog>,
     share_o: (i32, i32),
     canvas: Option<NodeId>,
@@ -185,6 +193,8 @@ impl Shell {
             grid_ids: Vec::new(),
             writer: None,
             refocus_doc: false,
+            filter_op: 0,
+            dialogs: HashMap::new(),
             share: None,
             share_o: (0, 0),
             canvas: None,
@@ -264,15 +274,26 @@ impl Shell {
     pub fn init(&mut self, ui: &mut Ui) {
         self.icons = icons::register(&mut ui.assets);
         self.sync_size(ui);
+        self.fit_labels(ui);
         self.apply_theme(ui);
         self.register_tip_levels(ui);
         self.build_all(ui);
+    }
+
+    /// Widens every large ribbon button to its label, as Office does ("Proofread"). The labels
+    /// are measured in points at the ribbon label size ([`RIBBON_LABEL_PT`]), the unit
+    /// `fit_large_labels` and the `ui-shell` `labels` test use, and the spec widths are in `u`
+    /// at [`REF_SCALE`].
+    fn fit_labels(&mut self, ui: &Ui) {
+        let text_w = |s: &str| ui.measure_px(s, RIBBON_LABEL_PT * ui.scale.0) / ui.scale.0;
+        layout::fit_large_labels(Arc::make_mut(&mut self.spec), text_w, REF_SCALE);
     }
 
     /// Takes the window size and scale from the `Ui` and rebuilds.
     pub fn resize(&mut self, ui: &mut Ui) {
         self.sync_size(ui);
         self.build_all(ui);
+        self.dialog_resize(ui);
     }
 
     /// Sets the frame between the window edge and the pane (physical pixels) and rebuilds.
@@ -444,6 +465,7 @@ impl Shell {
         self.build_doc(ui);
         self.sync_history(ui);
         self.refresh_hover(ui);
+        self.build_dialog(ui);
     }
 
     pub fn build_body(&mut self, ui: &mut Ui) {
@@ -456,6 +478,7 @@ impl Shell {
         self.build_grid(ui);
         self.build_doc(ui);
         self.refresh_hover(ui);
+        self.build_dialog(ui);
     }
 
     fn refresh_hover(&self, ui: &mut Ui) {
@@ -501,7 +524,8 @@ impl Shell {
         };
         let p = self.panel(ui, root, o, lay.status, status_fill);
         keep(self, p);
-        if let (Some(l), Some(b)) = (lay.formula_left, lay.formula_bar) {
+        let show_fbar = self.kind != AppKind::Sheets || self.sheet.ext_view.formula_bar;
+        if show_fbar && let (Some(l), Some(b)) = (lay.formula_left, lay.formula_bar) {
             let x = l.x.min(b.x);
             let y = l.y.min(b.y);
             let r = PxRect {
@@ -641,7 +665,7 @@ impl Shell {
         }
 
         // Formula strip.
-        if let Some(nb) = lay.name_box_outer {
+        if show_fbar && let Some(nb) = lay.name_box_outer {
             let edit = TextEdit::new(&self.name_box);
             let id = self.add(
                 ui,
@@ -660,7 +684,7 @@ impl Shell {
             self.roles.name_box = Some(id);
             keep(self, id);
         }
-        if let Some(g) = lay.grip {
+        if show_fbar && let Some(g) = lay.grip {
             let id = self.add(
                 ui,
                 root,
@@ -680,7 +704,7 @@ impl Shell {
             );
             keep(self, id);
         }
-        if let Some(fx) = lay.fx_group {
+        if show_fbar && let Some(fx) = lay.fx_group {
             let third = fx.w / 3;
             let parts = [
                 ("Cancel", "x", 0),
@@ -715,7 +739,7 @@ impl Shell {
                 keep(self, id);
             }
         }
-        if let Some(ff) = lay.formula_field {
+        if show_fbar && let Some(ff) = lay.formula_field {
             let id = self.add(
                 ui,
                 root,
@@ -1865,7 +1889,15 @@ impl Shell {
             .get(owner)
             .map(|n| n.label.clone())
             .unwrap_or_default();
-        let mut items = menus::items_for(id, &label);
+        let mut items = if id == "home.styles.cell-styles" {
+            self.sheet
+                .home_style_names()
+                .iter()
+                .map(|n| open365_ui_core::MenuItem::new(&format!("{id}.{n}"), n))
+                .collect()
+        } else {
+            menus::items_for(id, &label)
+        };
         self.give_icons(&mut items);
         let widest = items
             .iter()
@@ -1967,6 +1999,9 @@ impl Shell {
     pub fn handle(&mut self, ui: &mut Ui, events: Vec<Emit>) -> Vec<WinAct> {
         let mut out = Vec::new();
         for ev in events {
+            if self.dialog_handle(ui, &ev) {
+                continue;
+            }
             if self.kind == AppKind::Sheets && self.grid_event(ui, &ev) {
                 continue;
             }
@@ -2027,7 +2062,7 @@ impl Shell {
                     }
                 }
                 Emit::MenuCommand(_, id) if id.starts_with("share.") => self.open_share(ui),
-                Emit::MenuCommand(_, id) => self.run(&id, &mut out),
+                Emit::MenuCommand(_, id) => self.run(ui, &id, &mut out),
                 Emit::TextChanged(n, t) => {
                     if Some(n) == self.roles.formula {
                         self.formula = t;
@@ -2038,12 +2073,12 @@ impl Shell {
                 Emit::TextCommitted(n, t) => {
                     if Some(n) == self.roles.name_box {
                         self.name_box = t.clone();
-                        self.run(&format!("namebox.{t}"), &mut out);
+                        self.run(ui, &format!("namebox.{t}"), &mut out);
                     } else if Some(n) == self.roles.formula {
                         self.formula = t;
-                        self.run("formula.enter", &mut out);
+                        self.run(ui, "formula.enter", &mut out);
                     } else if let Some(Act::Cmd(id)) = self.acts.get(&n).cloned() {
-                        self.run(&format!("{id}={t}"), &mut out);
+                        self.run(ui, &format!("{id}={t}"), &mut out);
                     }
                 }
                 Emit::ValueChanged(n, v) => {
@@ -2054,7 +2089,7 @@ impl Shell {
                 Emit::Selected(n, i) => {
                     if let Some(Act::Cmd(id)) = self.acts.get(&n) {
                         let id = format!("{id}#{i}");
-                        self.run(&id, &mut out);
+                        self.run(ui, &id, &mut out);
                     }
                 }
                 Emit::ScrollChanged(..)
@@ -2063,6 +2098,7 @@ impl Shell {
                 | Emit::CanvasIme(..)
                 | Emit::CanvasWheel { .. }
                 | Emit::CanvasDrag { .. }
+                | Emit::CanvasButton { .. }
                 | Emit::CanvasRelease { .. }
                 | Emit::CanvasAction(..)
                 | Emit::CanvasPointer { .. } => {}
@@ -2206,27 +2242,74 @@ impl Shell {
         }
     }
 
-    fn run(&mut self, id: &str, out: &mut Vec<WinAct>) {
-        if let Some(p) = self.writer.as_mut() {
-            match id {
-                "view.show.ruler" => {
-                    let on = !p.ruler();
-                    p.set_ruler(on);
-                    self.refocus_doc = true;
-                }
-                "home.editing.find" => {
-                    p.find_open();
-                    self.refocus_doc = true;
-                }
-                _ => {}
-            }
+    fn run(&mut self, ui: &mut Ui, id: &str, out: &mut Vec<WinAct>) {
+        if self.try_open_dialog(ui, id) {
+            self.note = id.to_owned();
+            out.push(WinAct::Title(self.title()));
+            return;
         }
-        if let (Some(p), Some(f)) = (self.writer.as_mut(), doc::Format::from_ribbon(id)) {
-            p.format(f);
-            self.refocus_doc = true;
-        }
+        self.dispatch_command(ui, id, out);
+        self.poll_dialog_requests(ui);
+        self.apply_writer_zoom(ui);
         self.note = id.to_owned();
         out.push(WinAct::Title(self.title()));
+    }
+
+    /// Routes a ribbon command to the module of its app and tab (see [`ribbon`]).
+    fn dispatch_command(
+        &mut self,
+        ui: &mut Ui,
+        id: &str,
+        out: &mut Vec<WinAct>,
+    ) -> ribbon::Handled {
+        let mut ctx = RibbonCtx {
+            kind: self.kind,
+            ui,
+            writer: self.writer.as_mut(),
+            sheet: &mut self.sheet,
+            refocus_doc: &mut self.refocus_doc,
+            out,
+        };
+        ribbon::dispatch(&mut ctx, id)
+    }
+
+    /// Gives the Sheets model the OS file choosers (the app calls this; tests leave them unset
+    /// so no native dialog opens).
+    pub fn install_sheet_choosers(&mut self) {
+        let s = &mut self.sheet;
+        s.ext_page.chooser = Some(crate::sheet::sheet_ext::page_layout::system_picture_chooser);
+        s.ext_file.open_chooser = Some(crate::sheet::sheet_ext::file::system_open_chooser);
+        s.ext_file.pdf_chooser = Some(crate::sheet::sheet_ext::file::system_pdf_chooser);
+    }
+
+    /// Moves the status-bar zoom to a zoom the last command set on the Writer pane (View tab),
+    /// so the next `build_doc` does not reset it.
+    fn apply_writer_zoom(&mut self, ui: &mut Ui) {
+        if let Some(z) = self
+            .writer
+            .as_mut()
+            .and_then(doc::WriterPane::take_zoom_change)
+        {
+            self.set_zoom(ui, z);
+        } else if self.kind == AppKind::Sheets {
+            let z = self.sheet.ext_view.zoom as f32;
+            if (z - self.zoom).abs() > f32::EPSILON {
+                self.set_zoom(ui, z);
+            }
+        }
+    }
+
+    /// Runs ribbon command `id` as a click on its control would; whether a ribbon module knew it.
+    pub fn run_command(&mut self, ui: &mut Ui, id: &str) -> ribbon::Handled {
+        if self.try_open_dialog(ui, id) {
+            return ribbon::Handled::Yes;
+        }
+        let mut out = Vec::new();
+        let handled = self.dispatch_command(ui, id, &mut out);
+        self.poll_dialog_requests(ui);
+        self.apply_writer_zoom(ui);
+        self.sync_writer_state(ui);
+        handled
     }
 
     fn activate(&mut self, ui: &mut Ui, n: NodeId, out: &mut Vec<WinAct>) {
@@ -2253,7 +2336,7 @@ impl Shell {
                 if let Some(rest) = id.strip_prefix("backstage.") {
                     let _ = rest;
                 }
-                self.run(&id, out);
+                self.run(ui, &id, out);
             }
             Act::Menu(id) => self.open_menu(ui, n, &id),
             Act::File => {
@@ -2272,13 +2355,28 @@ impl Shell {
                     Some("back") => {
                         self.backstage = None;
                     }
-                    Some("close") => out.push(WinAct::Close),
+                    Some(
+                        page @ ("new" | "open" | "save" | "save-as" | "print" | "export" | "close"),
+                    ) => {
+                        let cmd = format!("file.{page}");
+                        let handled = self.dispatch_command(ui, &cmd, out);
+                        self.apply_writer_zoom(ui);
+                        if handled == ribbon::Handled::Yes {
+                            self.backstage = None;
+                            self.sync_writer_state(ui);
+                            out.push(WinAct::Title(self.title()));
+                        } else if page == "close" {
+                            out.push(WinAct::Close);
+                        } else {
+                            self.backstage = Some(i);
+                        }
+                    }
                     Some(_) => self.backstage = Some(i),
                     None => {}
                 }
                 self.build_body(ui);
             }
-            Act::Launcher(g) => self.run(&format!("{g}.launcher"), out),
+            Act::Launcher(g) => self.run(ui, &format!("{g}.launcher"), out),
             Act::GroupButton(i) => {
                 self.group_popup = if self.group_popup == Some(i) {
                     None

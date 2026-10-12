@@ -158,6 +158,38 @@ fn os_locale_impl() -> OsLocale {
     }
 }
 
+/// The local time zone's offset from UTC in minutes (east positive) right now, daylight saving
+/// included. Windows reports `ActiveTimeBias` (UTC minus local, a signed DWORD) in the registry,
+/// read through the same safe crate as the other settings. Elsewhere it is 0 (UTC) unless
+/// `OPEN365_UTC_OFFSET_MINUTES` names an offset.
+pub fn utc_offset_minutes() -> i32 {
+    offset_impl()
+}
+
+/// `ActiveTimeBias` (minutes, UTC = local + bias, stored as an unsigned DWORD) as an offset.
+pub fn offset_from_bias(bias: u32) -> i32 {
+    -(bias as i32)
+}
+
+#[cfg(windows)]
+fn offset_impl() -> i32 {
+    use windows_registry::LOCAL_MACHINE;
+    LOCAL_MACHINE
+        .open(r"SYSTEM\CurrentControlSet\Control\TimeZoneInformation")
+        .ok()
+        .and_then(|k| k.get_u32("ActiveTimeBias").ok())
+        .map_or(0, offset_from_bias)
+}
+
+#[cfg(not(windows))]
+fn offset_impl() -> i32 {
+    std::env::var("OPEN365_UTC_OFFSET_MINUTES")
+        .ok()
+        .and_then(|v| v.trim().parse::<i32>().ok())
+        .filter(|m| m.abs() <= 14 * 60)
+        .unwrap_or(0)
+}
+
 #[cfg(windows)]
 fn read_impl() -> PlatformSettings {
     use windows_registry::CURRENT_USER;
@@ -242,6 +274,15 @@ mod tests {
         assert_eq!(parse_rgb("1 2"), None);
         assert_eq!(parse_rgb("1 2 3 4"), None);
         assert_eq!(parse_rgb("256 0 0"), None);
+    }
+
+    #[test]
+    fn registry_bias_is_the_negated_offset() {
+        // UTC+1 stores a bias of -60 (as an unsigned DWORD); UTC-5 stores 300.
+        assert_eq!(offset_from_bias((-60i32) as u32), 60);
+        assert_eq!(offset_from_bias(300), -300);
+        assert_eq!(offset_from_bias(0), 0);
+        assert!(utc_offset_minutes().abs() <= 14 * 60);
     }
 
     #[test]

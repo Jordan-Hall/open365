@@ -364,3 +364,17 @@ Still open:
   0.02 to 0.3 pt off. `4ebce9eb`, `54d00e5f`: the remaining failures are cell and frame rectangles, not order.
 - Blank rows of tables inside text boxes are dropped (the oracle does not list those paragraphs); a repeated header row of blank cells is paired
   by position only.
+
+## Round 16 (template corpus 5749 -> 6193 of 7998 lines; word_parity unchanged at 13549 system)
+
+| Rule | Evidence |
+|---|---|
+| A header row with no body row after it on its page moves to the next page with that row (the body row neither fits whole nor, if it can split, gets one line). `flow.rs` `header_strands`. | `layout-table-pages` (test `table_header_strand.rs`) |
+| Between two rows the space is `pad bottom above + max(pad top below + own top border below, bottom border above)`: the upper row's border hides in the lower row's top padding; the lower row's own top border adds to it. Edges of the table keep the whole border. | `layout-table-hpad` 105/105, `layout-table-hborders` 118/118; `2f858f7d` 22 -> 78 |
+| Contextual spacing looks at the next paragraph of the story: the last paragraph of a cell loses its space after when the first paragraph of the next cell (next row's first cell after the last cell) has the same style and the style is contextual. | `layout-ctx-border` 73/73, `layout-cell-after-last`; `5ff67a28` |
+| A vertically merged cell needs its content plus the bottom padding of the row it ends in; the missing padding left the last row 14.4 pt short. | `65cf689e` 230 -> 280 |
+| A splittable row whose content fits but whose "at least" height does not goes whole to the next page (it was cut short). | `d52c20af` 61 -> 123 |
+| Block content controls in headers and footers are part of the story (page number galleries); a later section with `titlePg` after a section that has header/footer parts has empty first-page header and footer. | `4e493df5` 104 -> 213 |
+| A table whose top lies exactly between two grid lines (52.2 pt) goes to the lower line and keeps its row distances from it. | `ca4e5536` 483 -> 607 |
+
+Open: `w:beforeAutospacing`/`afterAutospacing` (probe `layout-autospacing`: 14 pt between paragraphs, collapsed with the larger neighbour, 0 at page top and first paragraph of a cell) needs `crates/docx` to expose the flag (`371fe1a1`, 7/127); x-edge ties (178.2, 142.2 go down, 217.8 goes up) are unexplained; implied empty first-page header/footer lines are not emitted; `65cf689e` remaining misses are mostly oracle mispairing of repeated placeholder text.

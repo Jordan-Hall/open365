@@ -1,0 +1,5 @@
+feature = "layout-ctx-cell3"
+made_with = "hand-written OOXML (generated from layout-table-basic.docx parts); reference taken with Microsoft Word 16.0"
+author = "project member"
+expect_dropped = []
+notes = "row height when the last empty paragraph of one cell has a direct space after: line 1.079 or single, contextual spacing or not"
