@@ -612,8 +612,72 @@ struct FieldState {
     suppress: bool,
 }
 
+/// Faces whose ascent Word measures as the full em (see `layout_paragraph`).
+fn east_asian_em_box(family: &str) -> bool {
+    matches!(
+        family,
+        "MS Gothic" | "MS PGothic" | "MS UI Gothic" | "MS Mincho" | "MS PMincho"
+    )
+}
+
+/// Ballot box characters (U+2610 to U+2612). Word sets them in an East Asian font when the run
+/// asks for it (`w:rFonts w:hint="eastAsia"`, which the model does not expose) and the run's own
+/// font lacks them; the template checkboxes do both.
+fn is_ballot(c: char) -> bool {
+    ('\u{2610}'..='\u{2612}').contains(&c)
+}
+
+/// Family Word's East Asian fallback sets the ballot boxes in. The PDF names MS Mincho; the
+/// machine's MS Gothic has the same metrics (ascent 0.859 em, descent 0.141 em).
+const BALLOT_FONT: &str = "MS Gothic";
+
 impl Collector<'_, '_> {
+    /// Style for ballot boxes of a run in `style`: its own when the font has the glyph.
+    fn ballot_style(&mut self, style: usize) -> usize {
+        let base = &self.styles[style];
+        if self.ctx.fonts.face(base.face).has_glyph('\u{2610}') {
+            return style;
+        }
+        let mut st = base.clone();
+        let fs = FontStyle {
+            bold: st.bold,
+            italic: st.italic,
+        };
+        st.chain = self.ctx.fonts.chain(BALLOT_FONT, fs);
+        st.face = st
+            .chain
+            .faces
+            .first()
+            .copied()
+            .unwrap_or_else(|| FaceId::from_index(0));
+        st.requested = BALLOT_FONT.to_owned();
+        self.styles.push(st);
+        self.styles.len() - 1
+    }
+
     fn push(&mut self, s: &str, style: usize) {
+        if s.chars().any(is_ballot) {
+            let mut rest = s;
+            while !rest.is_empty() {
+                let ballot = rest.chars().next().is_some_and(is_ballot);
+                let n = rest
+                    .char_indices()
+                    .find(|&(_, c)| is_ballot(c) != ballot)
+                    .map_or(rest.len(), |(i, _)| i);
+                let st = if ballot {
+                    self.ballot_style(style)
+                } else {
+                    style
+                };
+                self.push_plain(&rest[..n], st);
+                rest = &rest[n..];
+            }
+        } else {
+            self.push_plain(s, style);
+        }
+    }
+
+    fn push_plain(&mut self, s: &str, style: usize) {
         if s.is_empty() {
             return;
         }
@@ -770,6 +834,17 @@ impl Collector<'_, '_> {
                 .unwrap_or_default();
             let base = self.styles[style].clone();
             self.mark(&label, &base, style);
+        } else if h.is_w("softHyphen") {
+            // An optional hyphen is one character of Word's story offsets (measured on a
+            // template whose every later line starts one offset late without it); it draws
+            // nothing in the middle of a line.
+            if !self.suppressed() {
+                self.hide(1);
+            }
+        } else if h.is_w("noBreakHyphen") {
+            if !self.suppressed() {
+                self.push("\u{2011}", style);
+            }
         } else if h.is_w("separator") || h.is_w("continuationSeparator") {
             self.separator = true;
             self.hide(1);
@@ -1179,8 +1254,16 @@ pub(crate) fn layout_paragraph(
     let metrics: Vec<(f64, f64)> = styles
         .iter()
         .map(|st| {
-            ctx.model
-                .ascent_descent(ctx.fonts.face(st.face).metrics(), st.metric_size)
+            let face = ctx.fonts.face(st.face);
+            let (a, d) = ctx.model.ascent_descent(face.metrics(), st.metric_size);
+            // Measured (corpus checkboxes, MS Gothic at 11 pt and MS Mincho at 10 pt): Word's
+            // line over the Japanese bitmap faces rises a whole em above the baseline, 1.54 and
+            // 1.30 pt higher than their 0.859 em ascent.
+            if east_asian_em_box(face.family()) {
+                (a + d, d)
+            } else {
+                (a, d)
+            }
         })
         .collect();
     let mut fd = FillData {

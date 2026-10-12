@@ -924,7 +924,17 @@ pub(crate) fn layout_table(b: &mut Builder<'_>, table: &Table, avail: f64) -> Ta
             let last = (r + span).min(rows.len()) - 1;
             let row_top = rows[r].top + rows[r].above;
             let outer = rows[last].top + rows[last].height - rows[last].below - row_top;
+            // Measured (corpus): a vertically merged cell takes the bottom padding of the row
+            // it ends in; its clip and its centring both stop that far above the cell's end.
+            let end_pad = rows[last]
+                .cells
+                .iter()
+                .fold(0.0f64, |m, x| m.max(x.pad.bottom));
             let cell = &mut rows[r].cells[c];
+            if span > 1 {
+                cell.pad.bottom = end_pad;
+                cell.meta.pad_bottom = end_pad;
+            }
             cell.content_top = row_top + cell.pad.top + cell.valign_shift(outer);
         }
     }

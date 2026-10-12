@@ -80,6 +80,10 @@ total = 78
 matched = 75
 total = 75
 
+[fixtures.layout-cols-fn-unequal]
+matched = 77
+total = 77
+
 [fixtures.layout-cols-footnote]
 matched = 62
 total = 63
@@ -587,6 +591,10 @@ total = 78
 [system.layout-cols-continuous]
 matched = 75
 total = 75
+
+[system.layout-cols-fn-unequal]
+matched = 77
+total = 77
 
 [system.layout-cols-footnote]
 matched = 62

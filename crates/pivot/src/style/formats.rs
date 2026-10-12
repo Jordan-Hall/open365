@@ -61,6 +61,10 @@ pub struct UserFormat {
 struct Dxf {
     def: ElementDef,
     num_fmt_id: Option<u32>,
+    /// `border/@outline` (default true): the edges belong to the outline of the cells the area
+    /// selects. False (Excel writes it for a border around single cells): every selected cell
+    /// gets all its edges.
+    border_outline: bool,
 }
 
 /// The `dxfs` of a style sheet.
@@ -97,6 +101,9 @@ impl Dxfs {
                         Dxf {
                             def: dxf_element(dxf, 1),
                             num_fmt_id: id,
+                            border_outline: dxf
+                                .child_main("border")
+                                .is_none_or(|b| attr_bool(b, "outline", true)),
                         }
                     })
                     .collect()
@@ -444,7 +451,26 @@ fn to_edge(e: &EdgeDef, theme: &Theme) -> Edge {
     }
 }
 
-fn paint(style: &mut CellStyle, dxf: &Dxf, theme: &Theme) {
+/// Heaviness of an edge: hair < thin < medium < thick.
+fn weight_rank(e: &Edge) -> u8 {
+    match e.weight {
+        1 => 1,
+        -4138 => 3,
+        4 => 4,
+        _ => 2,
+    }
+}
+
+/// Paints a dxf on a cell; `edges` says which of its sides (left, top, bottom, right) show
+/// the dxf's outer border and `inside` which lie between two selected cells (they show the
+/// dxf's inside vertical or horizontal border). Returns the sides that got an edge.
+fn paint(
+    style: &mut CellStyle,
+    dxf: &Dxf,
+    theme: &Theme,
+    edges: [bool; 4],
+    inside: [bool; 4],
+) -> [bool; 4] {
     let d = &dxf.def;
     if let Some(b) = d.bold {
         style.bold = b;
@@ -461,15 +487,28 @@ fn paint(style: &mut CellStyle, dxf: &Dxf, theme: &Theme) {
     if let Some(n) = dxf.num_fmt_id {
         style.num_fmt_id = Some(n);
     }
-    // left, top, bottom, right
+    let mut set = [false; 4];
     for side in 0..4 {
-        if let Some(b) = &d.borders[side] {
+        // left and right lie on a vertical line, top and bottom on a horizontal one
+        let inner = if side == 0 || side == 3 { 4 } else { 5 };
+        let def = if edges[side] {
+            d.borders[side]
+        } else if inside[side] {
+            d.borders[inner]
+        } else {
+            None
+        };
+        if let Some(b) = &def {
             style.borders[side] = Some(to_edge(b, theme));
+            set[side] = true;
         }
     }
+    set
 }
 
-/// Lays the user formats over `styled` (the table style's formatting, or an empty grid).
+/// Lays the user formats over `styled` (the table style's formatting, or an empty grid); a
+/// user border also shows on the neighbouring cell's facing side, as `Range.DisplayFormat`
+/// reports it.
 pub fn apply_user_formats(
     styled: &mut StyledGrid,
     table: &PivotTable,
@@ -477,6 +516,20 @@ pub fn apply_user_formats(
     formats: &[UserFormat],
     dxfs: &Dxfs,
     theme: &Theme,
+) {
+    apply_user_layer(styled, table, grid, formats, dxfs, theme, true);
+}
+
+/// [`apply_user_formats`]; `mirror` off leaves a border on the cell the format gave it to
+/// (the formats stored in the cells, `cellXfs`).
+pub(super) fn apply_user_layer(
+    styled: &mut StyledGrid,
+    table: &PivotTable,
+    grid: &PivotGrid,
+    formats: &[UserFormat],
+    dxfs: &Dxfs,
+    theme: &Theme,
+    mirror: bool,
 ) {
     if formats.is_empty() || grid.row_items.len() != grid.row_lines.len() {
         return;
@@ -486,17 +539,21 @@ pub fn apply_user_formats(
         compact: table.compact,
     };
     let page_rows = (grid.body.0 - grid.range.0) as usize;
+    let np = table.page_fields.len().min(page_rows);
     let col_items: &[AxisLine] = &grid.col_items;
     let rows = grid.header_rows + grid.row_lines.len();
+    let total = page_rows + rows;
     let width = styled.cells.first().map_or(0, Vec::len);
     let lc = grid.label_cols;
+    // Sides (left, top, bottom, right) that a user format painted, per cell.
+    let mut painted = vec![vec![[false; 4]; width]; total];
     for f in formats {
         let Some(dxf) = dxfs.list.get(f.dxf) else {
             continue;
         };
-        let mut hit: Vec<(usize, usize)> = Vec::new();
+        let mut mask = vec![vec![false; width]; total];
         for r in 0..rows {
-            for c in 0..width {
+            for (c, hit) in mask[page_rows + r].iter_mut().enumerate() {
                 let row = r
                     .checked_sub(grid.header_rows)
                     .and_then(|i| grid.row_items.get(i));
@@ -529,18 +586,95 @@ pub fn apply_user_formats(
                     col_label,
                 };
                 if m.matches(&f.area, &cell) {
-                    hit.push((r, c));
+                    *hit = true;
                 }
             }
         }
-        for (r, c) in hit {
-            if let Some(cell) = styled
-                .cells
-                .get_mut(page_rows + r)
-                .and_then(|row| row.get_mut(c))
-            {
-                paint(cell, dxf, theme);
+        // The whole table includes the page-field area (its label and value cells).
+        if f.area.kind == AreaType::All {
+            for line in mask.iter_mut().take(np) {
+                for hit in line.iter_mut().take(2) {
+                    *hit = true;
+                }
             }
         }
+        for r in 0..total {
+            for c in 0..width {
+                if !mask[r][c] {
+                    continue;
+                }
+                // Left, top, bottom, right: an outline border shows only on the sides whose
+                // neighbour is not selected too.
+                let selected = |dr: isize, dc: isize| -> bool {
+                    r.checked_add_signed(dr)
+                        .zip(c.checked_add_signed(dc))
+                        .and_then(|(nr, nc)| mask.get(nr)?.get(nc).copied())
+                        .unwrap_or(false)
+                };
+                let neighbours = [
+                    selected(0, -1),
+                    selected(-1, 0),
+                    selected(1, 0),
+                    selected(0, 1),
+                ];
+                let mut edges = neighbours.map(|n| !dxf.border_outline || !n);
+                // The blank label cells right of a parent line's own label (the Region column of
+                // a Tier line) take the fill and font of a field's range but no border.
+                let filler = r >= page_rows + grid.header_rows
+                    && c < lc
+                    && grid
+                        .row_lines
+                        .get(r - page_rows - grid.header_rows)
+                        .is_some_and(|l| l.kind == LineKind::Item && !l.leaf && c > l.level);
+                if filler {
+                    edges = [false; 4];
+                }
+                let set = paint(&mut styled.cells[r][c], dxf, theme, edges, neighbours);
+                for (side, on) in set.iter().enumerate() {
+                    painted[r][c][side] |= *on;
+                }
+            }
+        }
+    }
+    if !mirror {
+        return;
+    }
+    // A shared edge shows the same on both cells (`DisplayFormat`). Where a user border is
+    // involved, the heavier edge wins and, at equal weight, the darker one.
+    for r in 0..total {
+        for c in 0..width {
+            for (side, (dr, dc), opposite) in [(3usize, (0usize, 1usize), 0usize), (2, (1, 0), 1)] {
+                let (nr, nc) = (r + dr, c + dc);
+                if nr >= total || nc >= width || !(painted[r][c][side] || painted[nr][nc][opposite])
+                {
+                    continue;
+                }
+                let won = stronger(
+                    styled.cells[r][c].borders[side],
+                    styled.cells[nr][nc].borders[opposite],
+                );
+                styled.cells[r][c].borders[side] = won;
+                styled.cells[nr][nc].borders[opposite] = won;
+            }
+        }
+    }
+}
+
+/// Darkness order of two edges that share a cell side: the heavier line wins, then the darker
+/// colour (luminance), else the first.
+fn stronger(a: Option<Edge>, b: Option<Edge>) -> Option<Edge> {
+    let (Some(x), Some(y)) = (a, b) else {
+        return a.or(b);
+    };
+    let light = |e: &Edge| {
+        0.2126 * f64::from(e.color.r)
+            + 0.7152 * f64::from(e.color.g)
+            + 0.0722 * f64::from(e.color.b)
+    };
+    match weight_rank(&x).cmp(&weight_rank(&y)) {
+        std::cmp::Ordering::Greater => a,
+        std::cmp::Ordering::Less => b,
+        std::cmp::Ordering::Equal if light(&y) < light(&x) => b,
+        std::cmp::Ordering::Equal => a,
     }
 }

@@ -12,7 +12,7 @@ use open365_xlsx::{
 
 use crate::compute::PivotGrid;
 use crate::model::PivotTable;
-use crate::style::{CellStyle, CustomStyles, Dxfs, Edge, style_cells_full};
+use crate::style::{CellStyle, CustomStyles, Dxfs, Edge, style_cells_layers};
 
 fn border_style(e: &Edge) -> BorderStyle {
     match (e.line, e.weight) {
@@ -59,7 +59,8 @@ pub(crate) fn reapply_user_formats(
     bare.remove_style_info();
     let custom = CustomStyles::from_workbook(wb);
     let dxfs = Dxfs::from_workbook(wb);
-    let Some(styled) = style_cells_full(&bare, grid, wb.styles().theme(), &custom, &dxfs) else {
+    let Some(styled) = style_cells_layers(&bare, grid, wb.styles().theme(), &custom, &dxfs, false)
+    else {
         return;
     };
     for (i, row) in styled.cells.iter().enumerate() {

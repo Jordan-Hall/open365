@@ -1,6 +1,8 @@
 <#
 Reads the definitions of Excel's built-in PivotTable styles (PivotStyleLight1-28, Medium1-28, Dark1-28) through the
 TableStyles object model and writes crates/pivot/src/builtin_styles.txt, the data table behind crates/pivot/src/style.rs.
+With -Kind Table it reads the built-in worksheet table styles (TableStyleLight1-21, Medium1-28, Dark1-11), which a PivotTable
+can use too, into crates/pivot/src/builtin_table_styles.txt (same line format; table styles define elements 0-12 only).
 
 LOCAL DEVELOPER TOOL ONLY (not CI). Starts its own Excel instance; aborts when COM attached to an instance that was
 already running; AutomationSecurity = 3; Quit in finally. Other EXCEL processes are never touched.
@@ -14,9 +16,10 @@ Line format (UTF-8, LF):  <style>|<element>|<stripe>|<bold>|<italic>|<font colou
   border   six fields left,top,bottom,right,insideV,insideH: <line style>:<weight>:<colour>, empty when unset
 Only elements with at least one property are written.
 #>
+param([ValidateSet('Pivot', 'Table')][string]$Kind = 'Pivot')
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
-$out = Join-Path $root 'crates/pivot/src/builtin_styles.txt'
+$out = Join-Path $root $(if ($Kind -eq 'Table') { 'crates/pivot/src/builtin_table_styles.txt' } else { 'crates/pivot/src/builtin_styles.txt' })
 $inv = [Globalization.CultureInfo]::InvariantCulture
 Add-Type -TypeDefinition @'
 using System; using System.Runtime.InteropServices;
@@ -27,6 +30,8 @@ $app = New-Object -ComObject Excel.Application
 $procId = [uint32]0
 [void][PvDefWin]::GetWindowThreadProcessId([IntPtr]$app.Hwnd, [ref]$procId)
 if ($before -contains [int]$procId) { Write-Host 'attached to a pre-existing Excel instance; aborting without touching it'; exit 1 }
+Write-Host "EXCEL PID $procId"
+$xlPid = [int]$procId
 # COM theme colour index -> OOXML theme index (measured: COM 1 is white = lt1, COM 2 is black = dk1)
 $themeMap = @{ 1 = 0; 2 = 1; 3 = 2; 4 = 3; 5 = 4; 6 = 5; 7 = 6; 8 = 7; 9 = 8; 10 = 9; 11 = 10; 12 = 11 }
 function Nn($x) { if ($x -is [DBNull]) { return $null }; return $x }
@@ -42,11 +47,11 @@ try {
   $wb = $app.Workbooks.Add()
   $lines = New-Object Collections.ArrayList
   $names = @()
-  foreach ($s in $wb.TableStyles) { if ($s.Name -like 'PivotStyle*') { $names += $s.Name } }
+  foreach ($s in $wb.TableStyles) { if ($s.Name -like "${Kind}Style*") { $names += $s.Name } }
   foreach ($n in $names) {
     $s = $wb.TableStyles.Item($n)
     for ($i = 0; $i -le 27; $i++) {
-      $e = $s.TableStyleElements.Item($i)
+      try { $e = $s.TableStyleElements.Item($i) } catch { continue }
       $bold = Nn $e.Font.Bold; $ital = Nn $e.Font.Italic
       $fc = ''; if ($null -ne $bold -or $null -ne $ital -or (Nn $e.Font.ThemeColor)) { $fc = Col $e.Font }
       $pat = Nn $e.Interior.Pattern; $fill = ''
@@ -69,4 +74,6 @@ try {
   try { foreach ($w in @($app.Workbooks)) { $w.Saved = $true; $w.Close($false) } } catch {}
   try { $app.Quit() } catch {}
   try { [void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($app) } catch {}
+  Start-Sleep -Seconds 2
+  if (Get-Process -Id $xlPid -ErrorAction SilentlyContinue) { Stop-Process -Id $xlPid -Force }
 }

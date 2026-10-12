@@ -132,7 +132,11 @@ fn builtin_table() -> &'static HashMap<String, StyleDef> {
     static TABLE: OnceLock<HashMap<String, StyleDef>> = OnceLock::new();
     TABLE.get_or_init(|| {
         let mut map: HashMap<String, StyleDef> = HashMap::new();
-        for line in include_str!("builtin_styles.txt").lines() {
+        // The pivot styles, then the worksheet table styles a pivot can use too.
+        for line in include_str!("builtin_styles.txt")
+            .lines()
+            .chain(include_str!("builtin_table_styles.txt").lines())
+        {
             let f: Vec<&str> = line.split('|').collect();
             if f.len() < 14 {
                 continue;
@@ -223,8 +227,8 @@ const PRIORITY: [usize; 28] = [
     element::COL_STRIPE_1,
     element::COL_STRIPE_2,
     element::FIRST_COLUMN,
-    element::LAST_COLUMN,
     element::HEADER_ROW,
+    element::LAST_COLUMN,
     element::SUBTOTAL_COLUMN_1,
     element::SUBTOTAL_COLUMN_1 + 1,
     element::SUBTOTAL_COLUMN_1 + 2,
@@ -313,7 +317,8 @@ impl Place<'_> {
         if self.info.show_row_headers && c < self.grid.label_cols {
             add(element::FIRST_COLUMN);
         }
-        if self.info.show_last_column && c + 1 == self.cols && r > 0 {
+        if self.info.show_last_column && c + 1 == self.cols && (r > 0 || self.grid.header_rows == 1)
+        {
             add(element::LAST_COLUMN);
         }
         if self.info.show_col_headers && header {
@@ -351,7 +356,7 @@ impl Place<'_> {
         }
         if let Some(l) = rl {
             match l.kind {
-                LineKind::Grand => add(element::TOTAL_ROW),
+                LineKind::Grand if !self.grid.row_levels.is_empty() => add(element::TOTAL_ROW),
                 // In tabular form the label columns left of the subtotal belong to the groups.
                 LineKind::Subtotal if !(self.grid.label_cols > 1 && c < l.level) => {
                     add(element::SUBTOTAL_ROW_1 + l.level.min(2));
@@ -415,6 +420,7 @@ pub fn style_cells_with(
     } else {
         custom.get(&info.name)?
     };
+    let table_style = info.name.to_ascii_lowercase().starts_with("tablestyle");
     let page_rows = (grid.body.0 - grid.range.0) as usize;
     let np = table.page_fields.len().min(page_rows);
     let rows = grid.header_rows + grid.row_lines.len();
@@ -451,7 +457,7 @@ pub fn style_cells_with(
             if sets[r][c] == 0 {
                 continue;
             }
-            let (st, edges) = compose(def, &sets, r, c, theme);
+            let (st, edges) = compose(def, &sets, r, c, theme, table_style);
             *cell = st;
             cand[r][c] = edges;
         }
@@ -498,6 +504,19 @@ pub fn style_cells_full(
     custom: &CustomStyles,
     dxfs: &Dxfs,
 ) -> Option<StyledGrid> {
+    style_cells_layers(table, grid, theme, custom, dxfs, true)
+}
+
+/// [`style_cells_full`]; `mirror` repeats a user border on the neighbouring cell's facing side
+/// (what `DisplayFormat` shows), off for the formats stored in the cells (`cellXfs`).
+pub(crate) fn style_cells_layers(
+    table: &PivotTable,
+    grid: &PivotGrid,
+    theme: &Theme,
+    custom: &CustomStyles,
+    dxfs: &Dxfs,
+    mirror: bool,
+) -> Option<StyledGrid> {
     let user = table.user_formats();
     let styled = style_cells_with(table, grid, theme, custom);
     if user.is_empty() {
@@ -514,7 +533,7 @@ pub fn style_cells_full(
             cells: vec![vec![CellStyle::default(); width]; page_rows + rows],
         }
     });
-    apply_user_formats(&mut styled, table, grid, &user, dxfs, theme);
+    formats::apply_user_layer(&mut styled, table, grid, &user, dxfs, theme, mirror);
     Some(styled)
 }
 
@@ -642,7 +661,7 @@ pub fn edge_sources(
         (0..rows)
             .map(|r| {
                 (0..cols)
-                    .map(|c| compose(def, &sets, r, c, theme).1.0)
+                    .map(|c| compose(def, &sets, r, c, theme, false).1.0)
                     .collect()
             })
             .collect(),
@@ -656,6 +675,7 @@ fn compose(
     r: usize,
     c: usize,
     theme: &Theme,
+    table_style: bool,
 ) -> (CellStyle, Candidates) {
     let mut style = CellStyle::default();
     let here = sets[r][c];
@@ -702,7 +722,8 @@ fn compose(
         ];
         for (side, idx) in picks {
             // The page-field area takes the whole-table borders between its own cells only.
-            if page_whole && idx < 4 && !(side == 1 || side == 2) {
+            // (a worksheet table style, `TableStyle*`, draws them all round the page area)
+            if page_whole && !table_style && idx < 4 && !(side == 1 || side == 2) {
                 continue;
             }
             if let Some(b) = d.borders[idx] {

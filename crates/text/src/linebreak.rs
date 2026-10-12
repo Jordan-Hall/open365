@@ -19,6 +19,10 @@ pub struct BreakOpportunity {
 /// reported (as `Mandatory`), matching the crate's convention.
 pub fn break_opportunities(text: &str) -> Vec<BreakOpportunity> {
     unicode_linebreak::linebreaks(text)
+        .filter(|&(offset, kind)| {
+            !(kind == unicode_linebreak::BreakOpportunity::Allowed
+                && inside_slash_word(text, offset))
+        })
         .map(|(offset, kind)| BreakOpportunity {
             offset,
             kind: match kind {
@@ -27,6 +31,21 @@ pub fn break_opportunities(text: &str) -> Vec<BreakOpportunity> {
             },
         })
         .collect()
+}
+
+/// Word keeps `student/athlete` together: no line ends after a slash that stands between two
+/// letters (measured on the template corpus, `f5b49e76`).
+fn inside_slash_word(text: &str, offset: usize) -> bool {
+    let before = &text[..offset];
+    let mut back = before.chars().rev();
+    if back.next() != Some('/') {
+        return false;
+    }
+    back.next().is_some_and(char::is_alphabetic)
+        && text[offset..]
+            .chars()
+            .next()
+            .is_some_and(char::is_alphabetic)
 }
 
 #[cfg(test)]
@@ -61,5 +80,20 @@ mod tests {
                 kind: BreakKind::Mandatory
             }
         );
+    }
+}
+
+#[cfg(test)]
+mod slash_tests {
+    use super::*;
+
+    #[test]
+    fn no_break_after_a_slash_between_letters() {
+        let b = break_opportunities("student/athlete of");
+        assert!(b.iter().all(|o| o.offset != "student/".len()));
+        // Still allowed after a space, and after a slash that is not between letters.
+        assert!(b.iter().any(|o| o.offset == "student/athlete ".len()));
+        let c = break_opportunities("a/ b 1/2x");
+        assert!(c.iter().any(|o| o.offset == "a/ ".len()));
     }
 }

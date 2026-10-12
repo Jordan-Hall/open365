@@ -141,8 +141,9 @@ fn shared_attrs(values: &[Value], date: bool) -> Vec<(&'static str, String)> {
         let min = dates.iter().copied().fold(f64::INFINITY, f64::min);
         let max = dates.iter().copied().fold(f64::NEG_INFINITY, f64::max);
         out.push(("minDate", serial_to_iso(min, false)));
-        // Excel stores the day after the last date.
-        out.push(("maxDate", serial_to_iso(max.floor() + 1.0, false)));
+        // Excel stores the day after the last date; a last value with a time of day stays.
+        let end = if max.fract() == 0.0 { max + 1.0 } else { max };
+        out.push(("maxDate", serial_to_iso(end, false)));
     }
     if values.is_empty() || (!has_str && !has_blank && !has_num && !has_date && !has_other) {
         out.clear();

@@ -75,8 +75,15 @@ Inline and floating placements match `layout-img-inline`, `layout-img-none`, `la
 - Shapes in `mc:AlternateContent` without text are kept as anchors (one character, wrapping); header/footer ones are not
   emitted as images.
 
-Open: clamping at the
-bottom margin (`layout-float-anchor-bottom`, `-anchor-nextpage`), the lookahead after an incremental restart.
+Two anchor rules at the bottom margin (`float.rs` `place`, `Anchored::overflows`; `layout-float-anchor-bottom` 67 of 67,
+`-anchor-nextpage` 69 of 69):
+
+| Rule | Evidence |
+|---|---|
+| A wrapping float (square, tight, through, top-and-bottom) placed from its paragraph or line (`posOffset`) whose bottom would pass the bottom margin moves up until its bottom meets the margin: a +120 top-and-bottom and a +200 square picture of 60 pt stand at 660 = 720 - 60. Floats in front of or behind the text, and floats placed from the page or the margin, are not moved. | `layout-float-anchor-bottom` |
+| The float never rises above its anchor. When moving it up would put it above the anchor's paragraph top, the anchor paragraph goes to the next page and the float is placed there (`overflows`, tested in `flow.rs` against the lines the paragraph would take). | `layout-float-anchor-nextpage` |
+
+Open: the lookahead after an incremental restart.
 
 ## Section columns (`w:cols`; `props.rs`, `flow.rs`, `float.rs`)
 
@@ -91,8 +98,21 @@ stream order (Word writes a page column by column; lines of two columns share ba
 | A continuous break balances the columns of the section it ends, on the section's last page only: each column aims at `content height / n` and takes a line that starts before that share is used up (10 lines and two gaps over two columns: 6 + 4); the height grows until the rest fits in the other columns; widow, orphan and keep rules apply. The next section starts below the tallest column plus the space after its last paragraph (none when the column ends inside a paragraph). The last section of the document and sections before a next-page break are not balanced. | `layout-cols-balance/-balance-pages/-continuous/-mid` |
 | `Column`-relative float positions use the column (`float-poscol`, 235 of 236). Floats wrap per column. | `layout-float-poscol` |
 
-Footnotes in columns: done in Round 3 (below). Not done: the `w:sep` line is not drawn,
+Footnotes in columns: done in Round 3 and in the unequal-column section below. Not done: the `w:sep` line is not drawn,
 tables in unequal columns use the first column's width, documents with columns are always paginated from scratch (no incremental restart).
+
+## Footnotes in unequal columns (`furniture.rs` `NoteStore::flow`, `flow.rs` `seed_notes`)
+
+Probe `layout-cols-fn-unequal` (columns 150 and 282 pt, six notes of four lines at 150 pt; Word's PDF is the truth, the oracle's `layout.json` lists only notes 1 to 4).
+
+| Rule | Evidence |
+|---|---|
+| Notes are set at the width of the column they stand in and flow down the first column; the next column starts at the area top. A note splits between columns by line, and its tail is broken again at the next column's width (`ParaLayout::builder().fill_in` from the line's first atom, as the body does for unequal columns). Note 3 keeps 2 lines at 150 pt and its tail runs "several lines of a narrow column and shows how wide the note area" / "is." at 282 pt. | PDF: 10 lines in column 1, 11 in column 2 |
+| Widow and orphan control apply to the split: at least two lines stay on each side, measured on the re-broken tail (a third line in column 1 would leave "is." alone, so Word keeps two). | same |
+| The note area is the smallest height at which that flow fits (binary search on the limit; here 11 lines, set by the second column). It need not be balanced: the first column is 10 lines, the second 11. | same |
+| The area counts the notes of every reference on the page, those in later columns included, and it limits the first column too: the body of column 1 ends at 553.8 pt, above the separator at 572.4, so the paragraph after "the glue." starts column 2. The paginator places a multi-column region once as a trial to find the page's notes and seeds them before the real run. | `layout-cols-fn-unequal` 77 of 77 lines, 2770 of 2782 glyphs |
+
+Equal columns keep the older rule (whole notes, balanced). Slots (`NoteSlot`) still count lines at the first column's width. Not measured: a note that splits across pages and columns, three or more unequal columns, endnotes in columns.
 
 ## Content controls (`w:sdt`; `para.rs`, `incremental.rs`, `crates/docx/src/flatten.rs`)
 
@@ -236,11 +256,27 @@ Round 3 (reader, list labels, footnotes in columns; system fonts, 443,196 Word g
 | The space after a label (`w:suff` = space) is set in Arial at the label's size, whatever the label font: the PDF draws it in ArialMT and the text starts 3.12 pt after the label at 11 pt (Calibri's space would give 2.4 pt). | `layout-lists-suff` 1959 -> 1990 of 2015 |
 | A list label is not kerned (`v.`, `r.`, `o.` keep their unkerned gap; kerning moved `.` by 0.5 to 1.2 pt). | `layout-lists-formats` 3808 -> 3816 of 3862 |
 | Label x positions for left, centre and right alignment, the tab / space / nothing gaps and the hanging indent were already right (`layout-lists-style` 90.9 %, `-suff` 98.8 %, `-multilevel` 100 %); what remains there is 0.5 to 0.9 pt drift after the first 30 glyphs of a line (the kerning/rounding noise below), not label placement. | `CHARX_DETAIL` rows |
-| Footnotes of a section with equal columns are set at the column width and balanced over the columns: whole notes in order, split so the tallest column is as short as it can be (6 one-line notes in 2 columns: 3 + 3). The note area (`NoteStore::area`) is that tallest column plus the separator, so the body gets the room back. Unequal columns still use the full width. | `layout-cols-footnote` 1446 -> 2212 of 2224 glyphs, lines 38 -> 62 of 63 |
+| Footnotes of a section with equal columns are set at the column width and balanced over the columns: whole notes in order, split so the tallest column is as short as it can be (6 one-line notes in 2 columns: 3 + 3). The note area (`NoteStore::area`) is that tallest column plus the separator, so the body gets the room back. Unequal columns: see the next section. | `layout-cols-footnote` 1446 -> 2212 of 2224 glyphs, lines 38 -> 62 of 63 |
+
+A note reference mark (`para.rs` `mark`) whose run has no superscript style is plain text: it is drawn at the run's size on the baseline with the digit's own advance (5.52 pt at 11.04 pt; the shrunk mark gave 3.55), and takes no line height of its own. Only a reference with `w:vertAlign` (the usual `FootnoteReference` style) is shrunk to 0.65 of the full size and raised. Evidence: `fixtures/reference/pdf/probes/probe-links` (link rectangle of the mark 10.08 pt wide), test `note_mark.rs`.
 
 Mixed sizes (`layout-mixed-sizes`, 96.9 %): the failing glyphs are the same sub-pixel drift (0.5 to 0.7 pt late in the line), baselines and the x of the size change agree; no rule to add.
 
 Open after Round 3: Word's glyph advances are whole pixels but rounding in the engine still lowers parity (kerning-pair rounding not investigated this round); the 5385 -> 5396 of 7998 corpus lines are mostly cell rectangles, text boxes and `ca4e5536`-style titles (a Title paragraph inside a block `w:sdt` is left-aligned by the engine where Word centres it, x 72 against 217.9; not diagnosed). The ~120 dropped blank rows are an oracle-side pairing problem (they need Word's `Range.Information`); they cannot be recovered from the committed references.
+
+## Template corpus, round 4 (5396 -> 5749 of 7998 lines, 67.5 % -> 71.9 %)
+
+Causes of the failing lines, counted from `ms_template_parity` detail output (5396 matched: 1143 lines off in y, 830 cell rectangles, 379 lines missing, 110 pictures, 104 on the wrong page, 33 off in x). Fixed, largest first:
+
+| Rule | Evidence |
+|---|---|
+| `w:softHyphen` is one character of Word's story offsets. Without it every later line of a template started one offset early and 296 lines had no counterpart. It draws nothing mid-line. `w:noBreakHyphen` draws U+2011. | `ad265748` +110 lines |
+| The line over MS Gothic, MS PGothic, MS UI Gothic, MS Mincho and MS PMincho rises a whole em above the baseline (ascent = win ascent + win descent = 1.0 em), not their 0.859 em: ballot boxes at 11 pt stand 1.54 pt lower, at 10 pt 1.30 pt lower than the OS/2 value gives. Descent stays 0.141 em. | `ca4e5536`, `3b40ec86` +186 lines |
+| U+2610 to U+2612 are set in MS Gothic when the run's font has no such glyph (the template checkboxes carry `w:hint="eastAsia"`, which `RunProps` does not expose, so every run without the glyph takes the East Asian face). | same |
+| A vertically merged cell takes its bottom padding from the row it ends in (a cell spanning rows 7 to 9 with `vAlign` centre sat 3.9 pt low: the bottom 7.2 pt padding of row 9 was missing). | `ad265748` +45 lines |
+| No line ends after a `/` between two letters (`student/athlete`). | `f5b49e76` +14 lines |
+
+Still open, by size: cell rectangles that differ by 0.06 to 0.4 pt from Word's PDF (824, the tolerance is 0.05 pt; ca4e5536, ad265748 and 65cf689e hold 270), page-2 shifts of one line in `65cf689e` (202 lines, a three-column page with a side column), footers made of shapes (`4e493df5`, `d52c20af`: the page number sits in a shape that is not placed), 110 pictures, drift of 2 to 5 pt after headings in `371fe1a1`, `2f858f7d`, `5ff67a28`. `crates/docx` should expose the East Asian font and `w:hint` of a run so the ballot-box rule can use them instead of the glyph test.
 
 ## Superscript and subscript runs (`w:vertAlign`; `para.rs` `style_from`, `GlyphRun::vert_align`)
 

@@ -6,6 +6,8 @@
 //! `refresh_sheet` and compared with `after.xlsx`: the pivot table (user `formats` included),
 //! cache definition and records parts, the cells, and the display format (fill, font and the
 //! four borders per cell, `Range.DisplayFormat`) that Excel reports after the refresh.
+//! Every kind of difference (`parts`, `cells`, `xf`, `display`) fails its test; `PIVOT_VERBOSE=1`
+//! prints what a `check` call leaves out of its kinds.
 //! The part comparison is semantic: attribute order does not matter and the values Excel stamps
 //! per run (`refreshedDate`, `cacheId`, `xr:uid`) are ignored.
 
@@ -341,28 +343,25 @@ fn check(sets: &[&str], total: usize, kinds: &[&str], pivots: &[&str]) {
     );
 }
 
-/// Pivot table, cache and records parts and cell values are Excel's; the user formats stay on
-/// the same items (`x/@v` is written as Excel does). Gap, not asserted: the cell formats
-/// (`cellXfs` borders Excel re-applies to the new layout) and the display format of the
-/// border rules (`PIVOT_VERBOSE=1` prints them).
+/// Pivot table, cache and records parts, cell values, the cell formats (`cellXfs` borders Excel
+/// re-applies to the new layout) and the display format are Excel's after a refresh; the user
+/// formats stay on the same items (`x/@v` is written as Excel does).
 #[test]
 fn formats_survive_refresh_like_excel() {
     check(
         &["formats", "formats-removed"],
         10,
-        &["parts", "cells"],
+        &["parts", "cells", "xf", "display"],
         &[],
     );
-    // The cell formats follow the items: exact on the tabular pivot (P4) of both sets.
-    check(&["formats", "formats-removed"], 10, &["xf"], &["P4"]);
 }
 
 /// Date groups (months, quarters, years, days) and number groups regroup on the refreshed
 /// data like Excel: cache `fieldGroup`, group items, pivot field items, records and cells.
 /// A number group made without blanks is dropped when the source gets a blank (the field is
-/// a plain field again). Gap, not asserted (`grouped-blank-date`): a blank date drops the date
-/// groups with their derived fields and the pivot loses those axis fields; the cells are asserted,
-/// the cache and pivot table parts fall back to `refreshOnLoad`.
+/// a plain field again). A blank date drops the date groups (`grouped-blank-date`): the derived
+/// fields leave the cache and the pivot, the base field goes back to inline records; parts,
+/// cells, cell formats and display format are Excel's.
 #[test]
 fn grouped_fields_refresh_like_excel() {
     check(
@@ -371,8 +370,30 @@ fn grouped_fields_refresh_like_excel() {
         &["parts", "cells"],
         &[],
     );
-    // A blank date drops the date groups: the cells are Excel's, the parts are not rebuilt.
-    check(&["grouped-blank-date"], 2, &["cells"], &[]);
+    check(
+        &["grouped-blank-date"],
+        2,
+        &["parts", "cells", "xf", "display"],
+        &[],
+    );
+}
+
+/// Time-of-day groups (hours, minutes, seconds, days of the year) and number groups over
+/// fractional values (`make-pivot-refresh-time.ps1`): the group items, bounds, records, cells.
+/// `-maxwhole` and `-onetime` probe the end bound: a last value on midnight ends a day later.
+#[test]
+fn time_and_fractional_groups_refresh_like_excel() {
+    check(
+        &[
+            "grouped-time",
+            "grouped-fraction",
+            "grouped-time-maxwhole",
+            "grouped-time-onetime",
+        ],
+        24,
+        &["parts", "cells"],
+        &[],
+    );
 }
 
 /// Calculated items: shared items, pivot field items, `calculatedItem` references, records,
@@ -392,25 +413,29 @@ fn sig(wb: &Workbook, si: usize, r: u32, c: u32) -> String {
     let b = &wb.cell_format(si, r, c).border;
     let f = |e: &open365_xlsx::BorderEdge, ch: char| {
         if e.style == BorderStyle::None {
-            '.'.to_string()
+            String::new()
         } else {
-            format!(
-                "{ch}{}",
-                format!("{:?}", e.color.source)
-                    .chars()
-                    .skip(4)
-                    .take(6)
-                    .collect::<String>()
-            )
+            let k = wb.styles().resolve_color(&e.color);
+            let s = match e.style {
+                BorderStyle::Thin => 't',
+                BorderStyle::Medium => 'm',
+                BorderStyle::Thick => 'T',
+                _ => '?',
+            };
+            format!("{ch}{s}{:02x}{:02x}{:02x}", k.r, k.g, k.b)
         }
     };
-    format!(
-        "{}{}{}{}",
+    let v = [
         f(&b.left, 'l'),
         f(&b.right, 'r'),
         f(&b.top, 't'),
-        f(&b.bottom, 'b')
-    )
+        f(&b.bottom, 'b'),
+    ];
+    v.iter()
+        .filter(|x| !x.is_empty())
+        .cloned()
+        .collect::<Vec<_>>()
+        .join(",")
 }
 
 /// Diagnostic: `PIVOT_SET=formats PIVOT_SHEET=P1 cargo test ... dump_xf -- --ignored --nocapture`.
@@ -426,14 +451,17 @@ fn dump_xf() {
     apply_edits(&mut mine, &dir);
     let si = mine.sheet_index(&sheet).unwrap();
     refresh_sheet(&mut mine, si, &PivotStrings::default()).unwrap();
-    for r in 4..14 {
-        for (name, wb) in [("before", &before), ("after ", &after), ("mine  ", &mine)] {
-            let row: Vec<String> = (2..6)
-                .map(|c| format!("{:<14}", sig(wb, si, r, c)))
-                .collect();
-            println!("{r:>2} {name} {}", row.join("|"));
+    for r in 3..40 {
+        for c in 2..9 {
+            let (a, m) = (sig(&after, si, r, c), sig(&mine, si, r, c));
+            if a != m || (std::env::var("PIVOT_ALL").is_ok() && !a.is_empty()) {
+                let col = (b'A' + (c - 1) as u8) as char;
+                println!(
+                    "{col}{r}: before [{}] after [{a}] mine [{m}]",
+                    sig(&before, si, r, c)
+                );
+            }
         }
-        println!();
     }
 }
 

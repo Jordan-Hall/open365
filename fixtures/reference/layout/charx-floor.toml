@@ -79,6 +79,10 @@ total = 2727
 agree = 2570
 total = 2580
 
+[fixtures.layout-cols-fn-unequal]
+agree = 2770
+total = 2782
+
 [fixtures.layout-cols-footnote]
 agree = 2212
 total = 2224
@@ -582,6 +586,10 @@ total = 2727
 [system.layout-cols-continuous]
 agree = 2570
 total = 2580
+
+[system.layout-cols-fn-unequal]
+agree = 2770
+total = 2782
 
 [system.layout-cols-footnote]
 agree = 2212

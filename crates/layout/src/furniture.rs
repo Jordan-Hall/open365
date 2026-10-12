@@ -27,7 +27,7 @@ use crate::float::{self, Frame as FloatFrame};
 use crate::flow::{Base, build_line, line_images};
 use crate::incremental::{REL_FOOTNOTES, related_links};
 use crate::numbering::ListLabel;
-use crate::para::{Context, FieldEnv, NoteOrder, ParaLayout};
+use crate::para::{Context, FieldEnv, LineBox, NoteOrder, ParaLayout};
 use crate::props::{SectionCols, SectionProps};
 use crate::rules::rules_of;
 use crate::{ImagePlacement, ImageSource, Line, NoteSlot, Page, StoryKind};
@@ -382,6 +382,20 @@ struct SectionNotes {
     /// Left edge of each note column relative to the text area (one entry for a one-column
     /// section).
     col_x: Vec<f64>,
+    /// Width of each note column when the columns differ (empty otherwise): notes are set at
+    /// each column's own width and flow down the first column, then the next (see
+    /// [`NoteStore::flow`]).
+    col_w: Vec<f64>,
+}
+
+/// A run of lines of one note paragraph in one note column.
+struct Frag {
+    /// Index into [`SectionNotes::paras`].
+    para: usize,
+    lines: Vec<LineBox>,
+    col: usize,
+    /// Distance from the top of the note area.
+    y: f64,
 }
 
 /// Footnote layouts for every section.
@@ -417,16 +431,23 @@ impl NoteStore {
         for (si, sp) in sections.iter().enumerate() {
             // Measured (layout-cols-footnote): the footnotes of a section with equal columns are
             // set in columns of the section's width and balanced over them.
-            let col_x: Vec<f64> = match cols.get(si) {
-                Some(c)
-                    if c.is_multi()
-                        && c.columns
-                            .iter()
-                            .all(|g| (g.width - c.first_width()).abs() < 0.01) =>
-                {
-                    c.columns.iter().map(|g| g.x).collect()
+            // Unequal columns (layout-cols-fn-unequal): each column keeps its own width.
+            let (col_x, col_w): (Vec<f64>, Vec<f64>) = match cols.get(si) {
+                Some(c) if c.is_multi() => {
+                    let equal = c
+                        .columns
+                        .iter()
+                        .all(|g| (g.width - c.first_width()).abs() < 0.01);
+                    (
+                        c.columns.iter().map(|g| g.x).collect(),
+                        if equal {
+                            Vec::new()
+                        } else {
+                            c.columns.iter().map(|g| g.width).collect()
+                        },
+                    )
                 }
-                _ => vec![0.0],
+                _ => (vec![0.0], Vec::new()),
             };
             let width = if col_x.len() > 1 {
                 cols[si].first_width()
@@ -476,6 +497,7 @@ impl NoteStore {
                 heights,
                 line_heights,
                 col_x,
+                col_w,
             });
         }
         Self { sections: out }
@@ -558,9 +580,219 @@ impl NoteStore {
         (packed.iter().map(|p| p.0).collect(), height)
     }
 
+    /// Whether the section has footnotes at all.
+    pub(crate) fn has_notes(&self, section: usize) -> bool {
+        self.sections
+            .get(section)
+            .is_some_and(|s| !s.ranges.is_empty())
+    }
+
+    /// Whether the section's note columns differ in width.
+    fn unequal(&self, section: usize) -> bool {
+        self.sections
+            .get(section)
+            .is_some_and(|s| !s.col_w.is_empty())
+    }
+
+    /// Lines of `pl` from atom `at` to atom `end`, broken for a column `delta` narrower than
+    /// the width the paragraph was laid out at.
+    fn refill(pl: &ParaLayout, at: usize, end: usize, delta: f64) -> Vec<LineBox> {
+        let b = pl.builder();
+        let mut out = Vec::new();
+        let mut a = at;
+        while a < end {
+            let l = b.fill_in(a, a == 0, (0.0, delta));
+            if l.atoms.end <= a {
+                break;
+            }
+            a = l.atoms.end;
+            out.push(l);
+        }
+        out
+    }
+
+    /// Sets `slots` in a section whose note columns differ in width (measured on
+    /// `layout-cols-fn-unequal`): the notes fill the first column down to `limit`, a note
+    /// splits by line and its tail is broken again at the next column's width. Widow and orphan
+    /// control keep two lines on each side of a split. `None` when the notes do not fit.
+    fn flow(&self, section: usize, slots: &[NoteSlot], limit: f64) -> Option<(Vec<Frag>, f64)> {
+        const EPS: f64 = 1e-6;
+        let s = self.sections.get(section)?;
+        let n = s.col_w.len();
+        let (mut col, mut y, mut tallest) = (0usize, 0.0f64, 0.0f64);
+        let mut frags = Vec::new();
+        for slot in slots {
+            let Some(r) = s.ranges.get(&slot.id) else {
+                continue;
+            };
+            let (mut lo, mut prev_after) = (0usize, 0.0f64);
+            for (pj, pl) in s.paras[r.clone()].iter().enumerate() {
+                let first_flat = lo;
+                lo += pl.lines.len();
+                let before = f64::from(pl.props.space_before_pt);
+                let after = f64::from(pl.props.space_after_pt);
+                let (a, b) = (slot.from.max(first_flat), slot.to.min(lo));
+                let mut sb = match (a == first_flat, pj) {
+                    (false, _) => 0.0,
+                    (true, 0) => before,
+                    (true, _) => prev_after.max(before),
+                };
+                prev_after = after;
+                if a >= b {
+                    continue;
+                }
+                let post = if b == lo && pj + 1 == r.len() {
+                    after
+                } else {
+                    0.0
+                };
+                let mut at = pl.lines[a - first_flat].atoms.start;
+                let end = pl.lines[b - 1 - first_flat].atoms.end;
+                loop {
+                    let lines = Self::refill(pl, at, end, s.col_w[0] - s.col_w[col]);
+                    if lines.is_empty() {
+                        break;
+                    }
+                    let total = lines.len();
+                    let mut k = 0;
+                    let mut used = y + sb;
+                    for (i, l) in lines.iter().enumerate() {
+                        let extra = if i + 1 == total { post } else { 0.0 };
+                        if used + l.height + extra > limit + EPS {
+                            break;
+                        }
+                        used += l.height;
+                        k += 1;
+                    }
+                    if k == total {
+                        frags.push(Frag {
+                            para: r.start + pj,
+                            lines,
+                            col,
+                            y: y + sb,
+                        });
+                        y = used + post;
+                        tallest = tallest.max(y);
+                        break;
+                    }
+                    if col + 1 >= n {
+                        return None;
+                    }
+                    let at_top = y == 0.0;
+                    let head = at == 0;
+                    if pl.flow.widow_control {
+                        let rest = |k: usize| {
+                            Self::refill(
+                                pl,
+                                lines[k].atoms.start,
+                                end,
+                                s.col_w[0] - s.col_w[col + 1],
+                            )
+                            .len()
+                        };
+                        if head && k == 1 {
+                            k = 0;
+                        } else if k >= 1 && rest(k) == 1 {
+                            k -= 1;
+                            if head && k < 2 {
+                                k = 0;
+                            }
+                        }
+                    }
+                    if k == 0 && at_top {
+                        k = 1;
+                    }
+                    if k > 0 {
+                        tallest =
+                            tallest.max(y + sb + lines[..k].iter().map(|l| l.height).sum::<f64>());
+                        frags.push(Frag {
+                            para: r.start + pj,
+                            lines: lines[..k].to_vec(),
+                            col,
+                            y: y + sb,
+                        });
+                        at = lines[k].atoms.start;
+                    }
+                    col += 1;
+                    y = 0.0;
+                    sb = 0.0;
+                }
+            }
+        }
+        Some((frags, tallest))
+    }
+
+    /// The smallest note area height for which [`Self::flow`] fits `slots`, and the notes as
+    /// they then lie.
+    fn flow_min(&self, section: usize, slots: &[NoteSlot]) -> (Vec<Frag>, f64) {
+        let total: f64 = slots.iter().map(|sl| self.slot_height(section, *sl)).sum();
+        let (mut lo, mut hi) = (0.0f64, total + 1.0);
+        let mut best = self.flow(section, slots, hi);
+        for _ in 0..30 {
+            let mid = (lo + hi) / 2.0;
+            if let Some(f) = self.flow(section, slots, mid) {
+                hi = mid;
+                best = Some(f);
+            } else {
+                lo = mid;
+            }
+        }
+        best.unwrap_or_default()
+    }
+
     /// Height of the note area (separator excluded) for `slots`.
     pub(crate) fn area(&self, section: usize, slots: &[NoteSlot]) -> f64 {
+        if self.unequal(section) {
+            return self.flow_min(section, slots).1;
+        }
         self.columns_of(section, slots).1
+    }
+
+    /// [`Self::page_lines`] for note columns of different widths.
+    fn flow_lines(
+        &self,
+        s: &SectionNotes,
+        section: usize,
+        slots: &[NoteSlot],
+        origin_x: f64,
+        bottom: f64,
+    ) -> (Vec<Line>, Vec<ImagePlacement>) {
+        let (frags, area) = self.flow_min(section, slots);
+        let mut y = bottom - (s.sep_h + area);
+        let src = ImageSource::Footnotes;
+        let sep = place(
+            &s.sep,
+            origin_x,
+            y,
+            StoryKind::FootnoteSeparator,
+            &src,
+            Some(&s.props),
+        );
+        y += sep.height;
+        let mut lines = sep.lines;
+        let mut images: Vec<ImagePlacement> = sep.images.into_iter().map(|i| i.1).collect();
+        let base = Base {
+            para: 0,
+            story: 0,
+            table: 0,
+        };
+        for f in &frags {
+            let pl = &s.paras[f.para];
+            let x = origin_x + s.col_x.get(f.col).copied().unwrap_or(0.0);
+            let mut top = y + f.y;
+            for lb in &f.lines {
+                let mut line = build_line(pl, lb, x, top, base);
+                line.story = StoryKind::Footnotes;
+                line.border = pl.line_border(lb, x, false, false);
+                for mut im in line_images(pl, lb, x, top, base) {
+                    im.source = src.clone();
+                    images.push(im);
+                }
+                lines.push(line);
+                top += lb.height;
+            }
+        }
+        (lines, images)
     }
 
     /// The separator and note lines of a page whose body area ends at `bottom`.
@@ -576,6 +808,9 @@ impl NoteStore {
         };
         if slots.is_empty() {
             return (Vec::new(), Vec::new());
+        }
+        if self.unequal(section) {
+            return self.flow_lines(s, section, slots, origin_x, bottom);
         }
         let (col_of, area) = self.columns_of(section, slots);
         let total: f64 = s.sep_h + area;

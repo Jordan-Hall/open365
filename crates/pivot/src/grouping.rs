@@ -23,7 +23,7 @@ fn bucket(g: &FieldGroup, v: &Value, date1904: bool) -> usize {
             } else if x > end {
                 last
             } else {
-                (1 + ((x - start) / step).floor() as usize).min(inner_last)
+                (1 + (((x - start) / step) + 1e-9).floor() as usize).min(inner_last)
             }
         }
         Some(by) => {
@@ -46,10 +46,14 @@ fn bucket(g: &FieldGroup, v: &Value, date1904: bool) -> usize {
                     let (sy, _, _) = serial_to_ymd(start, date1904);
                     1 + (y - sy).max(0) as usize
                 }
-                "days" => {
-                    let n = g.interval.filter(|i| *i >= 1.0).unwrap_or(1.0);
-                    1 + ((x.floor() - start.floor()) / n).floor() as usize
-                }
+                "days" => match g.interval.filter(|i| *i > 1.0) {
+                    Some(n) => 1 + ((x.floor() - start.floor()) / n).floor() as usize,
+                    // One day: the day of a leap year (`01-Jan` ... `31-Dec`).
+                    None => {
+                        let (_, m, d) = serial_to_ymd(x, date1904);
+                        1 + LEAP_DAYS[..(m as usize - 1)].iter().sum::<usize>() + d as usize - 1
+                    }
+                },
                 "hours" => 1 + (secs / 3600) as usize % 24,
                 "minutes" => 1 + ((secs / 60) % 60) as usize,
                 "seconds" => 1 + (secs % 60) as usize,
@@ -83,8 +87,10 @@ fn fmt_date(x: f64) -> String {
     format!("{d:02}/{m:02}/{y}")
 }
 
+/// A number as Excel prints it in a group label: 15 significant digits, no float noise.
 fn fmt_num(n: f64) -> String {
-    format!("{n}")
+    let clean = format!("{n:.14e}").parse::<f64>().unwrap_or(n);
+    format!("{clean}")
 }
 
 /// What a refresh does to the group of one cache field.
@@ -95,6 +101,8 @@ pub(crate) enum Regrouped {
     /// Excel drops the group: the data holds something the group cannot place.
     Ungroup,
 }
+
+const LEAP_DAYS: [usize; 12] = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
 
 const MONTHS: [&str; 12] = [
     "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
@@ -138,27 +146,34 @@ fn regroup_one(g: &FieldGroup, src: &[Value]) -> Option<Regrouped> {
                 return Some(Regrouped::Ungroup);
             }
             let step = g.interval.filter(|i| *i > 0.0)?;
-            if nums.iter().any(|n| n.fract() != 0.0) || step.fract() != 0.0 {
-                return None;
-            }
             let start = if g.auto_start { min } else { g.start_num? };
             let end = if g.auto_end { max } else { g.end_num? };
             out.start_num = Some(start);
             out.end_num = Some(end);
-            let mut items = vec![text(if blanks {
-                format!("<{} or (blank)", fmt_num(start))
-            } else {
-                format!("<{}", fmt_num(start))
-            })];
+            // Whole numbers throughout: `lo-hi` with hi one below the next group (the last group
+            // ends at the end bound when it falls on a step). Any fraction in the data, the step
+            // or the bounds: the groups touch, `lo-(lo+step)`.
+            let whole = |x: f64| x.fract() == 0.0;
+            let contiguous =
+                !(nums.iter().all(|n| whole(*n)) && [step, start, end].iter().all(|n| whole(*n)));
+            let first = match (blanks, g.auto_start) {
+                (true, true) => "(blank)".to_owned(),
+                (true, false) => format!("<{} or (blank)", fmt_num(start)),
+                (false, _) => format!("<{}", fmt_num(start)),
+            };
+            let mut items = vec![text(first)];
+            let mut k = 0.0;
             let mut lower = start;
             loop {
-                let upper = if lower + step == end {
-                    end
+                let next = start + (k + 1.0) * step;
+                let upper = if contiguous || next == end {
+                    next
                 } else {
-                    lower + step - 1.0
+                    next - 1.0
                 };
                 items.push(text(format!("{}-{}", fmt_num(lower), fmt_num(upper))));
-                lower += step;
+                lower = next;
+                k += 1.0;
                 if lower >= end {
                     break;
                 }
@@ -170,13 +185,11 @@ fn regroup_one(g: &FieldGroup, src: &[Value]) -> Option<Regrouped> {
             if blanks {
                 return Some(Regrouped::Ungroup);
             }
-            let start = if g.auto_start {
-                min.floor()
-            } else {
-                g.start_date?
-            };
+            // The first and the last value as they are; a last value on midnight (a date without
+            // a time) ends the range a day later.
+            let start = if g.auto_start { min } else { g.start_date? };
             let end = if g.auto_end {
-                max.floor() + 1.0
+                if max.fract() == 0.0 { max + 1.0 } else { max }
             } else {
                 g.end_date?
             };
@@ -190,6 +203,13 @@ fn regroup_one(g: &FieldGroup, src: &[Value]) -> Option<Regrouped> {
                     let (ey, _, _) = serial_to_ymd(end, false);
                     (sy..=ey).map(|y| text(y.to_string())).collect()
                 }
+                "hours" => (0..24).map(|h| text(format!("{h:02}"))).collect(),
+                "minutes" | "seconds" => (0..60).map(|m| text(format!(":{m:02}"))).collect(),
+                "days" if g.interval.is_none_or(|i| i <= 1.0) => LEAP_DAYS
+                    .iter()
+                    .enumerate()
+                    .flat_map(|(m, n)| (1..=*n).map(move |d| text(format!("{d:02}-{}", MONTHS[m]))))
+                    .collect(),
                 "days" => {
                     let n = g.interval.filter(|i| *i >= 1.0)?;
                     let mut v = Vec::new();

@@ -167,8 +167,9 @@ fn styles_match_excel_display_format() {
         ("holdout-customstyles", FLOOR_CUSTOM_OUT),
         ("formats", FLOOR_FORMATS),
         ("formats-areas", FLOOR_FORMATS_AREAS),
-        ("formats-borders", 10),
+        ("formats-borders", 26),
         ("holdout-formats", FLOOR_FORMATS_OUT),
+        ("tablestyles", FLOOR_TABLE),
     ] {
         // `PIVOT_SET=styles` runs (and prints diffs of) one set only: look at the in-sample set
         // while fitting and run the hold-out set for confirmation, never to tune.
@@ -192,10 +193,11 @@ const FLOOR_IN: usize = 40;
 const FLOOR_IN2: usize = 63;
 const FLOOR_OUT: usize = 39;
 const FLOOR_CUSTOM: usize = 39;
-const FLOOR_CUSTOM_OUT: usize = 28;
-const FLOOR_FORMATS: usize = 36;
+const FLOOR_CUSTOM_OUT: usize = 32;
+const FLOOR_FORMATS: usize = 40;
 const FLOOR_FORMATS_AREAS: usize = 64;
-const FLOOR_FORMATS_OUT: usize = 22;
+const FLOOR_FORMATS_OUT: usize = 26;
+const FLOOR_TABLE: usize = 36;
 
 /// `PIVOT_DUMP=P3`: Excel's and our formatting of one pivot as two character maps. Per cell:
 /// fill letter, `B`/`I`, font letter, then four border digits (left, top, bottom, right).

@@ -22,6 +22,7 @@ mod regen;
 mod showas;
 pub mod style;
 mod survive;
+mod ungroup;
 mod value;
 mod xmlutil;
 
@@ -116,18 +117,6 @@ impl SheetPivot {
         let mut table = self.table.clone();
         for fi in 0..cache.fields.len() {
             let cf = &cache.fields[fi];
-            if cf.group.is_none()
-                && self.cache.fields[fi].group.is_some()
-                && !self.cache.fields[fi].database_field
-            {
-                // A date group Excel drops takes its derived field off the axes.
-                table.row_fields.retain(|f| *f as usize != fi);
-                table.col_fields.retain(|f| *f as usize != fi);
-                if let Some(pf) = table.fields.get_mut(fi) {
-                    pf.axis = None;
-                }
-                continue;
-            }
             if cf.group.is_none() && self.cache.fields[fi].group.is_some() {
                 // The group is gone: the field lists its values in order of first appearance.
                 let mut seen = std::collections::HashSet::new();
@@ -212,7 +201,12 @@ pub fn refresh_sheet(
 ) -> Result<usize, PivotError> {
     let pivots = sheet_pivots(wb, sheet);
     let mut done = 0;
-    for p in &pivots {
+    for listed in &pivots {
+        // A date group a blank date drops: the pivot is rewritten without it first.
+        let dropped = Dataset::from_workbook(wb, &listed.cache)
+            .ok()
+            .and_then(|d| listed.without_dropped_date_groups(&d, wb.date1904()));
+        let p = dropped.as_ref().map_or(listed, |(p, _)| p);
         let grid = p.grid_refreshed(wb, strings)?;
         if let Some((r1, c1, r2, c2)) = parse_ref(&p.table.reference) {
             let top = grid.range.0.min(r1);
@@ -240,7 +234,10 @@ pub fn refresh_sheet(
                     .map_err(|e| PivotError::Write(e.to_string()))?;
             }
         }
-        let data = Dataset::from_workbook(wb, &p.cache)?;
+        let data = match &dropped {
+            Some((_, d)) => d.clone(),
+            None => Dataset::from_workbook(wb, &p.cache)?,
+        };
         let shared_cache = pivots_on_cache(wb, &p.cache_part) > 1;
         let regenerated = if shared_cache {
             None

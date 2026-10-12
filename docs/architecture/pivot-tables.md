@@ -1,6 +1,6 @@
 # PivotTables (`crates/pivot`)
 
-Status: slices 1-5 plus refresh regeneration, including user formats, groups and calculated items (slice 4 styles: built-in and custom table styles fitted, user `formats` partly open). Measured against Excel 16.0 (build 20430, en-GB) with `tools/office/pivot-oracle.ps1`.
+Status: slices 1-5 plus refresh regeneration, including user formats, groups (dates with a time of day, fractional numbers, groups a blank drops) and calculated items (slice 4 styles: built-in pivot and worksheet table styles and custom table styles fitted, user `formats` partly open). Measured against Excel 16.0 (build 20430, en-GB) with `tools/office/pivot-oracle.ps1`.
 
 ## Model
 
@@ -39,7 +39,7 @@ sheet coordinates and the `numFmtId` to apply).
 `items`, page selections, `rowItems`/`colItems`), the cache definition (`sharedItems`, `recordCount`,
 `refreshedDate`, no `refreshOnLoad`) and the cache records. `Workbook::save` writes every other part
 byte-identical. A pivot the writer does not model (a source that is not a worksheet range, a cache
-shared by several pivots, a date group that Excel drops) keeps its old cache and gets
+shared by several pivots) keeps its old cache and gets
 `refreshOnLoad="1"` so Excel rebuilds it (`tests/refresh.rs`).
 
 Refresh with user formats, groups and calculated items (`tests/refresh_ext.rs`, fixtures
@@ -54,10 +54,8 @@ with `before.xlsx`, `edits.json`, `after.xlsx` and `pivot.json`, made by
 * **Cell formats (`survive.rs`).** The borders, fills and fonts Excel keeps on the pivot's cells are not
   moved with the cells: Excel lays the `formats` areas over the new layout on every refresh. We do the
   same: the user layer (the area engine of `style/formats.rs` without the table style) is written into
-  the cell formats of the new area, cells the table left lose their formats. Exact on the tabular
-  pivots (P4 of both sets); the rest differ in 1 to 6 cells per pivot: an area border that also shows on
-  the neighbouring cell (P1), the whole-table outline of an `all` area (P3), and a right border on a cell
-  at the end of a row range (P5). These are rules of the area engine, not of the refresh.
+  the cell formats of the new area, cells the table left lose their formats. All 10 format pivots equal
+  Excel's cell formats (`xf`) and display format after the refresh (rules below, "User formats").
 * **Calculated items.** Regenerated: the calculated item is a shared item with `f="1"` after the items
   of the source, keeps its place in the pivot field `items`, and its `calculatedItem` reference gets
   the new shared index. 8 of 8 pivots equal Excel's parts, cells, cell formats and display format.
@@ -74,9 +72,27 @@ with `before.xlsx`, `edits.json`, `after.xlsx` and `pivot.json`, made by
 * **Ungrouping.** Excel drops a number group when the source gets a blank and the group was made
   without one (the field is a plain field again: shared items in order of first appearance, no
   `fieldGroup`); modelled and equal to Excel. Excel drops a date group when a source date is blank
-  (or text): the derived fields leave the cache and the pivot, the axis fields go, the base field
-  goes back to inline records. Cells modelled (the derived fields leave the axes; equal to Excel on the
-  2 pivots of `grouped-blank-date`); the parts are not: such a pivot gets `refreshOnLoad`.
+  (or text): the derived fields leave the cache and the pivot (`cacheFields`, `pivotFields`, `rowFields`,
+  `colFields`, `pageFields`, `dataFields` and `formats` renumbered or dropped), the base field loses its
+  `fieldGroup` and returns to inline records (no shared items unless it is on an axis itself) and the
+  pivot with no axis field is one value cell (`rowItems` `<i/>`). `ungroup.rs` rewrites the pivot and cache
+  that way before the refresh runs (`SheetPivot::without_dropped_date_groups`), so `regen.rs` sees a plain
+  pivot. Table, cache and records parts, cells, cell formats and display format equal Excel's on the 2 pivots
+  of `grouped-blank-date`. Not measured: the base field on an axis itself, calculated items or filters
+  that name a dropped field, a group dropped for only some of the derived fields of one base.
+* **Time-of-day and fractional groups** (`make-pivot-refresh-time.ps1`, sets `grouped-time`,
+  `grouped-fraction`, `grouped-time-maxwhole`, `grouped-time-onetime`; 24 of 24 pivots equal Excel's
+  parts and cells). Measured rules: hours items are `00`..`23`, minutes and seconds `:00`..`:59`, days with
+  no interval (alone or beside other parts) are the 366 days of a leap year `01-Jan`..`31-Dec`; the
+  `<dd/mm/yyyy` and `>dd/mm/yyyy` markers carry the date of the bounds. A date group's automatic start is
+  the first value as it is (time of day kept) and its end the last value as it is, a day later only when
+  that last value is a whole date (midnight): `maxDate` of the shared items follows the same rule (the
+  edge cases `maxwhole`, a time of day on every value but the latest, and `onetime`, a time of day on one
+  middle value, both end a day after the latest whole date). A number group is `lo-hi` with
+  `hi = lo + step - 1` only when the data, the step and the bounds are all whole numbers (the last group ends
+  at the end bound when `lo + step` equals it), else the groups touch, `lo-(lo+step)`; numbers print with 15
+  significant digits. The first item of a number group with blanks is `(blank)` when the start is
+  automatic and `<start or (blank)` when it was set by hand, else `<start`.
 
 Measured rules (`tests/refresh_oracle.rs`: `pivot-refresh-{none,values,items,removed}` edited, refreshed by
 `refresh_sheet` and compared part by part with Excel's `after.xlsx`, ignoring `refreshedDate`, `cacheId`,
@@ -117,8 +133,7 @@ Measured rules (`tests/refresh_oracle.rs`: `pivot-refresh-{none,values,items,rem
   numeric field with `rangePr`) reads the stored `groupItems` as its items; each source value is
   bucketed (below start/blank, in range, above end) for months, quarters, years, days by N,
   hours, minutes, seconds and numeric ranges. A refresh regroups (see "Refresh with user formats,
-  groups and calculated items"); hours, minutes and seconds groups and fractional number groups are
-  not rebuilt (they keep their stored items).
+  groups and calculated items"), hours, minutes, seconds and fractional number groups included.
 
 ## Location, styles, layout forms (slice 4)
 
@@ -140,7 +155,7 @@ Measured rules (`tests/refresh_oracle.rs`: `pivot-refresh-{none,values,items,rem
   priority order and resolves a border shared by two cells to the higher-priority element.
   Fitted against `Range.DisplayFormat` of every cell (`tests/style.rs`). Element numbers follow
   Excel's enumeration (RowSubheading1 is 23, BlankRow 19, ColumnSubheading1 20), not the order of
-  the ECMA names. Custom table styles are read by `style::CustomStyles` (`style/custom.rs`): `tableStyles/tableStyle/tableStyleElement` (type, `dxfId`, stripe `size`) and the `dxfs` they point to (font bold/italic/colour, solid fill `bgColor`, six borders with style thin/medium/thick/hair/dotted/dashed/double); `style_cells_with` looks them up before the built-in names. Rules found with the custom sets: `lastColumn` never formats the first header row; stripe `size` makes stripes of that many rows/columns; the page-field area takes the whole-table top and bottom borders.
+  the ECMA names. Worksheet table styles (`TableStyleLight1-21`, `Medium1-28`, `Dark1-11`) format a pivot too: `builtin_table_styles.txt` (read by `make-pivot-styledefs.ps1 -Kind Table`, elements 0-12) is merged into the built-in table, and the set `tablestyles` (`make-pivot-tablestyles.ps1`, 12 styles in compact, tabular and outline layouts with page fields) is 36/36, 2652/2652 cells after two rules: with the Last Column flag the last column also formats a pivot's only header row (not the first of several), and the page-field area of a worksheet table style carries the whole-table border on all four sides (a pivot style: top and bottom only). The Last Column element ranks above the header row (a table style's last column is bold dark text on the header fill). Custom table styles are read by `style::CustomStyles` (`style/custom.rs`): `tableStyles/tableStyle/tableStyleElement` (type, `dxfId`, stripe `size`) and the `dxfs` they point to (font bold/italic/colour, solid fill `bgColor`, six borders with style thin/medium/thick/hair/dotted/dashed/double); `style_cells_with` looks them up before the built-in names. Rules found with the custom sets: `lastColumn` never formats the first header row; stripe `size` makes stripes of that many rows/columns; the page-field area takes the whole-table top and bottom borders.
   Fitted rules (in-sample `pivot-styles`, 40/40): the header row beats every border; subtotal rows tie
   with row subheadings (the lower cell wins); the total row loses to subtotal rows but beats subtotal
   columns; tabular layouts apply subheading level k to label column k of every line of the group
@@ -150,7 +165,8 @@ Measured rules (`tests/refresh_oracle.rs`: `pivot-refresh-{none,values,items,rem
   but the last; page-field cells take the whole-table fill/font (not its outer borders) plus the
   page label/value elements.
   Block rules (found in styles2 P63 and customstyles): with Values on the rows, the first-label-column subheading of every data line and every subtotal line is a block of its own (its top and bottom edges are outer edges); a data field caption cell under a column field gets the column subheading of its level and is a block of its own horizontally; an inside border of the whole table beats a heavier-or-equal-weight stripe border only when it is heavier.
-  User formats (`style/formats.rs`): `formats/format` (`pivotArea` + `dxfId`) are read in document order (= application order) and laid over the table style by `style_cells_full`; `Dxfs` reads fill, bold/italic, font colour, borders and `numFmt` of the style sheet `dxfs`. An area selects cells by type (all, origin, button, topRight), `dataOnly`/`labelOnly`, `grandRow`/`grandCol` and references (field, item positions, `defaultSubtotal`); a reference list selects the lines whose level is the deepest named field. Round 6 rules for `outline="0"` label areas (`Matcher::field_range`, tabular/outline layouts, found in `formats-areas`): a reference list selects the label cells of the deepest named field's own column (column = its level, capped at the last label column) over every line of the named items, including the lines of its subtree whose cells in that column are empty; with `offset` set (Excel writes `offset="IV256"` on a parent item) only the last label column of the item's own line; a `defaultSubtotal` reference with items selects the subtotal line, last label column only; a `defaultSubtotal` reference without items means "all items and their subtotals" and does not count as the deepest field; `grandRow` + `labelOnly` + `outline="0"` selects all label columns of the grand total line; `topRight` with `outline="0"` is the whole top header row right of the origin. Custom style names (`style/custom.rs`, `tests/customstyles_conflicts.rs`, fixtures `pivot-customstyles-conflicts`, made by `tools/office/make-pivot-customstyles-conflicts.ps1` from hand-edited `styles.xml`): the names Excel ships (`PivotStyle|TableStyle` + Light|Medium|Dark + number, any case) always win over a custom style of the same name; custom names compare without case; of several custom styles with one name the first in the file applies; a style marked `pivot="0"` (tables only) applies to a pivot that names it. Open: borders of user formats (the `formats-borders` set; `table1` areas show no user border where we paint one, probably a later format or the interior-edge rule replacing it, unidentified); formats of Excel's document order: dxf ids descend in the file, so the file lists the newest format first, yet applying in document order fits every set so far. Regeneration remaps `x/@v` of the format references through the field-item position map (`regen::remap_formats`; an item that is gone drops its format; unit tests in `regen.rs`). Not tested against Excel: the oracle fixtures with formats share one cache among all pivots (the writer falls back to `refreshOnLoad`), so a single-cache formats fixture is needed.
+  User formats (`style/formats.rs`): `formats/format` (`pivotArea` + `dxfId`) are read in document order (= application order) and laid over the table style by `style_cells_full`; `Dxfs` reads fill, bold/italic, font colour, borders and `numFmt` of the style sheet `dxfs`. An area selects cells by type (all, origin, button, topRight), `dataOnly`/`labelOnly`, `grandRow`/`grandCol` and references (field, item positions, `defaultSubtotal`); a reference list selects the lines whose level is the deepest named field. Round 6 rules for `outline="0"` label areas (`Matcher::field_range`, tabular/outline layouts, found in `formats-areas`): a reference list selects the label cells of the deepest named field's own column (column = its level, capped at the last label column) over every line of the named items, including the lines of its subtree whose cells in that column are empty; with `offset` set (Excel writes `offset="IV256"` on a parent item) only the last label column of the item's own line; a `defaultSubtotal` reference with items selects the subtotal line, last label column only; a `defaultSubtotal` reference without items means "all items and their subtotals" and does not count as the deepest field; `grandRow` + `labelOnly` + `outline="0"` selects all label columns of the grand total line; `topRight` with `outline="0"` is the whole top header row right of the origin. Custom style names (`style/custom.rs`, `tests/customstyles_conflicts.rs`, fixtures `pivot-customstyles-conflicts`, made by `tools/office/make-pivot-customstyles-conflicts.ps1` from hand-edited `styles.xml`): the names Excel ships (`PivotStyle|TableStyle` + Light|Medium|Dark + number, any case) always win over a custom style of the same name (8 of 8 cases, every fill, font, bold, italic and border; `TableStyleMedium2` applies the built-in worksheet table style); custom names compare without case; of several custom styles with one name the first in the file applies; a style marked `pivot="0"` (tables only) applies to a pivot that names it. User format border rules (measured with `make-pivot-formats-probe.ps1`, 43 controlled cases (2 table styles) each read before and after a refresh, `pivot-formats-probe/`; `tests/formats_probe.rs` 41/43 cases equal Excel on every cell): a dxf `border` has `outline` (default true): its edges belong to the outline of the cells the area selects, so a side shows only where the neighbour cell is not selected by the same area (a `databody` left, top, bottom and right format gives the body rectangle's outline); `outline="0"` (Excel writes it for `BorderAround`) gives every selected cell all four edges; the dxf's inside vertical and horizontal borders (`Borders(11)`, `Borders(12)`) show between two selected cells. `type="all"` includes the page-field cells. A shared edge shows the same on both cells (`DisplayFormat`; the cell format `xf` holds an edge on the cell the format selected only): the heavier line wins, at equal weight the darker colour (luminance 0.2126 r + 0.7152 g + 0.0722 b: a thin red beats the gray table-style border, a thin green does not, blue beats red); the blank cells right of a parent line's own label in outline form take fill and font of a field's range but no border. Effect: formats 36/58 to 40/58, formats-borders 11/45 to 26/45, holdout-formats 22/38 to 26/38 (confirmation only), formats-areas unchanged 64/66. Not identified: ties between a user edge and an edge of the style of equal weight and equal luminance, line styles other than weight (dashed, double) at a shared edge, the repeated `(blank)` item cell that gets a box in outline form (probe `outline Region field data right`).
+  Open: borders of user formats (remaining `formats` failures are mostly fills/fonts of whole-table and label areas, not inspected here); formats of Excel's document order: dxf ids descend in the file, so the file lists the newest format first, yet applying in document order fits every set so far. Regeneration remaps `x/@v` of the format references through the field-item position map (`regen::remap_formats`; an item that is gone drops its format; unit tests in `regen.rs`). Not tested against Excel: the oracle fixtures with formats share one cache among all pivots (the writer falls back to `refreshOnLoad`), so a single-cache formats fixture is needed.
   Second round (`styles2`, 63/63): the exclusion of label columns left of a subtotal line holds with
   row headers off and for outline forms (`label_cols > 1`: a subtotal line or a non-leaf item of
   level k covers columns from k); a blank row joins the group of column c only when the next line
@@ -216,12 +232,15 @@ format and display text are in the reference JSON but not compared yet). Floors 
 | styles2 (row headers off, blank rows over levels, several page fields, subtotals top) | in-sample, second round | 63/63 pivots, 15485/15485 cells (62/63 before the data-on-rows block rule) |
 | holdout-styles | hold-out, random styles/flags/layouts | 39/48 pivots, 10771/11052 cells (38/48 before the data-on-rows block rule; not tuned on) (31/48, 10664 before the second round; unchanged by the custom-style fixes; confirmation only, failures not inspected) |
 | holdout-calc (calculated items and fields) | hold-out, random formulas/layouts, written once | 38/40 pivots, 2145/2173 cells (stored and refreshed; 29/40 before calc2; confirmation only, failures not tuned on) |
-| customstyles (`styles.xml` tableStyles and dxfs) | in-sample, random element sets | 39/48 pivots, 9673/10288 cells (36/48 before the block rules) |
-| formats (user `formats` over a table style) | in-sample, random area operations | 36/58 pivots, 6042/6922 cells (34/58, 5981 before the `outline="0"` rules; the failures left are mostly borders of whole-table and label areas) |
+| customstyles (`styles.xml` tableStyles and dxfs) | in-sample, random element sets | 39/48 pivots, 9671/10288 cells (36/48 before the block rules) |
+| tablestyles (worksheet table styles on pivots) | in-sample | 36/36 pivots, 2652/2652 cells (26/36 before the page-area and last-column rules) |
+| formats (user `formats` over a table style) | in-sample, random area operations | 40/58 pivots, 6297/6922 cells (36/58, 6042 before the outline-edge and shared-edge rules) |
+| formats-borders | in-sample | 26/45 pivots, 5569/6147 cells (11/45, 5040 before) |
 | formats-areas (one fill per pivot: which cells an area selects, fills only) | in-sample | 64/66 pivots, 9849/9855 cells (56/66, 9484 before round 6) |
-| holdout-formats | hold-out, fresh seed, written once | 22/38 pivots, 4052/5330 cells (baseline 20/38, 3983; confirmation only, failures not inspected) |
-| holdout-customstyles | hold-out, fresh seed, written once | 28/48 pivots, 7524/7901 cells (27/48 before the block rules; confirmation only) |
+| holdout-formats | hold-out, fresh seed, written once | 26/38 pivots, 4736/5330 cells (22/38, 4052 before the outline-edge and shared-edge rules; confirmation only, failures not inspected) |
+| holdout-customstyles | hold-out, fresh seed, written once | 32/48 pivots, 7530/7901 cells (28/48 before the last-column rule; confirmation only) |
 | refresh regeneration (`pivot-refresh-*`) | in-sample | 28/28 pivots part for part (none, values, items, removed) |
+| refresh with formats, groups, calculated items | in-sample | formats 10/10 (parts, cells, cell formats, display format), grouped 11/11, grouped-blank-date 2/2 (parts, cells, cell formats, display format), grouped-time and -fraction 24/24, calcitems 8/8 |
 
 The open hold-out case is `rankDescending` with the base field outermost over three row
 levels (the leaf ranks are not among the sibling items; the comparison set Excel uses is not
@@ -229,10 +248,7 @@ identified).
 
 ## Not done
 
-* Groups: the parts of a date group a blank drops are not rebuilt (cells are); hours/minutes/seconds and fractional
-  groups are not rebuilt on refresh; manual (discrete) groups and date parts with the 1904 date
-  system are untested; the oracle has no
-  time-of-day source data yet (hours/minutes/seconds are implemented but not measured).
+* Groups: manual (discrete) groups and date parts with the 1904 date system are untested; hours with years or quarters, and three or more derived fields of one base, are untested (measured: hours with days, minutes or months); the base field on an axis of its own when its date group is dropped is not measured.
 * Writing: the function wiring of GETPIVOTDATA in `open365-calc`; regeneration for shared caches (they fall back to `refreshOnLoad`).
 * Styles: 10 hold-out pivots still differ (not inspected, to keep the set clean). Open in-sample:
   `styles2` P63 (tabular, values on rows, row stripes: Excel draws the medium subheading bottom
@@ -244,7 +260,7 @@ identified).
   (P15/P20/P39), subtotal-row borders in compact layouts with two data fields (P1), border colour/weight
   conflicts between subheading and subtotal elements of random styles (P22/P29).
 * Refresh regeneration is done for single-cache pivots, including groups, calculated items and user
-  formats (see above). Open: the date group a blank drops, caches shared by several pivots, retained items of fields sorted by a data field, time-of-day sources.
+  formats (see above). Open: caches shared by several pivots, retained items of fields sorted by a data field.
 * Calculated items: 2 hold-out pivots still differ (a Max item over one field, a Count item with a product formula; not tuned on). The Min data field is not in the generated set.
 * Label and value filters, top-N, OLAP and data-model caches, `missingCaption`/`errorCaption`,
   `showAll` empty items.

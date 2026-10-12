@@ -1903,16 +1903,48 @@ fn checkpoint(pg: &Paginator<'_>, force: Force) -> Checkpoint {
 
 impl<'a> Paginator<'a> {
     /// Remembers the page as it is before the first content of a column region is placed.
-    fn snapshot(&mut self, item: usize, from_atom: usize) {
+    fn snapshot(&mut self, items: &'a [FlowItem], item: usize, from_atom: usize) {
         if self.trial || self.region.is_some() {
             return;
         }
         if column_count(self.env, self.page.cur) > 1 && self.page.col == 0 {
+            self.seed_notes(items, item, from_atom);
             self.region = Some(Region {
                 item,
                 from_atom,
                 page: self.page.clone(),
             });
+        }
+    }
+
+    /// The footnote area of a page is as tall as the notes of every reference on the page, those
+    /// in later columns included, and it limits the body of the first column too (measured on
+    /// `layout-cols-fn-unequal`: the notes of references in the second column keep the first
+    /// column's text above the separator). The notes the region's page will hold are found by
+    /// placing it once and are on the page from the start.
+    fn seed_notes(&mut self, items: &'a [FlowItem], item: usize, from_atom: usize) {
+        let env = self.env;
+        if !env.notes.has_notes(self.page.section_index) {
+            return;
+        }
+        for _ in 0..3 {
+            let mut tp = Paginator::start(env, self.page.clone());
+            tp.trial = true;
+            let mut force = Force::default();
+            for q in item..items.len() {
+                if q > item {
+                    tp.begin_item(items, q, &mut force);
+                }
+                tp.place_item(items, q, if q == item { from_atom } else { 0 }, &mut force);
+                if tp.overflow {
+                    break;
+                }
+            }
+            if tp.page.slots == self.page.slots {
+                break;
+            }
+            self.page.slots = tp.page.slots;
+            self.page.notes_h = env.notes.area(self.page.section_index, &self.page.slots);
         }
     }
 
@@ -2078,7 +2110,7 @@ impl<'a> Paginator<'a> {
         if item.unit.frame.is_some() {
             // A frame leaves the flow; the first paragraph of a run places all of it.
             if !frame_continues(items, p) {
-                self.snapshot(p, 0);
+                self.snapshot(items, p, 0);
                 self.place_frame_run(items, p);
             }
             return;
@@ -2086,7 +2118,7 @@ impl<'a> Paginator<'a> {
         if let Some(table) = table {
             if let Some(pos) = self.floating(table) {
                 self.cur = Some((item.unit.as_ref(), base));
-                self.snapshot(p, 0);
+                self.snapshot(items, p, 0);
                 self.place_float_table(items, p, table, &pos);
                 return;
             }
@@ -2096,7 +2128,7 @@ impl<'a> Paginator<'a> {
                 0.0
             };
             self.cur = Some((item.unit.as_ref(), base));
-            self.snapshot(p, 0);
+            self.snapshot(items, p, 0);
             self.page.anchor_top = None;
             self.place_table(table, gap);
             self.page.pending_after = 0.0;
@@ -2113,7 +2145,7 @@ impl<'a> Paginator<'a> {
             if self.overflow {
                 return;
             }
-            self.snapshot(p, from_atom);
+            self.snapshot(items, p, from_atom);
             let first_segment = from_atom == 0;
             // Spacing above the first line of this paragraph.
             let gap = |pg: &PageBuild| -> f64 {

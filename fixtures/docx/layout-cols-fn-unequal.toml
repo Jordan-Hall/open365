@@ -1,0 +1,5 @@
+feature = "layout-cols"
+made_with = "Microsoft Word 16.0.20430 (Windows)"
+author = "project member"
+expect_dropped = []
+notes = "a two column section of unequal widths with six footnotes: notes set at each column's width, split by line across columns"
