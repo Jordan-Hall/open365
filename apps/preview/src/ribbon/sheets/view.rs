@@ -1,8 +1,17 @@
 //! Sheets ribbon: the View tab (`view.*`).
 //!
-//! Wired: workbook views, Show options, Zoom, Freeze Panes, Split, and the window commands that
-//! one window can honour (New Window counts windows, Hide and Unhide flip the window state).
-//! Left: Sheet View (named filter views), Custom Views, Switch Theme, Macros.
+//! Wired: workbook views, Show options, Zoom, Zoom to Selection, Freeze Panes, Split, Hide and
+//! Unhide (window state only: the shell has no hide request), and Custom Views
+//! (`view.workbook-views.custom-views=add:Name`, `=show:Name`, `=delete:Name`; the dialog that
+//! lists them is not built, so a plain click does nothing).
+//!
+//! Left to `Handled::No`:
+//! - New Window, Arrange All, Switch Windows, Reset Window Position, View Side by Side and
+//!   Synchronous Scrolling: the shell hosts one document per window and has no second view of a
+//!   live workbook; `WinAct::OpenDocument` would start another instance on the saved file, which
+//!   shares no edits.
+//! - Macros: there is no VBA runtime.
+//! - Sheet View (named filter views) and Switch Theme.
 
 use crate::ribbon::{Handled, RibbonCtx, base};
 use crate::sheet::sheet_ext::view::{Freeze, ViewMode};
@@ -12,6 +21,7 @@ pub const IDS: &[&str] = &[
     "view.workbook-views.normal",
     "view.workbook-views.page-break-preview",
     "view.workbook-views.page-layout",
+    "view.workbook-views.custom-views",
     "view.show.navigation",
     "view.show.ruler",
     "view.show.gridlines",
@@ -22,16 +32,10 @@ pub const IDS: &[&str] = &[
     "view.zoom.zoom",
     "view.zoom.100",
     "view.zoom.zoom-to-selection",
-    "view.window.new-window",
-    "view.window.arrange-all",
     "view.window.freeze-panes",
     "view.window.split",
     "view.window.hide",
     "view.window.unhide",
-    "view.window.view-side-by-side",
-    "view.window.synchronous-scrolling",
-    "view.window.reset-window-position",
-    "view.window.switch-windows",
 ];
 
 /// The window the grid is shown in, for Zoom to Selection (logical pixels).
@@ -105,7 +109,6 @@ pub fn handle(ctx: &mut RibbonCtx<'_>, id: &str) -> Handled {
         }
         "view.zoom.100" => ctx.sheet.set_zoom_percent(100),
         "view.zoom.zoom-to-selection" => ctx.sheet.zoom_to_selection(VIEW_W, VIEW_H),
-        "view.window.new-window" => v.windows += 1,
         "view.window.freeze-panes" => {
             let kind = match tail {
                 "freeze-panes" | "freeze" | "unfreeze" => Some(if tail == "unfreeze" {
@@ -129,9 +132,23 @@ pub fn handle(ctx: &mut RibbonCtx<'_>, id: &str) -> Handled {
         "view.window.split" => ctx.sheet.toggle_split(),
         "view.window.hide" => v.hidden = true,
         "view.window.unhide" => v.hidden = false,
-        "view.window.view-side-by-side" => v.side_by_side = !v.side_by_side,
-        "view.window.synchronous-scrolling" => v.synchronous_scrolling = !v.synchronous_scrolling,
-        // Arrange All, Reset Window Position and Switch Windows act on several windows.
+        "view.workbook-views.custom-views" => {
+            if let Some((verb, name)) = id
+                .split_once('=')
+                .map(|(_, a)| a)
+                .and_then(|a| a.split_once(':'))
+            {
+                let r = match verb {
+                    "add" => ctx.sheet.view_add_custom_view(name),
+                    "show" => ctx.sheet.view_show_custom_view(name),
+                    "delete" => ctx.sheet.view_delete_custom_view(name),
+                    other => Err(format!("Unknown Custom Views action '{other}'.")),
+                };
+                if let Err(e) = r {
+                    ctx.sheet.status = e;
+                }
+            }
+        }
         _ => {}
     }
     Handled::Yes

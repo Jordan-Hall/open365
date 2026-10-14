@@ -98,8 +98,6 @@ fn split_and_window_commands() {
     assert_eq!(p.shell.sheet().ext_view.split(s), Some((5, 4)));
     run(&mut p, "view.window.split");
     assert_eq!(p.shell.sheet().ext_view.split(s), None);
-    run(&mut p, "view.window.new-window");
-    assert_eq!(p.shell.sheet().ext_view.windows, 2);
     run(&mut p, "view.window.hide");
     assert!(p.shell.sheet().ext_view.hidden);
     run(&mut p, "view.window.unhide");

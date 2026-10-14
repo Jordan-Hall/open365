@@ -535,6 +535,18 @@ impl Target {
                 self.notes = notes;
                 Ok((Inverse::Workbook(before), changed))
             }
+            (Content::Xlsx(x), command)
+                if crate::ext::sheet_objects::moves_drawings(x, command) =>
+            {
+                let before = Box::new(x.workbook.clone());
+                match crate::ext::sheet_objects::run_with_drawings(x, command) {
+                    Ok(()) => Ok((Inverse::Workbook(before), Vec::new())),
+                    Err(e) => {
+                        x.restore_workbook(*before);
+                        Err(e)
+                    }
+                }
+            }
             (
                 Content::Xlsx(x),
                 Command::SetColumnWidth {
@@ -693,6 +705,20 @@ impl Target {
                 let before = Box::new(x.workbook.clone());
                 let mut notes = Vec::new();
                 match crate::ext::sheet_objects::run(x, *sheet, op, &mut notes) {
+                    Ok(changed) => {
+                        self.notes = notes;
+                        Ok((Inverse::Workbook(before), changed))
+                    }
+                    Err(e) => {
+                        x.restore_workbook(*before);
+                        Err(e)
+                    }
+                }
+            }
+            (Content::Xlsx(x), Command::SheetPage { sheet, op }) => {
+                let before = Box::new(x.workbook.clone());
+                let mut notes = Vec::new();
+                match crate::ext::sheet_page::run(x, *sheet, op, &mut notes) {
                     Ok(changed) => {
                         self.notes = notes;
                         Ok((Inverse::Workbook(before), changed))
@@ -902,6 +928,7 @@ fn is_docx_edit(command: &Command) -> bool {
             | Command::DocxReplaceOne { .. }
             | Command::DocxSectionMargins { .. }
             | Command::DocxReferences { .. }
+            | Command::DocxReferencesMore { .. }
             | Command::DocxReview { .. }
             | Command::DocxLayout { .. }
             | Command::DocxDesign { .. }
@@ -1066,6 +1093,7 @@ fn replay_docx(doc: &mut Document, command: &Command) -> Result<usize, CommandEr
         }
         Command::DocxSectionMargins { op } => crate::ext::writer_margins::apply(doc, op)?,
         Command::DocxReferences { op } => crate::ext::writer_references::apply(doc, op)?,
+        Command::DocxReferencesMore { op } => crate::ext::references_more::apply(doc, op)?,
         Command::DocxReview { op } => crate::ext::writer_review::apply(doc, op)?,
         Command::DocxLayout { op } => crate::ext::writer_layout::apply(doc, op)?,
         Command::DocxDesign { op } => crate::ext::writer_design::apply(doc, op)?,

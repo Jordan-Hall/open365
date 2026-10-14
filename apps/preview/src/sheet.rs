@@ -7,16 +7,20 @@ use std::path::{Path, PathBuf};
 use std::rc::Rc;
 use std::sync::Arc;
 
-use open365_commands::{
-    CellEntry, CellRef, Command, EffectClass, RangeRef, Target, cell_display_text,
-    cell_source_text, grid_copy, parse_tsv, paste_rows,
+use crate::clip::sheet::{Mode, Options, Plan, copy_range, plan};
+use open365_clipboard::{
+    ClipPayload, MemoryPayload, PayloadIo, SheetClip, Source, read_sheet, sheet_payload,
 };
+use open365_commands::{
+    CellEntry, Command, EffectClass, RangeRef, Target, cell_display_text, cell_source_text,
+};
+use open365_ui_host::RichClipboard;
 use open365_xlsx::{CellValue, GridMetrics, SheetGeometry};
 
 #[path = "shell/barfmt.rs"]
 pub mod barfmt;
 #[path = "../../sheets/src/blank.rs"]
-mod blank;
+pub(crate) mod blank;
 #[path = "sheet_ext/mod.rs"]
 pub mod sheet_ext;
 
@@ -24,56 +28,43 @@ pub mod sheet_ext;
 pub const MAX_ROW: u32 = 1_048_576;
 pub const MAX_COL: u32 = 16_384;
 
-/// Where the clipboard text goes and comes from.
-pub trait ClipboardIo {
-    /// Puts `tsv` (plain text) and `html` on the clipboard.
-    fn set(&mut self, tsv: &str, html: &str) -> Result<(), String>;
-    /// The plain text on the clipboard.
-    fn text(&mut self) -> Option<String>;
-}
-
-/// The operating system clipboard (arboard): CF_UNICODETEXT plus CF_HTML.
-#[derive(Debug, Default)]
-pub struct SystemClipboard;
-
-impl ClipboardIo for SystemClipboard {
-    fn set(&mut self, tsv: &str, html: &str) -> Result<(), String> {
-        let mut cb = arboard::Clipboard::new().map_err(|e| e.to_string())?;
-        cb.set().html(html, Some(tsv)).map_err(|e| e.to_string())
-    }
-
-    fn text(&mut self) -> Option<String> {
-        arboard::Clipboard::new().ok()?.get_text().ok()
-    }
-}
-
 /// An in-process clipboard; clones share the contents (tests keep one handle).
 #[derive(Debug, Clone, Default)]
-pub struct MemoryClipboard(pub Rc<RefCell<(String, String)>>);
+pub struct MemoryClipboard(pub MemoryPayload);
 
 impl MemoryClipboard {
+    /// The plain text of the last copy.
     pub fn tsv(&self) -> String {
-        self.0.borrow().0.clone()
+        self.0.0.borrow().text.clone().unwrap_or_default()
     }
 
+    /// The HTML table of the last copy, without the clipboard container.
     pub fn html(&self) -> String {
-        self.0.borrow().1.clone()
+        self.0
+            .0
+            .borrow()
+            .html
+            .as_deref()
+            .and_then(|h| open365_clipboard::cfhtml::unwrap(h).ok())
+            .unwrap_or_default()
     }
 
+    /// Puts plain text on the clipboard, as another program's copy would.
     pub fn put_text(&self, text: &str) {
-        *self.0.borrow_mut() = (text.to_owned(), String::new());
+        *self.0.0.borrow_mut() = ClipPayload {
+            text: Some(text.to_owned()),
+            ..ClipPayload::default()
+        };
     }
 }
 
-impl ClipboardIo for MemoryClipboard {
-    fn set(&mut self, tsv: &str, html: &str) -> Result<(), String> {
-        *self.0.borrow_mut() = (tsv.to_owned(), html.to_owned());
-        Ok(())
+impl PayloadIo for MemoryClipboard {
+    fn set_payload(&mut self, payload: &ClipPayload) -> Result<(), String> {
+        self.0.set_payload(payload)
     }
 
-    fn text(&mut self) -> Option<String> {
-        let t = self.0.borrow().0.clone();
-        (!t.is_empty()).then_some(t)
+    fn payload(&mut self) -> ClipPayload {
+        self.0.payload()
     }
 }
 
@@ -86,7 +77,7 @@ pub fn system_save_chooser() -> SaveChooser {
         rfd::FileDialog::new()
             .set_title("Save As")
             .set_file_name(name)
-            .add_filter("Excel workbook (*.xlsx)", &["xlsx"])
+            .add_filter(open365_branding::FORMAT_XLSX, &["xlsx"])
             .save_file()
     })
 }
@@ -121,10 +112,20 @@ pub enum Gesture {
 /// What was copied inside this application (formulas shift on paste, a cut clears its source).
 #[derive(Debug, Clone)]
 struct Copied {
-    origin: CellRef,
-    tsv: String,
-    rows: Vec<Vec<String>>,
-    cut: Option<(u32, u32, u32, u32)>,
+    sheet: usize,
+    /// The copied range: first row, first column, last row, last column.
+    rect: Rect4,
+    /// The plain text this copy put on the clipboard: while the clipboard still holds it, the
+    /// copy is ours and a cut may clear its source.
+    text: String,
+    cut: Option<Rect4>,
+}
+
+/// A paste that waits for the person to agree to overwrite cells.
+#[derive(Debug, Clone)]
+struct PendingPaste {
+    plan: Plan,
+    cut: Option<Rect4>,
 }
 
 /// Which neighbours move when cells are inserted or deleted (the Insert and Delete dialogs).
@@ -374,9 +375,9 @@ pub struct SheetModel {
     pub status: String,
     pub gesture: Option<Gesture>,
     geo_cache: RefCell<Option<(u64, usize, GridGeometry)>>,
-    clipboard: Box<dyn ClipboardIo>,
+    clipboard: Box<dyn PayloadIo>,
     copied: Option<Copied>,
-    pending_paste: Option<(Command, Option<Rect4>, Option<Rect4>)>,
+    pending_paste: Option<PendingPaste>,
     /// The column where a run of Tab presses began: Enter returns there on the next row.
     pub tab_start: Option<u32>,
     /// A Ctrl+Space or Shift+Space just selected: its text event is not typed.
@@ -449,7 +450,7 @@ impl SheetModel {
             status: String::new(),
             gesture: None,
             geo_cache: RefCell::new(None),
-            clipboard: Box::new(SystemClipboard),
+            clipboard: Box::new(RichClipboard::new()),
             copied: None,
             pending_paste: None,
             tab_start: None,
@@ -472,7 +473,7 @@ impl SheetModel {
     }
 
     /// Replaces the clipboard (tests use [`MemoryClipboard`]).
-    pub fn set_clipboard(&mut self, clipboard: impl ClipboardIo + 'static) {
+    pub fn set_clipboard(&mut self, clipboard: impl PayloadIo + 'static) {
         self.clipboard = Box::new(clipboard);
     }
 
@@ -1077,7 +1078,8 @@ impl SheetModel {
 
     // ---- clipboard ---------------------------------------------------------------------------
 
-    /// Ctrl+C (`cut` false) or Ctrl+X: TSV and HTML to the clipboard.
+    /// Ctrl+C (`cut` false) or Ctrl+X: the range, with its formats, to the clipboard as text,
+    /// HTML and the private format.
     pub fn copy(&mut self, cut: bool) -> Result<(), String> {
         let selected = self.range();
         let (r1, c1, mut r2, mut c2) = selected;
@@ -1093,53 +1095,62 @@ impl SheetModel {
                 c2 = c1;
             }
         }
-        let clip = grid_copy(wb, self.sheet, (r1, c1), (r2, c2), MAX_COPY_CELLS)
+        let clip = copy_range(wb, self.sheet, (r1, c1, r2, c2), MAX_COPY_CELLS)
             .ok_or("the range is too large to copy")?;
-        self.clipboard.set(&clip.tsv, &clip.html)?;
+        let payload = sheet_payload(&clip);
+        self.clipboard.set_payload(&payload)?;
         self.copied = Some(Copied {
-            origin: clip.origin,
-            tsv: clip.tsv,
-            rows: clip.rows,
+            sheet: self.sheet,
+            rect: (r1, c1, r2, c2),
+            text: payload.text.unwrap_or_default(),
             cut: cut.then_some((r1, c1, r2, c2)),
         });
         self.status.clear();
         Ok(())
     }
 
+    /// The clip on the clipboard and where it came from; `None` when nothing pasteable is there.
+    fn clipboard_clip(&mut self) -> Option<(ClipPayload, Source, SheetClip)> {
+        let payload = self.clipboard.payload();
+        let (source, clip) = read_sheet(&payload)?;
+        Some((payload, source, clip))
+    }
+
+    /// The cut this clipboard still holds: the clipboard text is the one this window copied.
+    fn live_cut(&self, payload: &ClipPayload) -> Option<Rect4> {
+        let c = self.copied.as_ref()?;
+        let same = |a: &str, b: &str| a.replace("\r\n", "\n") == b.replace("\r\n", "\n");
+        let text = payload.text.as_deref()?;
+        same(&c.text, text).then_some(c.cut).flatten()
+    }
+
+    /// True when something can be pasted with Paste Special: a copy made in this window, or a
+    /// range from another program.
+    pub fn can_paste_special(&mut self) -> bool {
+        self.copied.is_some() || self.clipboard_clip().is_some()
+    }
+
     /// Ctrl+V at the top-left of the selection. Pasting over data is destructive: the paste waits
     /// for [`Self::confirm_paste`] (or [`Self::cancel_paste`]) and changes nothing until then.
     pub fn paste(&mut self) -> Result<Paste, String> {
-        let Some(text) = self.clipboard.text() else {
+        let Some((payload, source, clip)) = self.clipboard_clip() else {
             return Ok(Paste::Empty);
         };
         let (r1, c1, ..) = self.range();
-        let dest = CellRef {
-            sheet: self.sheet,
-            row: r1,
-            col: c1,
-        };
-        let (rows, cut, fmt_src) = match &self.copied {
-            Some(c) if c.tsv.replace("\r\n", "\n") == text.replace("\r\n", "\n") => (
-                paste_rows(&c.rows, Some(c.origin), dest),
-                c.cut,
-                Some(c.rect()),
-            ),
-            _ => (paste_rows(&parse_tsv(&text), None, dest), None, None),
-        };
-        if rows.is_empty() {
+        let plan = plan(&clip, source, self.sheet, (r1, c1), Options::default());
+        if plan.rect.is_none() {
             return Ok(Paste::Empty);
         }
-        let command = Command::XlsxPaste {
-            sheet: self.sheet,
-            row: r1,
-            col: c1,
-            rows,
-        };
-        if command.effect_in(&self.target) == EffectClass::Destructive {
-            self.pending_paste = Some((command, cut, fmt_src));
+        let cut = self.live_cut(&payload);
+        let destructive = plan
+            .values
+            .iter()
+            .any(|c| c.effect_in(&self.target) == EffectClass::Destructive);
+        if destructive {
+            self.pending_paste = Some(PendingPaste { plan, cut });
             return Ok(Paste::NeedsConfirm);
         }
-        self.run_paste(command, cut, fmt_src)?;
+        self.run_plan(plan, cut)?;
         Ok(Paste::Done)
     }
 
@@ -1150,7 +1161,7 @@ impl SheetModel {
     /// The person agreed to overwrite.
     pub fn confirm_paste(&mut self) -> Result<(), String> {
         match self.pending_paste.take() {
-            Some((command, cut, fmt)) => self.run_paste(command, cut, fmt),
+            Some(p) => self.run_plan(p.plan, p.cut),
             None => Ok(()),
         }
     }
@@ -1159,46 +1170,35 @@ impl SheetModel {
         self.pending_paste = None;
     }
 
-    fn run_paste(
-        &mut self,
-        command: Command,
-        cut: Option<Rect4>,
-        fmt_src: Option<Rect4>,
-    ) -> Result<(), String> {
-        let Command::XlsxPaste {
-            row, col, ref rows, ..
-        } = command
-        else {
+    /// Applies a paste plan. A cut empties and unformats its source first; the plan's formats then
+    /// land on top, so a paste over the source stays correct.
+    fn run_plan(&mut self, plan: Plan, cut: Option<Rect4>) -> Result<(), String> {
+        let Some((r1, c1, r2, c2)) = plan.rect else {
             return Ok(());
         };
-        let end = (
-            row + rows.len().saturating_sub(1) as u32,
-            col + rows
-                .iter()
-                .map(Vec::len)
-                .max()
-                .unwrap_or(1)
-                .saturating_sub(1) as u32,
-        );
-        if let Some(src) = fmt_src {
-            // Formats travel with the cells; a cut leaves its source unformatted. They go first
-            // so one undo takes back the pasted values.
-            self.copy_formats(src, (row, col, end.0, end.1), cut.is_some());
-        }
-        if let Some((r1, c1, r2, c2)) = cut {
-            let blank = vec![vec![String::new(); (c2 - c1 + 1) as usize]; (r2 - r1 + 1) as usize];
+        if let Some((s1, sc1, s2, sc2)) = cut {
+            let blank = vec![vec![String::new(); (sc2 - sc1 + 1) as usize]; (s2 - s1 + 1) as usize];
             self.apply(Command::XlsxPaste {
                 sheet: self.sheet,
-                row: r1,
-                col: c1,
+                row: s1,
+                col: sc1,
                 rows: blank,
             })?;
+            let _ = self.apply(Command::ClearFormats {
+                sheet: self.sheet,
+                range: RangeRef {
+                    first_row: s1,
+                    first_col: sc1,
+                    last_row: s2,
+                    last_col: sc2,
+                },
+            });
             self.copied = None;
         }
-        self.apply(command)?;
-        self.active = (row, col);
-        self.anchor = (row, col);
-        self.focus = (end.0.min(MAX_ROW), end.1.min(MAX_COL));
+        for command in plan.commands {
+            self.apply(command)?;
+        }
+        self.select_pasted(r1, c1, r2, c2);
         Ok(())
     }
 
@@ -1394,49 +1394,13 @@ impl SheetModel {
     /// The copied or cut range of this sheet, the one the marching ants outline.
     pub fn copied_range(&self) -> Option<(u32, u32, u32, u32)> {
         let c = self.copied.as_ref()?;
-        (c.origin.sheet == self.sheet).then(|| c.rect())
+        (c.sheet == self.sheet).then_some(c.rect)
     }
 
     /// Esc: drops the marching ants. The clipboard keeps its text, but a later paste is a plain
     /// text paste (a cut no longer clears its source).
     pub fn clear_copied(&mut self) -> bool {
         self.copied.take().is_some()
-    }
-
-    fn copy_formats(&mut self, src: Rect4, to: Rect4, clear_source: bool) {
-        let rr = |r: Rect4| RangeRef {
-            first_row: r.0,
-            first_col: r.1,
-            last_row: r.2,
-            last_col: r.3,
-        };
-        let _ = self.apply(Command::CopyFormat {
-            sheet: self.sheet,
-            from: rr(src),
-            to: rr(to),
-        });
-        let overlap = src.0 <= to.2 && to.0 <= src.2 && src.1 <= to.3 && to.1 <= src.3;
-        if clear_source && !overlap {
-            let _ = self.apply(Command::ClearFormats {
-                sheet: self.sheet,
-                range: rr(src),
-            });
-        }
-    }
-
-    /// The value a cell holds, as text that enters back as the same value.
-    fn value_text(&self, row: u32, col: u32) -> String {
-        match self
-            .target
-            .xlsx()
-            .and_then(|wb| wb.cell(self.sheet, row, col))
-            .map(|c| &c.value)
-        {
-            Some(CellValue::Number(n)) => number_text(*n),
-            Some(CellValue::Bool(b)) => if *b { "TRUE" } else { "FALSE" }.to_owned(),
-            Some(CellValue::Empty) | None => String::new(),
-            _ => self.display(row, col),
-        }
     }
 
     /// True after a copy or cut made in this window (Paste Special needs it).
@@ -1470,68 +1434,36 @@ impl SheetModel {
     }
 
     /// Paste Special with the dialog's choices: what to paste, skipping blank source cells,
-    /// transposing.
+    /// transposing. Works from the clipboard, so ranges copied in other programs paste too.
     pub fn paste_special_with(&mut self, o: PasteSpecialOpts) -> Result<Paste, String> {
-        let Some(c) = self.copied.clone() else {
+        let Some((_, source, clip)) = self.clipboard_clip() else {
             return Ok(Paste::Empty);
         };
         let (r1, c1, ..) = self.range();
-        let dest = CellRef {
-            sheet: self.sheet,
-            row: r1,
-            col: c1,
+        let mode = match o.what {
+            PasteWhat::All => Mode::All,
+            PasteWhat::Formulas => Mode::Formulas,
+            PasteWhat::Values => Mode::Values,
+            PasteWhat::Formats => Mode::Formats,
         };
-        let src = c.rect();
-        let (h, w) = (src.2 - src.0 + 1, src.3 - src.1 + 1);
-        let (dh, dw) = if o.transpose { (w, h) } else { (h, w) };
-        let dest_rect = (
-            r1,
-            c1,
-            (r1 + dh - 1).min(MAX_ROW),
-            (c1 + dw - 1).min(MAX_COL),
+        let plan = plan(
+            &clip,
+            source,
+            self.sheet,
+            (r1, c1),
+            Options {
+                mode,
+                skip_blanks: o.skip_blanks,
+                transpose: o.transpose,
+            },
         );
-        let formats = matches!(o.what, PasteWhat::All | PasteWhat::Formats);
-        if o.what == PasteWhat::Formats {
-            self.copy_formats(src, dest_rect, false);
-            self.select_pasted(dest_rect.0, dest_rect.1, dest_rect.2, dest_rect.3);
-            return Ok(Paste::Done);
-        }
-        let mut rows: Vec<Vec<String>> = match o.what {
-            PasteWhat::Values => (src.0..=src.2)
-                .map(|r| (src.1..=src.3).map(|cc| self.value_text(r, cc)).collect())
-                .collect(),
-            _ => paste_rows(&c.rows, Some(c.origin), dest),
+        let Some((pr1, pc1, pr2, pc2)) = plan.rect else {
+            return Ok(Paste::Empty);
         };
-        if o.transpose {
-            rows = (0..w as usize)
-                .map(|j| {
-                    rows.iter()
-                        .map(|row| row.get(j).cloned().unwrap_or_default())
-                        .collect()
-                })
-                .collect();
+        for command in plan.commands {
+            self.apply(command)?;
         }
-        if o.skip_blanks {
-            // A blank source cell keeps what the destination holds.
-            for (i, row) in rows.iter_mut().enumerate() {
-                for (j, cell) in row.iter_mut().enumerate() {
-                    if cell.is_empty() {
-                        *cell = self.source(r1 + i as u32, c1 + j as u32);
-                    }
-                }
-            }
-        }
-        if formats {
-            self.copy_formats(src, dest_rect, false);
-        }
-        let (bh, bw) = (rows.len() as u32, rows.first().map_or(0, Vec::len) as u32);
-        self.apply(Command::XlsxPaste {
-            sheet: self.sheet,
-            row: r1,
-            col: c1,
-            rows,
-        })?;
-        self.select_pasted(r1, c1, r1 + bh.max(1) - 1, c1 + bw.max(1) - 1);
+        self.select_pasted(pr1, pc1, pr2, pc2);
         Ok(Paste::Done)
     }
 
@@ -2484,19 +2416,6 @@ mod tests {
         assert_eq!(m.display(1, 3), "3");
         assert!(m.undo());
         assert_eq!(m.display(1, 3), "13");
-    }
-}
-
-impl Copied {
-    fn rect(&self) -> Rect4 {
-        let h = self.rows.len().max(1) as u32;
-        let w = self.rows.iter().map(Vec::len).max().unwrap_or(1).max(1) as u32;
-        (
-            self.origin.row,
-            self.origin.col,
-            self.origin.row + h - 1,
-            self.origin.col + w - 1,
-        )
     }
 }
 

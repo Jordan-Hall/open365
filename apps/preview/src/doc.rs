@@ -57,7 +57,7 @@ fn centred(ui: &Ui, top: f32, bottom: f32, px: f32) -> f32 {
 }
 
 const BODY: [&str; 6] = [
-    "Open365 Writer preview",
+    "Open Write preview",
     "",
     "This page is a placeholder drawn with the gfx renderer. The ribbon, tabs, Backstage",
     "view and status bar around it are the real chrome on the new UI platform.",

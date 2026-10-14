@@ -9,6 +9,8 @@ publish.workspace = true
 
 [dependencies]
 quick-xml = "0.42.0"
+# SVG pictures: size, and the PNG fallback Office stores beside them (same version as open365-gfx).
+resvg = { version = "0.48", default-features = false }
 
 [dev-dependencies]
 flate2.workspace = true

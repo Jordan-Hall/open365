@@ -1,0 +1,5 @@
+feature = "drawing"
+made_with = "Microsoft Excel 20430 (Windows)"
+author = "project member"
+expect_dropped = []
+notes = "three rectangles (one per Placement) and a picture over rows 5 to 8, for insert, delete, hide and resize scenarios"

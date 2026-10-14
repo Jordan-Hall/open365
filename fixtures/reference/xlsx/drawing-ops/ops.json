@@ -1,0 +1,397 @@
+{
+  "dpi": 120,
+  "scenarios": [
+    {"scenario": "initial", "shapes": [
+        {"name": "Box p1", "placement": 1, "left": 100, "top": 60.599998474121094, "width": 150, "height": 70, "topLeftCell": "C5", "bottomRightCell": "F10"},
+        {"name": "Box p2", "placement": 2, "left": 340, "top": 60.599998474121094, "width": 150, "height": 70, "topLeftCell": "H5", "bottomRightCell": "K10"},
+        {"name": "Box p3", "placement": 3, "left": 580, "top": 60.599998474121094, "width": 150, "height": 70, "topLeftCell": "M5", "bottomRightCell": "P10"},
+        {"name": "Box p4", "placement": 1, "left": 96, "top": 273.6000061035156, "width": 144, "height": 28.799999237060547, "topLeftCell": "C20", "bottomRightCell": "F22"},
+        {"name": "Pic p1", "placement": 2, "left": 818, "top": 59.599998474121094, "width": 48.00669479370117, "height": 36.00503921508789, "topLeftCell": "R5", "bottomRightCell": "S7"}
+    ]},
+    {"scenario": "insert-rows-above", "shapes": [
+        {"name": "Box p1", "placement": 1, "left": 100, "top": 89.4000015258789, "width": 150, "height": 70, "topLeftCell": "C7", "bottomRightCell": "F12"},
+        {"name": "Box p2", "placement": 2, "left": 340, "top": 89.4000015258789, "width": 150, "height": 70, "topLeftCell": "H7", "bottomRightCell": "K12"},
+        {"name": "Box p3", "placement": 3, "left": 580, "top": 60.599998474121094, "width": 150, "height": 70, "topLeftCell": "M5", "bottomRightCell": "P10"},
+        {"name": "Box p4", "placement": 1, "left": 96, "top": 302.3999938964844, "width": 144, "height": 28.799999237060547, "topLeftCell": "C22", "bottomRightCell": "F24"},
+        {"name": "Pic p1", "placement": 2, "left": 818, "top": 88.4000015258789, "width": 48.00669479370117, "height": 36.00503921508789, "topLeftCell": "R7", "bottomRightCell": "S9"}
+    ]},
+    {"scenario": "insert-row-inside", "shapes": [
+        {"name": "Box p1", "placement": 1, "left": 100, "top": 60.599998474121094, "width": 150, "height": 84.4000015258789, "topLeftCell": "C5", "bottomRightCell": "F11"},
+        {"name": "Box p2", "placement": 2, "left": 340, "top": 60.599998474121094, "width": 150, "height": 70, "topLeftCell": "H5", "bottomRightCell": "K10"},
+        {"name": "Box p3", "placement": 3, "left": 580, "top": 60.599998474121094, "width": 150, "height": 70, "topLeftCell": "M5", "bottomRightCell": "P10"},
+        {"name": "Box p4", "placement": 1, "left": 96, "top": 288, "width": 144, "height": 28.799999237060547, "topLeftCell": "C21", "bottomRightCell": "F23"},
+        {"name": "Pic p1", "placement": 2, "left": 818, "top": 59.599998474121094, "width": 48.00669479370117, "height": 36.00503921508789, "topLeftCell": "R5", "bottomRightCell": "S7"}
+    ]},
+    {"scenario": "insert-row-at-top", "shapes": [
+        {"name": "Box p1", "placement": 1, "left": 100, "top": 75, "width": 150, "height": 70, "topLeftCell": "C6", "bottomRightCell": "F11"},
+        {"name": "Box p2", "placement": 2, "left": 340, "top": 75, "width": 150, "height": 70, "topLeftCell": "H6", "bottomRightCell": "K11"},
+        {"name": "Box p3", "placement": 3, "left": 580, "top": 60.599998474121094, "width": 150, "height": 70, "topLeftCell": "M5", "bottomRightCell": "P10"},
+        {"name": "Box p4", "placement": 1, "left": 96, "top": 288, "width": 144, "height": 28.799999237060547, "topLeftCell": "C21", "bottomRightCell": "F23"},
+        {"name": "Pic p1", "placement": 2, "left": 818, "top": 74, "width": 48.00669479370117, "height": 36.00503921508789, "topLeftCell": "R6", "bottomRightCell": "S8"}
+    ]},
+    {"scenario": "insert-rows-below", "shapes": [
+        {"name": "Box p1", "placement": 1, "left": 100, "top": 60.599998474121094, "width": 150, "height": 70, "topLeftCell": "C5", "bottomRightCell": "F10"},
+        {"name": "Box p2", "placement": 2, "left": 340, "top": 60.599998474121094, "width": 150, "height": 70, "topLeftCell": "H5", "bottomRightCell": "K10"},
+        {"name": "Box p3", "placement": 3, "left": 580, "top": 60.599998474121094, "width": 150, "height": 70, "topLeftCell": "M5", "bottomRightCell": "P10"},
+        {"name": "Box p4", "placement": 1, "left": 96, "top": 302.3999938964844, "width": 144, "height": 28.799999237060547, "topLeftCell": "C22", "bottomRightCell": "F24"},
+        {"name": "Pic p1", "placement": 2, "left": 818, "top": 59.599998474121094, "width": 48.00669479370117, "height": 36.00503921508789, "topLeftCell": "R5", "bottomRightCell": "S7"}
+    ]},
+    {"scenario": "delete-rows-above", "shapes": [
+        {"name": "Box p1", "placement": 1, "left": 100, "top": 31.799999237060547, "width": 150, "height": 70, "topLeftCell": "C3", "bottomRightCell": "F8"},
+        {"name": "Box p2", "placement": 2, "left": 340, "top": 31.799999237060547, "width": 150, "height": 70, "topLeftCell": "H3", "bottomRightCell": "K8"},
+        {"name": "Box p3", "placement": 3, "left": 580, "top": 60.599998474121094, "width": 150, "height": 70, "topLeftCell": "M5", "bottomRightCell": "P10"},
+        {"name": "Box p4", "placement": 1, "left": 96, "top": 244.8000030517578, "width": 144, "height": 28.799999237060547, "topLeftCell": "C18", "bottomRightCell": "F20"},
+        {"name": "Pic p1", "placement": 2, "left": 818, "top": 30.799999237060547, "width": 48.00669479370117, "height": 36.00503921508789, "topLeftCell": "R3", "bottomRightCell": "S5"}
+    ]},
+    {"scenario": "delete-row-inside", "shapes": [
+        {"name": "Box p1", "placement": 1, "left": 100, "top": 60.599998474121094, "width": 150, "height": 55.599998474121094, "topLeftCell": "C5", "bottomRightCell": "F9"},
+        {"name": "Box p2", "placement": 2, "left": 340, "top": 60.599998474121094, "width": 150, "height": 70, "topLeftCell": "H5", "bottomRightCell": "K10"},
+        {"name": "Box p3", "placement": 3, "left": 580, "top": 60.599998474121094, "width": 150, "height": 70, "topLeftCell": "M5", "bottomRightCell": "P10"},
+        {"name": "Box p4", "placement": 1, "left": 96, "top": 259.20001220703125, "width": 144, "height": 28.799999237060547, "topLeftCell": "C19", "bottomRightCell": "F21"},
+        {"name": "Pic p1", "placement": 2, "left": 818, "top": 59.599998474121094, "width": 48.00669479370117, "height": 36.00503921508789, "topLeftCell": "R5", "bottomRightCell": "S7"}
+    ]},
+    {"scenario": "delete-rows-partial", "shapes": [
+        {"name": "Box p1", "placement": 1, "left": 100, "top": 28.799999237060547, "width": 150, "height": 58.599998474121094, "topLeftCell": "C3", "bottomRightCell": "F7"},
+        {"name": "Box p2", "placement": 2, "left": 340, "top": 28.799999237060547, "width": 150, "height": 70, "topLeftCell": "H3", "bottomRightCell": "K7"},
+        {"name": "Box p3", "placement": 3, "left": 580, "top": 60.599998474121094, "width": 150, "height": 70, "topLeftCell": "M5", "bottomRightCell": "P10"},
+        {"name": "Box p4", "placement": 1, "left": 96, "top": 230.39999389648438, "width": 144, "height": 28.799999237060547, "topLeftCell": "C17", "bottomRightCell": "F19"},
+        {"name": "Pic p1", "placement": 2, "left": 818, "top": 28.799999237060547, "width": 48.00669479370117, "height": 36.00503921508789, "topLeftCell": "R3", "bottomRightCell": "S5"}
+    ]},
+    {"scenario": "delete-rows-over", "shapes": [
+        {"name": "Box p1", "placement": 1, "left": 100, "top": 43.20000076293945, "width": 150, "height": 1, "topLeftCell": "C4", "bottomRightCell": "F4"},
+        {"name": "Box p2", "placement": 2, "left": 340, "top": 43.20000076293945, "width": 150, "height": 70, "topLeftCell": "H4", "bottomRightCell": "K8"},
+        {"name": "Box p3", "placement": 3, "left": 580, "top": 60.599998474121094, "width": 150, "height": 70, "topLeftCell": "M5", "bottomRightCell": "P10"},
+        {"name": "Box p4", "placement": 1, "left": 96, "top": 187.1999969482422, "width": 144, "height": 28.799999237060547, "topLeftCell": "C14", "bottomRightCell": "F16"},
+        {"name": "Pic p1", "placement": 2, "left": 818, "top": 43.20000076293945, "width": 48.00669479370117, "height": 36.00503921508789, "topLeftCell": "R4", "bottomRightCell": "S6"}
+    ]},
+    {"scenario": "insert-cols-left", "shapes": [
+        {"name": "Box p1", "placement": 1, "left": 148, "top": 60.599998474121094, "width": 150, "height": 70, "topLeftCell": "D5", "bottomRightCell": "G10"},
+        {"name": "Box p2", "placement": 2, "left": 388, "top": 60.599998474121094, "width": 150, "height": 70, "topLeftCell": "I5", "bottomRightCell": "L10"},
+        {"name": "Box p3", "placement": 3, "left": 580, "top": 60.599998474121094, "width": 150, "height": 70, "topLeftCell": "M5", "bottomRightCell": "P10"},
+        {"name": "Box p4", "placement": 1, "left": 144, "top": 273.6000061035156, "width": 144, "height": 28.799999237060547, "topLeftCell": "D20", "bottomRightCell": "G22"},
+        {"name": "Pic p1", "placement": 2, "left": 866, "top": 59.599998474121094, "width": 48.00669479370117, "height": 36.00503921508789, "topLeftCell": "S5", "bottomRightCell": "T7"}
+    ]},
+    {"scenario": "insert-col-inside", "shapes": [
+        {"name": "Box p1", "placement": 1, "left": 100, "top": 60.599998474121094, "width": 198, "height": 70, "topLeftCell": "C5", "bottomRightCell": "G10"},
+        {"name": "Box p2", "placement": 2, "left": 388, "top": 60.599998474121094, "width": 150, "height": 70, "topLeftCell": "I5", "bottomRightCell": "L10"},
+        {"name": "Box p3", "placement": 3, "left": 580, "top": 60.599998474121094, "width": 150, "height": 70, "topLeftCell": "M5", "bottomRightCell": "P10"},
+        {"name": "Box p4", "placement": 1, "left": 96, "top": 273.6000061035156, "width": 192, "height": 28.799999237060547, "topLeftCell": "C20", "bottomRightCell": "G22"},
+        {"name": "Pic p1", "placement": 2, "left": 866, "top": 59.599998474121094, "width": 48.00669479370117, "height": 36.00503921508789, "topLeftCell": "S5", "bottomRightCell": "T7"}
+    ]},
+    {"scenario": "insert-col-between", "shapes": [
+        {"name": "Box p1", "placement": 1, "left": 100, "top": 60.599998474121094, "width": 150, "height": 70, "topLeftCell": "C5", "bottomRightCell": "F10"},
+        {"name": "Box p2", "placement": 2, "left": 388, "top": 60.599998474121094, "width": 150, "height": 70, "topLeftCell": "I5", "bottomRightCell": "L10"},
+        {"name": "Box p3", "placement": 3, "left": 580, "top": 60.599998474121094, "width": 150, "height": 70, "topLeftCell": "M5", "bottomRightCell": "P10"},
+        {"name": "Box p4", "placement": 1, "left": 96, "top": 273.6000061035156, "width": 144, "height": 28.799999237060547, "topLeftCell": "C20", "bottomRightCell": "F22"},
+        {"name": "Pic p1", "placement": 2, "left": 866, "top": 59.599998474121094, "width": 48.00669479370117, "height": 36.00503921508789, "topLeftCell": "S5", "bottomRightCell": "T7"}
+    ]},
+    {"scenario": "delete-col-left", "shapes": [
+        {"name": "Box p1", "placement": 1, "left": 52, "top": 60.599998474121094, "width": 150, "height": 70, "topLeftCell": "B5", "bottomRightCell": "E10"},
+        {"name": "Box p2", "placement": 2, "left": 292, "top": 60.599998474121094, "width": 150, "height": 70, "topLeftCell": "G5", "bottomRightCell": "J10"},
+        {"name": "Box p3", "placement": 3, "left": 580, "top": 60.599998474121094, "width": 150, "height": 70, "topLeftCell": "M5", "bottomRightCell": "P10"},
+        {"name": "Box p4", "placement": 1, "left": 48, "top": 273.6000061035156, "width": 144, "height": 28.799999237060547, "topLeftCell": "B20", "bottomRightCell": "E22"},
+        {"name": "Pic p1", "placement": 2, "left": 770, "top": 59.599998474121094, "width": 48.00669479370117, "height": 36.00503921508789, "topLeftCell": "Q5", "bottomRightCell": "R7"}
+    ]},
+    {"scenario": "delete-cols-inside", "shapes": [
+        {"name": "Box p1", "placement": 1, "left": 100, "top": 60.599998474121094, "width": 54, "height": 70, "topLeftCell": "C5", "bottomRightCell": "D10"},
+        {"name": "Box p2", "placement": 2, "left": 244, "top": 60.599998474121094, "width": 150, "height": 70, "topLeftCell": "F5", "bottomRightCell": "I10"},
+        {"name": "Box p3", "placement": 3, "left": 580, "top": 60.599998474121094, "width": 150, "height": 70, "topLeftCell": "M5", "bottomRightCell": "P10"},
+        {"name": "Box p4", "placement": 1, "left": 96, "top": 273.6000061035156, "width": 48, "height": 28.799999237060547, "topLeftCell": "C20", "bottomRightCell": "D22"},
+        {"name": "Pic p1", "placement": 2, "left": 722, "top": 59.599998474121094, "width": 48.00669479370117, "height": 36.00503921508789, "topLeftCell": "P5", "bottomRightCell": "Q7"}
+    ]},
+    {"scenario": "delete-cols-over", "shapes": [
+        {"name": "Box p1", "placement": 1, "left": 100, "top": 60.599998474121094, "width": 150, "height": 70, "topLeftCell": "C5", "bottomRightCell": "F10"},
+        {"name": "Box p2", "placement": 2, "left": 336, "top": 60.599998474121094, "width": 150, "height": 70, "topLeftCell": "H5", "bottomRightCell": "K10"},
+        {"name": "Box p3", "placement": 3, "left": 580, "top": 60.599998474121094, "width": 150, "height": 70, "topLeftCell": "M5", "bottomRightCell": "P10"},
+        {"name": "Box p4", "placement": 1, "left": 96, "top": 273.6000061035156, "width": 144, "height": 28.799999237060547, "topLeftCell": "C20", "bottomRightCell": "F22"},
+        {"name": "Pic p1", "placement": 2, "left": 626, "top": 59.599998474121094, "width": 48.00669479370117, "height": 36.00503921508789, "topLeftCell": "N5", "bottomRightCell": "O7"}
+    ]},
+    {"scenario": "hide-rows-inside", "shapes": [
+        {"name": "Box p1", "placement": 1, "left": 100, "top": 60.599998474121094, "width": 150, "height": 55.599998474121094, "topLeftCell": "C5", "bottomRightCell": "F10"},
+        {"name": "Box p2", "placement": 2, "left": 340, "top": 60.599998474121094, "width": 150, "height": 70, "topLeftCell": "H5", "bottomRightCell": "K11"},
+        {"name": "Box p3", "placement": 3, "left": 580, "top": 60.599998474121094, "width": 150, "height": 70, "topLeftCell": "M5", "bottomRightCell": "P11"},
+        {"name": "Box p4", "placement": 1, "left": 96, "top": 259.20001220703125, "width": 144, "height": 28.799999237060547, "topLeftCell": "C20", "bottomRightCell": "F22"},
+        {"name": "Pic p1", "placement": 2, "left": 818, "top": 59.599998474121094, "width": 48.00669479370117, "height": 36.00503921508789, "topLeftCell": "R5", "bottomRightCell": "S8"}
+    ]},
+    {"scenario": "hide-rows-over", "shapes": [
+        {"name": "Box p1", "placement": 1, "left": 100, "top": 57.599998474121094, "width": 150, "height": 15.399999618530273, "topLeftCell": "C5", "bottomRightCell": "F10"},
+        {"name": "Box p2", "placement": 2, "left": 340, "top": 57.599998474121094, "width": 150, "height": 70, "topLeftCell": "H5", "bottomRightCell": "K13"},
+        {"name": "Box p3", "placement": 3, "left": 580, "top": 60.599998474121094, "width": 150, "height": 70, "topLeftCell": "M9", "bottomRightCell": "P14"},
+        {"name": "Box p4", "placement": 1, "left": 96, "top": 216, "width": 144, "height": 28.799999237060547, "topLeftCell": "C20", "bottomRightCell": "F22"},
+        {"name": "Pic p1", "placement": 2, "left": 818, "top": 57.599998474121094, "width": 48.00669479370117, "height": 36.00503921508789, "topLeftCell": "R5", "bottomRightCell": "S11"}
+    ]},
+    {"scenario": "hide-rows-above", "shapes": [
+        {"name": "Box p1", "placement": 1, "left": 100, "top": 31.799999237060547, "width": 150, "height": 70, "topLeftCell": "C5", "bottomRightCell": "F10"},
+        {"name": "Box p2", "placement": 2, "left": 340, "top": 31.799999237060547, "width": 150, "height": 70, "topLeftCell": "H5", "bottomRightCell": "K10"},
+        {"name": "Box p3", "placement": 3, "left": 580, "top": 60.599998474121094, "width": 150, "height": 70, "topLeftCell": "M7", "bottomRightCell": "P12"},
+        {"name": "Box p4", "placement": 1, "left": 96, "top": 244.8000030517578, "width": 144, "height": 28.799999237060547, "topLeftCell": "C20", "bottomRightCell": "F22"},
+        {"name": "Pic p1", "placement": 2, "left": 818, "top": 30.799999237060547, "width": 48.00669479370117, "height": 36.00503921508789, "topLeftCell": "R5", "bottomRightCell": "S7"}
+    ]},
+    {"scenario": "hide-col-inside", "shapes": [
+        {"name": "Box p1", "placement": 1, "left": 100, "top": 60.599998474121094, "width": 102, "height": 70, "topLeftCell": "C5", "bottomRightCell": "F10"},
+        {"name": "Box p2", "placement": 2, "left": 292, "top": 60.599998474121094, "width": 150, "height": 70, "topLeftCell": "H5", "bottomRightCell": "K10"},
+        {"name": "Box p3", "placement": 3, "left": 580, "top": 60.599998474121094, "width": 150, "height": 70, "topLeftCell": "N5", "bottomRightCell": "Q10"},
+        {"name": "Box p4", "placement": 1, "left": 96, "top": 273.6000061035156, "width": 96, "height": 28.799999237060547, "topLeftCell": "C20", "bottomRightCell": "F22"},
+        {"name": "Pic p1", "placement": 2, "left": 770, "top": 59.599998474121094, "width": 48.00669479370117, "height": 36.00503921508789, "topLeftCell": "R5", "bottomRightCell": "S7"}
+    ]},
+    {"scenario": "hide-cols-over", "shapes": [
+        {"name": "Box p1", "placement": 1, "left": 96, "top": 60.599998474121094, "width": 0, "height": 70, "topLeftCell": "C5", "bottomRightCell": "F10"},
+        {"name": "Box p2", "placement": 2, "left": 148, "top": 60.599998474121094, "width": 150, "height": 70, "topLeftCell": "H5", "bottomRightCell": "K10"},
+        {"name": "Box p3", "placement": 3, "left": 580, "top": 60.599998474121094, "width": 150, "height": 70, "topLeftCell": "Q5", "bottomRightCell": "T10"},
+        {"name": "Box p4", "placement": 1, "left": 96, "top": 273.6000061035156, "width": 0, "height": 28.799999237060547, "topLeftCell": "C20", "bottomRightCell": "F22"},
+        {"name": "Pic p1", "placement": 2, "left": 626, "top": 59.599998474121094, "width": 48.00669479370117, "height": 36.00503921508789, "topLeftCell": "R5", "bottomRightCell": "S7"}
+    ]},
+    {"scenario": "hide-cols-left", "shapes": [
+        {"name": "Box p1", "placement": 1, "left": 52, "top": 60.599998474121094, "width": 150, "height": 70, "topLeftCell": "C5", "bottomRightCell": "F10"},
+        {"name": "Box p2", "placement": 2, "left": 292, "top": 60.599998474121094, "width": 150, "height": 70, "topLeftCell": "H5", "bottomRightCell": "K10"},
+        {"name": "Box p3", "placement": 3, "left": 580, "top": 60.599998474121094, "width": 150, "height": 70, "topLeftCell": "N5", "bottomRightCell": "Q10"},
+        {"name": "Box p4", "placement": 1, "left": 48, "top": 273.6000061035156, "width": 144, "height": 28.799999237060547, "topLeftCell": "C20", "bottomRightCell": "F22"},
+        {"name": "Pic p1", "placement": 2, "left": 770, "top": 59.599998474121094, "width": 48.00669479370117, "height": 36.00503921508789, "topLeftCell": "R5", "bottomRightCell": "S7"}
+    ]},
+    {"scenario": "row-height-inside", "shapes": [
+        {"name": "Box p1", "placement": 1, "left": 100, "top": 60.599998474121094, "width": 150, "height": 95.19999694824219, "topLeftCell": "C5", "bottomRightCell": "F10"},
+        {"name": "Box p2", "placement": 2, "left": 340, "top": 60.599998474121094, "width": 150, "height": 70, "topLeftCell": "H5", "bottomRightCell": "K8"},
+        {"name": "Box p3", "placement": 3, "left": 580, "top": 60.599998474121094, "width": 150, "height": 70, "topLeftCell": "M5", "bottomRightCell": "P8"},
+        {"name": "Box p4", "placement": 1, "left": 96, "top": 298.79998779296875, "width": 144, "height": 28.799999237060547, "topLeftCell": "C20", "bottomRightCell": "F22"},
+        {"name": "Pic p1", "placement": 2, "left": 818, "top": 59.599998474121094, "width": 48.00669479370117, "height": 36.00503921508789, "topLeftCell": "R5", "bottomRightCell": "S6"}
+    ]},
+    {"scenario": "row-height-above", "shapes": [
+        {"name": "Box p1", "placement": 1, "left": 100, "top": 85.80000305175781, "width": 150, "height": 70, "topLeftCell": "C5", "bottomRightCell": "F10"},
+        {"name": "Box p2", "placement": 2, "left": 340, "top": 85.80000305175781, "width": 150, "height": 70, "topLeftCell": "H5", "bottomRightCell": "K10"},
+        {"name": "Box p3", "placement": 3, "left": 580, "top": 60.599998474121094, "width": 150, "height": 70, "topLeftCell": "M3", "bottomRightCell": "P8"},
+        {"name": "Box p4", "placement": 1, "left": 96, "top": 298.79998779296875, "width": 144, "height": 28.799999237060547, "topLeftCell": "C20", "bottomRightCell": "F22"},
+        {"name": "Pic p1", "placement": 2, "left": 818, "top": 84.80000305175781, "width": 48.00669479370117, "height": 36.00503921508789, "topLeftCell": "R5", "bottomRightCell": "S7"}
+    ]},
+    {"scenario": "col-width-inside", "shapes": [
+        {"name": "Box p1", "placement": 1, "left": 100, "top": 60.599998474121094, "width": 214.1999969482422, "height": 70, "topLeftCell": "C5", "bottomRightCell": "F10"},
+        {"name": "Box p2", "placement": 2, "left": 404.20001220703125, "top": 60.599998474121094, "width": 150, "height": 70, "topLeftCell": "H5", "bottomRightCell": "K10"},
+        {"name": "Box p3", "placement": 3, "left": 580, "top": 60.599998474121094, "width": 150, "height": 70, "topLeftCell": "K5", "bottomRightCell": "N10"},
+        {"name": "Box p4", "placement": 1, "left": 96, "top": 273.6000061035156, "width": 208.1999969482422, "height": 28.799999237060547, "topLeftCell": "C20", "bottomRightCell": "F22"},
+        {"name": "Pic p1", "placement": 2, "left": 882.2000122070312, "top": 59.599998474121094, "width": 48.00669479370117, "height": 36.00503921508789, "topLeftCell": "R5", "bottomRightCell": "S7"}
+    ]},
+    {"scenario": "col-width-left", "shapes": [
+        {"name": "Box p1", "placement": 1, "left": 164.1999969482422, "top": 60.599998474121094, "width": 150, "height": 70, "topLeftCell": "C5", "bottomRightCell": "F10"},
+        {"name": "Box p2", "placement": 2, "left": 404.20001220703125, "top": 60.599998474121094, "width": 150, "height": 70, "topLeftCell": "H5", "bottomRightCell": "K10"},
+        {"name": "Box p3", "placement": 3, "left": 580, "top": 60.599998474121094, "width": 150, "height": 70, "topLeftCell": "K5", "bottomRightCell": "N10"},
+        {"name": "Box p4", "placement": 1, "left": 160.1999969482422, "top": 273.6000061035156, "width": 144, "height": 28.799999237060547, "topLeftCell": "C20", "bottomRightCell": "F22"},
+        {"name": "Pic p1", "placement": 2, "left": 882.2000122070312, "top": 59.599998474121094, "width": 48.00669479370117, "height": 36.00503921508789, "topLeftCell": "R5", "bottomRightCell": "S7"}
+    ]},
+    {"scenario": "hide-then-unhide", "shapes": [
+        {"name": "Box p1", "placement": 1, "left": 100, "top": 60.599998474121094, "width": 150, "height": 70, "topLeftCell": "C5", "bottomRightCell": "F10"},
+        {"name": "Box p2", "placement": 2, "left": 340, "top": 60.599998474121094, "width": 150, "height": 70, "topLeftCell": "H5", "bottomRightCell": "K10"},
+        {"name": "Box p3", "placement": 3, "left": 580, "top": 60.599998474121094, "width": 150, "height": 70, "topLeftCell": "M5", "bottomRightCell": "P10"},
+        {"name": "Box p4", "placement": 1, "left": 96, "top": 273.6000061035156, "width": 144, "height": 28.799999237060547, "topLeftCell": "C20", "bottomRightCell": "F22"},
+        {"name": "Pic p1", "placement": 2, "left": 818, "top": 59.599998474121094, "width": 48.00669479370117, "height": 36.00503921508789, "topLeftCell": "R5", "bottomRightCell": "S7"}
+    ]},
+    {"scenario": "cells-insert-down", "shapes": [
+        {"name": "Box p1", "placement": 1, "left": 100, "top": 60.599998474121094, "width": 150, "height": 84.4000015258789, "topLeftCell": "C5", "bottomRightCell": "F11"},
+        {"name": "Box p2", "placement": 2, "left": 340, "top": 60.599998474121094, "width": 150, "height": 70, "topLeftCell": "H5", "bottomRightCell": "K10"},
+        {"name": "Box p3", "placement": 3, "left": 580, "top": 60.599998474121094, "width": 150, "height": 70, "topLeftCell": "M5", "bottomRightCell": "P10"},
+        {"name": "Box p4", "placement": 1, "left": 96, "top": 288, "width": 144, "height": 28.799999237060547, "topLeftCell": "C21", "bottomRightCell": "F23"},
+        {"name": "Pic p1", "placement": 2, "left": 818, "top": 59.599998474121094, "width": 48.00669479370117, "height": 36.00503921508789, "topLeftCell": "R5", "bottomRightCell": "S7"}
+    ]},
+    {"scenario": "cells-insert-down-b", "shapes": [
+        {"name": "Box p1", "placement": 1, "left": 100, "top": 60.599998474121094, "width": 150, "height": 70, "topLeftCell": "C5", "bottomRightCell": "F10"},
+        {"name": "Box p2", "placement": 2, "left": 340, "top": 89.4000015258789, "width": 150, "height": 70, "topLeftCell": "H7", "bottomRightCell": "K12"},
+        {"name": "Box p3", "placement": 3, "left": 580, "top": 60.599998474121094, "width": 150, "height": 70, "topLeftCell": "M5", "bottomRightCell": "P10"},
+        {"name": "Box p4", "placement": 1, "left": 96, "top": 273.6000061035156, "width": 144, "height": 28.799999237060547, "topLeftCell": "C20", "bottomRightCell": "F22"},
+        {"name": "Pic p1", "placement": 2, "left": 818, "top": 59.599998474121094, "width": 48.00669479370117, "height": 36.00503921508789, "topLeftCell": "R5", "bottomRightCell": "S7"}
+    ]},
+    {"scenario": "cells-insert-right", "shapes": [
+        {"name": "Box p1", "placement": 1, "left": 100, "top": 60.599998474121094, "width": 150, "height": 70, "topLeftCell": "C5", "bottomRightCell": "F10"},
+        {"name": "Box p2", "placement": 2, "left": 436, "top": 60.599998474121094, "width": 150, "height": 70, "topLeftCell": "J5", "bottomRightCell": "M10"},
+        {"name": "Box p3", "placement": 3, "left": 580, "top": 60.599998474121094, "width": 150, "height": 70, "topLeftCell": "M5", "bottomRightCell": "P10"},
+        {"name": "Box p4", "placement": 1, "left": 96, "top": 273.6000061035156, "width": 144, "height": 28.799999237060547, "topLeftCell": "C20", "bottomRightCell": "F22"},
+        {"name": "Pic p1", "placement": 2, "left": 914, "top": 59.599998474121094, "width": 48.00669479370117, "height": 36.00503921508789, "topLeftCell": "T5", "bottomRightCell": "U7"}
+    ]},
+    {"scenario": "cells-delete-up", "shapes": [
+        {"name": "Box p1", "placement": 1, "left": 100, "top": 60.599998474121094, "width": 150, "height": 70, "topLeftCell": "C5", "bottomRightCell": "F10"},
+        {"name": "Box p2", "placement": 2, "left": 340, "top": 31.799999237060547, "width": 150, "height": 70, "topLeftCell": "H3", "bottomRightCell": "K8"},
+        {"name": "Box p3", "placement": 3, "left": 580, "top": 60.599998474121094, "width": 150, "height": 70, "topLeftCell": "M5", "bottomRightCell": "P10"},
+        {"name": "Box p4", "placement": 1, "left": 96, "top": 273.6000061035156, "width": 144, "height": 28.799999237060547, "topLeftCell": "C20", "bottomRightCell": "F22"},
+        {"name": "Pic p1", "placement": 2, "left": 818, "top": 59.599998474121094, "width": 48.00669479370117, "height": 36.00503921508789, "topLeftCell": "R5", "bottomRightCell": "S7"}
+    ]},
+    {"scenario": "cells-delete-left", "shapes": [
+        {"name": "Box p1", "placement": 1, "left": 100, "top": 60.599998474121094, "width": 150, "height": 70, "topLeftCell": "C5", "bottomRightCell": "F10"},
+        {"name": "Box p2", "placement": 2, "left": 244, "top": 60.599998474121094, "width": 150, "height": 70, "topLeftCell": "F5", "bottomRightCell": "I10"},
+        {"name": "Box p3", "placement": 3, "left": 580, "top": 60.599998474121094, "width": 150, "height": 70, "topLeftCell": "M5", "bottomRightCell": "P10"},
+        {"name": "Box p4", "placement": 1, "left": 96, "top": 273.6000061035156, "width": 144, "height": 28.799999237060547, "topLeftCell": "C20", "bottomRightCell": "F22"},
+        {"name": "Pic p1", "placement": 2, "left": 722, "top": 59.599998474121094, "width": 48.00669479370117, "height": 36.00503921508789, "topLeftCell": "P5", "bottomRightCell": "Q7"}
+    ]},
+    {"scenario": "insert-row-at-bottom-edge", "shapes": [
+        {"name": "Box p1", "placement": 1, "left": 100, "top": 60.599998474121094, "width": 150, "height": 70, "topLeftCell": "C5", "bottomRightCell": "F10"},
+        {"name": "Box p2", "placement": 2, "left": 340, "top": 60.599998474121094, "width": 150, "height": 70, "topLeftCell": "H5", "bottomRightCell": "K10"},
+        {"name": "Box p3", "placement": 3, "left": 580, "top": 60.599998474121094, "width": 150, "height": 70, "topLeftCell": "M5", "bottomRightCell": "P10"},
+        {"name": "Box p4", "placement": 1, "left": 96, "top": 273.6000061035156, "width": 144, "height": 28.799999237060547, "topLeftCell": "C20", "bottomRightCell": "F22"},
+        {"name": "Pic p1", "placement": 2, "left": 818, "top": 59.599998474121094, "width": 48.00669479370117, "height": 36.00503921508789, "topLeftCell": "R5", "bottomRightCell": "S7"}
+    ]},
+    {"scenario": "insert-row-at-top-edge", "shapes": [
+        {"name": "Box p1", "placement": 1, "left": 100, "top": 60.599998474121094, "width": 150, "height": 70, "topLeftCell": "C5", "bottomRightCell": "F10"},
+        {"name": "Box p2", "placement": 2, "left": 340, "top": 60.599998474121094, "width": 150, "height": 70, "topLeftCell": "H5", "bottomRightCell": "K10"},
+        {"name": "Box p3", "placement": 3, "left": 580, "top": 60.599998474121094, "width": 150, "height": 70, "topLeftCell": "M5", "bottomRightCell": "P10"},
+        {"name": "Box p4", "placement": 1, "left": 96, "top": 288, "width": 144, "height": 28.799999237060547, "topLeftCell": "C21", "bottomRightCell": "F23"},
+        {"name": "Pic p1", "placement": 2, "left": 818, "top": 59.599998474121094, "width": 48.00669479370117, "height": 36.00503921508789, "topLeftCell": "R5", "bottomRightCell": "S7"}
+    ]},
+    {"scenario": "insert-row-mid-edge", "shapes": [
+        {"name": "Box p1", "placement": 1, "left": 100, "top": 60.599998474121094, "width": 150, "height": 70, "topLeftCell": "C5", "bottomRightCell": "F10"},
+        {"name": "Box p2", "placement": 2, "left": 340, "top": 60.599998474121094, "width": 150, "height": 70, "topLeftCell": "H5", "bottomRightCell": "K10"},
+        {"name": "Box p3", "placement": 3, "left": 580, "top": 60.599998474121094, "width": 150, "height": 70, "topLeftCell": "M5", "bottomRightCell": "P10"},
+        {"name": "Box p4", "placement": 1, "left": 96, "top": 273.6000061035156, "width": 144, "height": 43.20000076293945, "topLeftCell": "C20", "bottomRightCell": "F23"},
+        {"name": "Pic p1", "placement": 2, "left": 818, "top": 59.599998474121094, "width": 48.00669479370117, "height": 36.00503921508789, "topLeftCell": "R5", "bottomRightCell": "S7"}
+    ]},
+    {"scenario": "delete-row-below-edge", "shapes": [
+        {"name": "Box p1", "placement": 1, "left": 100, "top": 60.599998474121094, "width": 150, "height": 70, "topLeftCell": "C5", "bottomRightCell": "F10"},
+        {"name": "Box p2", "placement": 2, "left": 340, "top": 60.599998474121094, "width": 150, "height": 70, "topLeftCell": "H5", "bottomRightCell": "K10"},
+        {"name": "Box p3", "placement": 3, "left": 580, "top": 60.599998474121094, "width": 150, "height": 70, "topLeftCell": "M5", "bottomRightCell": "P10"},
+        {"name": "Box p4", "placement": 1, "left": 96, "top": 273.6000061035156, "width": 144, "height": 28.799999237060547, "topLeftCell": "C20", "bottomRightCell": "F22"},
+        {"name": "Pic p1", "placement": 2, "left": 818, "top": 59.599998474121094, "width": 48.00669479370117, "height": 36.00503921508789, "topLeftCell": "R5", "bottomRightCell": "S7"}
+    ]},
+    {"scenario": "delete-row-last-inside", "shapes": [
+        {"name": "Box p1", "placement": 1, "left": 100, "top": 60.599998474121094, "width": 150, "height": 70, "topLeftCell": "C5", "bottomRightCell": "F10"},
+        {"name": "Box p2", "placement": 2, "left": 340, "top": 60.599998474121094, "width": 150, "height": 70, "topLeftCell": "H5", "bottomRightCell": "K10"},
+        {"name": "Box p3", "placement": 3, "left": 580, "top": 60.599998474121094, "width": 150, "height": 70, "topLeftCell": "M5", "bottomRightCell": "P10"},
+        {"name": "Box p4", "placement": 1, "left": 96, "top": 273.6000061035156, "width": 144, "height": 14.399999618530273, "topLeftCell": "C20", "bottomRightCell": "F21"},
+        {"name": "Pic p1", "placement": 2, "left": 818, "top": 59.599998474121094, "width": 48.00669479370117, "height": 36.00503921508789, "topLeftCell": "R5", "bottomRightCell": "S7"}
+    ]},
+    {"scenario": "delete-rows-exact", "shapes": [
+        {"name": "Box p1", "placement": 1, "left": 100, "top": 60.599998474121094, "width": 150, "height": 70, "topLeftCell": "C5", "bottomRightCell": "F10"},
+        {"name": "Box p2", "placement": 2, "left": 340, "top": 60.599998474121094, "width": 150, "height": 70, "topLeftCell": "H5", "bottomRightCell": "K10"},
+        {"name": "Box p3", "placement": 3, "left": 580, "top": 60.599998474121094, "width": 150, "height": 70, "topLeftCell": "M5", "bottomRightCell": "P10"},
+        {"name": "Box p4", "deleted": true},
+        {"name": "Pic p1", "placement": 2, "left": 818, "top": 59.599998474121094, "width": 48.00669479370117, "height": 36.00503921508789, "topLeftCell": "R5", "bottomRightCell": "S7"}
+    ]},
+    {"scenario": "insert-col-bottom-edge", "shapes": [
+        {"name": "Box p1", "placement": 1, "left": 100, "top": 60.599998474121094, "width": 198, "height": 70, "topLeftCell": "C5", "bottomRightCell": "G10"},
+        {"name": "Box p2", "placement": 2, "left": 388, "top": 60.599998474121094, "width": 150, "height": 70, "topLeftCell": "I5", "bottomRightCell": "L10"},
+        {"name": "Box p3", "placement": 3, "left": 580, "top": 60.599998474121094, "width": 150, "height": 70, "topLeftCell": "M5", "bottomRightCell": "P10"},
+        {"name": "Box p4", "placement": 1, "left": 96, "top": 273.6000061035156, "width": 144, "height": 28.799999237060547, "topLeftCell": "C20", "bottomRightCell": "F22"},
+        {"name": "Pic p1", "placement": 2, "left": 866, "top": 59.599998474121094, "width": 48.00669479370117, "height": 36.00503921508789, "topLeftCell": "S5", "bottomRightCell": "T7"}
+    ]},
+    {"scenario": "insert-col-left-edge", "shapes": [
+        {"name": "Box p1", "placement": 1, "left": 148, "top": 60.599998474121094, "width": 150, "height": 70, "topLeftCell": "D5", "bottomRightCell": "G10"},
+        {"name": "Box p2", "placement": 2, "left": 388, "top": 60.599998474121094, "width": 150, "height": 70, "topLeftCell": "I5", "bottomRightCell": "L10"},
+        {"name": "Box p3", "placement": 3, "left": 580, "top": 60.599998474121094, "width": 150, "height": 70, "topLeftCell": "M5", "bottomRightCell": "P10"},
+        {"name": "Box p4", "placement": 1, "left": 144, "top": 273.6000061035156, "width": 144, "height": 28.799999237060547, "topLeftCell": "D20", "bottomRightCell": "G22"},
+        {"name": "Pic p1", "placement": 2, "left": 866, "top": 59.599998474121094, "width": 48.00669479370117, "height": 36.00503921508789, "topLeftCell": "S5", "bottomRightCell": "T7"}
+    ]},
+    {"scenario": "delete-cols-exact", "shapes": [
+        {"name": "Box p1", "placement": 1, "left": 96, "top": 60.599998474121094, "width": 10, "height": 70, "topLeftCell": "C5", "bottomRightCell": "C10"},
+        {"name": "Box p2", "placement": 2, "left": 196, "top": 60.599998474121094, "width": 150, "height": 70, "topLeftCell": "E5", "bottomRightCell": "H10"},
+        {"name": "Box p3", "placement": 3, "left": 580, "top": 60.599998474121094, "width": 150, "height": 70, "topLeftCell": "M5", "bottomRightCell": "P10"},
+        {"name": "Box p4", "deleted": true},
+        {"name": "Pic p1", "placement": 2, "left": 674, "top": 59.599998474121094, "width": 48.00669479370117, "height": 36.00503921508789, "topLeftCell": "O5", "bottomRightCell": "P7"}
+    ]},
+    {"scenario": "cells-down-at-from-row", "shapes": [
+        {"name": "Box p1", "placement": 1, "left": 100, "top": 75, "width": 150, "height": 70, "topLeftCell": "C6", "bottomRightCell": "F11"},
+        {"name": "Box p2", "placement": 2, "left": 340, "top": 60.599998474121094, "width": 150, "height": 70, "topLeftCell": "H5", "bottomRightCell": "K10"},
+        {"name": "Box p3", "placement": 3, "left": 580, "top": 60.599998474121094, "width": 150, "height": 70, "topLeftCell": "M5", "bottomRightCell": "P10"},
+        {"name": "Box p4", "placement": 1, "left": 96, "top": 288, "width": 144, "height": 28.799999237060547, "topLeftCell": "C21", "bottomRightCell": "F23"},
+        {"name": "Pic p1", "placement": 2, "left": 818, "top": 59.599998474121094, "width": 48.00669479370117, "height": 36.00503921508789, "topLeftCell": "R5", "bottomRightCell": "S7"}
+    ]},
+    {"scenario": "cells-down-narrow-band", "shapes": [
+        {"name": "Box p1", "placement": 1, "left": 100, "top": 60.599998474121094, "width": 150, "height": 70, "topLeftCell": "C5", "bottomRightCell": "F10"},
+        {"name": "Box p2", "placement": 2, "left": 340, "top": 60.599998474121094, "width": 150, "height": 70, "topLeftCell": "H5", "bottomRightCell": "K10"},
+        {"name": "Box p3", "placement": 3, "left": 580, "top": 60.599998474121094, "width": 150, "height": 70, "topLeftCell": "M5", "bottomRightCell": "P10"},
+        {"name": "Box p4", "placement": 1, "left": 96, "top": 273.6000061035156, "width": 144, "height": 28.799999237060547, "topLeftCell": "C20", "bottomRightCell": "F22"},
+        {"name": "Pic p1", "placement": 2, "left": 818, "top": 59.599998474121094, "width": 48.00669479370117, "height": 36.00503921508789, "topLeftCell": "R5", "bottomRightCell": "S7"}
+    ]},
+    {"scenario": "cells-down-edge-band", "shapes": [
+        {"name": "Box p1", "placement": 1, "left": 100, "top": 60.599998474121094, "width": 150, "height": 70, "topLeftCell": "C5", "bottomRightCell": "F10"},
+        {"name": "Box p2", "placement": 2, "left": 340, "top": 60.599998474121094, "width": 150, "height": 70, "topLeftCell": "H5", "bottomRightCell": "K10"},
+        {"name": "Box p3", "placement": 3, "left": 580, "top": 60.599998474121094, "width": 150, "height": 70, "topLeftCell": "M5", "bottomRightCell": "P10"},
+        {"name": "Box p4", "placement": 1, "left": 96, "top": 273.6000061035156, "width": 144, "height": 28.799999237060547, "topLeftCell": "C20", "bottomRightCell": "F22"},
+        {"name": "Pic p1", "placement": 2, "left": 818, "top": 59.599998474121094, "width": 48.00669479370117, "height": 36.00503921508789, "topLeftCell": "R5", "bottomRightCell": "S7"}
+    ]},
+    {"scenario": "cells-right-wide-band", "shapes": [
+        {"name": "Box p1", "placement": 1, "left": 196, "top": 60.599998474121094, "width": 150, "height": 70, "topLeftCell": "E5", "bottomRightCell": "H10"},
+        {"name": "Box p2", "placement": 2, "left": 436, "top": 60.599998474121094, "width": 150, "height": 70, "topLeftCell": "J5", "bottomRightCell": "M10"},
+        {"name": "Box p3", "placement": 3, "left": 580, "top": 60.599998474121094, "width": 150, "height": 70, "topLeftCell": "M5", "bottomRightCell": "P10"},
+        {"name": "Box p4", "placement": 1, "left": 96, "top": 273.6000061035156, "width": 144, "height": 28.799999237060547, "topLeftCell": "C20", "bottomRightCell": "F22"},
+        {"name": "Pic p1", "placement": 2, "left": 914, "top": 59.599998474121094, "width": 48.00669479370117, "height": 36.00503921508789, "topLeftCell": "T5", "bottomRightCell": "U7"}
+    ]},
+    {"scenario": "cells-right-at-inside", "shapes": [
+        {"name": "Box p1", "placement": 1, "left": 100, "top": 60.599998474121094, "width": 150, "height": 70, "topLeftCell": "C5", "bottomRightCell": "F10"},
+        {"name": "Box p2", "placement": 2, "left": 388, "top": 60.599998474121094, "width": 150, "height": 70, "topLeftCell": "I5", "bottomRightCell": "L10"},
+        {"name": "Box p3", "placement": 3, "left": 580, "top": 60.599998474121094, "width": 150, "height": 70, "topLeftCell": "M5", "bottomRightCell": "P10"},
+        {"name": "Box p4", "placement": 1, "left": 96, "top": 273.6000061035156, "width": 144, "height": 28.799999237060547, "topLeftCell": "C20", "bottomRightCell": "F22"},
+        {"name": "Pic p1", "placement": 2, "left": 866, "top": 59.599998474121094, "width": 48.00669479370117, "height": 36.00503921508789, "topLeftCell": "S5", "bottomRightCell": "T7"}
+    ]},
+    {"scenario": "cells-right-at-from", "shapes": [
+        {"name": "Box p1", "placement": 1, "left": 100, "top": 60.599998474121094, "width": 150, "height": 70, "topLeftCell": "C5", "bottomRightCell": "F10"},
+        {"name": "Box p2", "placement": 2, "left": 388, "top": 60.599998474121094, "width": 150, "height": 70, "topLeftCell": "I5", "bottomRightCell": "L10"},
+        {"name": "Box p3", "placement": 3, "left": 580, "top": 60.599998474121094, "width": 150, "height": 70, "topLeftCell": "M5", "bottomRightCell": "P10"},
+        {"name": "Box p4", "placement": 1, "left": 96, "top": 273.6000061035156, "width": 144, "height": 28.799999237060547, "topLeftCell": "C20", "bottomRightCell": "F22"},
+        {"name": "Pic p1", "placement": 2, "left": 866, "top": 59.599998474121094, "width": 48.00669479370117, "height": 36.00503921508789, "topLeftCell": "S5", "bottomRightCell": "T7"}
+    ]},
+    {"scenario": "cells-right-exact-rows", "shapes": [
+        {"name": "Box p1", "placement": 1, "left": 196, "top": 60.599998474121094, "width": 150, "height": 70, "topLeftCell": "E5", "bottomRightCell": "H10"},
+        {"name": "Box p2", "placement": 2, "left": 436, "top": 60.599998474121094, "width": 150, "height": 70, "topLeftCell": "J5", "bottomRightCell": "M10"},
+        {"name": "Box p3", "placement": 3, "left": 580, "top": 60.599998474121094, "width": 150, "height": 70, "topLeftCell": "M5", "bottomRightCell": "P10"},
+        {"name": "Box p4", "placement": 1, "left": 96, "top": 273.6000061035156, "width": 144, "height": 28.799999237060547, "topLeftCell": "C20", "bottomRightCell": "F22"},
+        {"name": "Pic p1", "placement": 2, "left": 914, "top": 59.599998474121094, "width": 48.00669479370117, "height": 36.00503921508789, "topLeftCell": "T5", "bottomRightCell": "U7"}
+    ]},
+    {"scenario": "cells-right-fromrow-only", "shapes": [
+        {"name": "Box p1", "placement": 1, "left": 100, "top": 60.599998474121094, "width": 150, "height": 70, "topLeftCell": "C5", "bottomRightCell": "F10"},
+        {"name": "Box p2", "placement": 2, "left": 436, "top": 60.599998474121094, "width": 150, "height": 70, "topLeftCell": "J5", "bottomRightCell": "M10"},
+        {"name": "Box p3", "placement": 3, "left": 580, "top": 60.599998474121094, "width": 150, "height": 70, "topLeftCell": "M5", "bottomRightCell": "P10"},
+        {"name": "Box p4", "placement": 1, "left": 96, "top": 273.6000061035156, "width": 144, "height": 28.799999237060547, "topLeftCell": "C20", "bottomRightCell": "F22"},
+        {"name": "Pic p1", "placement": 2, "left": 914, "top": 59.599998474121094, "width": 48.00669479370117, "height": 36.00503921508789, "topLeftCell": "T5", "bottomRightCell": "U7"}
+    ]},
+    {"scenario": "cells-left-wide-band", "shapes": [
+        {"name": "Box p1", "placement": 1, "left": 96, "top": 60.599998474121094, "width": 58, "height": 70, "topLeftCell": "C5", "bottomRightCell": "D10"},
+        {"name": "Box p2", "placement": 2, "left": 244, "top": 60.599998474121094, "width": 150, "height": 70, "topLeftCell": "F5", "bottomRightCell": "I10"},
+        {"name": "Box p3", "placement": 3, "left": 580, "top": 60.599998474121094, "width": 150, "height": 70, "topLeftCell": "M5", "bottomRightCell": "P10"},
+        {"name": "Box p4", "placement": 1, "left": 96, "top": 273.6000061035156, "width": 144, "height": 28.799999237060547, "topLeftCell": "C20", "bottomRightCell": "F22"},
+        {"name": "Pic p1", "placement": 2, "left": 722, "top": 59.599998474121094, "width": 48.00669479370117, "height": 36.00503921508789, "topLeftCell": "P5", "bottomRightCell": "Q7"}
+    ]},
+    {"scenario": "cells-up-inside", "shapes": [
+        {"name": "Box p1", "placement": 1, "left": 100, "top": 60.599998474121094, "width": 150, "height": 55.599998474121094, "topLeftCell": "C5", "bottomRightCell": "F9"},
+        {"name": "Box p2", "placement": 2, "left": 340, "top": 60.599998474121094, "width": 150, "height": 70, "topLeftCell": "H5", "bottomRightCell": "K10"},
+        {"name": "Box p3", "placement": 3, "left": 580, "top": 60.599998474121094, "width": 150, "height": 70, "topLeftCell": "M5", "bottomRightCell": "P10"},
+        {"name": "Box p4", "placement": 1, "left": 96, "top": 259.20001220703125, "width": 144, "height": 28.799999237060547, "topLeftCell": "C19", "bottomRightCell": "F21"},
+        {"name": "Pic p1", "placement": 2, "left": 818, "top": 59.599998474121094, "width": 48.00669479370117, "height": 36.00503921508789, "topLeftCell": "R5", "bottomRightCell": "S7"}
+    ]},
+    {"scenario": "cells-up-at-from", "shapes": [
+        {"name": "Box p1", "placement": 1, "left": 100, "top": 57.599998474121094, "width": 150, "height": 58.599998474121094, "topLeftCell": "C5", "bottomRightCell": "F9"},
+        {"name": "Box p2", "placement": 2, "left": 340, "top": 60.599998474121094, "width": 150, "height": 70, "topLeftCell": "H5", "bottomRightCell": "K10"},
+        {"name": "Box p3", "placement": 3, "left": 580, "top": 60.599998474121094, "width": 150, "height": 70, "topLeftCell": "M5", "bottomRightCell": "P10"},
+        {"name": "Box p4", "placement": 1, "left": 96, "top": 259.20001220703125, "width": 144, "height": 28.799999237060547, "topLeftCell": "C19", "bottomRightCell": "F21"},
+        {"name": "Pic p1", "placement": 2, "left": 818, "top": 59.599998474121094, "width": 48.00669479370117, "height": 36.00503921508789, "topLeftCell": "R5", "bottomRightCell": "S7"}
+    ]},
+    {"scenario": "cells-up-narrow", "shapes": [
+        {"name": "Box p1", "placement": 1, "left": 100, "top": 60.599998474121094, "width": 150, "height": 70, "topLeftCell": "C5", "bottomRightCell": "F10"},
+        {"name": "Box p2", "placement": 2, "left": 340, "top": 60.599998474121094, "width": 150, "height": 70, "topLeftCell": "H5", "bottomRightCell": "K10"},
+        {"name": "Box p3", "placement": 3, "left": 580, "top": 60.599998474121094, "width": 150, "height": 70, "topLeftCell": "M5", "bottomRightCell": "P10"},
+        {"name": "Box p4", "placement": 1, "left": 96, "top": 273.6000061035156, "width": 144, "height": 28.799999237060547, "topLeftCell": "C20", "bottomRightCell": "F22"},
+        {"name": "Pic p1", "placement": 2, "left": 818, "top": 59.599998474121094, "width": 48.00669479370117, "height": 36.00503921508789, "topLeftCell": "R5", "bottomRightCell": "S7"}
+    ]},
+    {"scenario": "row-height-bottom-edge", "shapes": [
+        {"name": "Box p1", "placement": 1, "left": 100, "top": 60.599998474121094, "width": 150, "height": 70, "topLeftCell": "C5", "bottomRightCell": "F10"},
+        {"name": "Box p2", "placement": 2, "left": 340, "top": 60.599998474121094, "width": 150, "height": 70, "topLeftCell": "H5", "bottomRightCell": "K10"},
+        {"name": "Box p3", "placement": 3, "left": 580, "top": 60.599998474121094, "width": 150, "height": 70, "topLeftCell": "M5", "bottomRightCell": "P10"},
+        {"name": "Box p4", "placement": 1, "left": 96, "top": 273.6000061035156, "width": 144, "height": 28.799999237060547, "topLeftCell": "C20", "bottomRightCell": "F22"},
+        {"name": "Pic p1", "placement": 2, "left": 818, "top": 59.599998474121094, "width": 48.00669479370117, "height": 36.00503921508789, "topLeftCell": "R5", "bottomRightCell": "S7"}
+    ]},
+    {"scenario": "hide-row-last", "shapes": [
+        {"name": "Box p1", "placement": 1, "left": 100, "top": 60.599998474121094, "width": 150, "height": 70, "topLeftCell": "C5", "bottomRightCell": "F10"},
+        {"name": "Box p2", "placement": 2, "left": 340, "top": 60.599998474121094, "width": 150, "height": 70, "topLeftCell": "H5", "bottomRightCell": "K10"},
+        {"name": "Box p3", "placement": 3, "left": 580, "top": 60.599998474121094, "width": 150, "height": 70, "topLeftCell": "M5", "bottomRightCell": "P10"},
+        {"name": "Box p4", "placement": 1, "left": 96, "top": 273.6000061035156, "width": 144, "height": 14.399999618530273, "topLeftCell": "C20", "bottomRightCell": "F22"},
+        {"name": "Pic p1", "placement": 2, "left": 818, "top": 59.599998474121094, "width": 48.00669479370117, "height": 36.00503921508789, "topLeftCell": "R5", "bottomRightCell": "S7"}
+    ]},
+    {"scenario": "hide-cols-p4", "shapes": [
+        {"name": "Box p1", "placement": 1, "left": 100, "top": 60.599998474121094, "width": 102, "height": 70, "topLeftCell": "C5", "bottomRightCell": "F10"},
+        {"name": "Box p2", "placement": 2, "left": 292, "top": 60.599998474121094, "width": 150, "height": 70, "topLeftCell": "H5", "bottomRightCell": "K10"},
+        {"name": "Box p3", "placement": 3, "left": 580, "top": 60.599998474121094, "width": 150, "height": 70, "topLeftCell": "N5", "bottomRightCell": "Q10"},
+        {"name": "Box p4", "placement": 1, "left": 96, "top": 273.6000061035156, "width": 96, "height": 28.799999237060547, "topLeftCell": "C20", "bottomRightCell": "F22"},
+        {"name": "Pic p1", "placement": 2, "left": 770, "top": 59.599998474121094, "width": 48.00669479370117, "height": 36.00503921508789, "topLeftCell": "R5", "bottomRightCell": "S7"}
+    ]},
+    {"scenario": "row-insert-then-delete", "shapes": [
+        {"name": "Box p1", "placement": 1, "left": 100, "top": 60.599998474121094, "width": 150, "height": 70, "topLeftCell": "C5", "bottomRightCell": "F10"},
+        {"name": "Box p2", "placement": 2, "left": 340, "top": 60.599998474121094, "width": 150, "height": 70, "topLeftCell": "H5", "bottomRightCell": "K10"},
+        {"name": "Box p3", "placement": 3, "left": 580, "top": 60.599998474121094, "width": 150, "height": 70, "topLeftCell": "M5", "bottomRightCell": "P10"},
+        {"name": "Box p4", "placement": 1, "left": 96, "top": 273.6000061035156, "width": 144, "height": 28.799999237060547, "topLeftCell": "C20", "bottomRightCell": "F22"},
+        {"name": "Pic p1", "placement": 2, "left": 818, "top": 59.599998474121094, "width": 48.00669479370117, "height": 36.00503921508789, "topLeftCell": "R5", "bottomRightCell": "S7"}
+    ]}
+  ]
+}

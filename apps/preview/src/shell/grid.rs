@@ -464,15 +464,47 @@ impl Shell {
                 }
                 true
             }
-            Emit::CanvasDrag { node, at, .. } if Some(*node) == self.canvas => {
+            Emit::CanvasDrag {
+                node,
+                at,
+                modifiers,
+                ..
+            } if Some(*node) == self.canvas => {
                 let x = self.content.x as f32 + at.x * self.scale;
                 let y = self.content.y as f32 + at.y * self.scale;
+                if self.sheet.drawing_dragging() {
+                    let geo = self.grid_geom();
+                    if let Some((px, py)) =
+                        crate::sheet_ext::drawing::pointer_to_sheet_pt(&geo, &self.sheet, x, y)
+                        && self.sheet.drawing_pointer_move(px, py, modifiers.shift)
+                    {
+                        self.build_grid(ui);
+                    }
+                    return true;
+                }
                 self.grid_drag(ui, x, y);
                 true
             }
             Emit::CanvasRelease {
-                node, modifiers, ..
+                node,
+                at,
+                modifiers,
+                ..
             } if Some(*node) == self.canvas => {
+                if self.sheet.drawing_dragging() {
+                    let x = self.content.x as f32 + at.x * self.scale;
+                    let y = self.content.y as f32 + at.y * self.scale;
+                    let geo = self.grid_geom();
+                    match crate::sheet_ext::drawing::pointer_to_sheet_pt(&geo, &self.sheet, x, y) {
+                        Some((px, py)) => {
+                            self.sheet.drawing_pointer_up(px, py, modifiers.shift);
+                        }
+                        None => self.sheet.drawing_pointer_cancel(),
+                    }
+                    self.sync_bars(ui);
+                    self.build_grid(ui);
+                    return true;
+                }
                 // Ctrl held as the fill handle is released: copy instead of continuing a series
                 // (or the other way round for a lone number), as Excel does.
                 if modifiers.ctrl && matches!(self.sheet.gesture, Some(Gesture::Fill { .. })) {
@@ -678,6 +710,10 @@ impl Shell {
             Key::Char('=') if m.alt => self.auto_sum(ui),
             Key::Char('+' | '=') if m.ctrl => self.open_insert_dialog(ui),
             Key::Char('-') if m.ctrl => self.open_delete_dialog(ui),
+            Key::Escape if self.sheet.drawing_dragging() => {
+                self.sheet.drawing_pointer_cancel();
+                self.build_grid(ui);
+            }
             Key::Escape if self.sheet.clear_copied() => self.build_grid(ui),
             Key::Escape if self.sheet.dismiss_autofill() => self.build_grid(ui),
             Key::PageDown => {
@@ -707,8 +743,11 @@ impl Shell {
             Key::F2 => self.begin_edit(ui, false, false),
             Key::F12 => self.save_as(),
             Key::Delete => {
-                // Delete empties the whole selection (formats stay).
-                let _ = self.sheet.clear_range();
+                // A selected picture, shape or text box goes first; else Delete empties the
+                // whole selection (formats stay).
+                if !self.sheet.drawing_delete_selected() {
+                    let _ = self.sheet.clear_range();
+                }
                 self.sync_bars(ui);
                 self.build_grid(ui);
             }
@@ -921,6 +960,13 @@ impl Shell {
             return;
         }
         let geo = self.grid_geom();
+        if let Some((px, py)) =
+            crate::sheet_ext::drawing::pointer_to_sheet_pt(&geo, &self.sheet, x, y)
+            && self.sheet.drawing_pointer_down(px, py, shift)
+        {
+            self.build_grid(ui);
+            return;
+        }
         let zone = if self.sheet.ext_view.mode == crate::sheet_ext::view::ViewMode::PageLayout {
             // The Page Layout view shows page tiles: a press picks the cell on the tile.
             match crate::doc::sheetchrome::layout_cell_at(

@@ -9,6 +9,17 @@ use open365_calc::Ast;
 use open365_calc::ast::{AreaKind, AreaRef, CellRef};
 
 use super::LeafShifter;
+
+// Drawing objects follow the cells they are anchored to (insert, delete, resize, hide). The
+// modules live beside this file and are declared here so `write/mod.rs` stays untouched.
+#[path = "drawing_edit.rs"]
+mod drawing_edit;
+#[path = "drawing.rs"]
+mod drawing_ops;
+#[path = "drawing_shift.rs"]
+mod drawing_shift;
+#[path = "drawing_xml.rs"]
+mod drawing_xml;
 use crate::XlsxError;
 use crate::refs::{MAX_COL, MAX_ROW};
 use crate::sheet::{CellShift, Rect, RectFate};
@@ -161,6 +172,7 @@ impl Workbook {
         let shift = direction.shift(rect);
         self.worksheet_mut(sheet)?.check_cell_shift(&shift)?;
         self.edited()?;
+        let drawings = self.drawing_snapshot(sheet);
         let target = self.sheets[sheet].info.name.clone();
 
         let shifter = LeafShifter {
@@ -207,6 +219,19 @@ impl Workbook {
             self.sst_dirty = true;
         }
         self.move_tables(sheet, &shift)?;
+        if let Some(snap) = drawings {
+            self.drawing_reflow(
+                sheet,
+                snap,
+                Some(drawing_shift::AxisShift {
+                    rows: shift.rows_axis,
+                    band: Some(shift.band),
+                    at: shift.at,
+                    count: shift.count,
+                    delete: shift.delete,
+                }),
+            )?;
+        }
         Ok(recalc)
     }
 

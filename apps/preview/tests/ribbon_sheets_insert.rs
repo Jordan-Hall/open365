@@ -359,6 +359,186 @@ fn header_and_footer_switches_to_page_layout_view() {
     let mut p = rig();
     run(&mut p, "insert.text.text.header-footer");
     assert_eq!(sheet(&mut p).ext_view.mode, ViewMode::PageLayout);
-    run(&mut p, "insert.text.text.text-box");
+    run(&mut p, "insert.text.text.wordart");
     assert!(sheet(&mut p).status.contains("not available"));
+}
+
+// ---- pictures, shapes, icons and text boxes ---------------------------------------------------
+
+fn png_file(name: &str, w: u32, h: u32) -> std::path::PathBuf {
+    let path = std::env::temp_dir().join(name);
+    image::RgbaImage::from_pixel(w, h, image::Rgba([40, 90, 200, 255]))
+        .save(&path)
+        .unwrap();
+    path
+}
+
+fn objects(p: &mut Preview) -> Vec<open365_preview::sheet::sheet_ext::drawing::ops::ObjectInfo> {
+    sheet(p).drawing_objects()
+}
+
+#[test]
+fn pictures_land_on_the_active_cell_selected_and_undo_in_one_step() {
+    use open365_drawing::Kind;
+    let mut p = rig();
+    sheet(&mut p).select_cell((4, 3));
+    let path = png_file("open365-ribbon-picture.png", 96, 64);
+    run(
+        &mut p,
+        &format!("insert.illustrations.pictures={}", path.display()),
+    );
+    let _ = std::fs::remove_file(&path);
+    let o = objects(&mut p);
+    assert_eq!(o.len(), 1);
+    assert_eq!(sheet(&mut p).drawing_selected(), Some(o[0].id));
+    let wb = saved(&mut p, "open365-insert-picture.xlsx");
+    let objs = wb.sheet_drawing_objects(0);
+    assert!(matches!(objs[0].object.kind, Kind::Picture(_)));
+    let open365_xlsx::Anchor::TwoCell { from, edit_as, .. } = objs[0].anchor else {
+        panic!("two-cell anchor");
+    };
+    // Row 4, column 3 (1-based) is the active cell: markers are 0-based.
+    assert_eq!((from.row, from.col), (3, 2));
+    assert_eq!(edit_as, open365_xlsx::EditAs::OneCell);
+    // 96 x 64 pixels at 96 dpi.
+    assert!((o[0].frame.w - 72.0).abs() < 1.0 && (o[0].frame.h - 48.0).abs() < 1.0);
+    assert!(sheet(&mut p).undo());
+    assert!(objects(&mut p).is_empty());
+    assert_eq!(sheet(&mut p).drawing_selected(), None);
+}
+
+#[test]
+fn a_missing_or_damaged_picture_file_says_so_and_adds_nothing() {
+    let mut p = rig();
+    run(&mut p, "insert.illustrations.pictures=/no/such/picture.png");
+    assert!(
+        sheet(&mut p).status.contains("cannot be opened"),
+        "{}",
+        sheet(&mut p).status
+    );
+    let path = std::env::temp_dir().join("open365-ribbon-notpicture.png");
+    std::fs::write(&path, b"not a picture").unwrap();
+    run(
+        &mut p,
+        &format!(
+            "insert.illustrations.pictures.this-device={}",
+            path.display()
+        ),
+    );
+    let _ = std::fs::remove_file(&path);
+    assert!(
+        sheet(&mut p).status.contains("not a picture format"),
+        "{}",
+        sheet(&mut p).status
+    );
+    assert!(objects(&mut p).is_empty());
+}
+
+#[test]
+fn an_icon_is_an_svg_picture_one_inch_square_with_a_png_fallback() {
+    let mut p = rig();
+    sheet(&mut p).select_cell((2, 2));
+    run(&mut p, "insert.illustrations.icons=home");
+    let o = objects(&mut p);
+    assert_eq!(o.len(), 1);
+    assert!(
+        (o[0].frame.w - 72.0).abs() < 1.0 && (o[0].frame.h - 72.0).abs() < 1.0,
+        "{:?}",
+        o[0].frame
+    );
+    let wb = saved(&mut p, "open365-insert-icon.xlsx");
+    assert!(wb.part_bytes("xl/media/image1.png").is_some());
+    let svg = wb.part_bytes("xl/media/image2.svg").expect("svg part");
+    assert!(std::str::from_utf8(svg).unwrap().contains("<svg"));
+    // The same icon through the menu item id, and a name that is not in the set.
+    run(&mut p, "insert.illustrations.icons.chart-pie");
+    assert_eq!(objects(&mut p).len(), 2);
+    run(&mut p, "insert.illustrations.icons=nope");
+    assert!(
+        sheet(&mut p).status.contains("not an icon"),
+        "{}",
+        sheet(&mut p).status
+    );
+    run(&mut p, "insert.illustrations.icons");
+    assert!(sheet(&mut p).status.contains("Choose an icon"));
+}
+
+#[test]
+fn shapes_come_from_the_gallery_and_use_the_default_style() {
+    use open365_drawing::Kind;
+    let mut p = rig();
+    sheet(&mut p).select_cell((3, 3));
+    run(&mut p, "insert.illustrations.shapes.rightArrow");
+    run(&mut p, "insert.illustrations.shapes");
+    let o = objects(&mut p);
+    assert_eq!(o.len(), 2);
+    assert_eq!(o[0].name, "Arrow: Right 1");
+    assert_eq!(o[1].name, "Rectangle 2");
+    let wb = saved(&mut p, "open365-insert-shape.xlsx");
+    let objs = wb.sheet_drawing_objects(0);
+    let Kind::Shape(s) = &objs[0].object.kind else {
+        panic!("a shape");
+    };
+    assert!(!s.is_text_box);
+    assert!(
+        matches!(&s.geometry, open365_drawing::model::Geometry::Preset { name, .. } if name == "rightArrow")
+    );
+    // Excel's default style: accent 1 fill and outline references.
+    let style = s.style.as_ref().expect("style");
+    assert_eq!(style.fill.as_ref().map(|f| f.idx), Some(1));
+    assert_eq!(style.ln.as_ref().map(|f| f.idx), Some(2));
+    run(&mut p, "insert.illustrations.shapes.noSuchShape");
+    assert!(
+        sheet(&mut p).status.contains("not a shape"),
+        "{}",
+        sheet(&mut p).status
+    );
+    assert!(sheet(&mut p).undo());
+    assert_eq!(objects(&mut p).len(), 1);
+}
+
+#[test]
+fn a_text_box_is_a_shape_with_the_text_box_flag() {
+    use open365_drawing::Kind;
+    let mut p = rig();
+    sheet(&mut p).select_cell((6, 2));
+    run(&mut p, "insert.text.text.text-box");
+    let o = objects(&mut p);
+    assert_eq!(o.len(), 1);
+    assert_eq!(o[0].name, "TextBox 1");
+    assert_eq!(sheet(&mut p).drawing_selected(), Some(o[0].id));
+    let wb = saved(&mut p, "open365-insert-textbox.xlsx");
+    let Kind::Shape(s) = &wb.sheet_drawing_objects(0)[0].object.kind else {
+        panic!("a shape");
+    };
+    assert!(s.is_text_box);
+}
+
+#[test]
+fn the_insert_menus_list_the_gallery_the_icons_and_this_device() {
+    use open365_preview::ribbon::sheets::insert::menu_items;
+    let shapes = menu_items("insert.illustrations.shapes").unwrap();
+    assert!(
+        shapes
+            .iter()
+            .any(|i| i.heading && i.label == "Block Arrows")
+    );
+    assert!(
+        shapes
+            .iter()
+            .any(|i| i.id == "insert.illustrations.shapes.rect" && i.label == "Rectangle")
+    );
+    let n = open365_drawing::catalog::CATEGORIES
+        .iter()
+        .map(|c| c.shapes.len())
+        .sum::<usize>();
+    assert_eq!(shapes.iter().filter(|i| !i.heading).count(), n);
+    let pictures = menu_items("insert.illustrations.pictures").unwrap();
+    assert_eq!(pictures[0].label, "This Device...");
+    let icons = menu_items("insert.illustrations.icons").unwrap();
+    assert!(
+        icons
+            .iter()
+            .any(|i| i.id == "insert.illustrations.icons.home")
+    );
 }

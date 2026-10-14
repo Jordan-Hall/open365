@@ -249,8 +249,8 @@ impl Shell {
 
     fn app_name(&self) -> &'static str {
         match self.kind {
-            AppKind::Writer => "Open365 Writer",
-            AppKind::Sheets => "Open365 Sheets",
+            AppKind::Writer => open365_branding::WRITE_NAME,
+            AppKind::Sheets => open365_branding::SHEET_NAME,
         }
     }
 

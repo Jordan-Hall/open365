@@ -17,7 +17,8 @@ use open365_chart::{
     WorkbookCells, render,
 };
 use open365_drawing::geom::Builtin;
-use open365_drawing::scene::{Poly, Scene, SceneItem, build_scene, place_in_rect};
+use open365_drawing::scene::{Poly, Scene, SceneItem, TextItem, build_scene, place_in_rect};
+use open365_drawing::text::{Align, Anchor};
 use open365_drawing::{Affine, Kind};
 use open365_xlsx::{GridMetrics, SheetObject, Workbook};
 
@@ -213,6 +214,7 @@ impl DrawingCache {
         for item in &scene.items {
             match item {
                 SceneItem::Poly(p) => paint_poly(painter, p, origin),
+                SceneItem::Text(t) => paint_text(painter, t, origin),
                 SceneItem::Image(img) => {
                     let embed = img.embed.clone().unwrap_or_default();
                     let tex = self.texture(painter.ctx(), index, &embed);
@@ -266,6 +268,46 @@ fn to_screen(origin: Pos2, p: open365_drawing::geom::P) -> Pos2 {
 
 fn colour(c: open365_drawing::paint::Rgba) -> Color32 {
     Color32::from_rgba_unmultiplied(c.r, c.g, c.b, c.a)
+}
+
+/// The text of a shape or text box in the text rectangle: wrapped, aligned, anchored, clipped to the
+/// rectangle. Upright whatever the shape's rotation; one regular face.
+fn paint_text(painter: &Painter, t: &TextItem, origin: Pos2) {
+    let tl = to_screen(origin, open365_drawing::geom::P::new(t.rect.0, t.rect.1));
+    let br = to_screen(origin, open365_drawing::geom::P::new(t.rect.2, t.rect.3));
+    let area = Rect::from_two_pos(tl, br);
+    if area.width() <= 0.0 || area.height() <= 0.0 {
+        return;
+    }
+    let galleys: Vec<_> = t
+        .lines
+        .iter()
+        .map(|l| {
+            painter.layout(
+                l.text.clone(),
+                FontId::proportional((l.size_pt as f32 * EGUI_PER_PT).max(1.0)),
+                colour(l.color),
+                if t.wrap { area.width() } else { f32::INFINITY },
+            )
+        })
+        .collect();
+    let total: f32 = galleys.iter().map(|g| g.size().y).sum();
+    let mut y = match t.anchor {
+        Anchor::Middle => area.top() + (area.height() - total) / 2.0,
+        Anchor::Bottom => area.bottom() - total,
+        _ => area.top(),
+    };
+    let clipped = painter.with_clip_rect(area.intersect(painter.clip_rect()));
+    for (g, l) in galleys.into_iter().zip(&t.lines) {
+        let x = match l.align {
+            Align::Center => area.left() + (area.width() - g.size().x) / 2.0,
+            Align::Right => area.right() - g.size().x,
+            _ => area.left(),
+        };
+        let h = g.size().y;
+        clipped.galley(pos2(x, y), g, colour(l.color));
+        y += h;
+    }
 }
 
 fn paint_poly(painter: &Painter, poly: &Poly, origin: Pos2) {

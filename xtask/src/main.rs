@@ -5,12 +5,15 @@ use std::env;
 use std::path::{Path, PathBuf};
 use std::process::{Command, ExitCode};
 
+mod icons;
+
 use cargo_metadata::{DependencyKind, MetadataCommand};
 
 /// Architectural layer of each workspace crate. A crate may depend (normal or
 /// build dependency) only on crates in the same or a lower layer. Dev
 /// dependencies are exempt so tests can use `open365-testkit`.
 const LAYERS: &[(&str, u8)] = &[
+    ("open365-branding", 0),
     ("open365-locale", 0),
     ("open365-opc", 0),
     ("open365-docx", 1),
@@ -35,7 +38,8 @@ fn main() -> ExitCode {
         Some("ci") => ci(),
         Some("layers") => check_layers(),
         Some("corpus-roundtrip") => corpus_roundtrip(),
-        _ => Err("usage: cargo xtask <ci|layers|corpus-roundtrip>".to_owned()),
+        Some("icons") => icons::generate(),
+        _ => Err("usage: cargo xtask <ci|layers|corpus-roundtrip|icons>".to_owned()),
     };
     match result {
         Ok(()) => ExitCode::SUCCESS,

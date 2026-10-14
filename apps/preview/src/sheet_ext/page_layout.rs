@@ -235,7 +235,7 @@ impl SheetModel {
     /// The page setup of the active sheet.
     #[must_use]
     pub fn page(&self) -> SheetPage {
-        let mut page = self.ext_page.of(self.sheet);
+        let mut page = self.page_over_file(self.ext_page.of(self.sheet));
         page.header_footer = self.header_footer_of(self.sheet);
         page
     }

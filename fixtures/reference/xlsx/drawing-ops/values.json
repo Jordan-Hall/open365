@@ -1,0 +1,88 @@
+{
+  "source": "fixtures/xlsx/drawing-ops.xlsx",
+  "sheets": [
+    {
+      "name": "Ops",
+      "visible": -1,
+      "usedRange": "A1:B14",
+      "truncatedAt2000": false,
+      "cells": {
+        "A1": {
+          "value2": "r1",
+          "text": "r1",
+          "formula": null
+        },
+        "B1": {
+          "value2": "B",
+          "text": "B",
+          "formula": null
+        },
+        "A2": {
+          "value2": "r2",
+          "text": "r2",
+          "formula": null
+        },
+        "A3": {
+          "value2": "r3",
+          "text": "r3",
+          "formula": null
+        },
+        "A4": {
+          "value2": "r4",
+          "text": "r4",
+          "formula": null
+        },
+        "A5": {
+          "value2": "r5",
+          "text": "r5",
+          "formula": null
+        },
+        "A6": {
+          "value2": "r6",
+          "text": "r6",
+          "formula": null
+        },
+        "A7": {
+          "value2": "r7",
+          "text": "r7",
+          "formula": null
+        },
+        "A8": {
+          "value2": "r8",
+          "text": "r8",
+          "formula": null
+        },
+        "A9": {
+          "value2": "r9",
+          "text": "r9",
+          "formula": null
+        },
+        "A10": {
+          "value2": "r10",
+          "text": "r10",
+          "formula": null
+        },
+        "A11": {
+          "value2": "r11",
+          "text": "r11",
+          "formula": null
+        },
+        "A12": {
+          "value2": "r12",
+          "text": "r12",
+          "formula": null
+        },
+        "A13": {
+          "value2": "r13",
+          "text": "r13",
+          "formula": null
+        },
+        "A14": {
+          "value2": "r14",
+          "text": "r14",
+          "formula": null
+        }
+      }
+    }
+  ]
+}

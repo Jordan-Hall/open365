@@ -2,17 +2,20 @@
 resolver = "3"
 exclude = ["fuzz"]
 members = [
+    "crates/branding",
     "crates/locale",
     "crates/opc",
     "crates/docx",
     "crates/xlsx",
     "crates/chart",
     "crates/pivot",
+    "crates/pivot",
     "crates/calc",
     "crates/text",
     "crates/spell",
     "crates/layout",
     "crates/pdf",
+    "crates/print",
     "crates/drawing",
     "crates/commands",
     "crates/mcp",
@@ -20,6 +23,7 @@ members = [
     "crates/ui-shell",
     "crates/gfx",
     "crates/ui-host",
+    "crates/clipboard",
     "crates/ui-core",
     "crates/testkit",
     "crates/robustness",
@@ -40,17 +44,20 @@ license = "MIT"
 publish = false
 
 [workspace.dependencies]
+open365-branding = { path = "crates/branding" }
 open365-locale = { path = "crates/locale" }
 open365-opc = { path = "crates/opc" }
 open365-docx = { path = "crates/docx" }
 open365-xlsx = { path = "crates/xlsx" }
 open365-chart = { path = "crates/chart" }
 open365-pivot = { path = "crates/pivot" }
+open365-pivot = { path = "crates/pivot" }
 open365-calc = { path = "crates/calc" }
 open365-text = { path = "crates/text" }
 open365-spell = { path = "crates/spell" }
 open365-layout = { path = "crates/layout" }
 open365-pdf = { path = "crates/pdf" }
+open365-print = { path = "crates/print" }
 open365-drawing = { path = "crates/drawing" }
 open365-commands = { path = "crates/commands" }
 open365-mcp = { path = "crates/mcp" }
@@ -58,6 +65,7 @@ open365-ui-egui = { path = "crates/ui-egui" }
 open365-ui-shell = { path = "crates/ui-shell" }
 open365-gfx = { path = "crates/gfx" }
 open365-ui-host = { path = "crates/ui-host" }
+open365-clipboard = { path = "crates/clipboard" }
 open365-ui-core = { path = "crates/ui-core" }
 open365-testkit = { path = "crates/testkit" }
 open365-server = { path = "crates/server" }
@@ -71,6 +79,9 @@ harfrust = "0.12"
 skrifa = "0.44"
 unicode-linebreak = "0.1.5"
 rfd = "0.17"
+# OS print hand-off (MIT): winspool on Windows, CUPS on Unix. PDF page surgery for print jobs (MIT), no default features.
+printers = "2.3"
+lopdf = { version = "0.45", default-features = false }
 # Safe registry reads (MIT OR Apache-2.0, Microsoft windows-rs): caret settings and the app theme.
 windows-registry = "0.6"
 serde = { version = "1.0.229", features = ["derive"] }
@@ -85,6 +96,8 @@ bytemuck = { version = "1.25", features = ["derive"] }
 pollster = "1.0"
 # Text clipboard for the winit host (MIT OR Apache-2.0). Safe public API; text only, so no image stack.
 arboard = { version = "3", default-features = false }
+# Multi-format Windows clipboard (BSL-1.0, safe public API): RTF and the private format next to arboard text and HTML.
+clipboard-win = "5"
 
 # Share-link server (open365-server, ADR-013 Stage 1). Licences verified in adr-sharing.md section 3a.
 axum = { version = "0.8", default-features = false, features = ["http1", "http2", "tokio", "json", "query"] }

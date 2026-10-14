@@ -49,13 +49,23 @@ struct Wrap {
 // running Word: WRAP_QUESTION (the wording of the second sentence), the "found no matches" and
 // "All done" lines in `count_message`. FINISHED and BAD_PATTERN are from Word's dialogs as
 // remembered; the Yes and No buttons of the question are Word's.
-const FINISHED: &str = "Open365 Writer has finished searching the document.";
+fn finished() -> String {
+    format!(
+        "{} has finished searching the document.",
+        open365_branding::WRITE_NAME
+    )
+}
 const BAD_PATTERN: &str =
     "The Find What text contains a Pattern Match expression which is not valid.";
-const WRAP_LINES: [&str; 2] = [
-    "Open365 Writer has reached the end of the document.",
-    "Do you want to continue searching at the beginning?",
-];
+fn wrap_lines() -> [String; 2] {
+    [
+        format!(
+            "{} has reached the end of the document.",
+            open365_branding::WRITE_NAME
+        ),
+        "Do you want to continue searching at the beginning?".to_owned(),
+    ]
+}
 
 /// What a point in the dialog is over.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -258,7 +268,7 @@ impl WriterPane {
         } else if self.find.error.is_some() {
             Some(BAD_PATTERN.to_owned())
         } else {
-            Some(FINISHED.to_owned())
+            Some(finished())
         }
     }
 
@@ -351,7 +361,7 @@ impl WriterPane {
             match_case: self.find.match_case,
             whole_word: self.find.whole_word,
             wildcards: self.find.wildcards,
-            clipboard: self.clipboard.get_text(),
+            clipboard: self.clipboard.payload().text,
         };
         let Some(outcome) = self.run(command) else {
             self.replace.message = Some(BAD_PATTERN.to_owned());
@@ -648,7 +658,7 @@ impl WriterPane {
                 p.frame.y1 - 2.0 * u,
             );
             list.fill_rect(body, pal.page);
-            for (i, line) in WRAP_LINES.iter().enumerate() {
+            for (i, line) in wrap_lines().iter().enumerate() {
                 crate::doc::text(
                     ui,
                     list,

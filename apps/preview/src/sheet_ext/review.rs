@@ -231,6 +231,7 @@ impl SheetModel {
         };
         review_ops::sheet_protection(wb, self.sheet).is_some()
             && review_ops::cell_locked(wb, self.sheet, row, col)
+            && !self.review_in_open_edit_range(row, col)
     }
 
     /// Typing into a cell, refused with Excel's message on a protected sheet when the cell is

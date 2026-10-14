@@ -2,9 +2,12 @@
 //! evaluator, paint, a display list in points, hit bounds and read-only fragment parsers.
 //! Design: `docs/architecture/drawing.md`.
 
+pub mod catalog;
 pub mod error;
 pub mod geom;
+pub mod handles;
 pub mod hit;
+pub mod image;
 pub mod model;
 pub mod paint;
 pub mod parse;

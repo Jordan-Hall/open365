@@ -487,7 +487,7 @@ pub const COMMANDS: &[CommandSpec] = &[
     CommandSpec {
         name: "sheet_objects",
         domain: Domain::Xlsx,
-        summary: "Sheets Insert and Formulas tabs and sheet management: tables, names, links, charts, pivots, conditional formats, sheet operations, cell shifts, recalculation.",
+        summary: "Sheets Insert and Formulas tabs and sheet management: tables, names, links, charts, pictures, shapes, text boxes, pivots, conditional formats, sheet operations, cell shifts, recalculation.",
         example: || json!({"command": "sheet_objects", "sheet": 0, "op": {"op": "calculate_now"}}),
     },
     CommandSpec {

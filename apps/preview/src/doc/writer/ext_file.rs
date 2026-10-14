@@ -3,8 +3,9 @@
 
 use std::path::PathBuf;
 
+use open365_clipboard::MemoryPayload;
 use open365_commands::Command;
-use open365_ui_core::{MemoryClipboard, Ui};
+use open365_ui_core::Ui;
 
 use super::WriterPane;
 
@@ -13,7 +14,7 @@ impl WriterPane {
     #[must_use]
     pub fn choose_open_path() -> Option<PathBuf> {
         rfd::FileDialog::new()
-            .add_filter("Word document", &["docx"])
+            .add_filter(open365_branding::FORMAT_DOCX, &["docx"])
             .set_title("Open")
             .pick_file()
     }
@@ -25,8 +26,7 @@ impl WriterPane {
             .canvas
             .and_then(|c| ui.tree.get(c).and_then(|n| n.parent));
         self.release(ui);
-        new.clipboard =
-            std::mem::replace(&mut self.clipboard, Box::new(MemoryClipboard::default()));
+        new.clipboard = std::mem::replace(&mut self.clipboard, Box::new(MemoryPayload::default()));
         new.chooser = self.chooser;
         if self.system_fonts {
             new.use_system_fonts();

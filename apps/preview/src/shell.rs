@@ -20,6 +20,7 @@ use open365_ui_core::{
 use crate::layout::{self, LayoutInput, PlacedChrome, PlacedControl, PlacedGroup, PxRect};
 use crate::menus;
 use crate::palette::Palette;
+use crate::print::{PrintPage, PrintSource, SheetsSource, WriterSource};
 use crate::ribbon::{self, RibbonCtx};
 use crate::sheet::SheetModel;
 use crate::spec::{AppSpec, Control, Kind, REF_SCALE, Scale as GroupScale, Size};
@@ -119,6 +120,8 @@ pub struct Shell {
     share: Option<share::ShareDialog>,
     share_o: (i32, i32),
     canvas: Option<NodeId>,
+    /// The Print page while Backstage shows it.
+    print: Option<crate::print::PrintPage>,
 }
 
 impl std::fmt::Debug for Shell {
@@ -203,6 +206,7 @@ impl Shell {
             share: None,
             share_o: (0, 0),
             canvas: None,
+            print: None,
         }
     }
 
@@ -246,8 +250,14 @@ impl Shell {
             return p.title();
         }
         let doc = match self.kind {
-            AppKind::Writer => "Document1 - Word",
-            AppKind::Sheets => "Book1 - Excel",
+            AppKind::Writer => open365_branding::window_title(
+                open365_branding::WRITE_UNTITLED,
+                open365_branding::WRITE_NAME,
+            ),
+            AppKind::Sheets => open365_branding::window_title(
+                open365_branding::SHEET_UNTITLED,
+                open365_branding::SHEET_NAME,
+            ),
         };
         if self.note.is_empty() {
             format!("{doc} (preview)")
@@ -1275,6 +1285,8 @@ impl Shell {
         }
         if let Some(sel) = self.backstage {
             self.build_backstage(ui, sel);
+        } else {
+            self.print = None;
         }
         if self.share.is_some() {
             self.build_share(ui);
@@ -1839,6 +1851,24 @@ impl Shell {
             },
             Act::Inert,
         );
+        if spec.backstage.nav.get(sel).is_some_and(|n| n.id == "print") {
+            let scale = self.scale;
+            let bounds = Rect::new(
+                nav_w as f32 / scale,
+                0.0,
+                (area.w - nav_w) as f32 / scale,
+                area.h as f32 / scale,
+            );
+            if let Some((page, mut source)) = Self::print_parts(
+                self.kind,
+                self.writer.as_mut(),
+                &mut self.sheet,
+                self.print.as_mut(),
+            ) {
+                page.build(ui, view, bounds, &mut *source);
+                return;
+            }
+        }
         let blank = match self.kind {
             AppKind::Writer => "Blank document",
             AppKind::Sheets => "Blank workbook",
@@ -1935,6 +1965,7 @@ impl Shell {
             closed = true;
         }
         if self.backstage.take().is_some() {
+            self.print = None;
             closed = true;
         }
         if self.close_share() {
@@ -2004,7 +2035,17 @@ impl Shell {
     pub fn handle(&mut self, ui: &mut Ui, events: Vec<Emit>) -> Vec<WinAct> {
         let mut out = Vec::new();
         for ev in events {
-            if self.dialog_handle(ui, &ev) {
+            if self.dialog_handle(ui, &ev) || self.print_event(ui, &ev) {
+                continue;
+            }
+            if let Emit::KeyPressed(_, Key::Char(c), m) = &ev
+                && m.ctrl
+                && !m.alt
+                && !m.shift
+                && c.eq_ignore_ascii_case(&'p')
+            {
+                self.open_print_page();
+                self.build_body(ui);
                 continue;
             }
             if self.kind == AppKind::Sheets && self.grid_event(ui, &ev) {
@@ -2294,6 +2335,13 @@ impl Shell {
     }
 
     fn run(&mut self, ui: &mut Ui, id: &str, out: &mut Vec<WinAct>) {
+        if id == "file.print" {
+            self.open_print_page();
+            self.build_body(ui);
+            self.note = id.to_owned();
+            out.push(WinAct::Title(self.title()));
+            return;
+        }
         if self.try_open_dialog(ui, id) {
             self.note = id.to_owned();
             out.push(WinAct::Title(self.title()));
@@ -2305,6 +2353,70 @@ impl Shell {
         self.apply_writer_zoom(ui);
         self.note = id.to_owned();
         out.push(WinAct::Title(self.title()));
+    }
+
+    /// The document the Print page prints, with the page itself; `None` while no page is open or
+    /// the app has no document.
+    fn print_parts<'a>(
+        kind: AppKind,
+        writer: Option<&'a mut doc::WriterPane>,
+        sheet: &'a mut SheetModel,
+        page: Option<&'a mut PrintPage>,
+    ) -> Option<(&'a mut PrintPage, Box<dyn PrintSource + 'a>)> {
+        let page = page?;
+        let source: Box<dyn PrintSource + 'a> = match (kind, writer) {
+            (AppKind::Writer, Some(pane)) => Box::new(WriterSource(pane)),
+            (AppKind::Writer, None) => return None,
+            (AppKind::Sheets, _) => Box::new(SheetsSource(sheet)),
+        };
+        Some((page, source))
+    }
+
+    /// Opens Backstage on its Print item (File > Print, Ctrl+P).
+    fn open_print_page(&mut self) {
+        let Some(i) = self.spec.backstage.nav.iter().position(|n| n.id == "print") else {
+            return;
+        };
+        self.open_print(i);
+        self.group_popup = None;
+    }
+
+    fn open_print(&mut self, nav_index: usize) {
+        let source: Option<Box<dyn PrintSource + '_>> = match (self.kind, self.writer.as_mut()) {
+            (AppKind::Writer, Some(pane)) => Some(Box::new(WriterSource(pane))),
+            (AppKind::Writer, None) => None,
+            (AppKind::Sheets, _) => Some(Box::new(SheetsSource(&mut self.sheet))),
+        };
+        let Some(source) = source else { return };
+        let page = PrintPage::open(&*source, &open365_print::OsPrintSystem);
+        drop(source);
+        self.print = Some(page);
+        self.backstage = Some(nav_index);
+    }
+
+    /// Gives the Print page its events; true when the page consumed one.
+    fn print_event(&mut self, ui: &mut Ui, ev: &Emit) -> bool {
+        if self.backstage.is_none()
+            || !matches!(
+                ev,
+                Emit::Clicked(_)
+                    | Emit::Selected(..)
+                    | Emit::ValueChanged(..)
+                    | Emit::TextChanged(..)
+                    | Emit::TextCommitted(..)
+            )
+        {
+            return false;
+        }
+        let Some((page, mut source)) = Self::print_parts(
+            self.kind,
+            self.writer.as_mut(),
+            &mut self.sheet,
+            self.print.as_mut(),
+        ) else {
+            return false;
+        };
+        page.handle(ui, ev, &mut *source, &mut open365_print::OsPrintSystem)
     }
 
     /// Routes a ribbon command to the module of its app and tab (see [`ribbon`]).
@@ -2407,9 +2519,8 @@ impl Shell {
                     Some("back") => {
                         self.backstage = None;
                     }
-                    Some(
-                        page @ ("new" | "open" | "save" | "save-as" | "print" | "export" | "close"),
-                    ) => {
+                    Some("print") => self.open_print(i),
+                    Some(page @ ("new" | "open" | "save" | "save-as" | "export" | "close")) => {
                         let cmd = format!("file.{page}");
                         let handled = self.dispatch_command(ui, &cmd, out);
                         self.apply_writer_zoom(ui);

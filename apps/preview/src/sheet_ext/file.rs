@@ -24,7 +24,10 @@ pub type PdfChooser = fn(&str) -> Option<PathBuf>;
 pub fn system_open_chooser() -> Option<PathBuf> {
     rfd::FileDialog::new()
         .set_title("Open")
-        .add_filter("Excel workbooks", &["xlsx", "xlsm", "xltx", "xltm"])
+        .add_filter(
+            open365_branding::FORMAT_WORKBOOK,
+            &["xlsx", "xlsm", "xltx", "xltm"],
+        )
         .pick_file()
 }
 

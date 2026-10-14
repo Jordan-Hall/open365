@@ -46,3 +46,23 @@ User documents and their hidden content (comments, tracked changes, metadata); p
 - Is the P1 parser sandbox a separate process (portable) or OS-specific (AppContainer/sandbox-exec/seccomp)? Decide during the shell spike.
 - Do we sign the agent audit log locally (tamper evidence) or only server-side?
 - What does CoWorker send by default: selection only, or the whole document? (Proposed: selection plus explicit user-added context.)
+
+## Teams additions (proposed, 2026-10-12; see `../architecture/teams.md`, ADR-016)
+Phase: T0 to T8 slices. Rows T17 to T25 come from ADR-014; T26 to T30 are new. T6 and T8 apply unchanged and gain a Teams test per route.
+
+| # | Boundary | Main threats | Controls (slice) |
+|---|---|---|---|
+| T17 | Message content | Injection through rich text, pasted HTML, deceptive links | Typed tree rendered by native widgets or DOM text nodes; pasted HTML sanitised against a payload corpus; links show the real target (T1) |
+| T18 | Subscription authz | Cross-tenant or removed-member reads over WebSocket; resume replays | Every subscribe and resume goes through the permission function; membership change closes live subscriptions; a test per event type (T0) |
+| T19 | Link previews and webhooks | SSRF, tracking, internal-network scans | Only the shared egress client from T12: private ranges blocked after DNS, redirects and size capped (T2, T7) |
+| T20 | Metadata | Presence, typing and read receipts leak activity; push leaks content | Scoped to shared channels; admin switch; push carries no text, sender or channel name, verified by payload capture (T2, T3) |
+| T21 | SFU and TURN abuse | Open relay, token reuse, stream floods | Single-room, short-lived, identity-bound tokens; TURN denies private and loopback peers; per-room and per-user limits; host remove and lock (T4) |
+| T22 | Capture consent | Silent screen capture or recording | Picker every time; recording needs host consent and shows an indicator; recordings are Drive files with ACLs (T5) |
+| T23 | File-tab permissions | Channel membership widening document access | A tab grants nothing; document ACL decides per viewer; leaving a channel never widens access (T2) |
+| T24 | Retention and legal hold | Deleted messages survive in search, thumbnails, push queues or backups | Delete removes derived stores (extends T7); holds are admin-only and audited (T6) |
+| T25 | Abuse and spam | Floods, bulk mentions, guest abuse | Rate limits per user, channel and tenant; guest limits; audit of bulk mentions and invites (T0, T6) |
+| T26 | Recording storage | Recordings readable by non-participants; consent bypass | Recording ACL equals meeting roster at start; consent event audited; retention applies (T5, T6) |
+| T27 | Apps and bots | Over-privileged bot tokens; prompt injection from message text into CoWorker or MCP | App principals with per-channel grants, expiring tokens, rate limits, audit; message text delimited as untrusted data; agent send and attach need native confirmation (T7) |
+| T28 | E2EE channels | Key or membership errors; plaintext leaking to search, logs, push or bots | MLS group membership tied to channel membership; removed members cannot decrypt later messages; grep test of the database and logs for plaintext; UI states disabled features (T8) |
+| T29 | Retention across derived stores | Search index, attachments, caches and mobile local stores outlive deletion | A retention job covers every store listed in a checked inventory; client caches honour server tombstones (T6) |
+| T30 | Federation bridge | Compromised remote server, spoofed senders, spam, residency | Allowlisted rooms and servers only; bridged identities are guests with a distinct marker; remote content treated as untrusted (T1); per-server rate limits; off by default (T8) |

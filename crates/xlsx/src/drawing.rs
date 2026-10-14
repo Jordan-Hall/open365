@@ -86,11 +86,11 @@ fn emu(text: Option<&str>) -> i64 {
     text.and_then(|t| t.trim().parse().ok()).unwrap_or(0)
 }
 
-fn is_xdr(e: &XmlElement, local: &str) -> bool {
+pub(crate) fn is_xdr(e: &XmlElement, local: &str) -> bool {
     e.head.ns.as_deref() == Some(XDR_NS) && e.head.local_name() == local
 }
 
-fn xdr_child<'a>(e: &'a XmlElement, local: &str) -> Option<&'a XmlElement> {
+pub(crate) fn xdr_child<'a>(e: &'a XmlElement, local: &str) -> Option<&'a XmlElement> {
     e.elements().find(|c| is_xdr(c, local))
 }
 
@@ -149,7 +149,7 @@ fn frame_name(e: &XmlElement) -> String {
     find(e).unwrap_or_default()
 }
 
-fn parse_anchor(e: &XmlElement) -> Option<Anchor> {
+pub(crate) fn parse_anchor(e: &XmlElement) -> Option<Anchor> {
     match e.head.local_name() {
         "twoCellAnchor" => {
             let edit_as = match e.head.attr("editAs") {
@@ -452,6 +452,26 @@ fn row_top_pt(ws: &Worksheet, row: u32) -> f64 {
     top
 }
 
+/// Height in points of 0-based `row` as stored (zero when hidden).
+fn row_height_pt(ws: &Worksheet, row: u32) -> f64 {
+    let format = ws.sheet_format();
+    ws.rows()
+        .iter()
+        .find(|r| r.r == row + 1)
+        .map(|r| {
+            if r.hidden() {
+                0.0
+            } else {
+                r.height().unwrap_or(format.default_row_height)
+            }
+        })
+        .unwrap_or(if format.zero_height {
+            0.0
+        } else {
+            format.default_row_height
+        })
+}
+
 impl Anchor {
     /// The anchored rectangle in points. Columns follow Excel's pixel quantisation (`metrics`
     /// at 96 dpi gives a default column of 48 pt); rows use their height in points.
@@ -468,16 +488,23 @@ impl Anchor {
 
     fn rect_with(&self, ws: &Worksheet, metrics: GridMetrics, quantised: bool) -> RectPt {
         let geometry = ws.geometry(metrics);
+        // An offset inside a cell is clamped to the cell: a marker in a hidden row or column sits on
+        // the cell's edge (measured: `hide-rows-over` in `fixtures/reference/xlsx/drawing-ops`).
         let col_x = |m: &AnchorMarker| {
-            metrics.px_to_pt(geometry.col_x(m.col + 1) as u32) + m.col_off as f64 / EMU_PER_POINT
+            let width = metrics.px_to_pt(geometry.col_px(m.col + 1));
+            metrics.px_to_pt(geometry.col_x(m.col + 1) as u32)
+                + (m.col_off as f64 / EMU_PER_POINT).clamp(0.0, width)
         };
         let row_y = |m: &AnchorMarker| {
-            let top = if quantised {
-                metrics.px_to_pt(geometry.row_y(m.row + 1) as u32)
+            let (top, height) = if quantised {
+                (
+                    metrics.px_to_pt(geometry.row_y(m.row + 1) as u32),
+                    metrics.px_to_pt(geometry.row_px(m.row + 1)),
+                )
             } else {
-                row_top_pt(ws, m.row)
+                (row_top_pt(ws, m.row), row_height_pt(ws, m.row))
             };
-            top + m.row_off as f64 / EMU_PER_POINT
+            top + (m.row_off as f64 / EMU_PER_POINT).clamp(0.0, height)
         };
         match *self {
             Self::TwoCell { from, to, .. } => {

@@ -10,12 +10,18 @@ publish.workspace = true
 [dependencies]
 accesskit.workspace = true
 accesskit_winit.workspace = true
-arboard.workspace = true
+open365-clipboard.workspace = true
 open365-gfx.workspace = true
 open365-ui-core.workspace = true
 thiserror = "2.0.21"
 wgpu.workspace = true
 winit.workspace = true
+
+[target.'cfg(windows)'.dependencies]
+clipboard-win.workspace = true
+
+[target.'cfg(not(windows))'.dependencies]
+arboard.workspace = true
 
 [dev-dependencies]
 open365-text.workspace = true

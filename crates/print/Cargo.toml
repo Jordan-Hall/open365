@@ -1,0 +1,15 @@
+[package]
+name = "open365-print"
+description = "File > Print back end: print settings, page selection and N-up on a finished PDF, and the hand-off to the OS print system (ADR-018)."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+lopdf.workspace = true
+printers.workspace = true
+
+[lints]
+workspace = true

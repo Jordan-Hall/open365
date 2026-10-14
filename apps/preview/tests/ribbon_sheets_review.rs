@@ -212,7 +212,6 @@ fn unsupported_review_controls_are_left_unhandled() {
         "review.performance.check-performance",
         "review.language.translate",
         "review.changes.show-changes",
-        "review.protect.allow-edit-ranges",
         "review.protect.unshare-workbook",
         "review.ink.hide-ink",
     ] {

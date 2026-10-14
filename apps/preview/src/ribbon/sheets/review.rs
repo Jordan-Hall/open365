@@ -10,11 +10,15 @@
 //! - `review.comments.new-comment=text` adds a threaded comment (a reply when the cell has one)
 //! - `review.notes.notes` edits the note of the active cell (new when it has none): `=text`;
 //!   the items `.new`, `.edit`, `.delete`, `.previous`, `.next` are the Notes menu
+//! - `review.notes.notes.convert-to-comments` turns every note of the workbook into a comment thread
+//! - `review.protect.allow-edit-ranges=add:Title|A1:B3|password`, `=modify:Old|Title|A1:B3|password`
+//!   and `=delete:Title` change the ranges users may edit on an unprotected sheet (the dialog that
+//!   collects them is not built; a plain click only reports how many ranges there are)
 //! - `review.proofing.spelling=en-GB` checks the sheet in that language
 //!
-//! Not wired: Thesaurus (no thesaurus data), Check Performance, Translate (network service),
-//! Show Changes and Unshare Workbook (shared workbooks, co-authoring), Allow Edit Ranges, Hide
-//! Ink (no ink).
+//! Not wired (left to `Handled::No`): Thesaurus (no thesaurus data), Check Performance, Translate
+//! (network service), Show Changes (legacy track changes) and Unshare Workbook (legacy shared
+//! workbooks; neither has an engine, both are replaced by co-authoring), Hide Ink (no ink).
 
 use open365_commands::review_ops::SheetProtection;
 
@@ -35,6 +39,7 @@ pub const IDS: &[&str] = &[
     "review.notes.notes",
     "review.protect.protect-sheet",
     "review.protect.protect-workbook",
+    "review.protect.allow-edit-ranges",
 ];
 
 fn split(id: &str) -> Option<(&'static str, &str, Option<&str>)> {
@@ -106,6 +111,7 @@ fn run(m: &mut SheetModel, ctrl: &str, sub: &str, arg: Option<&str>) -> Result<(
         "notes" => notes(m, sub, arg),
         "protect-sheet" => protect_sheet(m, arg),
         "protect-workbook" => protect_workbook(m, arg),
+        "allow-edit-ranges" => edit_ranges(m, arg),
         _ => Ok(()),
     }
 }
@@ -116,6 +122,7 @@ fn notes(m: &mut SheetModel, sub: &str, arg: Option<&str>) -> Result<(), String>
         "delete" => m.review_delete_note(),
         "previous" => m.review_goto_note(false),
         "next" => m.review_goto_note(true),
+        "convert-to-comments" | "convert" => m.review_convert_notes_to_comments(),
         "" | "run" | "new" | "edit" => {
             let has = m.review_note_at(row, col).is_some();
             if sub == "new" && has {
@@ -178,4 +185,23 @@ fn protect_workbook(m: &mut SheetModel, arg: Option<&str>) -> Result<(), String>
         m.ext_review.request(Request::ProtectWorkbook);
     }
     m.review_protect_workbook(password.as_deref())
+}
+
+/// Allow Edit Ranges: `add:Title|A1:B3|password`, `modify:Old|Title|A1:B3|password`,
+/// `delete:Title`. Without an argument it only reports the ranges.
+fn edit_ranges(m: &mut SheetModel, arg: Option<&str>) -> Result<(), String> {
+    let Some(arg) = arg else {
+        let n = m.review_edit_ranges().len();
+        m.status = format!("{n} ranges can be edited on this sheet.");
+        return Ok(());
+    };
+    let (verb, rest) = arg.split_once(':').unwrap_or((arg, ""));
+    let f: Vec<&str> = rest.split('|').collect();
+    let field = |i: usize| f.get(i).copied().unwrap_or_default();
+    match verb {
+        "add" => m.review_add_edit_range(field(0), field(1), Some(field(2))),
+        "modify" => m.review_modify_edit_range(field(0), field(1), field(2), Some(field(3))),
+        "delete" => m.review_delete_edit_range(field(0)),
+        other => Err(format!("Unknown Allow Edit Ranges action '{other}'.")),
+    }
 }

@@ -43,7 +43,7 @@ struct PasteSpecial;
 impl Shell {
     /// Ctrl+Alt+V: opens the dialog when something was copied in this window.
     pub fn open_paste_special_dialog(&mut self, ui: &mut Ui) {
-        if !self.sheet.has_copied() {
+        if !self.sheet.can_paste_special() {
             self.note = "Copy cells first, then paste special".to_owned();
             return;
         }

@@ -10,6 +10,7 @@ publish.workspace = true
 [dependencies]
 arboard = { version = "3.6.1", default-features = false }
 eframe.workspace = true
+open365-branding.workspace = true
 egui.workspace = true
 fontdb.workspace = true
 image.workspace = true

@@ -16,15 +16,14 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use accesskit::{Action, Node as AkNode, NodeId as AkId, Role, TextPosition, TextSelection};
+use open365_clipboard::{MemoryPayload, PayloadIo};
 use open365_commands::{Command, Outcome, Target};
 use open365_docx::{DocPos, RunPropsPatch, VertAlign};
 use open365_gfx::{Color, DrawList, FontId, GlyphPos, GlyphRun, Rect as GRect};
 use open365_layout::{ClusterKind, IncrementalLayout, LayoutOptions, Line, ParaRole};
 use open365_text::{FaceId, FontLibrary, FontStyle, ShapeFeatures, shape_run};
 use open365_ui_core::access::ak_id;
-use open365_ui_core::{
-    Clipboard, Emit, ImeInput, Key, MemoryClipboard, Modifiers, Node, NodeId, Rect, Ui, Widget,
-};
+use open365_ui_core::{Emit, ImeInput, Key, Modifiers, Node, NodeId, Rect, Ui, Widget};
 
 mod cells;
 mod ext_design;
@@ -34,6 +33,7 @@ mod ext_insert;
 mod ext_layout;
 mod ext_mailings;
 mod ext_references;
+mod ext_references_more;
 mod ext_review;
 mod ext_view;
 mod findbar;
@@ -360,7 +360,7 @@ pub type PathChooser = fn() -> Option<PathBuf>;
 
 fn choose_save_path() -> Option<PathBuf> {
     rfd::FileDialog::new()
-        .add_filter("Word document", &["docx"])
+        .add_filter(open365_branding::FORMAT_DOCX, &["docx"])
         .set_title("Save As")
         .save_file()
 }
@@ -393,7 +393,7 @@ pub struct WriterPane {
     /// The vertical scroll bar's thumb is being dragged.
     bar_drag: bool,
     blink_epoch: Instant,
-    clipboard: Box<dyn Clipboard>,
+    clipboard: Box<dyn PayloadIo>,
     chooser: PathChooser,
     /// Message for the status bar (the last failed command, the last save).
     pub status: Option<String>,
@@ -449,7 +449,7 @@ impl WriterPane {
             dragging: false,
             bar_drag: false,
             blink_epoch: Instant::now(),
-            clipboard: Box::new(MemoryClipboard::default()),
+            clipboard: Box::new(MemoryPayload::default()),
             chooser: choose_save_path,
             status: None,
             pictures: pictures::Cache::default(),
@@ -506,7 +506,7 @@ impl WriterPane {
     }
 
     /// Replaces the clipboard (the host passes the system one; tests a memory one).
-    pub fn set_clipboard(&mut self, c: Box<dyn Clipboard>) {
+    pub fn set_clipboard(&mut self, c: Box<dyn PayloadIo>) {
         self.clipboard = c;
     }
 
@@ -595,7 +595,7 @@ impl WriterPane {
             || "Document1".to_owned(),
             |n| n.to_string_lossy().into_owned(),
         );
-        format!("{name} - Word")
+        open365_branding::window_title(&name, open365_branding::WRITE_NAME)
     }
 
     // ---- model and layout sync ---------------------------------------------------------------
@@ -1729,11 +1729,20 @@ impl WriterPane {
         out.replace('\u{2003}', "\t")
     }
 
+    /// Ctrl+C: the selection to the clipboard as text, HTML, RTF and the private format.
     pub fn copy(&mut self) {
-        if self.has_selection() {
-            let t = self.selected_text();
-            self.clipboard.set_text(&t);
+        if !self.has_selection() {
+            return;
         }
+        let (a, b) = self.selection();
+        let rich = match self.target.docx() {
+            Some(doc) => crate::clip::writer::copy_selection(doc, a, b),
+            None => open365_clipboard::RichText::from_plain(&self.selected_text()),
+        };
+        // A refused copy leaves the previous contents, as the system clipboard does.
+        let _ = self
+            .clipboard
+            .set_payload(&crate::clip::writer_payload(&rich));
     }
 
     pub fn cut(&mut self) {
@@ -1743,10 +1752,22 @@ impl WriterPane {
         }
     }
 
+    /// Ctrl+V: the best format on the clipboard, with its formatting unless it is plain text.
     pub fn paste(&mut self) {
-        if let Some(t) = self.clipboard.get_text() {
-            self.paste_text(&t);
+        let payload = self.clipboard.payload();
+        let Some((source, rich)) = crate::clip::read_writer(&payload) else {
+            return;
+        };
+        // The selection is replaced, so the pasted text starts where it started.
+        let start = self.selection().0;
+        let insertion =
+            crate::clip::writer::insertion(&rich, start, source != crate::clip::Source::Text);
+        self.paste_text(&insertion.text);
+        let (anchor, caret) = (self.anchor, self.caret);
+        for command in insertion.commands {
+            let _ = self.run(command);
         }
+        self.select(anchor, caret);
     }
 
     // ---- saving ------------------------------------------------------------------------------

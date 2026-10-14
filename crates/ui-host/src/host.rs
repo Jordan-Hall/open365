@@ -34,6 +34,16 @@ pub struct HostConfig {
     pub decorations: bool,
     /// Initial position of the window in logical pixels; `None` lets the system place it.
     pub position: Option<(f64, f64)>,
+    /// The window and taskbar icon; `None` keeps the executable's own icon.
+    pub icon: Option<WindowIcon>,
+}
+
+/// A window icon as 8-bit RGBA pixels, row by row.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct WindowIcon {
+    pub rgba: Vec<u8>,
+    pub width: u32,
+    pub height: u32,
 }
 
 impl Default for HostConfig {
@@ -47,6 +57,7 @@ impl Default for HostConfig {
             atlas_size: 2048,
             decorations: true,
             position: None,
+            icon: None,
         }
     }
 }
@@ -155,6 +166,12 @@ impl<A: UiApp> Host<A> {
             .with_decorations(c.decorations)
             // Hidden until the AccessKit adapter exists, as the adapter requires.
             .with_visible(false);
+        if let Some(icon) = &c.icon
+            && let Ok(icon) =
+                winit::window::Icon::from_rgba(icon.rgba.clone(), icon.width, icon.height)
+        {
+            attrs = attrs.with_window_icon(Some(icon));
+        }
         if let Some((x, y)) = c.position {
             attrs = attrs.with_position(LogicalPosition::new(x, y));
         }

@@ -249,9 +249,9 @@ impl App {
     pub fn save_as(&mut self) {
         let Some(target) = &self.target else { return };
         let (name, ext) = if target.docx().is_some() {
-            ("Word document", "docx")
+            (open365_branding::FORMAT_DOCUMENT, "docx")
         } else {
-            ("Excel workbook", "xlsx")
+            (open365_branding::FORMAT_WORKBOOK, "xlsx")
         };
         if let Some(path) = rfd::FileDialog::new()
             .add_filter(name, &[ext])
@@ -284,7 +284,10 @@ impl App {
     pub fn export_pdf(&mut self) {
         let Some(target) = &self.target else { return };
         if target.docx().is_none() {
-            self.status = "Export PDF needs a Word document".to_owned();
+            self.status = format!(
+                "Export PDF needs a {}",
+                open365_branding::FORMAT_DOCUMENT.to_lowercase()
+            );
             return;
         }
         let name = target.path().and_then(|p| p.file_stem()).map_or_else(
@@ -345,7 +348,10 @@ impl App {
     pub fn print(&mut self) {
         let Some(target) = &self.target else { return };
         if target.docx().is_none() {
-            self.status = "Print needs a Word document".to_owned();
+            self.status = format!(
+                "Print needs a {}",
+                open365_branding::FORMAT_DOCUMENT.to_lowercase()
+            );
             return;
         }
         let stem = target.path().and_then(|p| p.file_stem()).map_or_else(
@@ -504,7 +510,10 @@ impl App {
             self.doc.toggle(target, which);
             self.doc.focus();
         } else {
-            self.status = "Character formatting applies to Word documents".to_owned();
+            self.status = format!(
+                "Character formatting applies to {}s",
+                open365_branding::FORMAT_DOCUMENT.to_lowercase()
+            );
         }
     }
 
@@ -946,7 +955,11 @@ impl App {
                 ui.vertical_centered(|ui| {
                     ui.add_space(80.0);
                     ui.heading("Open365");
-                    ui.label("Open a Word (.docx) or Excel (.xlsx) file to begin.");
+                    ui.label(format!(
+                        "Open a {} or {} file to begin.",
+                        open365_branding::FORMAT_DOCX,
+                        open365_branding::FORMAT_XLSX
+                    ));
                     if ui.button("Open...").clicked() {
                         self.open_dialog();
                     }

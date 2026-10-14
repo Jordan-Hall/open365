@@ -9,13 +9,14 @@ use std::sync::{Arc, OnceLock};
 use std::time::Instant;
 
 use accesskit::{Action, ActionData, ActionRequest, Role, TreeId};
+use open365_clipboard::{ClipPayload, PayloadIo};
 use open365_docx::DocPos;
 use open365_gfx::{Assets, Color, DrawList};
 use open365_preview::doc::{PathChooser, WriterPane};
 use open365_preview::layout::PxRect;
 use open365_preview::{AppKind, Palette, fonts};
 use open365_ui_core::geom::{Point, Rect};
-use open365_ui_core::{Clipboard, ImeInput, InputEvent, Key, Modifiers, PointerButton, Ui};
+use open365_ui_core::{ImeInput, InputEvent, Key, Modifiers, PointerButton, Ui};
 
 const SCALE: f32 = 1.25;
 const AREA: PxRect = PxRect {
@@ -33,13 +34,17 @@ struct Rig {
 #[derive(Clone, Default)]
 struct Shared(Rc<RefCell<Option<String>>>);
 
-impl Clipboard for Shared {
-    fn get_text(&mut self) -> Option<String> {
-        self.0.borrow().clone()
+impl PayloadIo for Shared {
+    fn set_payload(&mut self, payload: &ClipPayload) -> Result<(), String> {
+        *self.0.borrow_mut() = payload.text.clone();
+        Ok(())
     }
 
-    fn set_text(&mut self, text: &str) {
-        *self.0.borrow_mut() = Some(text.to_owned());
+    fn payload(&mut self) -> ClipPayload {
+        ClipPayload {
+            text: self.0.borrow().clone(),
+            ..ClipPayload::default()
+        }
     }
 }
 

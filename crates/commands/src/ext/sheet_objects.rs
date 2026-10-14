@@ -7,14 +7,14 @@ use open365_opc::{PartName, TargetMode};
 use open365_xlsx::{
     CalcMode, CellError, CellIsOp, CellValue, CfKind, CfRuleSpec, CfSpec, Cfvo, CfvoKind,
     ChartAnchor, Color, ColorSource, DataBarAxis, DataBarDirection, DataBarExt, Dxf, DxfFill,
-    DxfFont, FillPattern, HeaderChoice, HyperlinkSpec, HyperlinkTarget, NameSource, NameSpec,
-    NoteSpec, PivotSpec, Rgb, SheetKind, SheetState, ShiftDirection, TabColor, TableSpec,
+    DxfFont, EditAs, FillPattern, HeaderChoice, HyperlinkSpec, HyperlinkTarget, NameSource,
+    NameSpec, NoteSpec, PivotSpec, Rgb, SheetKind, SheetState, ShiftDirection, TabColor, TableSpec,
     TableStyleChoice, TimePeriod, Underline, Workbook,
 };
 use serde::{Deserialize, Serialize};
 
 use super::review::{self, ReviewOp};
-use crate::command::CellRef;
+use crate::command::{CellRef, Command};
 use crate::error::CommandError;
 use crate::format::{ColorSpec, RangeRef};
 use crate::xlsx_state::{XlsxState, build_engine};
@@ -332,6 +332,74 @@ pub enum CellShift {
     Up,
 }
 
+/// How a drawing object follows the cells beneath it (Format Object > Properties).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ObjectPlacement {
+    /// Move and size with cells.
+    MoveAndSize,
+    /// Move but do not size with cells.
+    Move,
+    /// Do not move or size with cells.
+    Free,
+}
+
+/// Where an object goes in the stacking order (Arrange group).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ObjectOrder {
+    Front,
+    Back,
+    Forward,
+    Backward,
+}
+
+/// One change to a picture, shape or text box.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum ObjectEdit {
+    /// Move and resize: the unrotated frame in points from the corner of A1.
+    Frame {
+        x: f64,
+        y: f64,
+        width: f64,
+        height: f64,
+    },
+    /// Rotation in degrees, clockwise.
+    Rotate {
+        degrees: f64,
+    },
+    Flip {
+        horizontal: bool,
+        vertical: bool,
+    },
+    /// `none`, `RRGGBB`, or a scheme colour such as `accent1` or `accent1:lumMod=60000,lumOff=40000`.
+    Fill {
+        color: String,
+    },
+    /// Outline colour (same forms as the fill), width in points and dash style; absent parts stay.
+    Line {
+        #[serde(default)]
+        color: Option<String>,
+        #[serde(default)]
+        width: Option<f64>,
+        #[serde(default)]
+        dash: Option<String>,
+    },
+    /// Replaces the text of a shape or text box; a new line starts a new paragraph.
+    Text {
+        text: String,
+    },
+    Name {
+        name: String,
+        #[serde(default)]
+        alt: Option<String>,
+    },
+    Placement {
+        mode: ObjectPlacement,
+    },
+}
+
 /// Every Insert tab, Formulas tab and sheet-management edit.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "op", rename_all = "snake_case")]
@@ -395,6 +463,41 @@ pub enum ObjectsOp {
         range: RangeRef,
         #[serde(default)]
         name: Option<String>,
+    },
+    /// Insert > Pictures: a PNG, JPEG, GIF, BMP or SVG file (`data` is the file) with its top-left
+    /// corner on cell `row`, `col` at its natural size. Reports `object N` with the new object's id.
+    InsertPicture {
+        data: Vec<u8>,
+        row: u32,
+        col: u32,
+        #[serde(default)]
+        name: Option<String>,
+    },
+    /// Insert > Shapes (a gallery preset such as `rect`, `ellipse`, `rightArrow`) and Insert > Text
+    /// Box (`text_box`), with the top-left corner on cell `row`, `col`; `size` is (width, height) in
+    /// points, the click default when absent. Reports `object N`.
+    InsertShape {
+        preset: String,
+        #[serde(default)]
+        text_box: bool,
+        row: u32,
+        col: u32,
+        #[serde(default)]
+        size: Option<(f64, f64)>,
+    },
+    /// Changes one picture, shape or text box, addressed by its drawing id.
+    EditObject {
+        object: u32,
+        edit: ObjectEdit,
+    },
+    /// Arrange > Bring to Front, Send to Back, Bring Forward, Send Backward.
+    ArrangeObject {
+        object: u32,
+        order: ObjectOrder,
+    },
+    /// Deletes a picture, shape, text box or chart from the sheet.
+    DeleteObject {
+        object: u32,
     },
     /// Adds a pivot table from the parts the pivot crate produced.
     AddPivotTable {
@@ -489,6 +592,7 @@ impl ObjectsOp {
                 | Self::DeleteConditionalFormat { .. }
                 | Self::ClearConditionalFormats { .. }
                 | Self::DeleteCells { .. }
+                | Self::DeleteObject { .. }
                 | Self::ReplaceConditionalFormat { .. }
         )
     }
@@ -956,6 +1060,84 @@ pub(crate) fn run(
             notes.push(format!("chart {}", made.name));
             Ok(Vec::new())
         }
+        ObjectsOp::InsertPicture {
+            data,
+            row,
+            col,
+            name,
+        } => {
+            let id = x
+                .workbook
+                .insert_picture(sheet, *row, *col, data, name.as_deref())?;
+            notes.push(format!("object {id}"));
+            Ok(Vec::new())
+        }
+        ObjectsOp::InsertShape {
+            preset,
+            text_box,
+            row,
+            col,
+            size,
+        } => {
+            let id = x
+                .workbook
+                .insert_shape(sheet, *row, *col, preset, *text_box, *size)?;
+            notes.push(format!("object {id}"));
+            Ok(Vec::new())
+        }
+        ObjectsOp::EditObject { object, edit } => {
+            let wb = &mut x.workbook;
+            match edit {
+                ObjectEdit::Frame {
+                    x: left,
+                    y,
+                    width,
+                    height,
+                } => wb.set_drawing_frame(sheet, *object, *left, *y, *width, *height)?,
+                ObjectEdit::Rotate { degrees } => {
+                    wb.set_drawing_rotation(sheet, *object, *degrees)?
+                }
+                ObjectEdit::Flip {
+                    horizontal,
+                    vertical,
+                } => wb.set_drawing_flip(sheet, *object, *horizontal, *vertical)?,
+                ObjectEdit::Fill { color } => wb.set_drawing_fill(sheet, *object, color)?,
+                ObjectEdit::Line { color, width, dash } => {
+                    wb.set_drawing_line(sheet, *object, color.as_deref(), *width, dash.as_deref())?
+                }
+                ObjectEdit::Text { text } => wb.set_drawing_text(sheet, *object, text)?,
+                ObjectEdit::Name { name, alt } => {
+                    wb.set_drawing_name(sheet, *object, name, alt.as_deref())?;
+                }
+                ObjectEdit::Placement { mode } => wb.set_drawing_placement(
+                    sheet,
+                    *object,
+                    match mode {
+                        ObjectPlacement::MoveAndSize => EditAs::TwoCell,
+                        ObjectPlacement::Move => EditAs::OneCell,
+                        ObjectPlacement::Free => EditAs::Absolute,
+                    },
+                )?,
+            }
+            Ok(Vec::new())
+        }
+        ObjectsOp::ArrangeObject { object, order } => {
+            x.workbook.arrange_drawing(
+                sheet,
+                *object,
+                match order {
+                    ObjectOrder::Front => "front",
+                    ObjectOrder::Back => "back",
+                    ObjectOrder::Forward => "forward",
+                    ObjectOrder::Backward => "backward",
+                },
+            )?;
+            Ok(Vec::new())
+        }
+        ObjectsOp::DeleteObject { object } => {
+            x.workbook.delete_drawing(sheet, *object)?;
+            Ok(Vec::new())
+        }
         ObjectsOp::AddPivotTable {
             cache_definition,
             cache_records,
@@ -1119,5 +1301,108 @@ pub(crate) fn run(
         }
         ObjectsOp::CalculateNow => refresh_values(x, None),
         ObjectsOp::CalculateSheet => refresh_values(x, Some(sheet)),
+    }
+}
+
+// ---- hide and resize with drawing objects ------------------------------------------------------
+
+/// The sheet of a hide, unhide or resize of rows or columns, when that sheet has drawing objects:
+/// the objects follow the cells (a move-only object keeps its size, a free-floating one its place),
+/// which rewrites their anchors, so the edit needs a whole-workbook inverse.
+pub(crate) fn moves_drawings(x: &XlsxState, command: &Command) -> bool {
+    let sheet = match command {
+        Command::SetColumnWidth { sheet, .. }
+        | Command::SetRowHeight { sheet, .. }
+        | Command::HideColumns { sheet, .. }
+        | Command::UnhideColumns { sheet, .. }
+        | Command::HideRows { sheet, .. }
+        | Command::UnhideRows { sheet, .. } => *sheet,
+        _ => return false,
+    };
+    !x.workbook.sheet_drawing_parts(sheet).is_empty()
+}
+
+/// Runs a command [`moves_drawings`] accepted and moves the sheet's drawing objects with the cells.
+pub(crate) fn run_with_drawings(x: &mut XlsxState, command: &Command) -> Result<(), CommandError> {
+    let wb = &mut x.workbook;
+    match command {
+        Command::SetColumnWidth {
+            sheet,
+            first,
+            last,
+            width,
+        } => wb.with_drawings_reflowed(*sheet, |w| {
+            w.set_column_width(*sheet, *first, *last, *width).map(drop)
+        }),
+        Command::SetRowHeight {
+            sheet,
+            first,
+            last,
+            points,
+        } => wb.with_drawings_reflowed(*sheet, |w| {
+            w.set_row_height(*sheet, *first, *last, *points).map(drop)
+        }),
+        Command::HideColumns { sheet, first, last } => {
+            wb.with_drawings_reflowed(*sheet, |w| w.hide_columns(*sheet, *first, *last).map(drop))
+        }
+        Command::UnhideColumns {
+            sheet,
+            first,
+            last,
+            default_width,
+        } => wb.with_drawings_reflowed(*sheet, |w| {
+            w.unhide_columns(*sheet, *first, *last, *default_width)
+                .map(drop)
+        }),
+        Command::HideRows { sheet, first, last } => {
+            wb.with_drawings_reflowed(*sheet, |w| w.hide_rows(*sheet, *first, *last).map(drop))
+        }
+        Command::UnhideRows { sheet, first, last } => {
+            wb.with_drawings_reflowed(*sheet, |w| w.unhide_rows(*sheet, *first, *last).map(drop))
+        }
+        _ => return Err(bad("not a hide or resize command")),
+    }
+    .map_err(|e| bad(e.to_string()))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use open365_opc::Limits;
+
+    fn state() -> XlsxState {
+        let path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../../fixtures/xlsx/drawing-ops.xlsx");
+        let bytes = std::fs::read(path).expect("fixture");
+        XlsxState::new(Workbook::open(&bytes, &Limits::default()).expect("opens"))
+    }
+
+    #[test]
+    fn hiding_rows_moves_the_move_only_and_the_free_objects_with_the_cells() {
+        let mut x = state();
+        let hide = Command::HideRows {
+            sheet: 0,
+            first: 5,
+            last: 8,
+        };
+        assert!(moves_drawings(&x, &hide));
+        assert!(!moves_drawings(
+            &x,
+            &Command::SheetObjects {
+                sheet: 0,
+                op: ObjectsOp::CalculateNow,
+            }
+        ));
+        let before: Vec<_> = x.workbook.sheet_drawing_objects(0);
+        run_with_drawings(&mut x, &hide).expect("hides");
+        let after = x.workbook.sheet_drawing_objects(0);
+        let (b, a) = (&before[1], &after[1]);
+        assert_eq!(b.object.name, "Box p2");
+        // The move-only box keeps its stored size (70 pt) whatever the rows do.
+        let ws = x.workbook.sheet(0).expect("sheet");
+        let m = open365_xlsx::GridMetrics::for_styles(x.workbook.styles(), 96);
+        let ra = a.anchor.rect_px_pt(ws, m);
+        assert!((ra.height - 70.0).abs() < 1.5, "{ra:?}");
+        assert_ne!(b.anchor, a.anchor);
     }
 }

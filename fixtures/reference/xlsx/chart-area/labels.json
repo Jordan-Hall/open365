@@ -1,0 +1,11 @@
+{
+  "source": "fixtures/xlsx/chart-area.xlsx",
+  "oracle": "Microsoft Excel via COM, points, origin at the chart area top left; tick_texts are Excel's number-format output for each tick value, not the rendered text",
+  "excel_build": "20430",
+  "chart_type": 1,
+  "value_axis": {"number_format":"General","linked":true,"scale":"linear","min":0,"max":25,"major":5,"tick_values":[0,5,10,15,20,25],"tick_texts":["0","5","10","15","20","25"]},
+  "category_axis": {"number_format": "General","linked": true},
+  "label_positions": [
+    
+  ]
+}

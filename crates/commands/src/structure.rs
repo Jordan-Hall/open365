@@ -103,7 +103,7 @@ pub(crate) fn apply(
         skipped: Cell::new(0),
     };
     let backup = workbook.clone();
-    match workbook.edit_structure(sheet, edit, &shifter) {
+    match workbook.edit_structure_with_drawings(sheet, edit, &shifter) {
         Ok(mut recalc) => {
             // Formulas whose references did not move but whose answer may: whole-column ranges, names, tables.
             let known: std::collections::HashSet<(usize, u32, u32)> =

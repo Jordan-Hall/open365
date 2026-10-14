@@ -111,10 +111,12 @@ impl WriterPane {
         ok
     }
 
-    /// Paste Special variants: this clipboard holds text only, so Paste Values, Paste
-    /// Formatting, Paste Link and Paste Special all paste plain text.
+    /// Paste Special variants: Paste Values, Paste Formatting, Paste Link and Paste Special
+    /// all paste the plain text of the clipboard.
     pub fn paste_plain(&mut self) {
-        self.paste();
+        if let Some(text) = self.clipboard.payload().text {
+            self.paste_text(&text);
+        }
     }
 
     /// Grow Font and Shrink Font: the next or previous size of the Font Size list.

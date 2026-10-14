@@ -173,6 +173,10 @@ pub enum Command {
     DocxReferences {
         op: crate::ext::writer_references::RefOp,
     },
+    /// Writer References tab: citations, bibliography and cross-references.
+    DocxReferencesMore {
+        op: crate::ext::references_more::MoreOp,
+    },
     /// Writer Mailings tab (merge fields, envelopes, labels).
     DocxMailings {
         op: crate::ext::mailings::MailingsOp,
@@ -377,6 +381,12 @@ pub enum Command {
         sheet: usize,
         op: crate::ObjectsOp,
     },
+    /// Sheets Page Layout, Review and View edits that write sheet structures (page setup, Allow Edit
+    /// Ranges, Convert to Comments, Custom Views). One undo step.
+    SheetPage {
+        sheet: usize,
+        op: crate::SheetPageOp,
+    },
     Save {
         path: PathBuf,
     },
@@ -465,6 +475,7 @@ impl Command {
             Self::DocxReplaceOne { .. } => "docx_replace_one",
             Self::DocxSectionMargins { .. } => "docx_section_margins",
             Self::DocxReferences { .. } => "docx_references",
+            Self::DocxReferencesMore { .. } => "docx_references_more",
             Self::DocxReview { .. } => "docx_review",
             Self::DocxLayout { .. } => "docx_layout",
             Self::DocxDesign { .. } => "docx_design",
@@ -498,6 +509,7 @@ impl Command {
             Self::DataOp { .. } => "data_op",
             Self::ReviewOp { .. } => "review_op",
             Self::SheetObjects { .. } => "sheet_objects",
+            Self::SheetPage { .. } => "sheet_page",
             Self::Save { .. } => "save",
             Self::ExportPdf { .. } => "export_pdf",
             Self::ShareSendCopy { .. } => "share_send_copy",
@@ -570,6 +582,7 @@ impl Command {
             Self::DocxReplaceOne { op } => op.effect(),
             Self::DocxSectionMargins { op } => op.effect(),
             Self::DocxReferences { op } => op.effect(),
+            Self::DocxReferencesMore { op } => op.effect(),
             Self::DocxReview { op } => op.effect(),
             Self::DocxLayout { op } => op.effect(),
             Self::DocxDesign { op } => op.effect(),
@@ -587,6 +600,7 @@ impl Command {
             Self::HomeOp { op, .. } if op.destroys() => EffectClass::Destructive,
             Self::DataOp { op, .. } if op.destroys() => EffectClass::Destructive,
             Self::SheetObjects { op, .. } if op.destroys() => EffectClass::Destructive,
+            Self::SheetPage { op, .. } if op.destroys() => EffectClass::Destructive,
             Self::DocxCorrectWord { .. }
             | Self::DocxReplaceAll { .. }
             | Self::XlsxReplaceAll { .. }
@@ -625,6 +639,7 @@ impl Command {
             | Self::HomeOp { .. }
             | Self::DataOp { .. }
             | Self::SheetObjects { .. }
+            | Self::SheetPage { .. }
             | Self::ReviewOp { .. } => EffectClass::Edit,
         }
     }
@@ -713,6 +728,7 @@ impl Command {
             | Self::DocxReplaceOne { .. }
             | Self::DocxSectionMargins { .. }
             | Self::DocxReferences { .. }
+            | Self::DocxReferencesMore { .. }
             | Self::DocxReview { .. }
             | Self::DocxLayout { .. }
             | Self::DocxDesign { .. }
@@ -741,6 +757,7 @@ impl Command {
             | Self::DataOp { .. }
             | Self::ReviewOp { .. }
             | Self::SheetObjects { .. }
+            | Self::SheetPage { .. }
             | Self::Save { .. }
             | Self::ExportPdf { .. }
             | Self::ShareSendCopy { .. }

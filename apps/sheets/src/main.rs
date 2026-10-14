@@ -1,4 +1,4 @@
-//! Open365 Sheets: `open365-sheets [file.xlsx|.xltx|.xlsm|.xltm]`.
+//! Open Sheet: `open-sheet [file.xlsx|.xltx|.xlsm|.xltm]`.
 
 mod blank;
 mod format_ui;
@@ -662,7 +662,7 @@ impl ShellHost for Host<'_> {
                 .file_name()
                 .map_or_else(String::new, |n| n.to_string_lossy().into_owned()),
             None if self.s.target.is_some() => format!("Book{}", self.s.untitled),
-            None => "Open365".to_owned(),
+            None => open365_branding::SUITE.to_owned(),
         }
     }
 
@@ -819,7 +819,7 @@ impl ShellHost for Host<'_> {
             None => {
                 ui.vertical_centered(|ui| {
                     ui.add_space(80.0);
-                    ui.heading("Open365 Sheets");
+                    ui.heading(open365_branding::SHEET_NAME);
                     ui.label("Create or open a workbook to begin.");
                     if ui.button("New blank workbook").clicked() {
                         s.new_blank();
@@ -851,7 +851,7 @@ impl ShellHost for Host<'_> {
         if let Some((text, command)) = s.prompt.take() {
             // None: still open; Some(true): OK; Some(false): Cancel.
             let mut answer = None;
-            egui::Window::new("Open365 Sheets")
+            egui::Window::new(open365_branding::SHEET_NAME)
                 .collapsible(false)
                 .resizable(false)
                 .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
@@ -911,7 +911,7 @@ impl eframe::App for SheetsApp {
             theme: self.shell.theme,
         };
         self.shell.show(ui, &mut host);
-        let title = format!("{} - Open365 Sheets", host.title());
+        let title = open365_branding::window_title(&host.title(), open365_branding::SHEET_NAME);
         if title != self.title {
             ui.ctx()
                 .send_viewport_cmd(egui::ViewportCommand::Title(title.clone()));
@@ -920,18 +920,36 @@ impl eframe::App for SheetsApp {
     }
 }
 
+/// The window and taskbar icon (the same art as the executable resource).
+fn app_icon() -> egui::IconData {
+    let png = include_bytes!("../../../assets/icons/open-sheet-256.png");
+    match image::load_from_memory_with_format(png, image::ImageFormat::Png) {
+        Ok(img) => {
+            let rgba = img.into_rgba8();
+            let (width, height) = rgba.dimensions();
+            egui::IconData {
+                rgba: rgba.into_raw(),
+                width,
+                height,
+            }
+        }
+        Err(_) => egui::IconData::default(),
+    }
+}
+
 fn main() -> eframe::Result {
     let initial = std::env::args_os().nth(1).map(PathBuf::from);
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
-            .with_title("Open365 Sheets")
+            .with_title(open365_branding::SHEET_NAME)
+            .with_icon(app_icon())
             .with_decorations(false)
             .with_inner_size([1280.0, 800.0])
             .with_min_inner_size([160.0, 160.0]),
         ..eframe::NativeOptions::default()
     };
     eframe::run_native(
-        "Open365 Sheets",
+        open365_branding::SHEET_NAME,
         options,
         Box::new(move |_cc| {
             // The grid owns egui's font table, so the OS UI font is handed to the grid.

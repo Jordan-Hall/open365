@@ -14,19 +14,31 @@
 //!   `.remove` removes the link of the active cell
 //! - `insert.comments.comment=text` adds a threaded comment
 //! - `insert.symbols.symbol=U+00A9` appends the symbol to the active cell
-//! - `insert.text.text.header-footer` switches to Page Layout view
+//! - `insert.text.text.header-footer` switches to Page Layout view; `insert.text.text.text-box` (or the
+//!   bare control) inserts a text box at the active cell, selected, at the click size
+//! - `insert.illustrations.pictures=path` inserts a PNG, JPEG, GIF, BMP or SVG file at the active cell
+//!   at its natural size (`.this-device` is the menu item; with no path a file dialog asks);
+//!   `insert.illustrations.shapes.<preset>` inserts a gallery shape (`.rect`, `.ellipse`,
+//!   `.rightArrow` ...; bare is a rectangle); `insert.illustrations.icons=name` (or `.name`) inserts a
+//!   bundled icon as an SVG picture
+//! - the new object is selected; moving, sizing, rotating, filling, outlining, text, order and delete
+//!   are `SheetModel::drawing_*` (see `sheet_ext::drawing`), each one undo step
 //!
 //! Not wired, with the missing subsystem: Suggested PivotTables (recommendation engine), Forms,
-//! Pictures, Shapes, Icons, 3D Models, Diagram, Screenshot (no drawing layer or image import),
-//! Checkbox (cell controls), Hierarchy, Statistic, Combo, Maps and PivotChart (chart engine has
-//! no such types), Sparklines (no sparkline engine), Slicer and Timeline, Equation, Text Box,
-//! WordArt, Signature Line and Object (no drawing layer), waterfall, funnel, surface and bubble.
+//! Stock and Online Pictures (no image services), 3D Models, Diagram, Screenshot (no capture or
+//! SmartArt), Checkbox (cell controls), Hierarchy, Statistic, Combo, Maps and PivotChart (chart
+//! engine has no such types), Sparklines (no sparkline engine), Slicer and Timeline, Equation,
+//! WordArt, Signature Line and Object (no such objects yet), waterfall, funnel, surface and bubble.
 
+use std::path::{Path, PathBuf};
+
+use open365_drawing::catalog;
 use open365_ui_core::MenuItem;
 
 use crate::dialogs::{insert_chart, insert_link, insert_symbol};
 use crate::ribbon::{Handled, RibbonCtx, base};
 use crate::sheet::SheetModel;
+use crate::sheet::sheet_ext::drawing::icons;
 use crate::sheet::sheet_ext::view::ViewMode;
 
 /// The control ids this module handles (ids as in the spec, without `=` or `#` suffixes).
@@ -43,6 +55,9 @@ pub const IDS: &[&str] = &[
     "insert.comments.comment",
     "insert.symbols.symbol",
     "insert.text.text",
+    "insert.illustrations.pictures",
+    "insert.illustrations.shapes",
+    "insert.illustrations.icons",
 ];
 
 fn split(id: &str) -> Option<(&'static str, &str, Option<&str>)> {
@@ -101,6 +116,21 @@ pub fn menu_items(id: &str) -> Option<Vec<MenuItem>> {
             item("Text Box", "text-box", 'T'),
             item("Header & Footer", "header-footer", 'H'),
         ],
+        "insert.illustrations.pictures" => vec![item("This Device...", "this-device", 'D')],
+        "insert.illustrations.shapes" => {
+            let mut out = Vec::new();
+            for c in catalog::CATEGORIES {
+                out.push(MenuItem::heading(c.label));
+                for (preset, label) in c.shapes {
+                    out.push(MenuItem::new(&format!("{id}.{preset}"), label));
+                }
+            }
+            out
+        }
+        "insert.illustrations.icons" => icons::ICONS
+            .iter()
+            .map(|(name, _)| MenuItem::new(&format!("{id}.{name}"), &icons::icon_label(name)))
+            .collect(),
         _ => return None,
     })
 }
@@ -167,13 +197,47 @@ fn run(m: &mut SheetModel, ctrl: &str, sub: &str, arg: Option<&str>) -> Result<(
                 m.set_view_mode(ViewMode::PageLayout);
                 Ok(())
             }
+            "" | "text-box" => m.insert_text_box().map(drop),
             _ => Err("This Text command is not available yet.".to_owned()),
         },
+        "pictures" => match arg.filter(|a| !a.is_empty()) {
+            Some(path) => m.insert_picture_file(Path::new(path)).map(drop),
+            None => match choose_picture_path() {
+                Some(path) => m.insert_picture_file(&path).map(drop),
+                None => Ok(()),
+            },
+        },
+        "shapes" => m
+            .insert_shape(if sub.is_empty() { "rect" } else { sub })
+            .map(drop),
+        "icons" => {
+            let name = if sub.is_empty() {
+                arg.unwrap_or_default()
+            } else {
+                sub
+            };
+            if name.is_empty() {
+                Err("Choose an icon: insert.illustrations.icons=NAME, for example home or chart-pie."
+                    .to_owned())
+            } else {
+                m.insert_icon(name).map(drop)
+            }
+        }
         _ => match insert_chart::kind_of(tail, sub) {
             Some(kind) => m.insert_chart(kind),
             None => Err("This chart type is not available yet.".to_owned()),
         },
     }
+}
+
+fn drop<T>(_: T) {}
+
+/// Insert > Pictures > This Device: asks for the file.
+fn choose_picture_path() -> Option<PathBuf> {
+    rfd::FileDialog::new()
+        .set_title("Insert Picture")
+        .add_filter("Pictures", &["png", "jpg", "jpeg", "gif", "bmp", "svg"])
+        .pick_file()
 }
 
 fn parse_range(text: &str) -> Result<(u32, u32, u32, u32), String> {

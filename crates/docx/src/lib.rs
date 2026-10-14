@@ -13,6 +13,7 @@ mod document;
 mod drawing;
 mod edit;
 mod error;
+mod ext_citations;
 mod ext_design;
 mod ext_layout;
 mod ext_mailings;
@@ -63,6 +64,10 @@ pub use drawing::{
     TextBoxAnchor, VerticalRelativeFrom, WrapSide, WrapType,
 };
 pub use error::DocxError;
+pub use ext_citations::{
+    Author, BibStyle, Seg, Source, SourceKind, bibliography_entry, citation_instruction,
+    citation_text, parse_citation, plain as plain_entry, sorted_sources,
+};
 pub use ext_design::{
     PageBorderSide, PageBorders, StyleOverride, THEME_COLOUR_SLOTS, ThemeSpec, Watermark,
 };

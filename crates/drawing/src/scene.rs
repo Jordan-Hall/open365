@@ -8,7 +8,8 @@
 use crate::geom::{P, PathFill, PresetSource, Seg};
 use crate::model::{DrawingObject, EMU_PER_PT, Xfrm};
 use crate::paint::{Fill, Line, Rgba, StyleRef};
-use crate::render::{DisplayList, ImagePrim, PathPrim, Prim, display_list};
+use crate::render::{DisplayList, ImagePrim, PathPrim, Prim, TextFramePrim, display_list};
+use crate::text::{Align, Anchor, paragraphs};
 use crate::theme::ThemeData;
 use crate::transform::Affine;
 
@@ -41,11 +42,40 @@ pub struct Poly {
     pub stroke: Option<StrokeSpec>,
 }
 
+/// One paragraph of a text item, colour resolved.
+#[derive(Debug, Clone, PartialEq)]
+pub struct TextLine {
+    pub text: String,
+    pub size_pt: f64,
+    pub bold: bool,
+    pub italic: bool,
+    pub color: Rgba,
+    pub align: Align,
+}
+
+/// The text of a shape or text box: paragraphs laid into `rect` (after the insets), a bounding box
+/// in the scene's space. A rotated shape's text turns with it: `angle_deg` is the rotation of the
+/// frame, clockwise, and `rect` is the text rectangle, upright, centred where the rotated rectangle's
+/// centre lands.
+#[derive(Debug, Clone, PartialEq)]
+pub struct TextItem {
+    pub object_id: u32,
+    /// `(left, top, right, bottom)` of the text rectangle inside the insets, scene points.
+    pub rect: (f64, f64, f64, f64),
+    pub angle_deg: f64,
+    /// Centre of the text rectangle in the scene (the pivot of `angle_deg`).
+    pub pivot: P,
+    pub lines: Vec<TextLine>,
+    pub anchor: Anchor,
+    pub wrap: bool,
+}
+
 /// A scene item in z order.
 #[derive(Debug, Clone, PartialEq)]
 pub enum SceneItem {
     Poly(Poly),
     Image(ImagePrim),
+    Text(TextItem),
 }
 
 /// Items in z order plus what could not be drawn faithfully.
@@ -95,13 +125,80 @@ pub fn scene_of(list: &DisplayList, theme: &ThemeData) -> Scene {
                 }
             }
             Prim::Image(i) => scene.items.push(SceneItem::Image(i.clone())),
-            Prim::TextFrame(t) => scene.diagnostics.push(format!(
-                "object {}: text in shapes is not drawn yet",
-                t.object_id
-            )),
+            Prim::TextFrame(t) => {
+                if let Some(item) = resolve_text(t, theme) {
+                    scene.items.push(SceneItem::Text(item));
+                }
+            }
         }
     }
     scene
+}
+
+/// Default size of text when a run gives none (Office's 11 pt).
+const DEFAULT_TEXT_PT: f64 = 11.0;
+
+fn resolve_text(t: &TextFramePrim, theme: &ThemeData) -> Option<TextItem> {
+    let paras = paragraphs(&t.story);
+    if paras.iter().all(|p| p.text.is_empty()) {
+        return None;
+    }
+    // Text colour: the run's, else the style's `fontRef`, else dark text.
+    let default = t
+        .style
+        .as_ref()
+        .and_then(|s| s.font.as_ref())
+        .and_then(|f| f.color.as_ref())
+        .map_or(
+            Rgba {
+                r: 0,
+                g: 0,
+                b: 0,
+                a: 255,
+            },
+            |c| c.resolve(theme, None),
+        );
+    let lines = paras
+        .into_iter()
+        .map(|p| TextLine {
+            color: p.color.map_or(default, |c| c.resolve(theme, Some(default))),
+            size_pt: p.size_pt.unwrap_or(DEFAULT_TEXT_PT),
+            text: p.text,
+            bold: p.bold,
+            italic: p.italic,
+            align: p.align,
+        })
+        .collect();
+    let k = EMU_PER_PT;
+    let (l, tp, r, b) = t.rect;
+    let (l, tp, r, b) = (
+        l + t.props.left_inset as f64 / k,
+        tp + t.props.top_inset as f64 / k,
+        r - t.props.right_inset as f64 / k,
+        b - t.props.bottom_inset as f64 / k,
+    );
+    // The frame's own space is the box at the origin, so the shape centre is half its extent; the
+    // transform places it (with any rotation) in the scene.
+    let tl = t.transform.apply(P::new(l, tp));
+    let br = t.transform.apply(P::new(r, b));
+    let mid = P::new((tl.x + br.x) / 2.0, (tl.y + br.y) / 2.0);
+    let angle = t.transform.b.atan2(t.transform.a).to_degrees();
+    // The rectangle in the scene space, unrotated about its own centre.
+    let (w, h) = ((r - l).max(0.0), (b - tp).max(0.0));
+    Some(TextItem {
+        object_id: t.object_id,
+        rect: (
+            mid.x - w / 2.0,
+            mid.y - h / 2.0,
+            mid.x + w / 2.0,
+            mid.y + h / 2.0,
+        ),
+        angle_deg: angle,
+        pivot: mid,
+        lines,
+        anchor: t.props.anchor,
+        wrap: t.props.wrap,
+    })
 }
 
 fn resolve_path(p: &PathPrim, theme: &ThemeData, diags: &mut Vec<String>) -> Option<Poly> {
@@ -355,6 +452,38 @@ mod tests {
         assert_eq!((s.color.r, s.color.g, s.color.b), (0x22, 0x39, 0x62));
         let xs: Vec<f64> = p.subpaths[0].points.iter().map(|q| q.x).collect();
         assert!(xs.iter().all(|x| (10.0..=110.0).contains(x)));
+    }
+
+    #[test]
+    fn text_in_a_shape_becomes_a_text_item_with_the_style_colour() {
+        let with_text = SP.replace(
+            "</xdr:sp>",
+            "<xdr:txBody><a:bodyPr lIns=\"127000\" tIns=\"63500\" rIns=\"127000\" bIns=\"63500\" anchor=\"ctr\"/><a:lstStyle/><a:p><a:pPr algn=\"ctr\"/><a:r><a:rPr lang=\"en-GB\" sz=\"1200\"/><a:t>Hello</a:t></a:r></a:p></xdr:txBody></xdr:sp>",
+        );
+        let obj = parse_fragment(&with_text).unwrap();
+        let placed = place_in_rect(&obj, 10.0, 20.0, 100.0, 50.0);
+        let scene = build_scene(&placed, &Builtin, &ThemeData::default(), Affine::IDENTITY);
+        let t = scene
+            .items
+            .iter()
+            .find_map(|i| match i {
+                SceneItem::Text(t) => Some(t),
+                _ => None,
+            })
+            .expect("a text item");
+        assert_eq!(t.lines[0].text, "Hello");
+        assert_eq!(t.lines[0].size_pt, 12.0);
+        assert_eq!(t.lines[0].align, Align::Center);
+        // fontRef lt1: white text on the accent fill.
+        assert_eq!(
+            (t.lines[0].color.r, t.lines[0].color.g, t.lines[0].color.b),
+            (255, 255, 255)
+        );
+        // Insets of 10 pt x 5 pt inside the 100 x 50 box at (10, 20).
+        assert!((t.rect.0 - 20.0).abs() < 1e-9 && (t.rect.1 - 25.0).abs() < 1e-9);
+        assert!((t.rect.2 - 100.0).abs() < 1e-9 && (t.rect.3 - 65.0).abs() < 1e-9);
+        assert_eq!(t.anchor, Anchor::Middle);
+        assert!(t.angle_deg.abs() < 1e-9);
     }
 
     #[test]

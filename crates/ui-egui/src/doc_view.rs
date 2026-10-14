@@ -503,9 +503,12 @@ impl DocView {
         meta: &open365_pdf::PdfMetadata,
     ) -> Result<open365_pdf::PdfOutput, String> {
         self.ensure_layout(target);
-        let doc = target
-            .docx()
-            .ok_or_else(|| "only Word documents can be exported to PDF".to_owned())?;
+        let doc = target.docx().ok_or_else(|| {
+            format!(
+                "only {}s can be exported to PDF",
+                open365_branding::FORMAT_DOCUMENT.to_lowercase()
+            )
+        })?;
         open365_pdf::export_pdf(doc, self.engine.layout(), &self.fonts.library, meta)
             .map_err(|e| e.to_string())
     }

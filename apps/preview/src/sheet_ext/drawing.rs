@@ -3,10 +3,16 @@
 //! The objects come from the sheet's drawing part (`Workbook::sheet_drawing_objects`), are placed
 //! with the same pixel geometry as the cells, and are drawn into the grid's draw list by
 //! [`paint`]. Shapes and pictures go through `open365-drawing` (display list, scene); charts
-//! through `open365-chart`. Nothing here edits the file.
+//! through `open365-chart`. Painting edits nothing; the edits (insert, move, resize, rotate, fill,
+//! outline, text, order, delete) are in [`ops`], each one `SheetObjects` command and one undo step.
+//! The selected object is drawn with its handles; a drag in progress draws the frame it would end in.
 //!
 //! Hook (in `doc::paint_sheet`, after the cells and before the selection):
 //! `crate::sheet_ext::drawing::paint(ui, list, &g, model);`
+//!
+//! Pointer hooks (grid input, sheet points are logical pixels from the corner of A1 times 72/96):
+//! `model.drawing_pointer_down/move/up(x, y, shift)` return true while an object owns the pointer;
+//! the Delete key is `model.drawing_delete_selected()`.
 
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -17,7 +23,9 @@ use open365_chart::{
     TextAnchor, WorkbookCells, render,
 };
 use open365_drawing::geom::{Builtin, P};
-use open365_drawing::scene::{Poly, Scene, SceneItem, build_scene, place_in_rect};
+use open365_drawing::handles::{Frame, Handle, handle_point};
+use open365_drawing::scene::{Poly, Scene, SceneItem, TextItem, build_scene, place_in_rect};
+use open365_drawing::text::{Align, Anchor};
 use open365_drawing::{Affine, Kind};
 use open365_gfx::{Cap, Color, DrawList, ImageId, Join, Path, Rect};
 use open365_ui_core::Ui;
@@ -25,12 +33,21 @@ use open365_xlsx::{SheetObject, Workbook};
 
 use crate::sheet::{Geo, SheetModel};
 
+#[path = "drawing_icons.rs"]
+pub mod icons;
+#[path = "drawing_ops.rs"]
+pub mod ops;
+
 /// Largest side of a decoded picture kept in the atlas.
 const ATLAS_SIDE: u32 = 1024;
 /// Logical pixels per point at 100 % zoom.
 const PX_PER_PT: f64 = 96.0 / 72.0;
 
 struct Item {
+    /// The object's drawing id.
+    id: u32,
+    /// Rotation in degrees, clockwise.
+    rot_deg: f64,
     /// Left, top, width, height in logical pixels from the corner of A1.
     rect: (f64, f64, f64, f64),
     scene: Scene,
@@ -80,6 +97,8 @@ fn build(wb: &Workbook, sheet: usize, metrics: open365_xlsx::GridMetrics) -> Vec
             Kind::Unknown { .. } => {}
         }
         out.push(Item {
+            id: obj.object.id,
+            rot_deg: obj.object.xfrm.rot as f64 / 60_000.0,
             rect,
             images: images_of(wb, &obj, &scene),
             scene,
@@ -137,6 +156,7 @@ pub fn paint(ui: &mut Ui, list: &mut DrawList, g: &Geo, model: &SheetModel) {
         if cache.items.is_empty() {
             return;
         }
+        let selection = ops::selection_frame(model.sheet, &cache.items);
         let (fr, fc) = g.frozen();
         let dev = |logical: f64| (logical * f64::from(g.scale)).round() as f32;
         let col0 = geo.col_x(1) as f64;
@@ -196,6 +216,9 @@ pub fn paint(ui: &mut Ui, list: &mut DrawList, g: &Geo, model: &SheetModel) {
                 }
                 paint_item(ui, list, wb, &mut cache, i, screen, g.scale);
             }
+            if let Some(frame) = &selection {
+                paint_selection(ui, list, frame, (ox, oy), g.scale);
+            }
             list.pop_clip();
         }
     });
@@ -221,6 +244,7 @@ fn paint_item(
     for item in &scene.items {
         match item {
             SceneItem::Poly(p) => paint_poly(ui, list, p, &at, k),
+            SceneItem::Text(t) => paint_text(ui, list, t, &at, k),
             SceneItem::Image(img) => {
                 let rid = img.embed.clone().unwrap_or_default();
                 let id = image_id(ui, cache, index, &rid, img.src_rect);
@@ -334,6 +358,173 @@ fn paint_poly(ui: &mut Ui, list: &mut DrawList, poly: &Poly, at: &dyn Fn(P) -> [
                 colour(s.color),
             );
         }
+    }
+}
+
+/// Converts a device point over the grid body to points from the corner of A1, using the panes the
+/// painter uses (frozen rows and columns keep their place, the rest follows the scroll position).
+/// `None` over the headers or outside the grid.
+#[must_use]
+pub fn pointer_to_sheet_pt(g: &Geo, model: &SheetModel, x: f32, y: f32) -> Option<(f64, f64)> {
+    let (bx, by) = (g.x0 + g.row_header_w, g.y0 + g.col_header_h);
+    if x < bx || y < by || x > g.x1 || y > g.y1 {
+        return None;
+    }
+    let geo = model.geometry();
+    let (fr, fc) = g.frozen();
+    let dev = |logical: f64| (logical * f64::from(g.scale)).round() as f32;
+    let (fw, fh) = (g.frozen_w(), g.frozen_h());
+    let ox = if fc > 0 && x < bx + fw {
+        bx - dev(geo.col_x(1) as f64)
+    } else {
+        g.scroll_x0() - dev(geo.col_x(g.top_left.1.max(fc + 1)) as f64)
+    };
+    let oy = if fr > 0 && y < by + fh {
+        by - dev(geo.row_y(1) as f64)
+    } else {
+        g.scroll_y0() - dev(geo.row_y(g.top_left.0.max(fr + 1)) as f64)
+    };
+    let k = f64::from(g.scale) * PX_PER_PT;
+    Some((f64::from(x - ox) / k, f64::from(y - oy) / k))
+}
+
+/// Breaks `text` into lines no wider than `max` pixels at `px`; a word wider than the line stays whole.
+fn wrap_lines(ui: &Ui, text: &str, px: f32, max: Option<f32>) -> Vec<String> {
+    let width = |s: &str| {
+        ui.assets
+            .layout_text(
+                ui.font,
+                s,
+                px,
+                0.0,
+                0.0,
+                open365_gfx::TextLayoutOptions::default(),
+            )
+            .width
+    };
+    let mut out = Vec::new();
+    for hard in text.split('\n') {
+        let Some(max) = max else {
+            out.push(hard.to_owned());
+            continue;
+        };
+        let mut line = String::new();
+        for word in hard.split(' ') {
+            let candidate = if line.is_empty() {
+                word.to_owned()
+            } else {
+                format!("{line} {word}")
+            };
+            if !line.is_empty() && width(&candidate) > max {
+                out.push(std::mem::take(&mut line));
+                line = word.to_owned();
+            } else {
+                line = candidate;
+            }
+        }
+        out.push(line);
+    }
+    out
+}
+
+/// The text of a shape or text box: paragraphs wrapped in the text rectangle, anchored as the shape
+/// says and clipped to it. Bold, italic and rotation are not drawn yet (one regular font, upright).
+fn paint_text(ui: &mut Ui, list: &mut DrawList, t: &TextItem, at: &dyn Fn(P) -> [f32; 2], k: f32) {
+    let [x0, y0] = at(P::new(t.rect.0, t.rect.1));
+    let [x1, y1] = at(P::new(t.rect.2, t.rect.3));
+    if x1 <= x0 || y1 <= y0 {
+        return;
+    }
+    // (text, size px, line height px, colour, alignment) per wrapped line.
+    let mut rows = Vec::new();
+    for l in &t.lines {
+        let px = (l.size_pt as f32 * k).max(1.0);
+        let (ascent, descent) = ui
+            .assets
+            .font_metrics(ui.font, px)
+            .map_or((px * 0.8, px * 0.2), |m| (m.ascent, m.descent));
+        for s in wrap_lines(ui, &l.text, px, t.wrap.then_some(x1 - x0)) {
+            rows.push((s, px, ascent, ascent + descent, l.color, l.align));
+        }
+    }
+    let total: f32 = rows.iter().map(|r| r.3).sum();
+    let mut y = match t.anchor {
+        Anchor::Middle => y0 + ((y1 - y0) - total) / 2.0,
+        Anchor::Bottom => y1 - total,
+        _ => y0,
+    };
+    list.push_clip(Rect::from_edges(x0, y0, x1, y1));
+    for (s, px, ascent, height, c, align) in rows {
+        if !s.is_empty() {
+            let w = ui
+                .assets
+                .layout_text(
+                    ui.font,
+                    &s,
+                    px,
+                    0.0,
+                    0.0,
+                    open365_gfx::TextLayoutOptions::default(),
+                )
+                .width;
+            let x = match align {
+                Align::Center => x0 + ((x1 - x0) - w) / 2.0,
+                Align::Right => x1 - w,
+                _ => x0,
+            };
+            crate::doc::text(ui, list, &s, x, (y + ascent).round(), px, colour(c));
+        }
+        y += height;
+    }
+    list.pop_clip();
+}
+
+const SELECT_COLOUR: Color = Color::rgb(0x6e, 0x6e, 0x6e);
+
+/// The selection border, the eight sizing handles and the rotation handle of `frame` (points from
+/// A1) drawn at `origin` (device pixels of A1).
+fn paint_selection(
+    ui: &mut Ui,
+    list: &mut DrawList,
+    frame: &Frame,
+    origin: (f32, f32),
+    scale: f32,
+) {
+    let k = scale * PX_PER_PT as f32;
+    let at = |p: P| [origin.0 + p.x as f32 * k, origin.1 + p.y as f32 * k];
+    let corners = [
+        handle_point(frame, Handle::NorthWest),
+        handle_point(frame, Handle::NorthEast),
+        handle_point(frame, Handle::SouthEast),
+        handle_point(frame, Handle::SouthWest),
+    ];
+    list.stroke_path(
+        &mut ui.assets,
+        &path_of(&corners, true, &at),
+        scale.max(1.0),
+        Join::Miter,
+        Cap::Butt,
+        SELECT_COLOUR,
+    );
+    // The rotation handle hangs off the middle of the top edge.
+    let (top, rot) = (
+        handle_point(frame, Handle::North),
+        handle_point(frame, Handle::Rotate),
+    );
+    list.stroke_path(
+        &mut ui.assets,
+        &path_of(&[top, rot], false, &at),
+        scale.max(1.0),
+        Join::Miter,
+        Cap::Butt,
+        SELECT_COLOUR,
+    );
+    let half = 4.5 * scale;
+    for h in Handle::SIZING.into_iter().chain([Handle::Rotate]) {
+        let [x, y] = at(handle_point(frame, h));
+        let r = Rect::from_edges(x - half, y - half, x + half, y + half);
+        list.fill_rect(r, Color::rgb(255, 255, 255));
+        list.rect_outline(r, scale.max(1.0), SELECT_COLOUR);
     }
 }
 

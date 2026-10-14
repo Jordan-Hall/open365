@@ -89,6 +89,7 @@ pub use workbook::{
     ShiftDirection, TabColor, TableInfo, TableSpec, TableStyleChoice,
     content_type as content_types, rel as relationship_types, validate_defined_name,
 };
+pub use workbook::{PageMargins, PageSetup};
 pub use xml::{
     Attr, ElementHead, MAIN_NS, MAIN_NS_STRICT, MAX_XML_DEPTH, ParsedXml, RawXml, XmlElement,
     parse as parse_xml,

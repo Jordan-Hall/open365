@@ -12,6 +12,7 @@
 // The pure parts of ui-shell, shared by path so the two shells cannot drift apart.
 #[path = "../../../crates/ui-shell/src/chrome.rs"]
 pub mod chrome;
+pub mod clip;
 #[path = "../../../crates/ui-shell/src/icon_table.rs"]
 mod icon_table;
 #[path = "../../../crates/ui-shell/src/layout.rs"]
@@ -27,6 +28,7 @@ pub mod headless;
 pub mod icons;
 pub mod menus;
 pub mod palette;
+pub mod print;
 pub mod ribbon;
 pub mod sheet;
 pub use sheet::sheet_ext;

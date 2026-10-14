@@ -1,0 +1,9 @@
+{
+  "source": "fixtures/xlsx/chart-doughnut.xlsx",
+  "oracle": "Microsoft Excel via COM, points, origin at the chart area top left; tick_texts are Excel's number-format output for each tick value, not the rendered text",
+  "excel_build": "20430",
+  "chart_type": -4120,
+  "label_positions": [
+    
+  ]
+}

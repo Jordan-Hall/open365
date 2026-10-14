@@ -48,6 +48,8 @@ pub struct TextFramePrim {
     pub transform: Affine,
     pub props: BodyProps,
     pub story: crate::model::RawXml,
+    /// The shape's style references; `fontRef` gives the default text colour.
+    pub style: Option<crate::paint::StyleRef>,
 }
 
 /// A display primitive.
@@ -55,7 +57,7 @@ pub struct TextFramePrim {
 pub enum Prim {
     Path(Box<PathPrim>),
     Image(ImagePrim),
-    TextFrame(TextFramePrim),
+    TextFrame(Box<TextFramePrim>),
 }
 
 /// Primitives in z order plus anything that could not be drawn faithfully.
@@ -177,13 +179,14 @@ fn emit_shape(
         let r = e
             .text_rect
             .map_or((0.0, 0.0, size.0, size.1), |r| (r.l, r.t, r.r, r.b));
-        out.prims.push(Prim::TextFrame(TextFramePrim {
+        out.prims.push(Prim::TextFrame(Box::new(TextFramePrim {
             object_id: obj.id,
             rect: r,
             transform: *m,
             props: t.props.clone(),
             story: t.story.clone(),
-        }));
+            style: s.style.clone(),
+        })));
     }
 }
 

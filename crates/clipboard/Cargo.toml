@@ -1,0 +1,15 @@
+[package]
+name = "open365-clipboard"
+description = "Rich clipboard formats for Open365: HTML Format, RTF, TSV and the private lossless format, with safe parsers (size limits, no external fetches) and serializers. Pure Rust, no platform code."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+
+[lints]
+workspace = true

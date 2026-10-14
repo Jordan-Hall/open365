@@ -83,7 +83,7 @@ impl UiHandler for Handler {
                 None => crate::doc::WriterPane::blank(),
             };
             pane.use_system_fonts();
-            pane.set_clipboard(Box::new(open365_ui_host::SystemClipboard::new()));
+            pane.set_clipboard(Box::new(open365_ui_host::RichClipboard::new()));
             self.shell.set_writer(ui, pane);
         } else {
             self.shell.set_locale(ui, crate::sheet::barfmt::os_locale());
@@ -216,8 +216,8 @@ pub fn run(kind: AppKind) -> Result<(), HostError> {
         }
     });
     let name = match kind {
-        AppKind::Writer => "Open365 Writer (next)",
-        AppKind::Sheets => "Open365 Sheets (next)",
+        AppKind::Writer => format!("{} (next)", open365_branding::WRITE_NAME),
+        AppKind::Sheets => format!("{} (next)", open365_branding::SHEET_NAME),
     };
     let handler = Handler {
         shell: Shell::new(kind, dark),
@@ -228,7 +228,7 @@ pub fn run(kind: AppKind) -> Result<(), HostError> {
     };
     open365_ui_host::run(
         HostConfig {
-            title: name.into(),
+            title: name,
             // 1600 x 1000 device pixels at 125 %, the size the specs were measured at.
             inner_size: (1280.0, 800.0),
             min_inner_size: Some((400.0, 300.0)),
@@ -238,10 +238,28 @@ pub fn run(kind: AppKind) -> Result<(), HostError> {
                 TitleBarTheme::Light
             },
             decorations: false,
+            icon: window_icon(kind),
             ..HostConfig::default()
         },
         UiAdapter::new(handler, cfg),
     )
+}
+
+/// The window and taskbar icon of `kind` (the same art as the executable resource).
+fn window_icon(kind: AppKind) -> Option<open365_ui_host::WindowIcon> {
+    let png: &[u8] = match kind {
+        AppKind::Writer => include_bytes!("../../../assets/icons/open-write-256.png"),
+        AppKind::Sheets => include_bytes!("../../../assets/icons/open-sheet-256.png"),
+    };
+    let img = image::load_from_memory_with_format(png, image::ImageFormat::Png)
+        .ok()?
+        .into_rgba8();
+    let (width, height) = img.dimensions();
+    Some(open365_ui_host::WindowIcon {
+        rgba: img.into_raw(),
+        width,
+        height,
+    })
 }
 
 /// Starts another instance of this program on `path`, as Word opens a merge result in its own

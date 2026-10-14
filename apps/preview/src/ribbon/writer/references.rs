@@ -5,9 +5,15 @@
 //! A control can carry a menu choice after its id (`references.footnotes.next-footnote.next-endnote`);
 //! the plain id and `<id>.run` run the control's default action.
 //!
-//! Not wired: Insert Citation, Manage Sources, Style, Bibliography and Change Provider (the
-//! sources list lives in a custom XML part the document model does not hold), Show Notes (no
-//! notes pane), Cross-reference (needs the reference dialog).
+//! Citations: the sources are the person's master list (`ext_references_more.rs`); Insert Citation
+//! takes a source tag as its menu choice, Style a style name (`style=MLA` or `style.mla`),
+//! Bibliography `bibliography`, `references`, `works-cited` or `insert-bibliography`,
+//! Cross-reference `figure`, `table` or `equation`, each with an optional `.entire` or `.page`.
+//! The source form of Manage Sources is the pane's `add_source`; there is no dialog host yet.
+//!
+//! Not wired: Change Provider (no online providers) and Show Notes (no notes pane).
+
+use open365_docx::BibStyle;
 
 use crate::ribbon::{Handled, RibbonCtx};
 
@@ -19,6 +25,11 @@ pub const IDS: &[&str] = &[
     "references.footnotes.insert-footnote",
     "references.footnotes.insert-endnote",
     "references.footnotes.next-footnote",
+    "references.citations-bibliography.insert-citation",
+    "references.citations-bibliography.manage-sources",
+    "references.citations-bibliography.style",
+    "references.citations-bibliography.bibliography",
+    "references.captions.cross-reference",
     "references.captions.insert-caption",
     "references.captions.insert-table-of-figures",
     "references.captions.update-table",
@@ -50,6 +61,7 @@ pub fn handle(ctx: &mut RibbonCtx<'_>, id: &str) -> Handled {
         return Handled::No;
     };
     let choice = if choice == "run" { "" } else { choice };
+    let typed = id.split_once('=').map(|(_, v)| v.trim().to_owned());
     let Some(p) = ctx.writer.as_deref_mut() else {
         return Handled::Yes;
     };
@@ -91,6 +103,46 @@ pub fn handle(ctx: &mut RibbonCtx<'_>, id: &str) -> Handled {
             p.insert_table_of_authorities()
         }
         ("references.table-of-authorities.update-table", "") => p.update_table_of_authorities(),
+        ("references.citations-bibliography.insert-citation", "") => p.insert_first_citation(),
+        ("references.citations-bibliography.insert-citation", tag) => p.insert_citation(tag, ""),
+        ("references.citations-bibliography.manage-sources", _) => {
+            let n = p.bib_sources().len();
+            p.status = Some(format!("Sources: {n}"));
+            true
+        }
+        ("references.citations-bibliography.style", item) => {
+            let name = typed.as_deref().unwrap_or(item);
+            match BibStyle::from_label(name) {
+                Some(style) => {
+                    p.set_bib_style(style);
+                    true
+                }
+                None => item.is_empty() && typed.is_none(),
+            }
+        }
+        ("references.citations-bibliography.bibliography", item) => match item {
+            "" | "bibliography" => p.insert_bibliography(Some("Bibliography")),
+            "references" => p.insert_bibliography(Some("References")),
+            "works-cited" => p.insert_bibliography(Some("Works Cited")),
+            "insert-bibliography" => p.insert_bibliography(None),
+            _ => return Handled::No,
+        },
+        ("references.captions.cross-reference", item) => {
+            let (label, kind) = match item.split_once('.') {
+                Some((l, "entire")) => (l, "entire"),
+                Some((l, "page")) => (l, "page"),
+                Some(_) => return Handled::No,
+                None => (item, "number"),
+            };
+            let label = match label {
+                "" if p.caption_paragraphs("Figure").is_empty() => "Table",
+                "" | "figure" => "Figure",
+                "table" => "Table",
+                "equation" => "Equation",
+                _ => return Handled::No,
+            };
+            p.insert_caption_cross_reference(label, kind)
+        }
         _ => return Handled::No,
     };
     if done {

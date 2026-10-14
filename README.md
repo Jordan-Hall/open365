@@ -1,6 +1,6 @@
 # Open365
 
-An open, self-hostable, native productivity suite for Office-oriented workflows, starting with Word-compatible documents and Excel-compatible spreadsheets. It is a clean-room implementation in Rust, licensed under MIT.
+An open, self-hostable, native productivity suite for Office-oriented workflows, starting with Open Write (Word-compatible documents) and Open Sheet (Excel-compatible spreadsheets). It is a clean-room implementation in Rust, licensed under MIT.
 
 Status: pre-alpha foundation (milestone M0). No document features yet.
 

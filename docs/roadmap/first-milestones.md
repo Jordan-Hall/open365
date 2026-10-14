@@ -2,6 +2,8 @@
 
 Status: proposed, 2026-10-10; Teams ordering added 2026-10-11 (ADR-014). Each milestone is a vertical slice with an acceptance command. Durations are estimates for a small team, not commitments.
 
+Current measured status and remaining work for Open Write and Open Sheet: `parity-status.md`.
+
 ## Product scope (owner requirement, 2026-10-10)
 The target is the **full Microsoft 365 suite at 1:1 parity, including Teams**, built entirely by us (ADR-009). Everything below is in scope. The phases set order, not whether something gets built.
 

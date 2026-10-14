@@ -9,5 +9,8 @@ pub mod formulas_more;
 pub mod home;
 pub mod insert;
 pub mod page_layout;
+pub mod page_layout_more;
 pub mod review;
+pub mod review_more;
 pub mod view;
+pub mod view_more;

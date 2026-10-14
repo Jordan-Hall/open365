@@ -9,6 +9,7 @@ publish.workspace = true
 
 [dependencies]
 cargo_metadata = "0.23.1"
+resvg = { version = "0.48", default-features = false }
 
 [lints]
 workspace = true

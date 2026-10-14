@@ -3,7 +3,9 @@
 //! Wired: Themes (the choice), Page Set-up (margins, orientation, size, print area, breaks,
 //! background, print titles), Scale to Fit and Sheet Options. Dropdown items arrive as
 //! `<dropdown id>.<item>` (`page-layout.page-set-up.size.a4`) or as `<dropdown id>#<n>`.
-//! Left: the Arrange group (it needs drawing objects with a z-order).
+//! Every page setup change is also written to the worksheet (`pageMargins`, `pageSetup`,
+//! `printOptions`, breaks, print area and titles) as one undo step. Left to `Handled::No`: the
+//! Arrange group (it needs drawing objects with a z-order).
 
 use crate::ribbon::{Handled, RibbonCtx, base};
 use crate::sheet::sheet_ext::page_layout::{Margins, Paper, parse_pages};
@@ -141,6 +143,13 @@ pub fn handle(ctx: &mut RibbonCtx<'_>, id: &str) -> Handled {
     };
     let item = item.as_deref().unwrap_or("");
     let sheet = ctx.sheet.sheet;
+    // The working copy follows the file first, and the file follows it after the command.
+    let file_backed = control.starts_with("page-layout.page-set-up")
+        || control.starts_with("page-layout.scale-to-fit")
+        || control.starts_with("page-layout.sheet-options.print");
+    if file_backed {
+        ctx.sheet.page_sync();
+    }
     match control {
         "page-layout.themes.themes"
         | "page-layout.themes.colours"
@@ -242,6 +251,9 @@ pub fn handle(ctx: &mut RibbonCtx<'_>, id: &str) -> Handled {
             ctx.sheet.set_print_headings(on);
         }
         _ => {}
+    }
+    if file_backed && let Err(e) = ctx.sheet.page_save() {
+        ctx.sheet.status = e;
     }
     Handled::Yes
 }

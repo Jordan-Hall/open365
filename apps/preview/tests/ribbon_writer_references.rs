@@ -238,3 +238,211 @@ fn every_control_runs_on_a_document() {
         }
     }
 }
+
+// ---- citations, bibliography, cross-references --------------------------------------------
+
+use open365_docx::{Author, Document, Source, SourceKind};
+use open365_opc::Limits;
+use std::sync::{Mutex, MutexGuard, PoisonError};
+
+/// The source list and the style are per person (process wide), so these tests take turns.
+static TURN: Mutex<()> = Mutex::new(());
+
+fn turn() -> MutexGuard<'static, ()> {
+    TURN.lock().unwrap_or_else(PoisonError::into_inner)
+}
+
+fn book() -> Source {
+    let mut s = Source::new(
+        "Doe2020",
+        SourceKind::Book,
+        vec![Author::new("Doe", "Jane"), Author::new("Roe", "Richard")],
+        "Learning Rust",
+        "2020",
+    );
+    s.publisher = "Acme Press".into();
+    s
+}
+
+fn main_xml(p: &mut Preview) -> String {
+    let bytes = pane(p).docx_bytes().unwrap();
+    let doc = Document::open(&bytes, &Limits::default()).unwrap();
+    String::from_utf8(doc.serialize_main()).unwrap()
+}
+
+#[test]
+fn insert_citation_adds_a_field_with_the_style_text_and_undoes() {
+    let _t = turn();
+    let mut p = rig();
+    pane(&mut p).add_source(book());
+    run(&mut p, "references.citations-bibliography.style=APA");
+    let before = paragraphs(&mut p);
+    run(
+        &mut p,
+        "references.citations-bibliography.insert-citation.Doe2020",
+    );
+    let after = paragraphs(&mut p);
+    assert!(
+        after.last().unwrap().ends_with("(Doe & Roe, 2020)"),
+        "{after:?}"
+    );
+    assert!(main_xml(&mut p).contains("CITATION Doe2020"));
+    assert_eq!(pane(&mut p).cited_sources().len(), 1);
+    assert!(pane(&mut p).undo());
+    assert_eq!(paragraphs(&mut p), before);
+}
+
+#[test]
+fn style_box_changes_the_next_citation() {
+    let _t = turn();
+    let mut p = rig();
+    pane(&mut p).add_source(book());
+    run(&mut p, "references.citations-bibliography.style=MLA");
+    run(
+        &mut p,
+        "references.citations-bibliography.insert-citation.Doe2020",
+    );
+    assert!(
+        paragraphs(&mut p)
+            .last()
+            .unwrap()
+            .ends_with("(Doe and Roe)"),
+        "{:?}",
+        paragraphs(&mut p)
+    );
+    run(&mut p, "references.citations-bibliography.style.chicago");
+    assert_eq!(pane(&mut p).bib_style().label(), "Chicago");
+    run(&mut p, "references.citations-bibliography.style=APA");
+}
+
+#[test]
+fn bibliography_lists_cited_sources_in_the_style_and_undoes() {
+    let _t = turn();
+    let mut p = rig();
+    pane(&mut p).add_source(book());
+    run(&mut p, "references.citations-bibliography.style=MLA");
+    run(
+        &mut p,
+        "references.citations-bibliography.insert-citation.Doe2020",
+    );
+    pane(&mut p).enter(false);
+    let before = paragraphs(&mut p);
+    run(
+        &mut p,
+        "references.citations-bibliography.bibliography.works-cited",
+    );
+    let after = paragraphs(&mut p);
+    assert!(after.iter().any(|t| t == "Works Cited"), "{after:?}");
+    assert!(
+        after
+            .iter()
+            .any(|t| t.starts_with("Doe, Jane, and Richard Roe. Learning Rust. Acme Press, 2020.")),
+        "{after:?}"
+    );
+    assert!(main_xml(&mut p).contains("BIBLIOGRAPHY"));
+    assert!(pane(&mut p).undo());
+    assert_eq!(paragraphs(&mut p), before);
+    run(&mut p, "references.citations-bibliography.style=APA");
+}
+
+#[test]
+fn bibliography_without_citations_says_so() {
+    let _t = turn();
+    let mut p = rig();
+    let before = paragraphs(&mut p);
+    run(&mut p, "references.citations-bibliography.bibliography");
+    assert_eq!(paragraphs(&mut p), before);
+    assert!(
+        pane(&mut p)
+            .status
+            .as_deref()
+            .unwrap()
+            .contains("no source")
+    );
+}
+
+#[test]
+fn cross_reference_points_at_the_caption() {
+    let _t = turn();
+    let mut p = rig();
+    run(&mut p, "references.captions.insert-caption");
+    let cap = paragraphs(&mut p)
+        .iter()
+        .position(|t| t.starts_with("Figure 1"))
+        .unwrap();
+    let last = paragraphs(&mut p).len() - 2;
+    pane(&mut p).set_caret(DocPos::new(last, 15));
+    let before = paragraphs(&mut p);
+    run(&mut p, "references.captions.cross-reference.figure");
+    let after = paragraphs(&mut p);
+    assert_eq!(
+        after[last],
+        format!("{}Figure 1", before[last]),
+        "{after:?}"
+    );
+    let xml = main_xml(&mut p);
+    assert!(xml.contains("REF _Ref"), "{xml}");
+    assert!(xml.contains("w:bookmarkStart"));
+    assert!(xml.contains("\\h"));
+    assert_eq!(cap, last + 1);
+    assert!(pane(&mut p).undo());
+    assert_eq!(paragraphs(&mut p), before);
+}
+
+#[test]
+fn cross_reference_page_and_entire_caption() {
+    let _t = turn();
+    let mut p = rig();
+    run(&mut p, "references.captions.insert-caption");
+    let last = paragraphs(&mut p).len() - 2;
+    pane(&mut p).set_caret(DocPos::new(last, 15));
+    run(&mut p, "references.captions.cross-reference.figure.page");
+    assert!(main_xml(&mut p).contains("PAGEREF _Ref"));
+    assert!(paragraphs(&mut p)[last].ends_with('1'));
+    let end = paragraphs(&mut p)[last].chars().count();
+    pane(&mut p).set_caret(DocPos::new(last, end));
+    run(&mut p, "references.captions.cross-reference.figure.entire");
+    assert!(paragraphs(&mut p)[last].ends_with("Figure 1"));
+}
+
+#[test]
+fn cross_reference_without_captions_changes_nothing() {
+    let _t = turn();
+    let mut p = rig();
+    let before = paragraphs(&mut p);
+    run(&mut p, "references.captions.cross-reference.table");
+    assert_eq!(paragraphs(&mut p), before);
+    assert!(
+        pane(&mut p)
+            .status
+            .as_deref()
+            .unwrap()
+            .contains("Table captions")
+    );
+}
+
+#[test]
+fn manage_sources_reports_the_list() {
+    let _t = turn();
+    let mut p = rig();
+    pane(&mut p).add_source(book());
+    run(&mut p, "references.citations-bibliography.manage-sources");
+    assert!(
+        pane(&mut p)
+            .status
+            .as_deref()
+            .unwrap()
+            .starts_with("Sources: ")
+    );
+}
+
+#[test]
+fn change_provider_and_show_notes_stay_unhandled() {
+    let mut p = rig();
+    for id in [
+        "references.citations-bibliography.change-provider",
+        "references.footnotes.show-notes",
+    ] {
+        assert_eq!(p.shell.run_command(&mut p.ui, id), Handled::No, "{id}");
+    }
+}
